@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/readest/readest" align="center">Refer to this for more info about the base Readest Project</a>
+  <a href="https://github.com/readest/readest" align="center">Refer to this for more info about the base Readest Project\n</a>
   <a href="#support">Support</a> •
   <a href="#license">License</a>
 </p>
