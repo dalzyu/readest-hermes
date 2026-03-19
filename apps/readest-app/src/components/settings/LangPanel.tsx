@@ -8,7 +8,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { saveViewSettings } from '@/helpers/settings';
 import { getTranslators } from '@/services/translators';
 import { useResetViewSettings } from '@/hooks/useResetSettings';
-import { TRANSLATED_LANGS, TRANSLATOR_LANGS } from '@/services/constants';
+import { TRANSLATED_LANGS } from '@/services/constants';
+import { getTranslatorLanguageOptions } from '@/services/translatorLanguages';
 import { ConvertChineseVariant } from '@/types/book';
 import { SettingsPanelPanelProp } from './SettingsDialog';
 import { getDirFromLanguage } from '@/utils/rtl';
@@ -115,7 +116,10 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
 
   const getCurrentTargetLangOption = () => {
     const value = translateTargetLang;
-    const availableOptions = getLangOptions(TRANSLATOR_LANGS);
+    const availableOptions = getTranslatorLanguageOptions({
+      includeSystemLanguage: true,
+      translate: _,
+    });
     return availableOptions.find((o) => o.value === value) || availableOptions[0]!;
   };
 
@@ -310,7 +314,10 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
               <Select
                 value={getCurrentTargetLangOption().value}
                 onChange={handleSelectTargetLang}
-                options={getLangOptions(TRANSLATOR_LANGS)}
+                options={getTranslatorLanguageOptions({
+                  includeSystemLanguage: true,
+                  translate: _,
+                })}
               />
             </div>
           </div>

@@ -26,8 +26,8 @@ interface LibraryHeaderProps {
   isSelectMode: boolean;
   isSelectAll: boolean;
   onPullLibrary: () => void;
-  onImportBooksFromFiles: () => void;
-  onImportBooksFromDirectory?: () => void;
+  onImportBooksFromFiles: () => void | Promise<void>;
+  onImportBooksFromDirectory?: () => void | Promise<void>;
   onOpenCatalogManager: () => void;
   onToggleSelectMode: () => void;
   onSelectAll: () => void;

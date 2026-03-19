@@ -1,18 +1,18 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import type { VocabularyEntry } from '@/services/contextTranslation/types';
 
-// Mock the store so tests don't touch IndexedDB
-vi.mock('@/services/contextTranslation/vocabularyStore', () => ({
-  vocabularyStore: {
-    save: vi.fn(),
-    getByBook: vi.fn(),
-    getAll: vi.fn(),
-    delete: vi.fn(),
-    search: vi.fn(),
+// Mock aiStore so tests don't touch IndexedDB
+vi.mock('@/services/ai/storage/aiStore', () => ({
+  aiStore: {
+    saveVocabularyEntry: vi.fn(),
+    getVocabularyByBook: vi.fn(),
+    getAllVocabulary: vi.fn(),
+    deleteVocabularyEntry: vi.fn(),
+    searchVocabulary: vi.fn(),
   },
 }));
 
-import { vocabularyStore } from '@/services/contextTranslation/vocabularyStore';
+import { aiStore } from '@/services/ai/storage/aiStore';
 import {
   saveVocabularyEntry,
   getVocabularyForBook,
@@ -21,7 +21,7 @@ import {
   searchVocabulary,
 } from '@/services/contextTranslation/vocabularyService';
 
-const mockStore = vi.mocked(vocabularyStore);
+const mockStore = vi.mocked(aiStore);
 
 const sampleEntry: VocabularyEntry = {
   id: 'abc-123',
@@ -39,7 +39,7 @@ beforeEach(() => {
 
 describe('saveVocabularyEntry', () => {
   test('generates an id and timestamp if not provided, then saves', async () => {
-    mockStore.save.mockResolvedValueOnce(undefined);
+    mockStore.saveVocabularyEntry.mockResolvedValueOnce(undefined);
 
     const saved = await saveVocabularyEntry({
       bookHash: 'book-xyz',
@@ -48,8 +48,8 @@ describe('saveVocabularyEntry', () => {
       result: { translation: 'close friend' },
     });
 
-    expect(mockStore.save).toHaveBeenCalledOnce();
-    const arg = mockStore.save.mock.calls[0]![0] as VocabularyEntry;
+    expect(mockStore.saveVocabularyEntry).toHaveBeenCalledOnce();
+    const arg = mockStore.saveVocabularyEntry.mock.calls[0]![0] as VocabularyEntry;
     expect(arg.id).toBeTruthy();
     expect(arg.addedAt).toBeGreaterThan(0);
     expect(arg.reviewCount).toBe(0);
@@ -58,11 +58,11 @@ describe('saveVocabularyEntry', () => {
   });
 
   test('saves with provided id and timestamp when given', async () => {
-    mockStore.save.mockResolvedValueOnce(undefined);
+    mockStore.saveVocabularyEntry.mockResolvedValueOnce(undefined);
 
     await saveVocabularyEntry(sampleEntry);
 
-    const arg = mockStore.save.mock.calls[0]![0] as VocabularyEntry;
+    const arg = mockStore.saveVocabularyEntry.mock.calls[0]![0] as VocabularyEntry;
     expect(arg.id).toBe('abc-123');
     expect(arg.addedAt).toBe(1700000000000);
   });
@@ -70,17 +70,17 @@ describe('saveVocabularyEntry', () => {
 
 describe('getVocabularyForBook', () => {
   test('returns entries for the given book hash', async () => {
-    mockStore.getByBook.mockResolvedValueOnce([sampleEntry]);
+    mockStore.getVocabularyByBook.mockResolvedValueOnce([sampleEntry]);
 
     const result = await getVocabularyForBook('book-xyz');
 
-    expect(mockStore.getByBook).toHaveBeenCalledWith('book-xyz');
+    expect(mockStore.getVocabularyByBook).toHaveBeenCalledWith('book-xyz');
     expect(result).toHaveLength(1);
     expect(result[0]!.term).toBe('知己');
   });
 
   test('returns empty array when book has no entries', async () => {
-    mockStore.getByBook.mockResolvedValueOnce([]);
+    mockStore.getVocabularyByBook.mockResolvedValueOnce([]);
     const result = await getVocabularyForBook('unknown-book');
     expect(result).toEqual([]);
   });
@@ -89,7 +89,7 @@ describe('getVocabularyForBook', () => {
 describe('getAllVocabulary', () => {
   test('returns all entries across books', async () => {
     const entries = [sampleEntry, { ...sampleEntry, id: 'def-456', bookHash: 'other-book' }];
-    mockStore.getAll.mockResolvedValueOnce(entries);
+    mockStore.getAllVocabulary.mockResolvedValueOnce(entries);
 
     const result = await getAllVocabulary();
     expect(result).toHaveLength(2);
@@ -98,18 +98,18 @@ describe('getAllVocabulary', () => {
 
 describe('deleteVocabularyEntry', () => {
   test('delegates deletion to the store', async () => {
-    mockStore.delete.mockResolvedValueOnce(undefined);
+    mockStore.deleteVocabularyEntry.mockResolvedValueOnce(undefined);
     await deleteVocabularyEntry('abc-123');
-    expect(mockStore.delete).toHaveBeenCalledWith('abc-123');
+    expect(mockStore.deleteVocabularyEntry).toHaveBeenCalledWith('abc-123');
   });
 });
 
 describe('searchVocabulary', () => {
   test('returns entries whose term contains the query (case-insensitive)', async () => {
-    mockStore.search.mockResolvedValueOnce([sampleEntry]);
+    mockStore.searchVocabulary.mockResolvedValueOnce([sampleEntry]);
 
     const result = await searchVocabulary('知己');
-    expect(mockStore.search).toHaveBeenCalledWith('知己');
+    expect(mockStore.searchVocabulary).toHaveBeenCalledWith('知己');
     expect(result[0]!.term).toBe('知己');
   });
 });

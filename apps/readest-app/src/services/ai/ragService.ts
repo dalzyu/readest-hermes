@@ -5,6 +5,7 @@ import { withRetryAndTimeout, AI_TIMEOUTS, AI_RETRY_CONFIGS } from './utils/retr
 import { getAIProvider } from './providers';
 import { aiLogger } from './logger';
 import type { AISettings, TextChunk, ScoredChunk, EmbeddingProgress, BookIndexMeta } from './types';
+import type { PageSearchBounds } from './storage/aiStore';
 
 interface SectionItem {
   id: string;
@@ -17,6 +18,19 @@ interface TOCItem {
   id: number;
   label: string;
   href?: string;
+}
+
+function getEmbeddingBatchSize(model: unknown): number {
+  const configuredBatchSize =
+    typeof model === 'object' &&
+    model !== null &&
+    'maxEmbeddingsPerCall' in model &&
+    typeof model.maxEmbeddingsPerCall === 'number' &&
+    model.maxEmbeddingsPerCall > 0
+      ? model.maxEmbeddingsPerCall
+      : 100;
+
+  return Math.max(1, configuredBatchSize);
 }
 
 export interface BookDocType {
@@ -137,25 +151,39 @@ export async function indexBook(
         : settings.aiGatewayEmbeddingModel || 'text-embedding-3-small';
     aiLogger.embedding.start(embeddingModelName, allChunks.length);
 
+    const embeddingModel = provider.getEmbeddingModel();
     const texts = allChunks.map((c) => c.text);
+    const batchSize = getEmbeddingBatchSize(embeddingModel);
     try {
-      const { embeddings } = await withRetryAndTimeout(
-        () =>
-          embedMany({
-            model: provider.getEmbeddingModel(),
-            values: texts,
-          }),
-        AI_TIMEOUTS.EMBEDDING_BATCH,
-        AI_RETRY_CONFIGS.EMBEDDING,
-      );
+      let embeddedCount = 0;
+      let embeddingDimensions = 0;
 
-      for (let i = 0; i < allChunks.length; i++) {
-        allChunks[i]!.embedding = embeddings[i];
-        state.chunksProcessed = i + 1;
-        state.progress = Math.round(((i + 1) / allChunks.length) * 100);
+      for (let batchStart = 0; batchStart < texts.length; batchStart += batchSize) {
+        const batchTexts = texts.slice(batchStart, batchStart + batchSize);
+        const { embeddings } = await withRetryAndTimeout(
+          () =>
+            embedMany({
+              model: embeddingModel,
+              values: batchTexts,
+            }),
+          AI_TIMEOUTS.EMBEDDING_BATCH,
+          AI_RETRY_CONFIGS.EMBEDDING,
+        );
+
+        embeddingDimensions ||= embeddings[0]?.length || 0;
+
+        for (let i = 0; i < embeddings.length; i++) {
+          allChunks[batchStart + i]!.embedding = embeddings[i];
+        }
+
+        embeddedCount += embeddings.length;
+        state.chunksProcessed = embeddedCount;
+        state.progress = Math.round((embeddedCount / allChunks.length) * 100);
+        onProgress?.({ current: embeddedCount, total: allChunks.length, phase: 'embedding' });
+        aiLogger.embedding.batch(embeddedCount, allChunks.length);
       }
-      onProgress?.({ current: allChunks.length, total: allChunks.length, phase: 'embedding' });
-      aiLogger.embedding.complete(embeddings.length, allChunks.length, embeddings[0]?.length || 0);
+
+      aiLogger.embedding.complete(embeddedCount, allChunks.length, embeddingDimensions);
     } catch (e) {
       aiLogger.embedding.error('batch', (e as Error).message);
       throw e;
@@ -200,7 +228,18 @@ export async function hybridSearch(
   topK = 10,
   maxPage?: number,
 ): Promise<ScoredChunk[]> {
-  aiLogger.search.query(query, maxPage);
+  return boundedHybridSearch(bookHash, query, settings, topK, maxPage);
+}
+
+export async function boundedHybridSearch(
+  bookHash: string,
+  query: string,
+  settings: AISettings,
+  topK = 10,
+  bounds?: number | PageSearchBounds,
+): Promise<ScoredChunk[]> {
+  const normalizedBounds = typeof bounds === 'number' ? { maxPage: bounds } : bounds;
+  aiLogger.search.query(query, normalizedBounds?.maxPage);
   const provider = getAIProvider(settings);
   let queryEmbedding: number[] | null = null;
 
@@ -220,7 +259,7 @@ export async function hybridSearch(
     // bm25 only fallback
   }
 
-  const results = await aiStore.hybridSearch(bookHash, queryEmbedding, query, topK, maxPage);
+  const results = await aiStore.hybridSearch(bookHash, queryEmbedding, query, topK, bounds);
   aiLogger.search.hybridResults(results.length, [...new Set(results.map((r) => r.searchMethod))]);
   return results;
 }

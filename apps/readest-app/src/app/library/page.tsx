@@ -9,6 +9,7 @@ import { OverlayScrollbarsComponent, OverlayScrollbarsComponentRef } from 'overl
 import 'overlayscrollbars/overlayscrollbars.css';
 
 import { Book } from '@/types/book';
+import type { BookSeries } from '@/services/contextTranslation/types';
 import { AppService, DeleteAction } from '@/types/system';
 import { navigateToLibrary, navigateToReader } from '@/utils/nav';
 import { formatAuthors, formatTitle, getPrimaryLanguage, listFormater } from '@/utils/book';
@@ -77,6 +78,77 @@ import DropIndicator from '@/components/DropIndicator';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import ModalPortal from '@/components/ModalPortal';
 import TransferQueuePanel from './components/TransferQueuePanel';
+import { addBookToSeries, getAllSeries, updateSeriesVolume } from '@/services/contextTranslation/seriesService';
+
+interface ImportSeriesSuggestion {
+  book: Book;
+  series: BookSeries;
+  suggestedVolumeIndex?: number;
+}
+
+const normalizeSuggestionText = (value: string | undefined) =>
+  (value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .trim();
+
+const extractVolumeNumber = (title: string | undefined): number | undefined => {
+  if (!title) return undefined;
+  const match =
+    title.match(/(?:vol(?:ume)?|book)?\s*(\d+)\s*$/i) ||
+    title.match(/\b(\d+)\b(?!.*\b\d+\b)/);
+  if (!match?.[1]) return undefined;
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+export const buildImportSeriesSuggestions = (
+  importedBooks: Book[],
+  existingSeries: BookSeries[],
+  libraryBooks: Book[],
+): ImportSeriesSuggestion[] =>
+  importedBooks.flatMap<ImportSeriesSuggestion>((book) => {
+    const normalizedTitle = normalizeSuggestionText(book.title);
+    const normalizedAuthor = normalizeSuggestionText(book.author);
+
+    const candidates = existingSeries
+      .filter((series) => !series.volumes.some((volume) => volume.bookHash === book.hash))
+      .map((series) => {
+        const normalizedSeriesName = normalizeSuggestionText(series.name);
+        const seriesBooks = series.volumes
+          .map((volume) => libraryBooks.find((libraryBook) => libraryBook.hash === volume.bookHash))
+          .filter((seriesBook): seriesBook is Book => !!seriesBook);
+        const authorMatches = seriesBooks.some(
+          (seriesBook) => normalizeSuggestionText(seriesBook.author) === normalizedAuthor,
+        );
+        const titleMatches =
+          (!!normalizedSeriesName && normalizedTitle.includes(normalizedSeriesName)) ||
+          seriesBooks.some((seriesBook) => {
+            const existingTitle = normalizeSuggestionText(seriesBook.title);
+            if (!existingTitle) return false;
+            const overlap = existingTitle
+              .split(' ')
+              .filter((token) => token && normalizedTitle.includes(token));
+            return overlap.length >= 2;
+          });
+
+        if (!authorMatches || !titleMatches) {
+          return [];
+        }
+
+        return [
+          {
+            book,
+            series,
+            suggestedVolumeIndex: extractVolumeNumber(book.title),
+          },
+        ];
+      })
+      .flat()
+      .sort((left, right) => (right.suggestedVolumeIndex || 0) - (left.suggestedVolumeIndex || 0));
+
+    return candidates.slice(0, 1);
+  });
 
 const LibraryPageWithSearchParams = () => {
   const searchParams = useSearchParams();
@@ -120,12 +192,15 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const [showDetailsBook, setShowDetailsBook] = useState<Book | null>(null);
   const [currentGroupPath, setCurrentGroupPath] = useState<string | undefined>(undefined);
   const [currentSeriesAuthorGroup, setCurrentSeriesAuthorGroup] = useState<{
-    groupBy: typeof LibraryGroupByType.Series | typeof LibraryGroupByType.Author;
+    groupBy: typeof LibraryGroupByType.Author;
     groupName: string;
   } | null>(null);
   const [booksTransferProgress, setBooksTransferProgress] = useState<{
     [key: string]: number | null;
   }>({});
+  const [pendingSeriesSuggestions, setPendingSeriesSuggestions] = useState<
+    ImportSeriesSuggestion[]
+  >([]);
   const [pendingNavigationBookIds, setPendingNavigationBookIds] = useState<string[] | null>(null);
   const isInitiating = useRef(false);
 
@@ -434,7 +509,21 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   }, [searchParams]);
 
   useEffect(() => {
+    if (searchParams?.get('groupBy') === LibraryGroupByType.Series) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('groupBy');
+      params.delete('group');
+      params.set('surface', 'series');
+      navigateToLibrary(router, params.toString());
+    }
+  }, [router, searchParams]);
+
+  useEffect(() => {
     const group = searchParams?.get('group') || '';
+    if (searchParams?.get('surface') === 'series') {
+      setCurrentGroupPath(undefined);
+      return;
+    }
     const groupName = getGroupName(group);
     setCurrentGroupPath(groupName);
   }, [libraryBooks, searchParams, getGroupName]);
@@ -450,10 +539,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     const groupByParam = searchParams?.get('groupBy');
     const groupBy = ensureLibraryGroupByType(groupByParam, settings.libraryGroupBy);
 
-    if (
-      groupId &&
-      (groupBy === LibraryGroupByType.Series || groupBy === LibraryGroupByType.Author)
-    ) {
+    if (searchParams?.get('surface') === 'series') {
+      setCurrentSeriesAuthorGroup(null);
+      return;
+    }
+
+    if (groupId && groupBy === LibraryGroupByType.Author) {
       // Find the group to get its name
       const allGroups = createBookGroups(
         libraryBooks.filter((b) => !b.deletedAt),
@@ -491,11 +582,25 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoBooks, libraryLoaded]);
 
+  const queueSeriesSuggestions = useCallback(async (importedBooks: Book[]) => {
+    if (importedBooks.length === 0) return;
+
+    const allSeries = await getAllSeries();
+    if (allSeries.length === 0) return;
+
+    const librarySnapshot = useLibraryStore.getState().library;
+    const suggestions = buildImportSeriesSuggestions(importedBooks, allSeries, librarySnapshot);
+    if (suggestions.length > 0) {
+      setPendingSeriesSuggestions((current) => [...current, ...suggestions]);
+    }
+  }, []);
+
   const importBooks = async (files: SelectedFile[], groupId?: string) => {
     setLoading(true);
     const { library } = useLibraryStore.getState();
     const failedImports: Array<{ filename: string; errorMessage: string }> = [];
     const successfulImports: string[] = [];
+    const importedBooksForSuggestions: Book[] = [];
 
     const processFile = async (selectedFile: SelectedFile): Promise<Book | null> => {
       const file = selectedFile.file || selectedFile.path;
@@ -519,6 +624,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           transferManager.queueUpload(book);
         }
         successfulImports.push(book.title);
+        importedBooksForSuggestions.push(book);
         return book;
       } catch (error) {
         const filename = typeof file === 'string' ? file : file.name;
@@ -562,6 +668,26 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     }
 
     setLoading(false);
+    await queueSeriesSuggestions(importedBooksForSuggestions);
+  };
+
+  const handleAcceptSeriesSuggestion = async () => {
+    const currentSuggestion = pendingSeriesSuggestions[0];
+    if (!currentSuggestion) return;
+
+    await addBookToSeries(currentSuggestion.series.id, currentSuggestion.book.hash);
+    if (currentSuggestion.suggestedVolumeIndex) {
+      await updateSeriesVolume(currentSuggestion.series.id, currentSuggestion.book.hash, {
+        volumeIndex: currentSuggestion.suggestedVolumeIndex,
+        label: `Vol. ${currentSuggestion.suggestedVolumeIndex}`,
+      });
+    }
+
+    setPendingSeriesSuggestions((current) => current.slice(1));
+  };
+
+  const handleDismissSeriesSuggestion = () => {
+    setPendingSeriesSuggestions((current) => current.slice(1));
   };
 
   const updateBookTransferProgress = throttle((bookHash: string, progress: ProgressPayload) => {
@@ -904,7 +1030,10 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
             }}
           >
             <div
-              className={clsx('scroll-container drop-zone flex-grow', isDragging && 'drag-over')}
+              className={clsx(
+                'scroll-container drop-zone flex h-full min-h-full flex-col',
+                isDragging && 'drag-over',
+              )}
               style={{
                 paddingTop: '0px',
                 paddingRight: `${insets.right}px`,
@@ -960,6 +1089,44 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           handleBookDeleteLocalCopy={handleBookDelete('local')}
           handleBookMetadataUpdate={handleUpdateMetadata}
         />
+      )}
+      {pendingSeriesSuggestions[0] && (
+        <ModalPortal>
+          <dialog open className='modal modal-open z-[120]'>
+            <div className='modal-box max-w-md'>
+              <h3 className='text-base font-semibold'>{_('Add to series?')}</h3>
+              <p className='mt-2 text-sm text-base-content/70'>
+                {_('{{title}} looks like it belongs in {{series}}.', {
+                  title: pendingSeriesSuggestions[0].book.title,
+                  series: pendingSeriesSuggestions[0].series.name,
+                })}
+              </p>
+              <div className='mt-4 rounded-lg border border-base-300 px-3 py-2 text-sm'>
+                <div className='font-medium'>{pendingSeriesSuggestions[0].series.name}</div>
+                {pendingSeriesSuggestions[0].suggestedVolumeIndex ? (
+                  <div className='text-base-content/60 mt-1'>
+                    {_('Suggested volume: {{volume}}', {
+                      volume: pendingSeriesSuggestions[0].suggestedVolumeIndex,
+                    })}
+                  </div>
+                ) : null}
+              </div>
+              <div className='modal-action'>
+                <button className='btn btn-ghost btn-sm' onClick={handleDismissSeriesSuggestion}>
+                  {_('Not now')}
+                </button>
+                <button className='btn btn-primary btn-sm' onClick={handleAcceptSeriesSuggestion}>
+                  {_('Add to series')}
+                </button>
+              </div>
+            </div>
+            <button
+              className='modal-backdrop'
+              onClick={handleDismissSeriesSuggestion}
+              aria-label={_('Close')}
+            />
+          </dialog>
+        </ModalPortal>
       )}
       {isTransferQueueOpen && (
         <ModalPortal>

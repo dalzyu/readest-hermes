@@ -64,6 +64,9 @@ importers:
 
   apps/readest-app:
     dependencies:
+      '@ai-sdk/openai':
+        specifier: ^3.0.41
+        version: 3.0.41(zod@4.3.6)
       '@ai-sdk/react':
         specifier: ^3.0.49
         version: 3.0.51(react@19.2.4)(zod@4.3.6)
@@ -310,6 +313,9 @@ importers:
       overlayscrollbars-react:
         specifier: ^0.5.6
         version: 0.5.6(overlayscrollbars@2.13.0)(react@19.2.4)
+      pinyin-pro:
+        specifier: ^3.28.0
+        version: 3.28.0
       posthog-js:
         specifier: ^1.246.0
         version: 1.335.2
@@ -603,6 +609,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/openai@3.0.41':
+    resolution: {integrity: sha512-IZ42A+FO+vuEQCVNqlnAPYQnnUpUfdJIwn1BEDOBywiEHa23fw7PahxVtlX9zm3/zMvTW4JKPzWyvAgDu+SQ2A==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider-utils@4.0.8':
     resolution: {integrity: sha512-ns9gN7MmpI8vTRandzgz+KK/zNMLzhrriiKECMt4euLtQFSBgNfydtagPOX4j4pS1/3KvHF6RivhT3gNQgBZsg==}
     engines: {node: '>=18'}
@@ -619,6 +631,10 @@ packages:
 
   '@ai-sdk/provider@3.0.5':
     resolution: {integrity: sha512-2Xmoq6DBJqmSl80U6V9z5jJSJP7ehaJJQMy2iFUqTay06wdCqTnPVBBQbtEL8RCChenL+q5DC5H5WzU3vV3v8w==}
+    engines: {node: '>=18'}
+
+  '@ai-sdk/provider@3.0.8':
+    resolution: {integrity: sha512-oGMAgGoQdBXbZqNG0Ze56CHjDZ1IDYOwGYxYjO5KLSlz5HiNQ9udIXsPZ61VWaHGZ5XW/jyjmr6t2xz2jGVwbQ==}
     engines: {node: '>=18'}
 
   '@ai-sdk/react@2.0.125':
@@ -3672,6 +3688,12 @@ packages:
     resolution: {integrity: sha512-WwgIlXeZ2/RKmQV/pBoduYIiY1t+gAG4zKyza6vq+ubYEV1eV9M/Ag0qxd3w8hVVbnIh3AFv/XA6NGU5fjWIww==}
     cpu: [arm64]
     os: [darwin]
+
+  '@tursodatabase/database-linux-arm64-gnu@0.5.0':
+    resolution: {integrity: sha512-ifhBSd+o0ZGUvbOJUVZHEWq+soY1MQcWTRHR4BF8gKo4VG+83fWfNx9rY6Ag5LK/dMmwLvFE4i6els+wFuHsqg==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
 
   '@tursodatabase/database-linux-x64-gnu@0.5.0':
     resolution: {integrity: sha512-m+th09HazKbuQwaj9C2hPBE/5TWvBn6bQ2/YghrXog+mvmjeq1W/GXEpUP0BDUCiQwj//2p30WaNvicLe2VMfg==}
@@ -7686,6 +7708,9 @@ packages:
     resolution: {integrity: sha512-udgsAY+fTnvv7kI7aaxbqwWNb0AHiB0qBO89PZKPkoTmGOgdbrHDKD+0B2X4uTfJ/FT1R09r9gTsjUjNJotuog==}
     engines: {node: '>=0.10.0'}
 
+  pinyin-pro@3.28.0:
+    resolution: {integrity: sha512-mMRty6RisoyYNphJrTo3pnvp3w8OMZBrXm9YSWkxhAfxKj1KZk2y8T2PDIZlDDRsvZ0No+Hz6FI4sZpA6Ey25g==}
+
   pirates@4.0.7:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
     engines: {node: '>= 6'}
@@ -9670,6 +9695,12 @@ snapshots:
       '@vercel/oidc': 3.1.0
       zod: 4.3.6
 
+  '@ai-sdk/openai@3.0.41(zod@4.3.6)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.8
+      '@ai-sdk/provider-utils': 4.0.8(patch_hash=c3995b156b800cc8c981771d26b6d62a5dd870939257c6c1bf3b593bc9d5eb9e)(zod@4.3.6)
+      zod: 4.3.6
+
   '@ai-sdk/provider-utils@4.0.8(patch_hash=c3995b156b800cc8c981771d26b6d62a5dd870939257c6c1bf3b593bc9d5eb9e)(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.4
@@ -9686,6 +9717,10 @@ snapshots:
       json-schema: 0.4.0
 
   '@ai-sdk/provider@3.0.5':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@3.0.8':
     dependencies:
       json-schema: 0.4.0
 
@@ -13152,6 +13187,9 @@ snapshots:
   '@tursodatabase/database-darwin-arm64@0.5.0':
     optional: true
 
+  '@tursodatabase/database-linux-arm64-gnu@0.5.0':
+    optional: true
+
   '@tursodatabase/database-linux-x64-gnu@0.5.0':
     optional: true
 
@@ -13172,6 +13210,7 @@ snapshots:
       '@tursodatabase/database-common': 0.5.0
     optionalDependencies:
       '@tursodatabase/database-darwin-arm64': 0.5.0
+      '@tursodatabase/database-linux-arm64-gnu': 0.5.0
       '@tursodatabase/database-linux-x64-gnu': 0.5.0
       '@tursodatabase/database-win32-x64-msvc': 0.5.0
 
@@ -18106,6 +18145,8 @@ snapshots:
   pidtree@0.6.0: {}
 
   pify@2.3.0: {}
+
+  pinyin-pro@3.28.0: {}
 
   pirates@4.0.7: {}
 

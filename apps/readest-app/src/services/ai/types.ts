@@ -1,6 +1,7 @@
 import type { LanguageModel, EmbeddingModel } from 'ai';
 
-export type AIProviderName = 'ollama' | 'ai-gateway';
+export type AIProviderName = 'ollama' | 'ai-gateway' | 'openai-compatible';
+export type AIProviderApiStyle = 'chat-completions' | 'responses';
 
 export interface AIProvider {
   id: AIProviderName;
@@ -26,6 +27,14 @@ export interface AISettings {
   aiGatewayModel?: string;
   aiGatewayCustomModel?: string;
   aiGatewayEmbeddingModel?: string;
+
+  openAICompatibleApiStyle: AIProviderApiStyle;
+  openAICompatibleBaseUrl: string;
+  openAICompatibleModel: string;
+  openAICompatibleApiKey?: string;
+  openAICompatibleEmbeddingBaseUrl: string;
+  openAICompatibleEmbeddingModel: string;
+  openAICompatibleEmbeddingApiKey?: string;
 
   spoilerProtection: boolean;
   maxContextChunks: number;

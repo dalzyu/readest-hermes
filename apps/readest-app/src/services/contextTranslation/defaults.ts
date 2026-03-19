@@ -4,7 +4,11 @@ export const DEFAULT_CONTEXT_TRANSLATION_SETTINGS: ContextTranslationSettings = 
   enabled: false,
   targetLanguage: 'en',
   recentContextPages: 3,
-  useRag: true,
+  lookAheadWords: 80,
+  sameBookRagEnabled: true,
+  priorVolumeRagEnabled: true,
+  sameBookChunkCount: 3,
+  priorVolumeChunkCount: 2,
   outputFields: [
     {
       id: 'translation',

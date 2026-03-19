@@ -7,9 +7,10 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
 import { getAIProvider } from '@/services/ai/providers';
 import { DEFAULT_AI_SETTINGS, GATEWAY_MODELS, MODEL_PRICING } from '@/services/ai/constants';
-import type { AISettings, AIProviderName } from '@/services/ai/types';
+import type { AISettings, AIProviderName, AIProviderApiStyle } from '@/services/ai/types';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
 import type { ContextTranslationSettings } from '@/services/contextTranslation/types';
+import { getTranslatorLanguageOptions } from '@/services/translatorLanguages';
 
 type ConnectionStatus = 'idle' | 'testing' | 'success' | 'error';
 type CustomModelStatus = 'idle' | 'validating' | 'valid' | 'invalid';
@@ -75,6 +76,19 @@ const AIPanel: React.FC = () => {
   const [ctxEnabled, setCtxEnabled] = useState(ctxTransSettings.enabled);
   const [ctxTargetLang, setCtxTargetLang] = useState(ctxTransSettings.targetLanguage);
   const [ctxRecentPages, setCtxRecentPages] = useState(ctxTransSettings.recentContextPages);
+  const [ctxLookAheadWords, setCtxLookAheadWords] = useState(ctxTransSettings.lookAheadWords);
+  const [ctxSameBookRagEnabled, setCtxSameBookRagEnabled] = useState(
+    ctxTransSettings.sameBookRagEnabled,
+  );
+  const [ctxPriorVolumeRagEnabled, setCtxPriorVolumeRagEnabled] = useState(
+    ctxTransSettings.priorVolumeRagEnabled,
+  );
+  const [ctxSameBookChunkCount, setCtxSameBookChunkCount] = useState(
+    ctxTransSettings.sameBookChunkCount,
+  );
+  const [ctxPriorVolumeChunkCount, setCtxPriorVolumeChunkCount] = useState(
+    ctxTransSettings.priorVolumeChunkCount,
+  );
   const [ctxOutputFields, setCtxOutputFields] = useState(ctxTransSettings.outputFields);
 
   const [enabled, setEnabled] = useState(aiSettings.enabled);
@@ -85,6 +99,27 @@ const AIPanel: React.FC = () => {
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [gatewayKey, setGatewayKey] = useState(aiSettings.aiGatewayApiKey ?? '');
+  const [openAICompatibleApiStyle, setOpenAICompatibleApiStyle] = useState<AIProviderApiStyle>(
+    aiSettings.openAICompatibleApiStyle,
+  );
+  const [openAICompatibleBaseUrl, setOpenAICompatibleBaseUrl] = useState(
+    aiSettings.openAICompatibleBaseUrl,
+  );
+  const [openAICompatibleModel, setOpenAICompatibleModel] = useState(
+    aiSettings.openAICompatibleModel,
+  );
+  const [openAICompatibleApiKey, setOpenAICompatibleApiKey] = useState(
+    aiSettings.openAICompatibleApiKey ?? '',
+  );
+  const [openAICompatibleEmbeddingBaseUrl, setOpenAICompatibleEmbeddingBaseUrl] = useState(
+    aiSettings.openAICompatibleEmbeddingBaseUrl,
+  );
+  const [openAICompatibleEmbeddingModel, setOpenAICompatibleEmbeddingModel] = useState(
+    aiSettings.openAICompatibleEmbeddingModel,
+  );
+  const [openAICompatibleEmbeddingApiKey, setOpenAICompatibleEmbeddingApiKey] = useState(
+    aiSettings.openAICompatibleEmbeddingApiKey ?? '',
+  );
 
   const savedCustomModel = aiSettings.aiGatewayCustomModel ?? '';
   const savedModel = aiSettings.aiGatewayModel ?? DEFAULT_AI_SETTINGS.aiGatewayModel ?? '';
@@ -222,6 +257,62 @@ const AIPanel: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gatewayKey]);
 
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (openAICompatibleApiStyle !== aiSettings.openAICompatibleApiStyle) {
+      saveAiSetting('openAICompatibleApiStyle', openAICompatibleApiStyle);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAICompatibleApiStyle]);
+
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (openAICompatibleBaseUrl !== aiSettings.openAICompatibleBaseUrl) {
+      saveAiSetting('openAICompatibleBaseUrl', openAICompatibleBaseUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAICompatibleBaseUrl]);
+
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (openAICompatibleModel !== aiSettings.openAICompatibleModel) {
+      saveAiSetting('openAICompatibleModel', openAICompatibleModel);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAICompatibleModel]);
+
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (openAICompatibleApiKey !== (aiSettings.openAICompatibleApiKey ?? '')) {
+      saveAiSetting('openAICompatibleApiKey', openAICompatibleApiKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAICompatibleApiKey]);
+
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (openAICompatibleEmbeddingBaseUrl !== aiSettings.openAICompatibleEmbeddingBaseUrl) {
+      saveAiSetting('openAICompatibleEmbeddingBaseUrl', openAICompatibleEmbeddingBaseUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAICompatibleEmbeddingBaseUrl]);
+
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (openAICompatibleEmbeddingModel !== aiSettings.openAICompatibleEmbeddingModel) {
+      saveAiSetting('openAICompatibleEmbeddingModel', openAICompatibleEmbeddingModel);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAICompatibleEmbeddingModel]);
+
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (openAICompatibleEmbeddingApiKey !== (aiSettings.openAICompatibleEmbeddingApiKey ?? '')) {
+      saveAiSetting('openAICompatibleEmbeddingApiKey', openAICompatibleEmbeddingApiKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAICompatibleEmbeddingApiKey]);
+
   // Get the effective model ID to use (either selected or custom)
   const getEffectiveModelId = useCallback(() => {
     if (selectedModel === CUSTOM_MODEL_VALUE && customModelStatus === 'valid') {
@@ -312,6 +403,13 @@ const AIPanel: React.FC = () => {
         ollamaEmbeddingModel,
         aiGatewayApiKey: gatewayKey,
         aiGatewayModel: effectiveModel,
+        openAICompatibleApiStyle,
+        openAICompatibleBaseUrl,
+        openAICompatibleModel,
+        openAICompatibleApiKey,
+        openAICompatibleEmbeddingBaseUrl,
+        openAICompatibleEmbeddingModel,
+        openAICompatibleEmbeddingApiKey,
       };
       const aiProvider = getAIProvider(testSettings);
       const isHealthy = await aiProvider.healthCheck();
@@ -322,7 +420,9 @@ const AIPanel: React.FC = () => {
         setErrorMessage(
           provider === 'ollama'
             ? _("Couldn't connect to Ollama. Is it running?")
-            : _('Invalid API key or connection failed'),
+            : provider === 'ai-gateway'
+              ? _('Invalid API key or connection failed')
+              : _('Connection failed'),
         );
       }
     } catch (error) {
@@ -375,6 +475,17 @@ const AIPanel: React.FC = () => {
                 className='radio'
                 checked={provider === 'ai-gateway'}
                 onChange={() => setProvider('ai-gateway')}
+                disabled={!enabled}
+              />
+            </div>
+            <div className='config-item'>
+              <span>{_('OpenAI-Compatible')}</span>
+              <input
+                type='radio'
+                name='ai-provider'
+                className='radio'
+                checked={provider === 'openai-compatible'}
+                onChange={() => setProvider('openai-compatible')}
                 disabled={!enabled}
               />
             </div>
@@ -544,6 +655,101 @@ const AIPanel: React.FC = () => {
         </div>
       )}
 
+      {provider === 'openai-compatible' && (
+        <div className={clsx('w-full', disabledSection)}>
+          <h2 className='mb-2 font-medium'>{_('OpenAI-Compatible Configuration')}</h2>
+          <p className='text-base-content/70 mb-3 text-sm'>
+            {_(
+              'Connect to any OpenAI-compatible text and embedding endpoints. Choose the text API style your server supports.',
+            )}
+          </p>
+          <div className='card border-base-200 bg-base-100 border shadow'>
+            <div className='divide-base-200 divide-y'>
+              <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
+                <span>{_('API Style')}</span>
+                <select
+                  className='select select-bordered select-sm bg-base-100 text-base-content w-full'
+                  value={openAICompatibleApiStyle}
+                  onChange={(e) =>
+                    setOpenAICompatibleApiStyle(e.target.value as AIProviderApiStyle)
+                  }
+                  disabled={!enabled}
+                >
+                  <option value='chat-completions'>{_('Chat Completions')}</option>
+                  <option value='responses'>{_('Responses')}</option>
+                </select>
+              </div>
+              <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
+                <span>{_('Base URL')}</span>
+                <input
+                  type='text'
+                  className='input input-bordered input-sm w-full'
+                  value={openAICompatibleBaseUrl}
+                  onChange={(e) => setOpenAICompatibleBaseUrl(e.target.value)}
+                  placeholder='http://127.0.0.1:8080'
+                  disabled={!enabled}
+                />
+              </div>
+              <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
+                <span>{_('Model')}</span>
+                <input
+                  type='text'
+                  className='input input-bordered input-sm w-full'
+                  value={openAICompatibleModel}
+                  onChange={(e) => setOpenAICompatibleModel(e.target.value)}
+                  placeholder='e.g. gemma-3-4b'
+                  disabled={!enabled}
+                />
+              </div>
+              <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
+                <span>{_('Text API Key (optional)')}</span>
+                <input
+                  type='password'
+                  className='input input-bordered input-sm w-full'
+                  value={openAICompatibleApiKey}
+                  onChange={(e) => setOpenAICompatibleApiKey(e.target.value)}
+                  placeholder={_('Leave blank if not required')}
+                  disabled={!enabled}
+                />
+              </div>
+              <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
+                <span>{_('Embedding Base URL')}</span>
+                <input
+                  type='text'
+                  className='input input-bordered input-sm w-full'
+                  value={openAICompatibleEmbeddingBaseUrl}
+                  onChange={(e) => setOpenAICompatibleEmbeddingBaseUrl(e.target.value)}
+                  placeholder='http://127.0.0.1:8081'
+                  disabled={!enabled}
+                />
+              </div>
+              <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
+                <span>{_('Embedding Model')}</span>
+                <input
+                  type='text'
+                  className='input input-bordered input-sm w-full'
+                  value={openAICompatibleEmbeddingModel}
+                  onChange={(e) => setOpenAICompatibleEmbeddingModel(e.target.value)}
+                  placeholder='e.g. embeddinggemma'
+                  disabled={!enabled}
+                />
+              </div>
+              <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
+                <span>{_('Embedding API Key (optional)')}</span>
+                <input
+                  type='password'
+                  className='input input-bordered input-sm w-full'
+                  value={openAICompatibleEmbeddingApiKey}
+                  onChange={(e) => setOpenAICompatibleEmbeddingApiKey(e.target.value)}
+                  placeholder={_('Leave blank if not required')}
+                  disabled={!enabled}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={clsx('w-full', disabledSection)}>
         <h2 className='mb-2 font-medium'>{_('Connection')}</h2>
         <div className='card border-base-200 bg-base-100 border shadow'>
@@ -614,17 +820,11 @@ const AIPanel: React.FC = () => {
                   saveCtxTransSetting({ targetLanguage: e.target.value });
                 }}
               >
-                <option value='en'>{_('English')}</option>
-                <option value='zh'>{_('Chinese (Simplified)')}</option>
-                <option value='zh-TW'>{_('Chinese (Traditional)')}</option>
-                <option value='ja'>{_('Japanese')}</option>
-                <option value='ko'>{_('Korean')}</option>
-                <option value='es'>{_('Spanish')}</option>
-                <option value='fr'>{_('French')}</option>
-                <option value='de'>{_('German')}</option>
-                <option value='pt'>{_('Portuguese')}</option>
-                <option value='ru'>{_('Russian')}</option>
-                <option value='ar'>{_('Arabic')}</option>
+                {getTranslatorLanguageOptions().map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -646,6 +846,118 @@ const AIPanel: React.FC = () => {
                   const val = Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1));
                   setCtxRecentPages(val);
                   saveCtxTransSetting({ recentContextPages: val });
+                }}
+              />
+            </div>
+
+            <div
+              className={clsx(
+                'config-item',
+                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+              )}
+            >
+              <span>{_('Look-ahead Words')}</span>
+              <input
+                type='number'
+                className='input input-bordered input-sm w-20 text-right'
+                min={0}
+                max={300}
+                value={ctxLookAheadWords}
+                disabled={!ctxEnabled}
+                onChange={(e) => {
+                  const val = Math.max(0, Math.min(300, parseInt(e.target.value, 10) || 0));
+                  setCtxLookAheadWords(val);
+                  saveCtxTransSetting({ lookAheadWords: val });
+                }}
+              />
+            </div>
+
+            <div
+              className={clsx(
+                'config-item',
+                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+              )}
+            >
+              <label className='flex items-center gap-2' htmlFor='ctx-same-book-memory-toggle'>
+                <span>{_('Use same-book memory')}</span>
+              </label>
+              <input
+                id='ctx-same-book-memory-toggle'
+                type='checkbox'
+                className='toggle'
+                checked={ctxSameBookRagEnabled}
+                disabled={!ctxEnabled}
+                onChange={() => {
+                  const next = !ctxSameBookRagEnabled;
+                  setCtxSameBookRagEnabled(next);
+                  saveCtxTransSetting({ sameBookRagEnabled: next });
+                }}
+              />
+            </div>
+
+            <div
+              className={clsx(
+                'config-item',
+                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+              )}
+            >
+              <span>{_('Same-book memory chunks')}</span>
+              <input
+                type='number'
+                className='input input-bordered input-sm w-20 text-right'
+                min={1}
+                max={10}
+                value={ctxSameBookChunkCount}
+                disabled={!ctxEnabled || !ctxSameBookRagEnabled}
+                onChange={(e) => {
+                  const val = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1));
+                  setCtxSameBookChunkCount(val);
+                  saveCtxTransSetting({ sameBookChunkCount: val });
+                }}
+              />
+            </div>
+
+            <div
+              className={clsx(
+                'config-item',
+                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+              )}
+            >
+              <label className='flex items-center gap-2' htmlFor='ctx-prior-volume-memory-toggle'>
+                <span>{_('Use prior-volume memory')}</span>
+              </label>
+              <input
+                id='ctx-prior-volume-memory-toggle'
+                type='checkbox'
+                className='toggle'
+                checked={ctxPriorVolumeRagEnabled}
+                disabled={!ctxEnabled}
+                onChange={() => {
+                  const next = !ctxPriorVolumeRagEnabled;
+                  setCtxPriorVolumeRagEnabled(next);
+                  saveCtxTransSetting({ priorVolumeRagEnabled: next });
+                }}
+              />
+            </div>
+
+            <div
+              className={clsx(
+                'config-item',
+                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+              )}
+            >
+              <span>{_('Prior-volume memory chunks')}</span>
+              <input
+                type='number'
+                className='input input-bordered input-sm w-20 text-right'
+                min={1}
+                max={10}
+                value={ctxPriorVolumeChunkCount}
+                disabled={!ctxEnabled || !ctxPriorVolumeRagEnabled}
+                onChange={(e) => {
+                  const val = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1));
+                  setCtxPriorVolumeChunkCount(val);
+                  saveCtxTransSetting({ priorVolumeChunkCount: val });
                 }}
               />
             </div>

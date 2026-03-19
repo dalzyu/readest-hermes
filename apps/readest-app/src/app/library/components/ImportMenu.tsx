@@ -8,8 +8,8 @@ import Menu from '@/components/Menu';
 
 interface ImportMenuProps {
   setIsDropdownOpen?: (open: boolean) => void;
-  onImportBooksFromFiles: () => void;
-  onImportBooksFromDirectory?: () => void;
+  onImportBooksFromFiles: () => void | Promise<void>;
+  onImportBooksFromDirectory?: () => void | Promise<void>;
   onOpenCatalogManager: () => void;
 }
 

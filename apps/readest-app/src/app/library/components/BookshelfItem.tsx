@@ -252,6 +252,12 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
         handleBookUpload(book);
       },
     });
+    const manageSeriesMenuItem = await MenuItem.new({
+      text: _('Manage Series'),
+      action: async () => {
+        eventDispatcher.dispatch('manage-series', { hash: book.hash, title: book.title });
+      },
+    });
     const deleteBookMenuItem = await MenuItem.new({
       text: _('Delete'),
       action: async () => {
@@ -261,6 +267,7 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
     const menu = await Menu.new();
     menu.append(selectBookMenuItem);
     menu.append(groupBooksMenuItem);
+    menu.append(manageSeriesMenuItem);
     if (book.readingStatus === 'finished') {
       menu.append(markAsUnreadMenuItem);
     } else {

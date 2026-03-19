@@ -1,4 +1,4 @@
-import { generateText } from 'ai';
+import { generateText, streamText } from 'ai';
 import type { LanguageModel } from 'ai';
 
 /**
@@ -12,11 +12,31 @@ export async function callLLM(
   systemPrompt: string,
   userPrompt: string,
   model: LanguageModel,
+  abortSignal?: AbortSignal,
 ): Promise<string> {
   const { text } = await generateText({
     model,
     system: systemPrompt,
     prompt: userPrompt,
+    abortSignal,
   });
   return text;
+}
+
+export async function* streamLLM(
+  systemPrompt: string,
+  userPrompt: string,
+  model: LanguageModel,
+  abortSignal?: AbortSignal,
+): AsyncGenerator<string> {
+  const result = streamText({
+    model,
+    system: systemPrompt,
+    prompt: userPrompt,
+    abortSignal,
+  });
+
+  for await (const chunk of result.textStream) {
+    yield chunk;
+  }
 }

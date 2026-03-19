@@ -118,7 +118,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const proofreadPopupHeight = Math.min(200, maxHeight);
   const ctxTransPopupWidth = Math.min(480, maxWidth);
   const ctxTransPopupHeight = Math.min(200, maxHeight);
-  const annotPopupWidth = Math.min(useResponsiveSize(300), maxWidth);
+  const annotPopupWidth = Math.min(480, maxWidth);
   const annotPopupHeight = useResponsiveSize(44);
   const androidSelectionHandlerHeight = 0;
 
@@ -1053,6 +1053,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         selection &&
         settings.globalReadSettings.contextTranslation?.enabled && (
           <ContextTranslationPopup
+            key={selection.cfi || `${selection.index}-${selection.page}-${selection.text}`}
             bookKey={bookKey}
             bookHash={bookData.book?.hash ?? ''}
             selectedText={selection.text}

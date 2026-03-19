@@ -1,5 +1,8 @@
 import { describe, test, expect } from 'vitest';
-import { parseTranslationResponse } from '@/services/contextTranslation/responseParser';
+import {
+  parseStreamingTranslationResponse,
+  parseTranslationResponse,
+} from '@/services/contextTranslation/responseParser';
 import type { TranslationOutputField } from '@/services/contextTranslation/types';
 
 const fields: TranslationOutputField[] = [
@@ -85,5 +88,25 @@ Line three
     const result = parseTranslationResponse(response, fields);
 
     expect(result['translation']).toBe('Line one\nLine two\nLine three');
+  });
+});
+
+describe('parseStreamingTranslationResponse', () => {
+  test('parses partial content for the active field while streaming', () => {
+    const result = parseStreamingTranslationResponse('<translation>close fr', fields);
+
+    expect(result.fields['translation']).toBe('close fr');
+    expect(result.activeFieldId).toBe('translation');
+  });
+
+  test('keeps field order and accumulates later completed tags', () => {
+    const result = parseStreamingTranslationResponse(
+      '<translation>close friend</translation><contextualMeaning>a trusted companion',
+      fields,
+    );
+
+    expect(result.fields['translation']).toBe('close friend');
+    expect(result.fields['contextualMeaning']).toBe('a trusted companion');
+    expect(result.activeFieldId).toBe('contextualMeaning');
   });
 });

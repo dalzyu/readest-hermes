@@ -1,16 +1,63 @@
 import { TextChunk, ScoredChunk, BookIndexMeta, AIConversation, AIMessage } from '../types';
+import type { VocabularyEntry, BookSeries } from '@/services/contextTranslation/types';
 import { aiLogger } from '../logger';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const lunr = require('lunr') as typeof import('lunr');
 
 const DB_NAME = 'readest-ai';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const CHUNKS_STORE = 'chunks';
 const META_STORE = 'bookMeta';
 const BM25_STORE = 'bm25Indices';
 const CONVERSATIONS_STORE = 'conversations';
 const MESSAGES_STORE = 'messages';
+const VOCAB_STORE = 'vocabulary';
+const SERIES_STORE = 'bookSeries';
+
+export interface PageSearchBounds {
+  minPage?: number;
+  maxPage?: number;
+}
+
+export interface LegacyBookSeriesRecord {
+  id: string;
+  name: string;
+  bookHashes: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+function isLegacySeriesRecord(value: BookSeries | LegacyBookSeriesRecord): value is LegacyBookSeriesRecord {
+  return 'bookHashes' in value;
+}
+
+export function normalizeSeriesRecord(raw: BookSeries | LegacyBookSeriesRecord): BookSeries {
+  if (!isLegacySeriesRecord(raw)) {
+    return {
+      ...raw,
+      volumes: [...raw.volumes].sort((a, b) => a.volumeIndex - b.volumeIndex),
+    };
+  }
+
+  return {
+    id: raw.id,
+    name: raw.name,
+    volumes: raw.bookHashes.map((bookHash, index) => ({
+      bookHash,
+      volumeIndex: index + 1,
+      label: `Vol. ${index + 1}`,
+    })),
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+}
+
+export function normalizeSeriesRecords(
+  records: Array<BookSeries | LegacyBookSeriesRecord>,
+): BookSeries[] {
+  return records.map(normalizeSeriesRecord).sort((a, b) => a.name.localeCompare(b.name));
+}
 
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
@@ -26,12 +73,29 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom;
 }
 
+function normalizeSearchBounds(bounds?: number | PageSearchBounds): PageSearchBounds {
+  if (typeof bounds === 'number') {
+    return { maxPage: bounds };
+  }
+
+  return bounds ?? {};
+}
+
+function isPageWithinBounds(pageNumber: number, bounds?: number | PageSearchBounds): boolean {
+  const normalized = normalizeSearchBounds(bounds);
+  if (normalized.minPage !== undefined && pageNumber < normalized.minPage) return false;
+  if (normalized.maxPage !== undefined && pageNumber > normalized.maxPage) return false;
+  return true;
+}
+
 class AIStore {
   private db: IDBDatabase | null = null;
   private chunkCache = new Map<string, TextChunk[]>();
   private indexCache = new Map<string, lunr.Index>();
   private metaCache = new Map<string, BookIndexMeta>();
   private conversationCache = new Map<string, AIConversation[]>();
+  private seriesMigrationComplete = false;
+  private seriesMigrationPromise: Promise<void> | null = null;
 
   async recoverFromError(): Promise<void> {
     if (this.db) {
@@ -46,6 +110,8 @@ class AIStore {
     this.indexCache.clear();
     this.metaCache.clear();
     this.conversationCache.clear();
+    this.seriesMigrationComplete = false;
+    this.seriesMigrationPromise = null;
     await this.openDB();
   }
 
@@ -90,6 +156,17 @@ class AIStore {
         if (!db.objectStoreNames.contains(MESSAGES_STORE)) {
           const msgStore = db.createObjectStore(MESSAGES_STORE, { keyPath: 'id' });
           msgStore.createIndex('conversationId', 'conversationId', { unique: false });
+        }
+
+        // v4: vocabulary and book series stores
+        if (!db.objectStoreNames.contains(VOCAB_STORE)) {
+          const vocabStore = db.createObjectStore(VOCAB_STORE, { keyPath: 'id' });
+          vocabStore.createIndex('bookHash', 'bookHash', { unique: false });
+          vocabStore.createIndex('term', 'term', { unique: false });
+          vocabStore.createIndex('addedAt', 'addedAt', { unique: false });
+        }
+        if (!db.objectStoreNames.contains(SERIES_STORE)) {
+          db.createObjectStore(SERIES_STORE, { keyPath: 'id' });
         }
       };
     });
@@ -223,13 +300,13 @@ class AIStore {
     bookHash: string,
     queryEmbedding: number[],
     topK: number,
-    maxPage?: number,
+    maxPage?: number | PageSearchBounds,
   ): Promise<ScoredChunk[]> {
     const chunks = await this.getChunks(bookHash);
     const beforeFilter = chunks.filter((c) => c.embedding).length;
     const scored: ScoredChunk[] = [];
     for (const chunk of chunks) {
-      if (maxPage !== undefined && chunk.pageNumber > maxPage) continue;
+      if (!isPageWithinBounds(chunk.pageNumber, maxPage)) continue;
       if (!chunk.embedding) continue;
       scored.push({
         ...chunk,
@@ -239,8 +316,9 @@ class AIStore {
     }
     scored.sort((a, b) => b.score - a.score);
     const results = scored.slice(0, topK);
-    if (maxPage !== undefined)
-      aiLogger.search.spoilerFiltered(beforeFilter, results.length, maxPage);
+    const normalizedBounds = normalizeSearchBounds(maxPage);
+    if (normalizedBounds.maxPage !== undefined)
+      aiLogger.search.spoilerFiltered(beforeFilter, results.length, normalizedBounds.maxPage);
     if (results.length > 0) aiLogger.search.vectorResults(results.length, results[0]!.score);
     return results;
   }
@@ -249,7 +327,7 @@ class AIStore {
     bookHash: string,
     query: string,
     topK: number,
-    maxPage?: number,
+    maxPage?: number | PageSearchBounds,
   ): Promise<ScoredChunk[]> {
     const index = await this.loadBM25Index(bookHash);
     if (!index) return [];
@@ -261,7 +339,7 @@ class AIStore {
       for (const result of results) {
         const chunk = chunkMap.get(result.ref);
         if (!chunk) continue;
-        if (maxPage !== undefined && chunk.pageNumber > maxPage) continue;
+        if (!isPageWithinBounds(chunk.pageNumber, maxPage)) continue;
         scored.push({ ...chunk, score: result.score, searchMethod: 'bm25' });
         if (scored.length >= topK) break;
       }
@@ -277,7 +355,7 @@ class AIStore {
     queryEmbedding: number[] | null,
     query: string,
     topK: number,
-    maxPage?: number,
+    maxPage?: number | PageSearchBounds,
   ): Promise<ScoredChunk[]> {
     const [vectorResults, bm25Results] = await Promise.all([
       queryEmbedding ? this.vectorSearch(bookHash, queryEmbedding, topK * 2, maxPage) : [],
@@ -447,6 +525,156 @@ class AIStore {
         resolve(messages);
       };
       req.onerror = () => reject(req.error);
+    });
+  }
+
+  // vocabulary methods
+
+  async saveVocabularyEntry(entry: VocabularyEntry): Promise<void> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(VOCAB_STORE, 'readwrite');
+      tx.objectStore(VOCAB_STORE).put(entry);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async getVocabularyByBook(bookHash: string): Promise<VocabularyEntry[]> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const req = db
+        .transaction(VOCAB_STORE, 'readonly')
+        .objectStore(VOCAB_STORE)
+        .index('bookHash')
+        .getAll(bookHash);
+      req.onsuccess = () =>
+        resolve((req.result as VocabularyEntry[]).sort((a, b) => b.addedAt - a.addedAt));
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async getAllVocabulary(): Promise<VocabularyEntry[]> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(VOCAB_STORE, 'readonly').objectStore(VOCAB_STORE).getAll();
+      req.onsuccess = () =>
+        resolve((req.result as VocabularyEntry[]).sort((a, b) => b.addedAt - a.addedAt));
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async deleteVocabularyEntry(id: string): Promise<void> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(VOCAB_STORE, 'readwrite');
+      tx.objectStore(VOCAB_STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async searchVocabulary(query: string): Promise<VocabularyEntry[]> {
+    const all = await this.getAllVocabulary();
+    const lower = query.toLowerCase();
+    return all.filter(
+      (e) => e.term.toLowerCase().includes(lower) || e.context.toLowerCase().includes(lower),
+    );
+  }
+
+  // series methods
+
+  private async getRawSeriesRecords(): Promise<Array<BookSeries | LegacyBookSeriesRecord>> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(SERIES_STORE, 'readonly').objectStore(SERIES_STORE).getAll();
+      req.onsuccess = () => resolve(req.result as Array<BookSeries | LegacyBookSeriesRecord>);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async saveSeries(series: BookSeries): Promise<void> {
+    const normalized = normalizeSeriesRecord(series);
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(SERIES_STORE, 'readwrite');
+      tx.objectStore(SERIES_STORE).put(normalized);
+      tx.oncomplete = () => {
+        this.seriesMigrationComplete = true;
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async saveLegacySeriesRecord(series: LegacyBookSeriesRecord): Promise<void> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(SERIES_STORE, 'readwrite');
+      tx.objectStore(SERIES_STORE).put(series);
+      tx.oncomplete = () => {
+        this.seriesMigrationComplete = false;
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async migrateLegacySeriesRecords(): Promise<void> {
+    if (this.seriesMigrationComplete) return;
+    if (this.seriesMigrationPromise) {
+      await this.seriesMigrationPromise;
+      return;
+    }
+
+    this.seriesMigrationPromise = (async () => {
+      const records = await this.getRawSeriesRecords();
+      const legacyRecords = records.filter(isLegacySeriesRecord);
+      if (legacyRecords.length === 0) {
+        this.seriesMigrationComplete = true;
+        return;
+      }
+
+      const db = await this.openDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(SERIES_STORE, 'readwrite');
+        const store = tx.objectStore(SERIES_STORE);
+        for (const record of legacyRecords) {
+          store.put(normalizeSeriesRecord(record));
+        }
+        tx.oncomplete = () => {
+          this.seriesMigrationComplete = true;
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    })();
+
+    try {
+      await this.seriesMigrationPromise;
+    } finally {
+      this.seriesMigrationPromise = null;
+    }
+  }
+
+  async getAllSeries(): Promise<BookSeries[]> {
+    await this.migrateLegacySeriesRecords();
+    const records = await this.getRawSeriesRecords();
+    return normalizeSeriesRecords(records);
+  }
+
+  async getSeriesForBook(bookHash: string): Promise<BookSeries | null> {
+    const all = await this.getAllSeries();
+    return all.find((series) => series.volumes.some((volume) => volume.bookHash === bookHash)) || null;
+  }
+
+  async deleteSeries(id: string): Promise<void> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(SERIES_STORE, 'readwrite');
+      tx.objectStore(SERIES_STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
     });
   }
 }

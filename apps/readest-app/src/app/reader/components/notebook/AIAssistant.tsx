@@ -5,6 +5,7 @@ import {
   AssistantRuntimeProvider,
   useLocalRuntime,
   useAssistantRuntime,
+  useComposerRuntime,
   type ThreadMessage,
   type ThreadHistoryAdapter,
 } from '@assistant-ui/react';
@@ -205,7 +206,9 @@ const ThreadWrapper = ({
 }) => {
   const [sources, setSources] = useState(getLastSources());
   const assistantRuntime = useAssistantRuntime();
-  const { setActiveConversation } = useAIChatStore();
+  const composerRuntime = useComposerRuntime();
+  const { activeConversationId, pendingSeedMessage, clearPendingSeedMessage, setActiveConversation } =
+    useAIChatStore();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -213,6 +216,25 @@ const ThreadWrapper = ({
     }, 500);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!activeConversationId || !pendingSeedMessage || isLoadingHistory) {
+      return;
+    }
+    if (pendingSeedMessage.conversationId !== activeConversationId) {
+      return;
+    }
+
+    composerRuntime.setText(pendingSeedMessage.content);
+    composerRuntime.send();
+    clearPendingSeedMessage(activeConversationId);
+  }, [
+    activeConversationId,
+    clearPendingSeedMessage,
+    composerRuntime,
+    isLoadingHistory,
+    pendingSeedMessage,
+  ]);
 
   const handleClear = useCallback(() => {
     clearLastSources();

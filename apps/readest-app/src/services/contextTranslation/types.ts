@@ -11,14 +11,21 @@ export interface TranslationOutputField {
 /** The parsed result from the LLM, keyed by field id */
 export type TranslationResult = Record<string, string>;
 
+export type RetrievalStatus = 'local-only' | 'local-volume' | 'cross-volume';
+
+export interface TranslationStreamResult {
+  fields: TranslationResult;
+  activeFieldId: string | null;
+  rawText: string;
+  done: boolean;
+}
+
 /** Input passed to the translation service for a single lookup */
 export interface TranslationRequest {
   /** The selected text to translate */
   selectedText: string;
-  /** Recent page text used as immediate context */
-  recentContext: string;
-  /** Chunks retrieved from RAG search for deeper context */
-  ragContext?: string;
+  /** Structured popup context sections passed to the prompt */
+  popupContext: PopupContextBundle;
   /** Source language (e.g. "zh", "ja"). Auto-detected if omitted. */
   sourceLanguage?: string;
   /** Target language for translation (e.g. "en") */
@@ -38,11 +45,46 @@ export interface VocabularyEntry {
   reviewCount: number;
 }
 
+export interface BookSeriesVolume {
+  bookHash: string;
+  volumeIndex: number;
+  label?: string;
+}
+
+/** An ordered collection of books treated as a series for cross-volume RAG */
+export interface BookSeries {
+  id: string;
+  name: string;
+  volumes: BookSeriesVolume[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PopupRetrievalHints {
+  currentVolumeIndexed: boolean;
+  missingLocalIndex: boolean;
+  missingPriorVolumes: number[];
+  missingSeriesAssignment: boolean;
+}
+
+export interface PopupContextBundle {
+  localPastContext: string;
+  localFutureBuffer: string;
+  sameBookChunks: string[];
+  priorVolumeChunks: string[];
+  retrievalStatus: RetrievalStatus;
+  retrievalHints: PopupRetrievalHints;
+}
+
 /** Settings for the context-aware translation feature */
 export interface ContextTranslationSettings {
   enabled: boolean;
   targetLanguage: string;
   recentContextPages: number;
+  lookAheadWords: number;
+  sameBookRagEnabled: boolean;
+  priorVolumeRagEnabled: boolean;
+  sameBookChunkCount: number;
+  priorVolumeChunkCount: number;
   outputFields: TranslationOutputField[];
-  useRag: boolean;
 }

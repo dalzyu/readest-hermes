@@ -24,6 +24,24 @@ interface TauriAdapterOptions {
   currentPage: number;
 }
 
+function extractSeededPopupSection(content: string, label: string): string {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(
+    `(?:^|\\n\\n)${escapedLabel}:\\n([\\s\\S]*?)(?=\\n\\n[^\\n]+:\\n|$)`,
+    'i',
+  );
+  return content.match(pattern)?.[1]?.trim() ?? '';
+}
+
+function buildRetrievalQuery(content: string): string {
+  const selection = extractSeededPopupSection(content, 'Selection');
+  const translation = extractSeededPopupSection(content, 'translation');
+  const question = extractSeededPopupSection(content, 'Question');
+
+  const seededQuery = [selection, translation, question].filter(Boolean).join('\n');
+  return seededQuery || content;
+}
+
 async function* streamViaApiRoute(
   messages: Array<{ role: string; content: string }>,
   systemPrompt: string,
@@ -70,6 +88,7 @@ export function createTauriAdapter(getOptions: () => TauriAdapterOptions): ChatM
         lastUserMessage?.content
           ?.filter((c) => c.type === 'text')
           .map((c) => c.text)
+          .map((text) => buildRetrievalQuery(text))
           .join(' ') || '';
 
       aiLogger.chat.send(query.length, false);

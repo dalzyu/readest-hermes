@@ -71,6 +71,7 @@ describe('Model constants', () => {
 describe('AISettings Type', () => {
   test('should allow creating valid settings object', () => {
     const settings: AISettings = {
+      ...DEFAULT_AI_SETTINGS,
       enabled: true,
       provider: 'ollama',
       ollamaBaseUrl: 'http://localhost:11434',
@@ -98,5 +99,24 @@ describe('AISettings Type', () => {
 
     expect(settings.provider).toBe('ai-gateway');
     expect(settings.aiGatewayApiKey).toBe('test-key');
+  });
+
+  test('should support openai-compatible provider with api style and separate embedding config', () => {
+    const settings: AISettings = {
+      ...DEFAULT_AI_SETTINGS,
+      enabled: true,
+      provider: 'openai-compatible',
+      openAICompatibleApiStyle: 'chat-completions',
+      openAICompatibleBaseUrl: 'http://127.0.0.1:8080',
+      openAICompatibleModel: 'gemma-3-4b',
+      openAICompatibleApiKey: 'text-key',
+      openAICompatibleEmbeddingBaseUrl: 'http://127.0.0.1:8081',
+      openAICompatibleEmbeddingModel: 'embeddinggemma',
+      openAICompatibleEmbeddingApiKey: 'embed-key',
+    };
+
+    expect(settings.provider).toBe('openai-compatible');
+    expect(settings.openAICompatibleApiStyle).toBe('chat-completions');
+    expect(settings.openAICompatibleEmbeddingApiKey).toBe('embed-key');
   });
 });

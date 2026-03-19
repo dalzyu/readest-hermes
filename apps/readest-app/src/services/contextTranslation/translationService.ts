@@ -1,8 +1,9 @@
 import type { LanguageModel } from 'ai';
-import type { TranslationRequest, TranslationResult } from './types';
+import type { TranslationRequest, TranslationResult, TranslationStreamResult } from './types';
+import { formatTranslationResult } from './exampleFormatter';
 import { buildTranslationPrompt } from './promptBuilder';
-import { parseTranslationResponse } from './responseParser';
-import { callLLM } from './llmClient';
+import { parseStreamingTranslationResponse, parseTranslationResponse } from './responseParser';
+import { callLLM, streamLLM } from './llmClient';
 
 /**
  * Orchestrates context-aware translation:
@@ -13,8 +14,36 @@ import { callLLM } from './llmClient';
 export async function translateWithContext(
   request: TranslationRequest,
   model?: LanguageModel,
+  abortSignal?: AbortSignal,
 ): Promise<TranslationResult> {
   const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
-  const response = await callLLM(systemPrompt, userPrompt, model!);
-  return parseTranslationResponse(response, request.outputFields);
+  const response = await callLLM(systemPrompt, userPrompt, model!, abortSignal);
+  return formatTranslationResult(parseTranslationResponse(response, request.outputFields), request);
+}
+
+export async function* streamTranslationWithContext(
+  request: TranslationRequest,
+  model: LanguageModel,
+  abortSignal?: AbortSignal,
+): AsyncGenerator<TranslationStreamResult> {
+  const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
+  let rawText = '';
+
+  for await (const chunk of streamLLM(systemPrompt, userPrompt, model, abortSignal)) {
+    rawText += chunk;
+    const parsed = parseStreamingTranslationResponse(rawText, request.outputFields);
+    yield {
+      fields: formatTranslationResult(parsed.fields, request),
+      activeFieldId: parsed.activeFieldId,
+      rawText,
+      done: false,
+    };
+  }
+
+  yield {
+    fields: formatTranslationResult(parseTranslationResponse(rawText, request.outputFields), request),
+    activeFieldId: null,
+    rawText,
+    done: true,
+  };
 }

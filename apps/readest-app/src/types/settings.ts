@@ -9,6 +9,7 @@ import type { NotebookTab } from '@/store/notebookStore';
 
 export type ThemeType = 'light' | 'dark' | 'auto';
 export type LibraryViewModeType = 'grid' | 'list';
+export type LibrarySurfaceModeType = 'books' | 'series';
 export const LibrarySortByType = {
   Title: 'title',
   Author: 'author',

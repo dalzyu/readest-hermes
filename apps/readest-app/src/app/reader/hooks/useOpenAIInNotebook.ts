@@ -6,13 +6,15 @@ import { useAIChatStore } from '@/store/aiChatStore';
 
 export function useOpenAIInNotebook() {
   const { setNotebookVisible, setNotebookActiveTab } = useNotebookStore();
-  const { setActiveConversation, createConversation } = useAIChatStore();
+  const { setActiveConversation, createConversation, createConversationWithFirstMessage } =
+    useAIChatStore();
 
   const openAIInNotebook = useCallback(
     async (options?: {
       conversationId?: string;
       bookHash?: string;
       newConversationTitle?: string;
+      firstMessageContent?: string;
     }) => {
       // Open notebook and switch to AI tab
       setNotebookVisible(true);
@@ -21,12 +23,23 @@ export function useOpenAIInNotebook() {
       if (options?.conversationId) {
         // Load existing conversation
         await setActiveConversation(options.conversationId);
+      } else if (options?.bookHash && options?.newConversationTitle && options?.firstMessageContent) {
+        await createConversationWithFirstMessage(
+          options.bookHash,
+          options.newConversationTitle,
+          options.firstMessageContent,
+        );
       } else if (options?.bookHash && options?.newConversationTitle) {
-        // Create new conversation
         await createConversation(options.bookHash, options.newConversationTitle);
       }
     },
-    [setNotebookVisible, setNotebookActiveTab, setActiveConversation, createConversation],
+    [
+      setNotebookVisible,
+      setNotebookActiveTab,
+      setActiveConversation,
+      createConversation,
+      createConversationWithFirstMessage,
+    ],
   );
 
   const closeAIInNotebook = useCallback(() => {

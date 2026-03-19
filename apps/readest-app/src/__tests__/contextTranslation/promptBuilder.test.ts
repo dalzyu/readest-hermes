@@ -1,9 +1,7 @@
-import { describe, test, expect } from 'vitest';
+import { describe, expect, test } from 'vitest';
+
 import { buildTranslationPrompt } from '@/services/contextTranslation/promptBuilder';
-import type {
-  TranslationRequest,
-  TranslationOutputField,
-} from '@/services/contextTranslation/types';
+import type { TranslationOutputField, TranslationRequest } from '@/services/contextTranslation/types';
 
 const baseFields: TranslationOutputField[] = [
   {
@@ -31,7 +29,19 @@ const baseFields: TranslationOutputField[] = [
 
 const baseRequest: TranslationRequest = {
   selectedText: '知己',
-  recentContext: 'He had finally found a true 知己 among his companions.',
+  popupContext: {
+    localPastContext: 'He had finally found a true 知己 among his companions.',
+    localFutureBuffer: 'The next few words clarify the tone.',
+    sameBookChunks: ['Earlier in the novel, 知己 described a sworn confidant.'],
+    priorVolumeChunks: ['In volume 1, the term appeared during a reunion scene.'],
+    retrievalStatus: 'cross-volume',
+    retrievalHints: {
+      currentVolumeIndexed: true,
+      missingLocalIndex: false,
+      missingPriorVolumes: [],
+      missingSeriesAssignment: false,
+    },
+  },
   targetLanguage: 'en',
   outputFields: baseFields,
 };
@@ -42,7 +52,7 @@ describe('buildTranslationPrompt', () => {
     expect(userPrompt).toContain('知己');
   });
 
-  test('includes recent context in prompt', () => {
+  test('includes recent local context in prompt', () => {
     const { userPrompt } = buildTranslationPrompt(baseRequest);
     expect(userPrompt).toContain('He had finally found a true 知己');
   });
@@ -72,18 +82,25 @@ describe('buildTranslationPrompt', () => {
     expect(systemPrompt).not.toContain('<examples>');
   });
 
-  test('includes RAG context when provided', () => {
-    const request: TranslationRequest = {
-      ...baseRequest,
-      ragContext: 'From chapter 3: 知己 was used to describe a lifelong bond.',
-    };
-    const { userPrompt } = buildTranslationPrompt(request);
-    expect(userPrompt).toContain('From chapter 3');
+  test('includes structured same-book and prior-volume memory when provided', () => {
+    const { userPrompt } = buildTranslationPrompt(baseRequest);
+
+    expect(userPrompt).toContain('Earlier in the novel');
+    expect(userPrompt).toContain('In volume 1');
   });
 
-  test('omits RAG section when ragContext is absent', () => {
-    const { userPrompt } = buildTranslationPrompt(baseRequest);
-    expect(userPrompt).not.toContain('deeper context');
+  test('omits empty memory sections when they are absent', () => {
+    const { userPrompt } = buildTranslationPrompt({
+      ...baseRequest,
+      popupContext: {
+        ...baseRequest.popupContext,
+        sameBookChunks: [],
+        priorVolumeChunks: [],
+      },
+    });
+
+    expect(userPrompt).not.toContain('same_book_memory');
+    expect(userPrompt).not.toContain('prior_volume_memory');
   });
 
   test('includes source language hint when provided', () => {
@@ -93,5 +110,56 @@ describe('buildTranslationPrompt', () => {
     };
     const { systemPrompt } = buildTranslationPrompt(request);
     expect(systemPrompt).toContain('zh');
+  });
+
+  test('requires enabled fields to be emitted in configured order', () => {
+    const request: TranslationRequest = {
+      ...baseRequest,
+      sourceLanguage: 'zh',
+      outputFields: [
+        {
+          id: 'contextualMeaning',
+          label: 'Contextual Meaning',
+          enabled: true,
+          order: 0,
+          promptInstruction: 'Explain what the word/phrase means given the surrounding context.',
+        },
+        {
+          id: 'translation',
+          label: 'Translation',
+          enabled: true,
+          order: 1,
+          promptInstruction: 'Provide a direct translation of the selected text.',
+        },
+      ],
+    };
+
+    const { systemPrompt } = buildTranslationPrompt(request);
+
+    expect(systemPrompt).toContain('Emit fields in this exact order');
+    expect(systemPrompt).toContain('contextualMeaning, translation');
+  });
+
+  test('requires chinese examples to include chinese and english without asking ai for pinyin', () => {
+    const request: TranslationRequest = {
+      ...baseRequest,
+      sourceLanguage: 'zh',
+      outputFields: [
+        ...baseFields.slice(0, 2),
+        {
+          id: 'examples',
+          label: 'Examples',
+          enabled: true,
+          order: 2,
+          promptInstruction: 'Give usage examples.',
+        },
+      ],
+    };
+
+    const { systemPrompt } = buildTranslationPrompt(request);
+
+    expect(systemPrompt).not.toContain('Pinyin:');
+    expect(systemPrompt).toContain('English:');
+    expect(systemPrompt).toContain('1. 中文句子');
   });
 });

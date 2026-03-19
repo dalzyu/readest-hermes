@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import React from 'react';
-import { PiNotePencil, PiRobot } from 'react-icons/pi';
+import { PiNotePencil, PiRobot, PiBookBookmark } from 'react-icons/pi';
 
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -21,7 +21,13 @@ const NotebookTabNavigation: React.FC<NotebookTabNavigationProps> = ({
   const { settings } = useSettingsStore();
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
 
-  const tabs: NotebookTab[] = aiEnabled ? ['notes', 'ai'] : [];
+  const ctxEnabled =
+    settings?.globalReadSettings?.contextTranslation?.enabled ?? false;
+  const tabs: NotebookTab[] = aiEnabled
+    ? ctxEnabled
+      ? ['notes', 'ai', 'vocabulary']
+      : ['notes', 'ai']
+    : [];
 
   const getTabLabel = (tab: NotebookTab) => {
     switch (tab) {
@@ -29,6 +35,8 @@ const NotebookTabNavigation: React.FC<NotebookTabNavigationProps> = ({
         return _('Notes');
       case 'ai':
         return _('AI');
+      case 'vocabulary':
+        return _('Vocabulary');
       default:
         return '';
     }
@@ -40,6 +48,8 @@ const NotebookTabNavigation: React.FC<NotebookTabNavigationProps> = ({
         return <PiNotePencil className='mx-auto' size={20} />;
       case 'ai':
         return <PiRobot className='mx-auto' size={20} />;
+      case 'vocabulary':
+        return <PiBookBookmark className='mx-auto' size={20} />;
       default:
         return null;
     }

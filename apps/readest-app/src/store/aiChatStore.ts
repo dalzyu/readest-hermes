@@ -8,13 +8,25 @@ interface AIChatState {
   messages: AIMessage[];
   isLoadingHistory: boolean;
   currentBookHash: string | null;
+  pendingSeedMessage:
+    | {
+        conversationId: string;
+        content: string;
+      }
+    | null;
 
   loadConversations: (bookHash: string) => Promise<void>;
   setActiveConversation: (id: string | null) => Promise<void>;
   createConversation: (bookHash: string, title: string) => Promise<string>;
+  createConversationWithFirstMessage: (
+    bookHash: string,
+    title: string,
+    firstMessageContent: string,
+  ) => Promise<string>;
   addMessage: (message: Omit<AIMessage, 'id' | 'createdAt'>) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
   renameConversation: (id: string, title: string) => Promise<void>;
+  clearPendingSeedMessage: (conversationId: string) => void;
   clearActiveConversation: () => void;
 }
 
@@ -28,6 +40,7 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
   messages: [],
   isLoadingHistory: false,
   currentBookHash: null,
+  pendingSeedMessage: null,
 
   loadConversations: async (bookHash: string) => {
     if (get().currentBookHash === bookHash && get().conversations.length > 0) {
@@ -85,6 +98,37 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
     return id;
   },
 
+  createConversationWithFirstMessage: async (
+    bookHash: string,
+    title: string,
+    firstMessageContent: string,
+  ) => {
+    const id = generateId();
+    const now = Date.now();
+    const conversation: AIConversation = {
+      id,
+      bookHash,
+      title: title.slice(0, 50) || 'New conversation',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await aiStore.saveConversation(conversation);
+
+    const conversations = await aiStore.getConversations(bookHash);
+    set({
+      conversations,
+      activeConversationId: id,
+      messages: [],
+      currentBookHash: bookHash,
+      pendingSeedMessage: {
+        conversationId: id,
+        content: firstMessageContent,
+      },
+    });
+    return id;
+  },
+
   addMessage: async (message: Omit<AIMessage, 'id' | 'createdAt'>) => {
     const id = generateId();
     const fullMessage: AIMessage = {
@@ -133,7 +177,15 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
     }
   },
 
+  clearPendingSeedMessage: (conversationId: string) => {
+    const { pendingSeedMessage } = get();
+    if (pendingSeedMessage?.conversationId !== conversationId) {
+      return;
+    }
+    set({ pendingSeedMessage: null });
+  },
+
   clearActiveConversation: () => {
-    set({ activeConversationId: null, messages: [] });
+    set({ activeConversationId: null, messages: [], pendingSeedMessage: null });
   },
 }));

@@ -7,6 +7,7 @@ import { Book, BooksGroup, ReadingStatus } from '@/types/book';
 import {
   LibraryCoverFitType,
   LibraryGroupByType,
+  LibrarySurfaceModeType,
   LibrarySortByType,
   LibraryViewModeType,
 } from '@/types/settings';
@@ -38,6 +39,8 @@ import ModalPortal from '@/components/ModalPortal';
 import BookshelfItem, { generateBookshelfItems } from './BookshelfItem';
 import SelectModeActions from './SelectModeActions';
 import GroupingModal from './GroupingModal';
+import SeriesModal from './SeriesModal';
+import SeriesShelf from './SeriesShelf';
 import SetStatusAlert from './SetStatusAlert';
 
 interface BookshelfProps {
@@ -82,6 +85,9 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   const { safeAreaInsets } = useThemeStore();
 
   const groupId = searchParams?.get('group') || '';
+  const surfaceMode = (searchParams?.get('surface') === 'series'
+    ? 'series'
+    : 'books') as LibrarySurfaceModeType;
   const queryTerm = searchParams?.get('q') || null;
   const viewMode = searchParams?.get('view') || settings.libraryViewMode;
   const sortBy = ensureLibrarySortByType(searchParams?.get('sort'), settings.librarySortBy);
@@ -134,6 +140,17 @@ const Bookshelf: React.FC<BookshelfProps> = ({
       }
     },
     [router, searchParams],
+  );
+
+  const handleSetSurfaceMode = useCallback(
+    (mode: LibrarySurfaceModeType) => {
+      updateUrlParams({
+        surface: mode === 'series' ? 'series' : null,
+        group: null,
+        groupBy: mode === 'series' ? null : searchParams?.get('groupBy') || null,
+      });
+    },
+    [searchParams, updateUrlParams],
   );
 
   const filteredBooks = useMemo(() => {
@@ -397,76 +414,83 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   const selectedBooks = getSelectedBooks();
 
   return (
-    <div className='bookshelf'>
-      <div
-        ref={autofocusRef}
-        tabIndex={-1}
-        className={clsx(
-          'bookshelf-items transform-wrapper focus:outline-none',
-          viewMode === 'grid' && 'grid flex-1 grid-cols-3 gap-x-4 px-4 sm:gap-x-0 sm:px-2',
-          viewMode === 'grid' && 'sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-12',
-          viewMode === 'list' && 'flex flex-col',
-        )}
-        style={{
-          gridTemplateColumns:
-            viewMode === 'grid' && !settings.libraryAutoColumns
-              ? `repeat(${settings.libraryColumns}, minmax(0, 1fr))`
-              : undefined,
-        }}
-        role='main'
-        aria-label={_('Bookshelf')}
-      >
-        {sortedBookshelfItems.map((item) => (
-          <BookshelfItem
-            key={`library-item-${'hash' in item ? item.hash : item.id}`}
-            item={item}
-            mode={viewMode as LibraryViewModeType}
-            coverFit={coverFit as LibraryCoverFitType}
-            isSelectMode={isSelectMode}
-            itemSelected={
-              'hash' in item ? selectedBooks.includes(item.hash) : selectedBooks.includes(item.id)
-            }
-            setLoading={setLoading}
-            toggleSelection={toggleSelection}
-            handleGroupBooks={groupSelectedBooks}
-            handleBookUpload={handleBookUpload}
-            handleBookDownload={handleBookDownload}
-            handleBookDelete={handleBookDelete}
-            handleSetSelectMode={handleSetSelectMode}
-            handleShowDetailsBook={handleShowDetailsBook}
-            handleLibraryNavigation={handleLibraryNavigation}
-            handleUpdateReadingStatus={handleUpdateReadingStatus}
-            transferProgress={
-              'hash' in item ? booksTransferProgress[(item as Book).hash] || null : null
-            }
-          />
-        ))}
-        {viewMode === 'grid' && currentBookshelfItems.length > 0 && (
+    <div className='bookshelf flex h-full min-h-full flex-col'>
+      <div className='min-h-0 flex-1'>
+        {surfaceMode === 'books' ? (
           <div
-            className={clsx('bookshelf-import-item mx-0 my-2 sm:mx-4 sm:my-4')}
-            style={
-              coverFit === 'fit' && viewMode === 'grid'
-                ? {
-                    display: 'flex',
-                    paddingBottom: `${iconSize15 + 24}px`,
-                  }
-                : undefined
-            }
+            ref={autofocusRef}
+            tabIndex={-1}
+            className={clsx(
+              'bookshelf-items transform-wrapper focus:outline-none',
+              viewMode === 'grid' && 'grid flex-1 grid-cols-3 gap-x-4 px-4 sm:gap-x-0 sm:px-2',
+              viewMode === 'grid' &&
+                'sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-12',
+              viewMode === 'list' && 'flex flex-col',
+            )}
+            style={{
+              gridTemplateColumns:
+                viewMode === 'grid' && !settings.libraryAutoColumns
+                  ? `repeat(${settings.libraryColumns}, minmax(0, 1fr))`
+                  : undefined,
+            }}
+            role='main'
+            aria-label={_('Bookshelf')}
           >
-            <button
-              aria-label={_('Import Books')}
-              className={clsx(
-                'bookitem-main bg-base-100 hover:bg-base-300/50',
-                'flex items-center justify-center',
-                'aspect-[28/41] w-full',
-              )}
-              onClick={handleImportBooks}
-            >
-              <div className='flex items-center justify-center'>
-                <PiPlus className='size-10' color='gray' />
+            {sortedBookshelfItems.map((item) => (
+              <BookshelfItem
+                key={`library-item-${'hash' in item ? item.hash : item.id}`}
+                item={item}
+                mode={viewMode as LibraryViewModeType}
+                coverFit={coverFit as LibraryCoverFitType}
+                isSelectMode={isSelectMode}
+                itemSelected={
+                  'hash' in item ? selectedBooks.includes(item.hash) : selectedBooks.includes(item.id)
+                }
+                setLoading={setLoading}
+                toggleSelection={toggleSelection}
+                handleGroupBooks={groupSelectedBooks}
+                handleBookUpload={handleBookUpload}
+                handleBookDownload={handleBookDownload}
+                handleBookDelete={handleBookDelete}
+                handleSetSelectMode={handleSetSelectMode}
+                handleShowDetailsBook={handleShowDetailsBook}
+                handleLibraryNavigation={handleLibraryNavigation}
+                handleUpdateReadingStatus={handleUpdateReadingStatus}
+                transferProgress={
+                  'hash' in item ? booksTransferProgress[(item as Book).hash] || null : null
+                }
+              />
+            ))}
+            {viewMode === 'grid' && currentBookshelfItems.length > 0 && (
+              <div
+                className={clsx('bookshelf-import-item mx-0 my-2 sm:mx-4 sm:my-4')}
+                style={
+                  coverFit === 'fit' && viewMode === 'grid'
+                    ? {
+                        display: 'flex',
+                        paddingBottom: `${iconSize15 + 24}px`,
+                      }
+                    : undefined
+                }
+              >
+                <button
+                  aria-label={_('Import Books')}
+                  className={clsx(
+                    'bookitem-main bg-base-100 hover:bg-base-300/50',
+                    'flex items-center justify-center',
+                    'aspect-[28/41] w-full',
+                  )}
+                  onClick={handleImportBooks}
+                >
+                  <div className='flex items-center justify-center'>
+                    <PiPlus className='size-10' color='gray' />
+                  </div>
+                </button>
               </div>
-            </button>
+            )}
           </div>
+        ) : (
+          <SeriesShelf libraryBooks={libraryBooks} />
         )}
       </div>
       {loading && (
@@ -486,6 +510,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
           onCancel={() => handleSetSelectMode(false)}
         />
       )}
+      <SeriesModal />
       {showGroupingModal && selectedBooks.length > 0 && (
         <ModalPortal>
           <GroupingModal
@@ -535,6 +560,31 @@ const Bookshelf: React.FC<BookshelfProps> = ({
           onUpdateStatus={updateBooksStatus}
         />
       )}
+      <div
+        className='bg-base-100/95 sticky bottom-0 z-10 mt-4 flex items-center justify-center gap-2 border-t border-base-300 px-4 py-3 backdrop-blur'
+        style={{
+          paddingBottom: `${(safeAreaInsets?.bottom || 0) + 12}px`,
+        }}
+      >
+        <button
+          className={clsx(
+            'btn btn-sm rounded-full',
+            surfaceMode === 'books' ? 'btn-primary' : 'btn-ghost',
+          )}
+          onClick={() => handleSetSurfaceMode('books')}
+        >
+          {_('My Books')}
+        </button>
+        <button
+          className={clsx(
+            'btn btn-sm rounded-full',
+            surfaceMode === 'series' ? 'btn-primary' : 'btn-ghost',
+          )}
+          onClick={() => handleSetSurfaceMode('series')}
+        >
+          {_('My Series')}
+        </button>
+      </div>
     </div>
   );
 };

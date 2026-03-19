@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
 import type {
+  BookSeries,
   ContextTranslationSettings,
   TranslationOutputField,
 } from '@/services/contextTranslation/types';
@@ -46,5 +47,31 @@ describe('DEFAULT_CONTEXT_TRANSLATION_SETTINGS', () => {
   test('fields have unique, sequential order values', () => {
     const orders = s.outputFields.map((f) => f.order).sort((a, b) => a - b);
     orders.forEach((o, i) => expect(o).toBe(i));
+  });
+
+  test('provides defaults for look-ahead and popup rag limits', () => {
+    expect(s.lookAheadWords).toBe(80);
+    expect(s.sameBookChunkCount).toBeGreaterThan(0);
+    expect(s.priorVolumeChunkCount).toBeGreaterThan(0);
+  });
+
+  test('provides separate toggles for same-book and prior-volume rag', () => {
+    expect(s.sameBookRagEnabled).toBe(true);
+    expect(s.priorVolumeRagEnabled).toBe(true);
+  });
+
+  test('supports ordered series volumes in the context translation model', () => {
+    const series: BookSeries = {
+      id: 'series-1',
+      name: 'The Grey Castle',
+      volumes: [
+        { bookHash: 'vol-1', volumeIndex: 1, label: 'Vol. 1' },
+        { bookHash: 'vol-2', volumeIndex: 2, label: 'Vol. 2' },
+      ],
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    expect(series.volumes[1]?.volumeIndex).toBe(2);
   });
 });

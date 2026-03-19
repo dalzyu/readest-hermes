@@ -30,6 +30,12 @@ export const DEFAULT_AI_SETTINGS: AISettings = {
   aiGatewayModel: 'google/gemini-2.5-flash-lite',
   aiGatewayEmbeddingModel: 'openai/text-embedding-3-small',
 
+  openAICompatibleApiStyle: 'chat-completions',
+  openAICompatibleBaseUrl: 'http://127.0.0.1:8080',
+  openAICompatibleModel: '',
+  openAICompatibleEmbeddingBaseUrl: 'http://127.0.0.1:8081',
+  openAICompatibleEmbeddingModel: '',
+
   spoilerProtection: true,
   maxContextChunks: 10,
   indexingMode: 'on-demand',

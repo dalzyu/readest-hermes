@@ -1,52 +1,92 @@
-import { describe, test, expect } from 'vitest';
-import { assembleRecentContext } from '@/services/contextTranslation/contextAssembler';
+import { describe, expect, test } from 'vitest';
 
-describe('assembleRecentContext', () => {
+import { assemblePopupLocalContext } from '@/services/contextTranslation/contextAssembler';
+
+describe('assemblePopupLocalContext', () => {
   const pages = [
     { pageNumber: 1, text: 'Page one content with some words.' },
     { pageNumber: 2, text: 'Page two content with more words.' },
-    { pageNumber: 3, text: 'Page three content with the selected word 知己.' },
+    {
+      pageNumber: 3,
+      text: 'Page three content with the selected word 知己 and several words after it for look ahead.',
+    },
     { pageNumber: 4, text: 'Page four content that comes after.' },
     { pageNumber: 5, text: 'Page five content way after.' },
   ];
 
-  test('returns text from the last N pages up to current', () => {
-    const result = assembleRecentContext(pages, 3, 3);
-    expect(result).toContain('Page one content');
-    expect(result).toContain('Page two content');
-    expect(result).toContain('Page three content');
-    expect(result).not.toContain('Page four content');
+  test('returns bounded local context from the last N pages up to the selected text', () => {
+    const result = assemblePopupLocalContext(pages, {
+      currentPage: 3,
+      windowSize: 3,
+      selectedText: '知己',
+      lookAheadWords: 0,
+    });
+
+    expect(result.localPastContext).toContain('Page one content');
+    expect(result.localPastContext).toContain('Page two content');
+    expect(result.localPastContext).toContain('selected word 知己');
+    expect(result.localPastContext).not.toContain('and several words after');
+    expect(result.windowStartPage).toBe(1);
   });
 
-  test('returns only pages up to and including currentPage', () => {
-    const result = assembleRecentContext(pages, 2, 3);
-    expect(result).toContain('Page two content');
-    expect(result).toContain('Page three content');
-    expect(result).not.toContain('Page one content');
+  test('adds a separate future buffer after the selected text', () => {
+    const result = assemblePopupLocalContext(pages, {
+      currentPage: 3,
+      windowSize: 2,
+      selectedText: '知己',
+      lookAheadWords: 5,
+    });
+
+    expect(result.localPastContext).toContain('Page two content');
+    expect(result.localPastContext).not.toContain('and several words after');
+    expect(result.localFutureBuffer).toContain('and several words after it');
+    expect(result.localFutureBuffer).not.toContain('Page four content');
   });
 
   test('handles fewer pages than requested window', () => {
-    const result = assembleRecentContext(pages, 10, 2);
-    expect(result).toContain('Page one content');
-    expect(result).toContain('Page two content');
-    expect(result).not.toContain('Page three content');
+    const result = assemblePopupLocalContext(pages, {
+      currentPage: 2,
+      windowSize: 10,
+      selectedText: 'missing',
+      lookAheadWords: 0,
+    });
+
+    expect(result.localPastContext).toContain('Page one content');
+    expect(result.localPastContext).toContain('Page two content');
+    expect(result.localPastContext).not.toContain('Page three content');
   });
 
-  test('handles currentPage beyond available pages gracefully', () => {
-    const result = assembleRecentContext(pages, 3, 99);
-    // should return last 3 available pages
-    expect(result).toContain('Page three content');
-    expect(result).toContain('Page four content');
-    expect(result).toContain('Page five content');
+  test('spills the future buffer onto later pages when needed', () => {
+    const result = assemblePopupLocalContext(pages, {
+      currentPage: 3,
+      windowSize: 2,
+      selectedText: '知己',
+      lookAheadWords: 20,
+    });
+
+    expect(result.localFutureBuffer).toContain('Page four content');
   });
 
-  test('returns empty string for empty pages array', () => {
-    const result = assembleRecentContext([], 3, 1);
-    expect(result).toBe('');
+  test('returns empty sections for empty pages array', () => {
+    const result = assemblePopupLocalContext([], {
+      currentPage: 1,
+      windowSize: 3,
+      selectedText: '知己',
+      lookAheadWords: 5,
+    });
+
+    expect(result.localPastContext).toBe('');
+    expect(result.localFutureBuffer).toBe('');
   });
 
-  test('joins pages with newline separator', () => {
-    const result = assembleRecentContext(pages, 2, 2);
-    expect(result).toContain('\n');
+  test('joins pages with newline separator in the past context', () => {
+    const result = assemblePopupLocalContext(pages, {
+      currentPage: 2,
+      windowSize: 2,
+      selectedText: 'missing',
+      lookAheadWords: 0,
+    });
+
+    expect(result.localPastContext).toContain('\n');
   });
 });
