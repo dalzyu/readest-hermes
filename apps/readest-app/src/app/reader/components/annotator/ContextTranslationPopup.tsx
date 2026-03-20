@@ -35,14 +35,16 @@ interface ContextTranslationPopupProps {
 }
 
 interface ParsedExampleItem {
-  chineseLine: string;
+  sourceLine: string;
   englishLine: string | null;
+  chineseLine: string | null;
   extraLines: string[];
 }
 
 const HAN_REGEX = /[\u3400-\u9fff]/u;
 const PINYIN_LINE_REGEX = /^Pinyin:\s*/iu;
 const ENGLISH_LINE_REGEX = /^English:\s*/iu;
+const CHINESE_LINE_REGEX = /^Chinese:\s*/iu;
 
 function isChineseText(value: string): boolean {
   return HAN_REGEX.test(value);
@@ -148,6 +150,51 @@ function RubyText({
   );
 }
 
+function HighlightedText({
+  text,
+  highlightText,
+  className,
+}: {
+  text: string;
+  highlightText?: string;
+  className?: string;
+}) {
+  const ranges = highlightText ? findExampleMatchRanges(text, highlightText) : [];
+
+  if (ranges.length === 0) {
+    return <span className={className}>{text}</span>;
+  }
+
+  const segments: React.ReactNode[] = [];
+  let cursor = 0;
+
+  ranges.forEach((range, index) => {
+    if (cursor < range.start) {
+      segments.push(
+        <span key={`plain-${index}-${cursor}`}>{text.slice(cursor, range.start)}</span>,
+      );
+    }
+
+    const segmentClassName =
+      range.kind === 'exact'
+        ? 'rounded bg-yellow-300/20 px-0.5 text-yellow-200'
+        : 'rounded bg-cyan-300/20 px-0.5 text-cyan-200';
+
+    segments.push(
+      <span key={`highlight-${index}-${range.start}`} className={segmentClassName}>
+        {text.slice(range.start, range.end)}
+      </span>,
+    );
+    cursor = range.end;
+  });
+
+  if (cursor < text.length) {
+    segments.push(<span key={`plain-tail-${cursor}`}>{text.slice(cursor)}</span>);
+  }
+
+  return <span className={className}>{segments}</span>;
+}
+
 function parseExampleItems(value: string): string[] {
   return value
     .split(/\n{2,}/)
@@ -165,18 +212,41 @@ function parseExampleItem(item: string): ParsedExampleItem {
     .map((line) => line.trim())
     .filter(Boolean);
   const [firstLine = ''] = lines;
+  const sourceLine = stripExampleNumbering(firstLine);
+  const englishLine = lines.find((line) => ENGLISH_LINE_REGEX.test(line)) ?? null;
+  const chineseLine =
+    lines.find((line) => CHINESE_LINE_REGEX.test(line)) ??
+    lines.find(
+      (line, index) =>
+        index > 0 &&
+        !PINYIN_LINE_REGEX.test(line) &&
+        !ENGLISH_LINE_REGEX.test(line) &&
+        HAN_REGEX.test(line),
+    ) ??
+    null;
 
   return {
-    chineseLine: stripExampleNumbering(firstLine),
-    englishLine: lines.find((line) => ENGLISH_LINE_REGEX.test(line)) ?? null,
+    sourceLine,
+    englishLine,
+    chineseLine,
     extraLines: lines.filter(
-      (line, index) => index > 0 && !PINYIN_LINE_REGEX.test(line) && !ENGLISH_LINE_REGEX.test(line),
+      (line, index) =>
+        index > 0 && !PINYIN_LINE_REGEX.test(line) && line !== englishLine && line !== chineseLine,
     ),
   };
 }
 
 function hasRenderableExampleMatch(item: string, selectedText: string): boolean {
-  return classifyExampleMatch(parseExampleItem(item).chineseLine, selectedText).kind !== 'none';
+  const parsedItem = parseExampleItem(item);
+  const candidates = [
+    parsedItem.sourceLine,
+    parsedItem.chineseLine?.replace(CHINESE_LINE_REGEX, ''),
+    parsedItem.englishLine?.replace(ENGLISH_LINE_REGEX, ''),
+  ].filter(Boolean);
+
+  return candidates
+    .filter((c): c is string => c !== undefined)
+    .some((candidate) => classifyExampleMatch(candidate, selectedText).kind !== 'none');
 }
 
 function formatVolumeList(values: number[]): string {
@@ -424,22 +494,52 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
                     <ol className='not-eink:text-white/90 select-text list-decimal space-y-4 pl-5 text-sm leading-relaxed'>
                       {exampleItems.map((item, index) => {
                         const parsedExample = parseExampleItem(item);
+                        const sourceIsChinese = isChineseText(parsedExample.sourceLine);
 
                         return (
                           <li key={`${field.id}-${index}`} className='space-y-2'>
-                            {parsedExample.chineseLine ? (
+                            {parsedExample.sourceLine ? (
                               <div className='leading-8'>
-                                <RubyText
-                                  text={parsedExample.chineseLine}
-                                  highlightText={selectedText}
-                                  className='not-eink:text-white/95'
-                                />
+                                {sourceIsChinese ? (
+                                  <RubyText
+                                    text={parsedExample.sourceLine}
+                                    highlightText={selectedText}
+                                    className='not-eink:text-white/95'
+                                  />
+                                ) : (
+                                  <HighlightedText
+                                    text={parsedExample.sourceLine}
+                                    highlightText={selectedText}
+                                    className='not-eink:text-white/95'
+                                  />
+                                )}
                               </div>
                             ) : null}
                             {parsedExample.englishLine ? (
                               <p className='whitespace-pre-wrap text-white/80'>
                                 {parsedExample.englishLine}
                               </p>
+                            ) : null}
+                            {parsedExample.chineseLine ? (
+                              <div className='leading-8 text-white/80'>
+                                {CHINESE_LINE_REGEX.test(parsedExample.chineseLine) ? (
+                                  <>
+                                    <span>Chinese: </span>
+                                    <RubyText
+                                      text={parsedExample.chineseLine.replace(
+                                        CHINESE_LINE_REGEX,
+                                        '',
+                                      )}
+                                      className='not-eink:text-white/90'
+                                    />
+                                  </>
+                                ) : (
+                                  <RubyText
+                                    text={parsedExample.chineseLine}
+                                    className='not-eink:text-white/90'
+                                  />
+                                )}
+                              </div>
                             ) : null}
                             {parsedExample.extraLines.map((line, lineIndex) => (
                               <p

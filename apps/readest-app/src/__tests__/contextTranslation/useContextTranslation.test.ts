@@ -241,7 +241,7 @@ describe('useContextTranslation', () => {
     await waitFor(() => expect(buildPopupContextBundle).toHaveBeenCalledTimes(1));
     expect(streamTranslationWithContext).not.toHaveBeenCalled();
 
-    resolveContext?.(popupContextBundle);
+    (resolveContext as ((value: PopupContextBundle) => void) | null)?.(popupContextBundle);
 
     await waitFor(() => expect(streamTranslationWithContext).toHaveBeenCalledTimes(1));
   });
@@ -251,7 +251,7 @@ describe('useContextTranslation', () => {
 
     vi.mocked(streamTranslationWithContext).mockImplementationOnce(async function* () {
       yield {
-        fields: { translation: 'close' },
+        fields: { translation: 'close' } as Record<string, string>,
         activeFieldId: 'translation',
         rawText: '<translation>close',
         done: false,
@@ -260,7 +260,10 @@ describe('useContextTranslation', () => {
         releaseFinalChunk = resolve;
       });
       yield {
-        fields: { translation: 'close friend', contextualMeaning: 'trusted companion' },
+        fields: { translation: 'close friend', contextualMeaning: 'trusted companion' } as Record<
+          string,
+          string
+        >,
         activeFieldId: null,
         rawText:
           '<translation>close friend</translation><contextualMeaning>trusted companion</contextualMeaning>',
@@ -270,10 +273,10 @@ describe('useContextTranslation', () => {
 
     const { result } = renderHook(() => useContextTranslation(defaultProps));
 
-    await waitFor(() => expect(result.current.partialResult?.translation).toBe('close'));
+    await waitFor(() => expect(result.current.partialResult?.['translation']).toBe('close'));
     expect(result.current.loading).toBe(false);
-    releaseFinalChunk?.();
-    await waitFor(() => expect(result.current.result?.translation).toBe('close friend'));
+    (releaseFinalChunk as (() => void) | null)?.();
+    await waitFor(() => expect(result.current.result?.['translation']).toBe('close friend'));
     expect(result.current.activeFieldId).toBeNull();
   });
 

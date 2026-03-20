@@ -31,7 +31,7 @@ vi.mock('ai-sdk-ollama', () => ({
 }));
 
 vi.mock('@ai-sdk/openai', () => ({
-  createOpenAI: (...args: unknown[]) => mockCreateOpenAI(...args),
+  createOpenAI: (...args: unknown[]) => (mockCreateOpenAI as (...a: unknown[]) => unknown)(...args),
 }));
 
 import { OllamaProvider } from '@/services/ai/providers/OllamaProvider';

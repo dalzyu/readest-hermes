@@ -9,7 +9,7 @@ describe('Cloudflare build orchestration', () => {
     expect(packageJson.scripts.preview).not.toContain('patch-build-webpack');
     expect(packageJson.scripts.deploy).not.toContain('restore-build-original');
     expect(packageJson.scripts.upload).not.toContain('patch-build-webpack');
-    expect(packageJson.scripts['config-wrangler']).toBeUndefined();
+    expect((packageJson.scripts as Record<string, string | undefined>)['config-wrangler']).toBeUndefined();
   });
 
   test('helper builds preview command without package mutation', () => {

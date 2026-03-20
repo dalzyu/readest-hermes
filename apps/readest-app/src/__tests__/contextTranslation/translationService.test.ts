@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { TranslationOutputField, TranslationRequest } from '@/services/contextTranslation/types';
+import type {
+  TranslationOutputField,
+  TranslationRequest,
+} from '@/services/contextTranslation/types';
 
 vi.mock('@/services/contextTranslation/llmClient', () => ({
   callLLM: vi.fn(),
@@ -81,8 +84,8 @@ describe('translateWithContext', () => {
     expect(userPrompt).toContain('知己');
     expect(userPrompt).toContain('Earlier in the same volume');
 
-    expect(result.translation).toBe('close friend');
-    expect(result.contextualMeaning).toBe('A soulmate who truly understands you.');
+    expect(result['translation']).toBe('close friend');
+    expect(result['contextualMeaning']).toBe('A soulmate who truly understands you.');
   });
 
   test('returns empty translation when LLM returns empty string', async () => {
@@ -90,7 +93,7 @@ describe('translateWithContext', () => {
 
     const result = await translateWithContext(baseRequest);
 
-    expect(result.translation).toBe('');
+    expect(result['translation']).toBe('');
   });
 
   test('propagates LLM errors', async () => {
@@ -110,7 +113,7 @@ describe('translateWithContext', () => {
       outputFields: fieldsWithExamples,
     });
 
-    expect(result.examples).toBe(
+    expect(result['examples']).toBe(
       '1. 知己难逢\nPinyin: zhī jǐ nán féng\nEnglish: True friends are hard to find.',
     );
   });
@@ -130,11 +133,11 @@ describe('streamTranslationWithContext', () => {
       updates.push(update);
     }
 
-    expect(updates[0]!.fields.translation).toBe('close');
-    expect(updates[1]!.fields.translation).toBe('close friend');
-    expect(updates[1]!.fields.contextualMeaning).toBe('trusted ally');
+    expect(updates[0]!.fields['translation']).toBe('close');
+    expect(updates[1]!.fields['translation']).toBe('close friend');
+    expect(updates[1]!.fields['contextualMeaning']).toBe('trusted ally');
     expect(updates.at(-1)!.done).toBe(true);
-    expect(updates.at(-1)!.fields.contextualMeaning).toBe('trusted ally');
+    expect(updates.at(-1)!.fields['contextualMeaning']).toBe('trusted ally');
   });
 
   test('streams chinese examples with deterministic pinyin', async () => {
@@ -156,8 +159,8 @@ describe('streamTranslationWithContext', () => {
       updates.push(update);
     }
 
-    expect(updates[0]!.fields.examples).toBe('1. 知己难逢\nPinyin: zhī jǐ nán féng');
-    expect(updates.at(-1)!.fields.examples).toBe(
+    expect(updates[0]!.fields['examples']).toBe('1. 知己难逢\nPinyin: zhī jǐ nán féng');
+    expect(updates.at(-1)!.fields['examples']).toBe(
       '1. 知己难逢\nPinyin: zhī jǐ nán féng\nEnglish: True friends are hard to find.',
     );
   });

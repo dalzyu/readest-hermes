@@ -20,12 +20,14 @@ const SeriesShelf: React.FC<SeriesShelfProps> = ({ libraryBooks }) => {
   }, []);
 
   useEffect(() => {
+    // setState is only called after awaiting getAllSeries — not synchronous.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadSeries();
   }, [loadSeries]);
 
   if (seriesList.length === 0) {
     return (
-      <div className='px-4 py-10 text-center text-sm text-base-content/60'>
+      <div className='text-base-content/60 px-4 py-10 text-center text-sm'>
         {_('No series yet.')}
       </div>
     );

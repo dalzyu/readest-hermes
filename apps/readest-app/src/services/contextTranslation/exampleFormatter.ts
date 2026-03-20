@@ -1,13 +1,20 @@
 import { pinyin } from 'pinyin-pro';
-import type { TranslationRequest, TranslationResult } from './types';
+import type { TranslationOutputField, TranslationResult } from './types';
 import { classifyExampleMatch } from './exampleMatcher';
+
+type FormatRequest = {
+  selectedText: string;
+  sourceLanguage?: string;
+  targetLanguage: string;
+  outputFields: TranslationOutputField[];
+};
 
 const HAN_REGEX = /[\u3400-\u9fff]/u;
 const NUMBERED_EXAMPLE_REGEX = /^(\d+\.\s*)(.+)$/u;
 const ENGLISH_LINE_REGEX = /^English:\s*/iu;
 const PINYIN_LINE_REGEX = /^Pinyin:\s*/iu;
 
-function shouldFormatChineseExamples(request: TranslationRequest, result: TranslationResult): boolean {
+function shouldFormatChineseExamples(request: FormatRequest, result: TranslationResult): boolean {
   return (
     !!result['examples'] &&
     request.outputFields.some((field) => field.enabled && field.id === 'examples') &&
@@ -15,7 +22,7 @@ function shouldFormatChineseExamples(request: TranslationRequest, result: Transl
   );
 }
 
-function shouldProcessExamples(request: TranslationRequest, result: TranslationResult): boolean {
+function shouldProcessExamples(request: FormatRequest, result: TranslationResult): boolean {
   return (
     !!result['examples'] &&
     request.outputFields.some((field) => field.enabled && field.id === 'examples')
@@ -88,7 +95,7 @@ function formatExampleBlock(
   return formattedLines.join('\n');
 }
 
-function formatExamples(examples: string, request: TranslationRequest): string {
+function formatExamples(examples: string, request: FormatRequest): string {
   const normalizedExamples = normalizeExampleLayout(examples);
   if (!normalizedExamples) {
     return examples;
@@ -126,7 +133,11 @@ function formatExamples(examples: string, request: TranslationRequest): string {
 
   return blocks
     .map((block) =>
-      formatExampleBlock(block, request.selectedText, shouldFormatChineseExamples(request, { examples })),
+      formatExampleBlock(
+        block,
+        request.selectedText,
+        shouldFormatChineseExamples(request, { examples }),
+      ),
     )
     .filter(Boolean)
     .join('\n\n');
@@ -134,7 +145,7 @@ function formatExamples(examples: string, request: TranslationRequest): string {
 
 export function formatTranslationResult(
   result: TranslationResult,
-  request: TranslationRequest,
+  request: FormatRequest,
 ): TranslationResult {
   const examples = result['examples'];
 
