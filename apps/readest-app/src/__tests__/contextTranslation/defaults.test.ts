@@ -1,5 +1,9 @@
 import { describe, test, expect } from 'vitest';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
+import {
+  DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+  DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+  CONTEXT_LOOKUP_MODES,
+} from '@/services/contextTranslation/defaults';
 import type {
   BookSeries,
   ContextTranslationSettings,
@@ -73,5 +77,16 @@ describe('DEFAULT_CONTEXT_TRANSLATION_SETTINGS', () => {
     };
 
     expect(series.volumes[1]?.volumeIndex).toBe(2);
+  });
+});
+
+describe('CONTEXT_LOOKUP_MODES and dictionary defaults', () => {
+  test('exposes translation and dictionary mode ids', () => {
+    expect(CONTEXT_LOOKUP_MODES).toEqual(['translation', 'dictionary']);
+  });
+
+  test('provides dictionary defaults separate from translation defaults', () => {
+    expect(DEFAULT_CONTEXT_DICTIONARY_SETTINGS.enabled).toBe(false);
+    expect(DEFAULT_CONTEXT_TRANSLATION_SETTINGS.targetLanguage).toBe('en');
   });
 });

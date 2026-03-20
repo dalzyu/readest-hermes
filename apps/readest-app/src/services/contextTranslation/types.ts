@@ -76,6 +76,12 @@ export interface PopupContextBundle {
   retrievalHints: PopupRetrievalHints;
 }
 
+/** Settings for the source-language dictionary lookup feature */
+export interface ContextDictionarySettings {
+  enabled: boolean;
+  sourceExamples: boolean;
+}
+
 /** Settings for the context-aware translation feature */
 export interface ContextTranslationSettings {
   enabled: boolean;

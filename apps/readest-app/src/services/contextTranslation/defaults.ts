@@ -1,4 +1,5 @@
-import type { ContextTranslationSettings } from './types';
+import type { ContextDictionarySettings, ContextTranslationSettings } from './types';
+export { CONTEXT_LOOKUP_MODES } from './modes';
 
 export const DEFAULT_CONTEXT_TRANSLATION_SETTINGS: ContextTranslationSettings = {
   enabled: false,
@@ -35,4 +36,9 @@ export const DEFAULT_CONTEXT_TRANSLATION_SETTINGS: ContextTranslationSettings = 
         'Provide 2–3 short example sentences using the selected term in similar contexts.',
     },
   ],
+};
+
+export const DEFAULT_CONTEXT_DICTIONARY_SETTINGS: ContextDictionarySettings = {
+  enabled: false,
+  sourceExamples: true,
 };
