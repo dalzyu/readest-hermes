@@ -12,9 +12,9 @@ const command = args[0];
 const shouldInjectLocalConfig =
   (command === 'build' || command === 'dev') && !args.includes('--config');
 
-const tauriArgs = ['exec', 'tauri', ...args];
+const tauriArgs = ['exec', '--', 'tauri', ...args];
 if (shouldInjectLocalConfig) {
-  tauriArgs.splice(3, 0, '--config', 'src-tauri/tauri.local.conf.json');
+  tauriArgs.splice(4, 0, '--config', 'src-tauri/tauri.local.conf.json');
 }
 
 const result = spawnSync(process.execPath, [npmExecPath, ...tauriArgs], {
