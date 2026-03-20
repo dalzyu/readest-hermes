@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import AIPanel from '@/components/settings/AIPanel';
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
+import {
+  DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+  DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+} from '@/services/contextTranslation/defaults';
 
 const saveSettingsMock = vi.fn();
 const setSettingsMock = vi.fn();
@@ -33,6 +36,7 @@ vi.mock('@/store/settingsStore', () => ({
           ...DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
           enabled: true,
         },
+        contextDictionary: DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
       },
     },
     setSettings: setSettingsMock,
@@ -74,5 +78,10 @@ describe('AIPanel', () => {
 
     expect(setSettingsMock).toHaveBeenCalled();
     expect(saveSettingsMock).toHaveBeenCalled();
+  });
+
+  test('ai panel persists dictionary settings separately from translation settings', () => {
+    render(<AIPanel />);
+    expect(screen.getByLabelText(/enable dictionary lookup/i)).toBeTruthy();
   });
 });

@@ -8,4 +8,5 @@ export type AnnotationToolType =
   | 'translate'
   | 'tts'
   | 'proofread'
-  | 'ctx-translate';
+  | 'ctx-translate'
+  | 'ctx-dictionary';

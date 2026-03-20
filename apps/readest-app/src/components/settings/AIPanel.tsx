@@ -8,8 +8,14 @@ import { useEnv } from '@/context/EnvContext';
 import { getAIProvider } from '@/services/ai/providers';
 import { DEFAULT_AI_SETTINGS, GATEWAY_MODELS, MODEL_PRICING } from '@/services/ai/constants';
 import type { AISettings, AIProviderName, AIProviderApiStyle } from '@/services/ai/types';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
-import type { ContextTranslationSettings } from '@/services/contextTranslation/types';
+import {
+  DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+  DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+} from '@/services/contextTranslation/defaults';
+import type {
+  ContextDictionarySettings,
+  ContextTranslationSettings,
+} from '@/services/contextTranslation/types';
 import { getTranslatorLanguageOptions } from '@/services/translatorLanguages';
 
 type ConnectionStatus = 'idle' | 'testing' | 'success' | 'error';
@@ -73,6 +79,9 @@ const AIPanel: React.FC = () => {
   const ctxTransSettings: ContextTranslationSettings =
     settings?.globalReadSettings?.contextTranslation ?? DEFAULT_CONTEXT_TRANSLATION_SETTINGS;
 
+  const ctxDictSettings: ContextDictionarySettings =
+    settings?.globalReadSettings?.contextDictionary ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS;
+
   const [ctxEnabled, setCtxEnabled] = useState(ctxTransSettings.enabled);
   const [ctxTargetLang, setCtxTargetLang] = useState(ctxTransSettings.targetLanguage);
   const [ctxRecentPages, setCtxRecentPages] = useState(ctxTransSettings.recentContextPages);
@@ -90,6 +99,8 @@ const AIPanel: React.FC = () => {
     ctxTransSettings.priorVolumeChunkCount,
   );
   const [ctxOutputFields, setCtxOutputFields] = useState(ctxTransSettings.outputFields);
+
+  const [ctxDictEnabled, setCtxDictEnabled] = useState(ctxDictSettings.enabled);
 
   const [enabled, setEnabled] = useState(aiSettings.enabled);
   const [provider, setProvider] = useState<AIProviderName>(aiSettings.provider);
@@ -171,6 +182,19 @@ const AIPanel: React.FC = () => {
         currentSettings.globalReadSettings.contextTranslation ??
         DEFAULT_CONTEXT_TRANSLATION_SETTINGS;
       currentSettings.globalReadSettings.contextTranslation = { ...current, ...patch };
+      setSettings(currentSettings);
+      saveSettings(envConfig, currentSettings);
+    },
+    [envConfig, setSettings, saveSettings],
+  );
+
+  const saveCtxDictSetting = useCallback(
+    (patch: Partial<ContextDictionarySettings>) => {
+      const currentSettings = settingsRef.current;
+      if (!currentSettings) return;
+      const current: ContextDictionarySettings =
+        currentSettings.globalReadSettings.contextDictionary ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS;
+      currentSettings.globalReadSettings.contextDictionary = { ...current, ...patch };
       setSettings(currentSettings);
       saveSettings(envConfig, currentSettings);
     },
@@ -986,6 +1010,33 @@ const AIPanel: React.FC = () => {
                     />
                   </div>
                 ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className='w-full'>
+        <h2 className='mb-2 font-medium'>{_('Dictionary Lookup')}</h2>
+        <p className='text-base-content/70 mb-3 text-sm'>
+          {_(
+            'When enabled, selecting text in the reader can trigger a context-aware dictionary lookup using the AI model.',
+          )}
+        </p>
+        <div className='card border-base-200 bg-base-100 border shadow'>
+          <div className='divide-base-200 divide-y'>
+            <div className='config-item'>
+              <label htmlFor='ctx-dict-enabled-toggle'>{_('Enable Dictionary Lookup')}</label>
+              <input
+                id='ctx-dict-enabled-toggle'
+                type='checkbox'
+                className='toggle'
+                checked={ctxDictEnabled}
+                onChange={() => {
+                  const next = !ctxDictEnabled;
+                  setCtxDictEnabled(next);
+                  saveCtxDictSetting({ enabled: next });
+                }}
+              />
             </div>
           </div>
         </div>
