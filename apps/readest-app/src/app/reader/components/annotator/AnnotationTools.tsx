@@ -5,7 +5,7 @@ import { PiHighlighterFill } from 'react-icons/pi';
 import { FaWikipediaW } from 'react-icons/fa';
 import { BsPencilSquare } from 'react-icons/bs';
 import { BsTranslate } from 'react-icons/bs';
-import { TbHexagonLetterD } from 'react-icons/tb';
+import { TbHexagonLetterD, TbHexagonLetterA } from 'react-icons/tb';
 import { FaHeadphones } from 'react-icons/fa6';
 import { IoIosBuild } from 'react-icons/io';
 import { RiTranslate2 } from 'react-icons/ri';
@@ -98,6 +98,12 @@ export const annotationToolButtons = createAnnotationToolButtons([
     tooltip: _('Context-aware AI translation after selection'),
     Icon: RiTranslate2,
     quickAction: true,
+  },
+  {
+    type: 'ctx-dictionary',
+    label: _('AI Dictionary'),
+    tooltip: _('Context-aware AI dictionary lookup after selection'),
+    Icon: TbHexagonLetterA,
   },
 ]);
 
