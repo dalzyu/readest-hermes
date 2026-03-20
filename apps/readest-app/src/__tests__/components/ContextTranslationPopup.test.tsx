@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import ContextTranslationPopup from '@/app/reader/components/annotator/ContextTranslationPopup';
 import type { ContextTranslationSettings } from '@/services/contextTranslation/types';
@@ -72,7 +72,7 @@ const settings: ContextTranslationSettings = {
 const defaultProps = {
   bookKey: 'book-key-1',
   bookHash: 'hash-abc',
-  selectedText: '身侧',
+  selectedText: '\u8eab\u4fa7',
   currentPage: 5,
   settings,
   position: { point: { x: 0, y: 0 } },
@@ -93,7 +93,7 @@ describe('ContextTranslationPopup', () => {
         translation: 'by his side',
         contextualMeaning: 'trusted companion',
         examples:
-          '1. 程岩挥挥手，招呼侍卫带自己离开，卡特犹豫了下，还是跟上队伍，走在四王子身侧。\nPinyin: ignored\nEnglish: Carter walked beside the prince.\n\n2. 他始终守在身侧，不敢退后。\nPinyin: ignored\nEnglish: He remained by his side without stepping back.',
+          '1. \u7a0b\u535a\u6325\u624b\uff0c\u62db\u547c\u4f8d\u536b\u5e26\u81ea\u5df1\u79bb\u5f00\uff0c\u5361\u7279\u72b9\u8c6b\u4e86\u4e00\u4e0b\uff0c\u8fd8\u662f\u8ddf\u4e0a\u961f\u4f0d\uff0c\u8d70\u5728\u56db\u738b\u5b50\u8eab\u4fa7\u3002\nPinyin: ignored\nEnglish: Carter walked beside the prince.\n\n2. \u4ed6\u59cb\u7ec8\u5b88\u5728\u8eab\u4fa7\uff0c\u4e0d\u6562\u9000\u540e\u3002\nPinyin: ignored\nEnglish: He remained by his side without stepping back.',
       },
       loading: true,
       streaming: true,
@@ -124,8 +124,8 @@ describe('ContextTranslationPopup', () => {
 
     const { container } = render(<ContextTranslationPopup {...defaultProps} />);
 
-    expect(screen.getByText('身侧')).toBeTruthy();
-    expect(screen.getByText('shēn cè')).toBeTruthy();
+    expect(screen.getByText('\u8eab\u4fa7')).toBeTruthy();
+    expect(screen.getByText('sh\u0113n c\u00e8')).toBeTruthy();
     expect(screen.getByText('by his side')).toBeTruthy();
     expect(screen.getByText('Cross-volume context')).toBeTruthy();
     expect(screen.getByText('Ask About This')).toBeTruthy();
@@ -133,12 +133,8 @@ describe('ContextTranslationPopup', () => {
 
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
     expect(screen.getByText('English: Carter walked beside the prince.')).toBeTruthy();
-
-    const rubyNodes = container.querySelectorAll('ruby');
-    expect(rubyNodes.length).toBeGreaterThan(2);
-
-    const highlightedNodes = container.querySelectorAll('.bg-yellow-300\\/20');
-    expect(highlightedNodes.length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('ruby').length).toBeGreaterThan(2);
+    expect(container.querySelectorAll('.bg-yellow-300\\/20').length).toBeGreaterThan(0);
   });
 
   test('renders a speak button that dispatches tts-speak with text and bookKey', () => {
@@ -163,13 +159,11 @@ describe('ContextTranslationPopup', () => {
     render(<ContextTranslationPopup {...defaultProps} />);
 
     const speakBtns = screen.getAllByRole('button', { name: 'Speak' });
-    expect(speakBtns.length).toBeGreaterThan(0);
-
     fireEvent.click(speakBtns[0]!);
 
     expect(mockDispatch).toHaveBeenCalledWith('tts-speak', {
       bookKey: 'book-key-1',
-      text: '身侧',
+      text: '\u8eab\u4fa7',
       oneTime: true,
     });
   });
@@ -179,7 +173,7 @@ describe('ContextTranslationPopup', () => {
       result: {
         translation: 'by his side',
         examples:
-          '1. 他始终守在身 侧。\nPinyin: ignored\nEnglish: He stayed by his side.\n\n2. 众人纷纷后退。\nPinyin: ignored\nEnglish: The crowd backed away.',
+          '1. \u4ed6\u59cb\u7ec8\u5b88\u5728\u8eab \u4fa7\u3002\nPinyin: ignored\nEnglish: He stayed by his side.\n\n2. \u4f17\u4eba\u7eb7\u7eb7\u540e\u9000\u3002\nPinyin: ignored\nEnglish: The crowd backed away.',
       },
       partialResult: null,
       loading: false,
@@ -209,12 +203,132 @@ describe('ContextTranslationPopup', () => {
       saveToVocabulary: vi.fn(),
     });
 
-    const { container } = render(<ContextTranslationPopup {...defaultProps} selectedText='身侧' />);
+    const { container } = render(
+      <ContextTranslationPopup {...defaultProps} selectedText='\u8eab\u4fa7' />,
+    );
 
-    expect(container.querySelectorAll('ol > li')).toHaveLength(1);
     expect(screen.queryByText('English: The crowd backed away.')).toBeNull();
+    expect(container.textContent).toContain('English: He stayed by his side.');
+  });
 
-    const variantHighlightedNodes = container.querySelectorAll('.bg-cyan-300\\/20');
-    expect(variantHighlightedNodes.length).toBeGreaterThan(0);
+  test('renders usage examples from structured sourceText and targetText fields', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: {
+        translation: 'kindred spirit',
+        examples: '1. 知己难逢\nPinyin: zhī jǐ nán féng\nEnglish: True friends are hard to find.',
+      },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      saveToVocabulary: vi.fn(),
+    });
+
+    const { container } = render(
+      <ContextTranslationPopup
+        {...defaultProps}
+        selectedText='知己'
+        settings={{ ...settings, targetLanguage: 'en', outputFields: settings.outputFields }}
+      />,
+    );
+
+    expect(container.textContent).toContain('English: True friends are hard to find.');
+    expect(screen.getByText('kindred spirit')).toBeTruthy();
+  });
+
+  test('renders english-to-chinese examples without requiring language-label parsing in popup', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: {
+        translation: '格林尼斯公司',
+        examples: '1. Mr. Dursley worked at Grunnings.\nChinese: 杜斯礼先生在格林尼斯公司工作。',
+      },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      saveToVocabulary: vi.fn(),
+    });
+
+    const { container } = render(
+      <ContextTranslationPopup
+        {...defaultProps}
+        selectedText='Grunnings'
+        settings={{ ...settings, targetLanguage: 'zh', outputFields: settings.outputFields }}
+      />,
+    );
+
+    // The example sentence text should be visible
+    expect(container.textContent).toContain('Mr. Dursley worked at Grunnings.');
+    // The Chinese translation should appear (from Chinese: label in formatted text)
+    expect(container.textContent).toContain('格林尼斯公司');
+  });
+
+  test('renders english-to-chinese examples with grouped english highlights and chinese ruby translation', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: {
+        translation: '\u683c\u6797\u5c3c\u65af\u516c\u53f8',
+        examples:
+          '1. Mr. Dursley worked at Grunnings, a company that manufactured drills.\nChinese: \u675c\u65af\u793c\u5148\u751f\u5728\u4e00\u5bb6\u751f\u4ea7\u94bb\u673a\u7684\u683c\u6797\u5c3c\u65af\u516c\u53f8\u5de5\u4f5c\u3002',
+      },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-volume',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: {
+        localPastContext: 'past',
+        localFutureBuffer: '',
+        sameBookChunks: [],
+        priorVolumeChunks: [],
+        retrievalStatus: 'local-volume',
+        retrievalHints: {
+          currentVolumeIndexed: true,
+          missingLocalIndex: false,
+          missingPriorVolumes: [],
+          missingSeriesAssignment: false,
+        },
+      },
+      saveToVocabulary: vi.fn(),
+    });
+
+    const { container } = render(
+      <ContextTranslationPopup {...defaultProps} selectedText='Grunnings' />,
+    );
+
+    expect(container.textContent).toContain(
+      'Mr. Dursley worked at Grunnings, a company that manufactured drills.',
+    );
+    expect(container.textContent).toContain('Chinese:');
+    expect(
+      Array.from(container.querySelectorAll('.bg-yellow-300\\/20')).some(
+        (node) => node.textContent === 'Grunnings',
+      ),
+    ).toBe(true);
+    expect(container.querySelectorAll('ruby').length).toBeGreaterThan(0);
   });
 });

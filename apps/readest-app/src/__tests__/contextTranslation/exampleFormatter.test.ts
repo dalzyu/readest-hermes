@@ -92,7 +92,8 @@ describe('formatTranslationResult', () => {
   test('keeps spacing-variant matches while normalizing layout', () => {
     const result = formatTranslationResult(
       {
-        examples: '1. \u4ed6\u59cb\u7ec8\u5b88\u5728\u8eab \u4fa7\u3002\nEnglish: He stayed by his side.',
+        examples:
+          '1. \u4ed6\u59cb\u7ec8\u5b88\u5728\u8eab \u4fa7\u3002\nEnglish: He stayed by his side.',
       },
       {
         ...chineseRequest,
@@ -102,6 +103,51 @@ describe('formatTranslationResult', () => {
 
     expect(result['examples']).toBe(
       '1. \u4ed6\u59cb\u7ec8\u5b88\u5728\u8eab \u4fa7\u3002\nPinyin: t\u0101 sh\u01d0 zh\u014dng sh\u01d2u z\u00e0i sh\u0113n c\u00e8\nEnglish: He stayed by his side.',
+    );
+  });
+
+  test('english-to-chinese format: only keeps examples containing the selected term', () => {
+    const result = formatTranslationResult(
+      {
+        examples:
+          '1. Mr. Dursley worked at Grunnings.\nChinese: 杜斯礼先生在格林尼斯公司工作。\n\n2. He was a big beefy man.\nChinese: 他是个大块头男人。',
+      },
+      {
+        selectedText: 'Grunnings',
+        sourceLanguage: 'en',
+        targetLanguage: 'zh',
+        outputFields: [
+          {
+            id: 'examples',
+            label: 'Examples',
+            enabled: true,
+            order: 0,
+            promptInstruction: 'Give examples.',
+          },
+        ],
+      },
+    );
+
+    expect(result['examples']).toContain('Grunnings');
+    expect(result['examples']).not.toContain('big beefy man');
+  });
+
+  test('normalizes english-to-chinese examples into source and chinese translation lines without model pinyin', () => {
+    const result = formatTranslationResult(
+      {
+        examples:
+          '1. Mr. Dursley worked at Grunnings.\nPinyin: ignored\nChinese: \u675c\u65af\u793c\u5148\u751f\u5728\u683c\u6797\u5c3c\u65af\u516c\u53f8\u5de5\u4f5c\u3002\n\n2. He looked away from the sign.\nChinese: \u4ed6\u628a\u76ee\u5149\u4ece\u62db\u724c\u4e0a\u79fb\u5f00\u3002',
+      },
+      {
+        ...chineseRequest,
+        selectedText: 'Grunnings',
+        sourceLanguage: 'en',
+        targetLanguage: 'zh',
+      },
+    );
+
+    expect(result['examples']).toBe(
+      '1. Mr. Dursley worked at Grunnings.\nChinese: \u675c\u65af\u793c\u5148\u751f\u5728\u683c\u6797\u5c3c\u65af\u516c\u53f8\u5de5\u4f5c\u3002',
     );
   });
 });
