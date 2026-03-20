@@ -138,12 +138,13 @@ The LLM may still emit tagged text, JSON, or another transport shape, but the ap
 - `term`
 - `sourceLanguage`
 - `targetLanguage`
+- `sourceLanguageConfidence?: number`
 - `translation`
 - `primaryMeaning`
 - `alternativeMeanings?: string[]`
-- `usageExamples: Array<{ sourceText: string; targetText: string; sourceTermRanges?: Array<{ start: number; end: number }>; targetTermRanges?: Array<{ start: number; end: number }> }>`
+- `usageExamples: Array<{ id: string; sourceText: string; targetText: string; sourceTermRanges?: Array<{ start: number; end: number }>; targetTermRanges?: Array<{ start: number; end: number }> }>`
 - `notes?: string[]`
-- `annotations?: Record<string, TranslationAnnotations>`
+- `annotations?: { source?: TranslationAnnotations; target?: TranslationAnnotations }`
 
 Rules:
 
@@ -158,11 +159,12 @@ Rules:
 
 - `term`
 - `sourceLanguage`
+- `sourceLanguageConfidence?: number`
 - `simpleDefinition`
 - `contextualMeaning`
 - `sourceExamples: string[]`
 - `notes?: string[]`
-- `annotations?: Record<string, DictionaryAnnotations>`
+- `annotations?: { source?: DictionaryAnnotations }`
 
 Rules:
 
@@ -183,6 +185,7 @@ Suggested shape:
 - `DictionaryAnnotations`
   - `pronunciation?: PronunciationAnnotation`
   - `segmentation?: SegmentationAnnotation`
+  - `exampleAnnotations?: ExampleAnnotation[]`
 
 Suggested low-level data:
 
@@ -194,10 +197,25 @@ Suggested low-level data:
   - `tokens: Array<{ text: string; start: number; end: number }>`
 
 - `ExampleAnnotation`
+  - `exampleId`
   - `sourceText`
   - `targetText`
-  - `sourceTokens?: ...`
-  - `targetTokens?: ...`
+  - `sourceTokens?: Array<{ text: string; start: number; end: number }>`
+  - `targetTokens?: Array<{ text: string; start: number; end: number }>`
+
+## Offset And Indexing Contract
+
+All `start` and `end` offsets in normalized models should use Unicode code point indices relative to the specific field string they annotate.
+
+Rules:
+
+- offsets are zero-based
+- `end` is exclusive
+- ranges are never relative to the whole popup payload
+- example ranges are relative to `usageExamples[n].sourceText` or `usageExamples[n].targetText`
+- token offsets follow the same rule
+
+The renderer may convert these code point indices into grapheme-safe display spans if needed, but the data contract should remain code-point-based across plugins and validators.
 
 ## Plugin API
 
@@ -243,6 +261,34 @@ Run:
 
 This keeps dictionary mode source-language-first and avoids accidental target-language enrichment.
 
+## Unknown And Mixed-Language Policy
+
+The detector may return:
+
+- a concrete BCP-47 language tag
+- `und` for undetermined language
+- a low-confidence result for short or mixed text
+
+Policy:
+
+- if source language is `und`, the system still proceeds with the fallback plugin and soft validation only
+- if source language confidence is low, the system should avoid hard language-based validation failures unless structural errors also exist
+- mixed-language selections should be treated as valid input, but plugin enrichment should default to the fallback plugin unless one language is dominant enough for confident plugin selection
+- dictionary mode should refuse only when the selection is too ambiguous to explain reliably in a single source language; otherwise it should continue with fallback behavior
+
+## Annotation Keying And Ownership
+
+Annotation containers should be keyed by logical slot, not plugin id and not raw language tag.
+
+Use:
+
+- `annotations.source`
+- `annotations.target`
+
+This avoids collisions between locale variants and keeps renderer lookup deterministic.
+
+Language tags and plugin ids should instead be stored inside annotation metadata or telemetry events.
+
 ## Validation And Recovery
 
 Validation must happen between LLM output and UI rendering.
@@ -255,6 +301,13 @@ Validation tiers:
 2. role validation
 3. heuristic language validation
 4. plugin-assisted validation
+
+Decision states:
+
+- `accept`
+- `accept-with-warning`
+- `repair`
+- `degrade`
 
 ### Translation Validation
 
@@ -272,6 +325,33 @@ Allow-rules for unchanged translation should include at least:
 - explicit borrowing cases accepted by plugin or validator rules
 
 Heuristic language validation should be soft for short strings and same-script language pairs. A suspicious result should produce a warning score, not an immediate hard failure, unless multiple checks agree.
+
+Suggested decision policy:
+
+- `accept`
+  - structural validation passes
+  - no role violation
+  - no strong validator warnings
+- `accept-with-warning`
+  - structural validation passes
+  - role validation passes
+  - only soft heuristic warnings are present
+- `repair`
+  - structural validation fails in a repairable way
+  - role validation fails
+  - or two or more independent warnings agree that the translation is likely wrong
+- `degrade`
+  - repair attempt already failed
+  - or required fields remain unusable after normalization
+
+Independent warnings should mean checks from different sources, for example:
+
+- heuristic language mismatch
+- plugin validator disagreement
+- identical-source translation without an allow-rule
+- malformed example pairing
+
+Same-script pairs and very short strings should require stronger evidence before escalating from `accept-with-warning` to `repair`.
 
 If validation fails:
 
@@ -307,6 +387,13 @@ Priority order:
 2. tagged text fallback normalized into the same internal model
 
 The normalization layer should treat tagged text as a compatibility transport only, not as the primary application contract.
+
+The structured transport should carry a schema version so the application can evolve fields without breaking older fallbacks.
+
+Suggested rule:
+
+- version all structured payloads with a top-level schema version
+- keep tagged-text normalization tests for backward compatibility until the tagged path is removed
 
 ## Prompt Policy
 
