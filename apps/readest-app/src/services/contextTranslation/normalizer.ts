@@ -17,7 +17,12 @@ function extractLookupJson(raw: string): Record<string, string> | null {
   try {
     const parsed: unknown = JSON.parse(match[1].trim());
     if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as Record<string, string>;
+      // Ensure all leaf values are strings (LLM may return arrays or objects for structured fields)
+      const stringified: Record<string, string> = {};
+      for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+        stringified[key] = typeof value === 'string' ? value : JSON.stringify(value);
+      }
+      return stringified;
     }
   } catch {
     // malformed JSON — fall through to tag-based parser
