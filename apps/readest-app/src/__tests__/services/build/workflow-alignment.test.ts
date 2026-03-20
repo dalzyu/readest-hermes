@@ -53,6 +53,12 @@ describe('workflow alignment', () => {
     );
   });
 
+  test('workflow dispatch can create a release when the fork has no existing release object', () => {
+    expect(releaseWorkflow).toContain('getReleaseByTag');
+    expect(releaseWorkflow).toContain('createRelease');
+    expect(releaseWorkflow).toContain("const tag = `v${process.env.PACKAGE_VERSION}`;");
+  });
+
   test('tauri hooks use the same package-manager entrypoint as local builds', () => {
     expect(tauriConfig.build.beforeDevCommand).toBe('corepack pnpm dev');
     expect(tauriConfig.build.beforeBuildCommand).toBe('corepack pnpm build');
