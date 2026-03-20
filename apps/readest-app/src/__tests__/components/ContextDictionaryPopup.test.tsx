@@ -1,5 +1,7 @@
-import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { LookupAnnotationSlots } from '@/services/contextTranslation/types';
+import { eventDispatcher } from '@/utils/event';
 import ContextDictionaryPopup from '@/app/reader/components/annotator/ContextDictionaryPopup';
 import type {
   ContextDictionarySettings,
@@ -16,6 +18,19 @@ vi.mock('@/components/Popup', () => ({
 
 vi.mock('@/hooks/useTranslation', () => ({
   useTranslation: () => (value: string) => value,
+}));
+
+vi.mock('@/utils/event', () => ({
+  eventDispatcher: {
+    dispatch: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+  },
+}));
+
+const mockOpenAIFns = { openAIInNotebook: vi.fn(), closeAIInNotebook: vi.fn() };
+vi.mock('@/app/reader/hooks/useOpenAIInNotebook', () => ({
+  useOpenAIInNotebook: vi.fn(() => mockOpenAIFns),
 }));
 
 const mockUseContextDictionary = vi.fn();
@@ -39,53 +54,169 @@ const defaultProps = {
   popupHeight: 260,
 };
 
-describe('ContextDictionaryPopup', () => {
-  test('dictionary popup renders simplified source-language explanation fields', () => {
-    mockUseContextDictionary.mockReturnValue({
-      result: { simpleDefinition: 'simple definition', contextualMeaning: 'clear explanation' },
-      partialResult: null,
-      loading: false,
-      streaming: false,
-      activeFieldId: null,
-      error: null,
-      validationDecision: 'accept',
-      retrievalStatus: 'local-only',
-      retrievalHints: {
-        currentVolumeIndexed: true,
-        missingLocalIndex: false,
-        missingPriorVolumes: [],
-        missingSeriesAssignment: false,
-      },
-      popupContext: null,
-      saveToVocabulary: vi.fn(),
-    });
-
-    render(<ContextDictionaryPopup {...defaultProps} />);
-    expect(screen.getByText('simple definition')).toBeTruthy();
-    expect(screen.getByText('clear explanation')).toBeTruthy();
-  });
-
-  test('shows loading state', () => {
-    mockUseContextDictionary.mockReturnValue({
-      result: null,
-      partialResult: null,
-      loading: true,
-      streaming: false,
-      activeFieldId: null,
-      error: null,
-      validationDecision: null,
-      retrievalStatus: 'local-only',
+function mockResult(overrides: Partial<ReturnType<typeof mockUseContextDictionary>> = {}) {
+  return {
+    result: {
+      simpleDefinition: 'a trusted companion',
+      contextualMeaning: 'someone you can count on',
+    },
+    partialResult: null,
+    loading: false,
+    streaming: false,
+    activeFieldId: null,
+    error: null,
+    validationDecision: 'accept' as const,
+    retrievalStatus: 'local-only' as const,
+    retrievalHints: {
+      currentVolumeIndexed: false,
+      missingLocalIndex: true,
+      missingPriorVolumes: [],
+      missingSeriesAssignment: false,
+    },
+    popupContext: {
+      localPastContext: 'past context',
+      localFutureBuffer: '',
+      sameBookChunks: [],
+      priorVolumeChunks: [],
+      retrievalStatus: 'local-only' as const,
       retrievalHints: {
         currentVolumeIndexed: false,
-        missingLocalIndex: false,
+        missingLocalIndex: true,
         missingPriorVolumes: [],
         missingSeriesAssignment: false,
       },
-      popupContext: null,
-      saveToVocabulary: vi.fn(),
-    });
+    },
+    examples: [],
+    annotations: {},
+    saveToVocabulary: vi.fn(),
+    ...overrides,
+  };
+}
+
+describe('ContextDictionaryPopup', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('renders TTS button, Ask About This, and save buttons in header', () => {
+    mockUseContextDictionary.mockReturnValue(mockResult());
 
     render(<ContextDictionaryPopup {...defaultProps} />);
-    expect(screen.getByText('Looking up...')).toBeTruthy();
+
+    expect(screen.getAllByRole('button', { name: 'Speak' }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Ask About This' })).toBeTruthy();
+  });
+
+  test('TTS button dispatches tts-speak event with selected text and bookKey', () => {
+    mockUseContextDictionary.mockReturnValue(mockResult());
+
+    render(<ContextDictionaryPopup {...defaultProps} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Speak' })[0]!);
+
+    expect(eventDispatcher.dispatch).toHaveBeenCalledWith('tts-speak', {
+      bookKey: 'book-1',
+      text: '知己',
+      oneTime: true,
+    });
+  });
+
+  test('Ask About This button calls openAIInNotebook with context summary', () => {
+    mockUseContextDictionary.mockReturnValue(mockResult());
+
+    render(<ContextDictionaryPopup {...defaultProps} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Ask About This' })[0]!);
+
+    expect(mockOpenAIFns.openAIInNotebook).toHaveBeenCalledWith({
+      bookHash: 'hash-1',
+      newConversationTitle: 'Ask about 知己',
+      firstMessageContent: expect.stringContaining('Selection:\n知己'),
+    });
+  });
+
+  test('save button calls saveToVocabulary', () => {
+    const saveFn = vi.fn();
+    mockUseContextDictionary.mockReturnValue(mockResult({ saveToVocabulary: saveFn }));
+
+    const { container } = render(<ContextDictionaryPopup {...defaultProps} />);
+
+    const buttons = container.querySelectorAll('button');
+    // Find the bookmark/save button by checking for the icon class or title
+    const saveButton = Array.from(buttons).find(
+      (btn) => btn.getAttribute('title') === 'Save to vocabulary',
+    );
+
+    expect(saveButton).toBeDefined();
+    fireEvent.click(saveButton!);
+    expect(saveFn).toHaveBeenCalled();
+  });
+
+  test('renders pinyin in header for Chinese selected text', () => {
+    mockUseContextDictionary.mockReturnValue(mockResult());
+
+    const { container } = render(<ContextDictionaryPopup {...defaultProps} />);
+
+    // pinyin for 知己 with symbol toneType is "zhī jǐ"
+    expect(container.textContent).toMatch(/zhī jǐ/);
+  });
+
+  test('renders structured source examples with RubyText for Chinese text', () => {
+    const examples = [
+      {
+        exampleId: '1',
+        sourceText: '人生难得一知己。',
+        targetText: 'A true friend is hard to find in life.',
+      },
+    ];
+    const annotations: LookupAnnotationSlots = {
+      source: {
+        examples: {
+          '1': { phonetic: 'shēng rén nán dé yī zhī jǐ' },
+        },
+      },
+    };
+    mockUseContextDictionary.mockReturnValue(
+      mockResult({
+        result: {
+          simpleDefinition: 'a trusted companion',
+          contextualMeaning: 'someone you can count on',
+          sourceExamples: '1. 人生难得一知己。\nEnglish: A true friend is hard to find in life.',
+        },
+        examples,
+        annotations,
+      }),
+    );
+
+    render(<ContextDictionaryPopup {...defaultProps} />);
+
+    expect(screen.getByText('A true friend is hard to find in life.')).toBeTruthy();
+    const { container } = render(<ContextDictionaryPopup {...defaultProps} />);
+    expect(container.querySelectorAll('ruby').length).toBeGreaterThan(0);
+  });
+
+  test('renders retrieval status badge', () => {
+    mockUseContextDictionary.mockReturnValue(
+      mockResult({ retrievalStatus: 'cross-volume' as const }),
+    );
+
+    render(<ContextDictionaryPopup {...defaultProps} />);
+
+    expect(screen.getByText('Cross-volume context')).toBeTruthy();
+  });
+
+  test('renders partial result during streaming', () => {
+    mockUseContextDictionary.mockReturnValue(
+      mockResult({
+        loading: true,
+        streaming: true,
+        partialResult: { simpleDefinition: 'a friend', contextualMeaning: '' },
+        result: null,
+      }),
+    );
+
+    render(<ContextDictionaryPopup {...defaultProps} />);
+
+    expect(screen.getByText('a friend')).toBeTruthy();
   });
 });
