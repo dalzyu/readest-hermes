@@ -34,6 +34,15 @@ export interface TranslationRequest {
   outputFields: TranslationOutputField[];
 }
 
+/** Schema version for VocabularyEntry persistence format */
+export const VOCABULARY_SCHEMA_VERSION = 1;
+
+/** A saved example sentence linked to a vocabulary entry */
+export interface VocabularyExample {
+  exampleId: string;
+  text: string;
+}
+
 /** A saved vocabulary lookup entry */
 export interface VocabularyEntry {
   id: string;
@@ -43,6 +52,16 @@ export interface VocabularyEntry {
   result: TranslationResult;
   addedAt: number;
   reviewCount: number;
+  /** Lookup mode that produced this entry ('translation' | 'dictionary') */
+  mode?: 'translation' | 'dictionary';
+  /** Schema version for forward-compatible reads */
+  schemaVersion?: number;
+  /** Source language tag, e.g. 'zh' or 'en' */
+  sourceLanguage?: string;
+  /** Target language tag, e.g. 'en' or 'zh' */
+  targetLanguage?: string;
+  /** Linked example sentences with stable annotation IDs */
+  examples?: VocabularyExample[];
 }
 
 export interface BookSeriesVolume {

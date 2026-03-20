@@ -113,3 +113,22 @@ describe('searchVocabulary', () => {
     expect(result[0]!.term).toBe('知己');
   });
 });
+
+describe('saveVocabularyEntry with examples', () => {
+  test('preserves example annotation linkage by exampleId during save and load', async () => {
+    mockStore.saveVocabularyEntry.mockResolvedValueOnce(undefined);
+
+    const structuredEntry = {
+      bookHash: 'book-xyz',
+      term: '知己',
+      context: 'He found a true 知己.',
+      result: { translation: 'close friend' },
+      mode: 'translation' as const,
+      examples: [{ exampleId: 'ex-abc', text: '他终于找到了知己。' }],
+    };
+
+    const entry = await saveVocabularyEntry(structuredEntry);
+    expect(entry.examples![0]!.exampleId).toBeDefined();
+    expect(entry.examples![0]!.exampleId).toBe('ex-abc');
+  });
+});

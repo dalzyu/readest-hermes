@@ -1,4 +1,5 @@
 import type { VocabularyEntry, TranslationResult, TranslationOutputField } from './types';
+import { VOCABULARY_SCHEMA_VERSION } from './types';
 import { aiStore } from '@/services/ai/storage/aiStore';
 
 type NewEntry = Omit<VocabularyEntry, 'id' | 'addedAt' | 'reviewCount'> &
@@ -13,6 +14,11 @@ export async function saveVocabularyEntry(input: NewEntry): Promise<VocabularyEn
     result: input.result as TranslationResult,
     addedAt: input.addedAt ?? Date.now(),
     reviewCount: input.reviewCount ?? 0,
+    mode: input.mode ?? 'translation',
+    schemaVersion: input.schemaVersion ?? VOCABULARY_SCHEMA_VERSION,
+    sourceLanguage: input.sourceLanguage,
+    targetLanguage: input.targetLanguage,
+    examples: input.examples ?? [],
   };
   await aiStore.saveVocabularyEntry(entry);
   return entry;
@@ -66,11 +72,9 @@ export function exportAsCSV(
   const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
   const header = ['Term', 'Context', ...fields.map((f) => f.label)].map(escape).join(',');
   const rows = entries.map((e) => {
-    const cols = [
-      e.term,
-      e.context.slice(0, 200),
-      ...fields.map((f) => e.result[f.id] ?? ''),
-    ].map(escape);
+    const cols = [e.term, e.context.slice(0, 200), ...fields.map((f) => e.result[f.id] ?? '')].map(
+      escape,
+    );
     return cols.join(',');
   });
   return [header, ...rows].join('\n');
