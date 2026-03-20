@@ -23,6 +23,17 @@ vi.mock('@/services/contextTranslation/contextLookupService', () => ({
   contextLookupTelemetry: { logOutcome: vi.fn() },
 }));
 
+vi.mock('@/services/contextTranslation/translationService', () => ({
+  streamTranslationWithContext: vi.fn(function* () {
+    yield {
+      fields: { translation: 'close friend' },
+      activeFieldId: null,
+      rawText: '<lookup_json>{"translation":"close friend"}</lookup_json>',
+      done: true,
+    };
+  }),
+}));
+
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
 import { useContextLookup } from '@/hooks/useContextLookup';

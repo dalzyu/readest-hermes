@@ -4,6 +4,8 @@ import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 import { getAIProvider } from '@/services/ai/providers';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
+import { streamTranslationWithContext } from '@/services/contextTranslation/translationService';
+import type { TranslationRequest } from '@/services/contextTranslation/types';
 import type {
   LookupAnnotationSlots,
   LookupExample,
@@ -116,23 +118,77 @@ export function useContextLookup({
         setPopupContext(bundle);
 
         const model = getAIProvider(requestSnapshot.aiSettings).getModel();
-        const lookupResult = await runContextLookup({
-          mode,
-          selectedText,
-          popupContext: bundle,
-          targetLanguage: requestSnapshot.settings.targetLanguage,
-          outputFields: requestSnapshot.settings.outputFields,
-          dictionarySettings: requestSnapshot.dictionarySettings,
-          model,
-          abortSignal: abortController.signal,
-        });
 
-        if (cancelled) return;
+        if (mode === 'translation') {
+          // Streaming path for translation mode — real-time UI updates + post-stream repair/enrichment
+          setStreaming(true);
 
-        setResult(lookupResult.fields);
-        setExamples(lookupResult.examples ?? []);
-        setAnnotations(lookupResult.annotations ?? {});
-        setValidationDecision(lookupResult.validationDecision);
+          const translationRequest: TranslationRequest = {
+            selectedText,
+            popupContext: bundle,
+            sourceLanguage: undefined,
+            targetLanguage: requestSnapshot.settings.targetLanguage,
+            outputFields: requestSnapshot.settings.outputFields,
+          };
+
+          let finalRawText = '';
+          let finalFields: TranslationResult = {};
+
+          for await (const chunk of streamTranslationWithContext(
+            translationRequest,
+            model,
+            abortController.signal,
+          )) {
+            if (cancelled) return;
+            finalRawText = chunk.rawText;
+            finalFields = chunk.fields;
+            setPartialResult(chunk.fields);
+            setActiveFieldId(chunk.activeFieldId);
+          }
+
+          if (cancelled) return;
+
+          setStreaming(false);
+
+          // Post-stream: repair (if needed) + enrichment + telemetry via runContextLookup
+          const lookupResult = await runContextLookup({
+            mode: 'translation',
+            selectedText,
+            popupContext: bundle,
+            targetLanguage: requestSnapshot.settings.targetLanguage,
+            outputFields: requestSnapshot.settings.outputFields,
+            model,
+            abortSignal: abortController.signal,
+            preNormalizedFields: finalFields,
+            rawResponse: finalRawText,
+          });
+
+          if (cancelled) return;
+
+          setResult(lookupResult.fields);
+          setExamples(lookupResult.examples ?? []);
+          setAnnotations(lookupResult.annotations ?? {});
+          setValidationDecision(lookupResult.validationDecision);
+        } else {
+          // Dictionary mode — non-streaming final-result-first
+          const lookupResult = await runContextLookup({
+            mode: 'dictionary',
+            selectedText,
+            popupContext: bundle,
+            targetLanguage: requestSnapshot.settings.targetLanguage,
+            outputFields: requestSnapshot.settings.outputFields,
+            dictionarySettings: requestSnapshot.dictionarySettings,
+            model,
+            abortSignal: abortController.signal,
+          });
+
+          if (cancelled) return;
+
+          setResult(lookupResult.fields);
+          setExamples(lookupResult.examples ?? []);
+          setAnnotations(lookupResult.annotations ?? {});
+          setValidationDecision(lookupResult.validationDecision);
+        }
       } catch (err) {
         if (!cancelled && (err as Error).name !== 'AbortError') {
           setError(err instanceof Error ? err.message : String(err));

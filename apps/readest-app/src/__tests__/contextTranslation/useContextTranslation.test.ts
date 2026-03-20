@@ -24,6 +24,23 @@ vi.mock('@/services/contextTranslation/contextLookupService', () => ({
   buildContextLookupTelemetryPayload: vi.fn(),
   contextLookupTelemetry: { logOutcome: vi.fn() },
 }));
+vi.mock('@/services/contextTranslation/translationService', () => ({
+  streamTranslationWithContext: vi.fn(function* () {
+    yield {
+      fields: { translation: '' },
+      activeFieldId: 'translation',
+      rawText: '<translation></translation>',
+      done: false,
+    };
+    yield {
+      fields: { translation: 'close friend', contextualMeaning: 'a deeply trusted companion' },
+      activeFieldId: null,
+      rawText:
+        '<lookup_json>{"translation":"close friend","contextualMeaning":"a deeply trusted companion"}</lookup_json>',
+      done: true,
+    };
+  }),
+}));
 
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
@@ -246,12 +263,15 @@ describe('useContextTranslation', () => {
     await waitFor(() => expect(runContextLookup).toHaveBeenCalledTimes(1));
   });
 
-  test('shared lookup returns the final result without legacy streaming updates', async () => {
+  test('shared lookup returns the final result after streaming', async () => {
     const { result } = renderHook(() => useContextTranslation(defaultProps));
 
     await waitFor(() => expect(result.current.result?.['translation']).toBe('close friend'));
-    expect(result.current.partialResult).toBeNull();
+    // partialResult reflects the last streamed chunk (done: true yields final fields)
+    expect(result.current.partialResult).not.toBeNull();
     expect(result.current.activeFieldId).toBeNull();
     expect(result.current.streaming).toBe(false);
+    // After stream completes, runContextLookup is called for post-stream repair/enrichment
+    expect(runContextLookup).toHaveBeenCalled();
   });
 });

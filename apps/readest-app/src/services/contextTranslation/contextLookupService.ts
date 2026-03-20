@@ -34,6 +34,13 @@ export interface ContextLookupRequest {
   dictionarySettings?: ContextDictionarySettings;
   model?: LanguageModel;
   abortSignal?: AbortSignal;
+  /**
+   * When provided, the LLM call is skipped and these pre-normalized fields are used
+   * directly for validation/repair/enrichment. Used for post-streaming repair.
+   */
+  preNormalizedFields?: NormalizedLookupResult;
+  /** The raw LLM response corresponding to preNormalizedFields. Required when preNormalizedFields is set. */
+  rawResponse?: string;
 }
 
 export interface ContextLookupResult {
@@ -125,7 +132,7 @@ export function buildContextLookupTelemetryPayload(input: {
  * Shared lookup service:
  * 1. Detects source language from selectedText
  * 2. Builds prompts via buildLookupPrompt
- * 3. Calls the LLM
+ * 3. Calls the LLM (skipped if preNormalizedFields is provided)
  * 4. Normalizes the response
  * 5. Validates the result
  * 6. Returns a ContextLookupResult
@@ -152,9 +159,16 @@ export async function runContextLookup(
     dictionarySettings: request.dictionarySettings,
   });
 
-  const runAttempt = async (system: string, user: string) => {
-    const raw = await callLLM(system, user, request.model as LanguageModel, request.abortSignal);
-    const normalized = normalizeLookupResponse(raw, request.mode);
+  const runAttempt = async (
+    system: string,
+    user: string,
+    overrideFields?: NormalizedLookupResult,
+    overrideRaw?: string,
+  ) => {
+    const raw =
+      overrideRaw ??
+      (await callLLM(system, user, request.model as LanguageModel, request.abortSignal));
+    const normalized = overrideFields ?? normalizeLookupResponse(raw, request.mode);
     const fields =
       request.mode === 'translation'
         ? formatTranslationResult(normalized, {
@@ -171,7 +185,10 @@ export async function runContextLookup(
 
   let repairCount = 0;
   let degradationPath: ContextLookupDegradationPath = 'none';
-  let attempt = await runAttempt(systemPrompt, userPrompt);
+  let attempt =
+    request.preNormalizedFields !== undefined && request.rawResponse !== undefined
+      ? await runAttempt(systemPrompt, userPrompt, request.preNormalizedFields, request.rawResponse)
+      : await runAttempt(systemPrompt, userPrompt);
 
   if (attempt.validation.decision === 'degrade' && CONTEXT_LOOKUP_ROLLOUT.repairOnDegrade) {
     repairCount = 1;
