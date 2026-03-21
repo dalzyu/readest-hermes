@@ -74,6 +74,7 @@ export async function buildPopupContextBundle({
         missingPriorVolumes,
         missingSeriesAssignment: !series,
       },
+      dictionaryEntries: [],
     };
   }
 
@@ -134,5 +135,6 @@ export async function buildPopupContextBundle({
       missingPriorVolumes,
       missingSeriesAssignment: !series,
     },
+    dictionaryEntries: [],
   };
 }

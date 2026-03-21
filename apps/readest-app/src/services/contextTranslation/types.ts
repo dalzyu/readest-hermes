@@ -109,6 +109,7 @@ export interface PopupContextBundle {
   priorVolumeChunks: string[];
   retrievalStatus: RetrievalStatus;
   retrievalHints: PopupRetrievalHints;
+  dictionaryEntries: string[];
 }
 
 /** Settings for the source-language dictionary lookup feature */

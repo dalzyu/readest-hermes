@@ -47,6 +47,7 @@ const baseRequest: TranslationRequest = {
       missingPriorVolumes: [],
       missingSeriesAssignment: false,
     },
+    dictionaryEntries: [],
   },
   targetLanguage: 'en',
   outputFields: baseFields,
@@ -169,5 +170,30 @@ describe('buildLookupPrompt', () => {
     expect(systemPrompt).toContain('<simpleDefinition>');
     expect(systemPrompt).toContain('<contextualMeaning>');
     expect(systemPrompt).not.toContain('Always respond in French');
+  });
+
+  test('buildTranslationPrompt injects reference_dictionary block when dictionaryEntries provided', () => {
+    const req: TranslationRequest = {
+      ...baseRequest,
+      popupContext: {
+        ...baseRequest.popupContext,
+        dictionaryEntries: ['apple: a round fruit', 'apples: plural of apple'],
+      },
+    };
+    const { userPrompt } = buildTranslationPrompt(req);
+    expect(userPrompt).toContain('<reference_dictionary>');
+    expect(userPrompt).toContain('apple: a round fruit');
+  });
+
+  test('buildTranslationPrompt omits reference_dictionary block when dictionaryEntries is empty', () => {
+    const req: TranslationRequest = {
+      ...baseRequest,
+      popupContext: {
+        ...baseRequest.popupContext,
+        dictionaryEntries: [],
+      },
+    };
+    const { userPrompt } = buildTranslationPrompt(req);
+    expect(userPrompt).not.toContain('reference_dictionary');
   });
 });

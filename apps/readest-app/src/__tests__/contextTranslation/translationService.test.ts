@@ -61,6 +61,7 @@ const baseRequest: TranslationRequest = {
       missingPriorVolumes: [],
       missingSeriesAssignment: false,
     },
+    dictionaryEntries: [],
   },
   targetLanguage: 'en',
   outputFields: fields,

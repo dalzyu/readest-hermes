@@ -23,6 +23,7 @@ import { buildRepairPrompt } from './repairPromptBuilder';
 import { callLLM } from './llmClient';
 import { normalizeLookupResponse } from './normalizer';
 import { validateLookupResult } from './validator';
+import { lookupDefinitions } from './dictionaryService';
 
 export interface ContextLookupRequest {
   mode: ContextLookupMode;
@@ -142,6 +143,26 @@ export async function runContextLookup(
 ): Promise<ContextLookupResult> {
   const detectedLanguage = detectLookupLanguage(request.selectedText);
   const sourceLanguage = request.sourceLanguage ?? detectedLanguage.language;
+
+  // Look up dictionary entries for the selected text
+  let dictionaryEntries: string[] = [];
+  try {
+    const entries = await lookupDefinitions(
+      request.selectedText,
+      sourceLanguage,
+      request.targetLanguage,
+    );
+    dictionaryEntries = entries.map((e) => `${e.headword}: ${e.definition}`);
+  } catch {
+    dictionaryEntries = [];
+  }
+
+  // Create popup context with dictionary entries
+  const popupContextWithDictionary: PopupContextBundle = {
+    ...request.popupContext,
+    dictionaryEntries,
+  };
+
   const primaryField = resolvePrimaryField(request.outputFields);
   const plugins = resolveLookupPlugins({
     sourceLanguage,
@@ -152,7 +173,7 @@ export async function runContextLookup(
   const { systemPrompt, userPrompt } = buildLookupPrompt({
     mode: request.mode,
     selectedText: request.selectedText,
-    popupContext: request.popupContext,
+    popupContext: popupContextWithDictionary,
     targetLanguage: request.targetLanguage,
     sourceLanguage,
     outputFields: request.outputFields,

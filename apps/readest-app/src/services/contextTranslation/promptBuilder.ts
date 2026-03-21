@@ -19,7 +19,7 @@ function isChineseTarget(request: TranslationRequest): boolean {
 }
 
 function buildContextSections(request: TranslationRequest): string {
-  return [
+  const sections = [
     `<local_past_context>${request.popupContext.localPastContext}</local_past_context>`,
     request.popupContext.localFutureBuffer
       ? `<local_future_buffer>${request.popupContext.localFutureBuffer}</local_future_buffer>`
@@ -30,9 +30,15 @@ function buildContextSections(request: TranslationRequest): string {
     request.popupContext.priorVolumeChunks.length > 0
       ? `<prior_volume_memory>${request.popupContext.priorVolumeChunks.join('\n\n')}</prior_volume_memory>`
       : '',
-  ]
-    .filter(Boolean)
-    .join('\n\n');
+  ];
+
+  if (request.popupContext.dictionaryEntries.length > 0) {
+    sections.push(
+      `<reference_dictionary>${request.popupContext.dictionaryEntries.join('\n')}</reference_dictionary>`,
+    );
+  }
+
+  return sections.filter(Boolean).join('\n\n');
 }
 
 export function buildTranslationPrompt(request: TranslationRequest): {
@@ -84,6 +90,10 @@ Do not include pinyin. The application will generate it separately.
         : ''
     : '';
 
+  const referenceDictionaryInstruction = `
+
+If a <reference_dictionary> block is present, use it as an authoritative reference to ground your translation and explanation. Do not contradict it without strong contextual reason.`;
+
   const systemPrompt = `You are a literary translation assistant. Translate and explain text for a reader learning a foreign language.${sourceLangHint}
 
 Always respond in ${targetLang}. For each request, provide the following fields, each wrapped in the specified XML tags:
@@ -91,7 +101,7 @@ Always respond in ${targetLang}. For each request, provide the following fields,
 ${fieldInstructions}
 
 Emit fields in this exact order: ${orderedFieldIds}.
-Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.${examplesLayoutInstruction}`;
+Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.${examplesLayoutInstruction}${referenceDictionaryInstruction}`;
 
   const userPrompt = `<selected_text>${request.selectedText}</selected_text>
 
@@ -125,6 +135,10 @@ function buildDictionaryPrompt(request: LookupPromptRequest): {
     )
     .join('\n');
 
+  const referenceDictionaryInstruction = `
+
+If a <reference_dictionary> block is present, use it as an authoritative reference to ground your translation and explanation. Do not contradict it without strong contextual reason.`;
+
   const systemPrompt = `You are a literary dictionary assistant.
 Explain the selected text in simpler terms using only the source language.
 The source language is ${sourceLanguage}. Do not translate the primary explanation into another language.
@@ -133,7 +147,7 @@ Provide the following fields:
 ${fieldInstructions}
 
 Emit fields in this exact order: ${orderedFieldIds}.
-Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.`;
+Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.${referenceDictionaryInstruction}`;
 
   const userPrompt = `<selected_text>${request.selectedText}</selected_text>
 
