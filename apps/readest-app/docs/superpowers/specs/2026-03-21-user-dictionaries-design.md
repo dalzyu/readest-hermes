@@ -44,6 +44,9 @@ interface UserDictionary {
   entryCount: number;
   source: 'bundled' | 'user';
   importedAt: number;
+  /** Only present when source === 'bundled'. Checked against BUNDLED_DICTIONARIES
+   *  version to detect when a committed .json.gz has been updated in the repo. */
+  bundledVersion?: string;
 }
 ```
 
@@ -117,7 +120,7 @@ Removes the record from IndexedDB, removes the entry from `userDictionaryMeta` i
 
 ### `initBundledDictionaries(): Promise<void>`
 
-Called once at app startup. Compares `BUNDLED_DICTIONARIES` manifest against IndexedDB (by id). For any missing entry, fetches `public/dictionaries/[lang]-[targetLang].json.gz` via `fetch()` (same-origin on both Tauri asset protocol and web deployments — this is not a runtime download from a third-party server; the files ship with the app and are always available). Decompresses and stores in IndexedDB. If `fetch()` fails (e.g. offline on web with a cold cache), the dictionary is silently skipped for this run and retried next startup.
+Called once at app startup. Compares `BUNDLED_DICTIONARIES` manifest against IndexedDB (by `id`). For any entry where the stored `bundledVersion` does not match the manifest constant, the stale IndexedDB record is replaced by re-fetching the updated `public/dictionaries/*.json.gz`. For entries missing from IndexedDB entirely, fetches and stores them. Fetches via `fetch()` from the app's own origin (Tauri asset protocol or web deployment, not a third-party server). If fetch fails (offline on web), the dictionary is skipped for this run and retried next startup.
 
 ### `lookupDefinitions(text: string, sourceLang: string, targetLang: string): Promise<DictionaryEntry[]>`
 
@@ -132,8 +135,10 @@ For **dictionary mode** (where `targetLang === sourceLang`), categories 1 and 2 
 **Lookup strategy per dictionary** (applied to each matching dictionary in rank order):
 
 1. **Exact match** — binary search on the sorted `DictionaryEntry[]` for `headword === text`. Always attempted regardless of text length.
-2. **Prefix — headword starts with text** — scan outward from binary search landing position for entries where `headword.startsWith(text)`. Only if `text.length <= 40`. Useful for European languages: selecting "run" returns "run", "running", "runway".
-3. **Prefix — text starts with headword** — scan for entries where `text.startsWith(headword)`. Only if `text.length <= 40`. Useful for CJK: selecting "苹果汁" returns the "苹果" entry when "苹果汁" is not itself a headword.
+
+2. **Prefix — headword starts with text** — `headword.startsWith(text)`; only if `text.length <= 40`. Scan outward from binary search landing position in both directions (left and right) until the headword prefix no longer matches `text`. Note: for CJK dictionaries, Unicode sort order does not group by radical or phonetic similarity, so the matched block may be scattered and the scan may need to traverse a large portion of the array. This is an acceptable performance limitation for large CJK dictionaries.
+
+3. **Prefix — text starts with headword** — `text.startsWith(headword)`; only if `text.length <= 40`. Same bidirectional scan approach. Useful for CJK: selecting "苹果汁" returns the "苹果" entry when "苹果汁" is not itself a headword. For CJK this scan is typically more relevant than direction 2 since compound words are common.
 4. **Fuzzy fallback** — Levenshtein distance ≤ 2 over the 200 candidates nearest the binary search position. Only if `text.length <= 40`. This is a best-effort heuristic: lexicographic neighbors cover single-character substitutions and transpositions near the sort position but do not guarantee coverage for all edit-distance-2 pairs (e.g. "colour"/"color" may not be adjacent). Acceptable for the intended use case of handling minor typos and diacritics variations.
 
 **Result assembly** — up to 1 matching entry per dictionary, taken in rank order, capped at 3 total. Deduplicated by headword: if a headword appears in multiple dictionaries, only the first (highest-ranked) definition is used. Returns `[]` if no match found in any dictionary.
@@ -246,7 +251,7 @@ src/__tests__/contextTranslation/
 | Malformed zip / missing `.ifo` | `previewDictionaryZip` throws; user sees error; no state written |
 | Parse produces 0 entries | `importUserDictionary` throws; user sees error; no state written |
 | Corrupted `.idx`/`.dict.dz` | Parser throws; treated as 0-entry failure |
-| IndexedDB unavailable | `initBundledDictionaries` and `importUserDictionary` fail silently; `lookupDefinitions` returns `[]`; feature degrades gracefully |
+| IndexedDB unavailable | `initBundledDictionaries` and `importUserDictionary` fail silently; `lookupDefinitions` returns `[]`. A non-blocking warning banner is shown in the Dictionaries Settings section: *"Dictionary lookup unavailable — storage is full or blocked."* The banner is dismissible. |
 | Bundled dict fetch fails (web, offline) | Dictionary skipped for this session; retried next startup |
 | Dictionary deleted mid-session | Cache entry removed immediately; subsequent lookups skip that dictionary |
 
