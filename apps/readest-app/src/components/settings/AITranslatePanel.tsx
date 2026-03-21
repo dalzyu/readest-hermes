@@ -166,8 +166,7 @@ const AITranslatePanel: React.FC = () => {
         targetLanguage: targetLang,
       });
       // Refresh user dictionaries list
-      const { useSettingsStore: useSettingsStoreLocal } = await import('@/store/settingsStore');
-      setUserDictionaries(useSettingsStoreLocal.getState().settings.userDictionaryMeta ?? []);
+      setUserDictionaries(useSettingsStore.getState().settings.userDictionaryMeta ?? []);
       setShowModal(false);
       setImportPreview(null);
       setSelectedZipFile(null);
@@ -183,7 +182,7 @@ const AITranslatePanel: React.FC = () => {
       await deleteUserDictionary(id);
       setUserDictionaries((prev) => prev.filter((d) => d.id !== id));
     } catch (err) {
-      // Handle error silently or show toast
+      console.error('Failed to delete dictionary:', err);
     }
   };
 
@@ -408,7 +407,7 @@ const AITranslatePanel: React.FC = () => {
         </div>
       </div>
 
-      <div className='w-full'>
+      <div className={clsx('w-full', disabledSection)}>
         <h2 className='mb-2 font-medium'>{_('Dictionary Lookup')}</h2>
         <p className='text-base-content/70 mb-3 text-sm'>
           {_(
@@ -451,7 +450,7 @@ const AITranslatePanel: React.FC = () => {
         </div>
       </div>
 
-      <div className='w-full'>
+      <div className={clsx('w-full', disabledSection)}>
         <h2 className='mb-2 font-medium'>{_('Dictionaries')}</h2>
 
         {dictionaryUnavailableBanner && (
