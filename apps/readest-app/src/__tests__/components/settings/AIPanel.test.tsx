@@ -72,6 +72,16 @@ const { stableSettings } = vi.hoisted(() => {
       },
     },
     userDictionaryMeta: [] as unknown[],
+    globalViewSettings: {
+      uiLanguage: '',
+      translationEnabled: false,
+      translationProvider: 'google',
+      translateTargetLang: '',
+      showTranslateSource: false,
+      ttsReadAloudText: 'both',
+      replaceQuotationMarks: false,
+      convertChineseVariant: 'none',
+    },
   };
   return { stableSettings };
 });
@@ -286,5 +296,26 @@ describe('AIPanel', () => {
     }
     // If no user dicts, test passes trivially (no dicts to toggle)
     expect(true).toBe(true);
+  });
+});
+
+describe('LangPanel', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  test('Language tab does not have Translation section', async () => {
+    // Use importActual to get the real LangPanel (bypassing the module-level mock)
+    const { default: RealLangPanel } = await vi.importActual<{
+      default: React.ComponentType<{ bookKey: string; onRegisterReset: (fn: () => void) => void }>;
+    }>('@/components/settings/LangPanel');
+
+    render(<RealLangPanel bookKey="test" onRegisterReset={() => {}} />);
+
+    // Target the specific data-setting-id attribute (NOT data-testid)
+    const translationSection = document.querySelector(
+      '[data-setting-id="settings.language.translationEnabled"]',
+    );
+    expect(translationSection).toBeNull();
   });
 });
