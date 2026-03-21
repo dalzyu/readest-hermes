@@ -1,6 +1,6 @@
 import { Fzf, FzfResultItem, byLengthAsc } from 'fzf';
 import { SettingsPanelType } from '@/components/settings/SettingsDialog';
-import { RiFontSize, RiDashboardLine, RiTranslate } from 'react-icons/ri';
+import { RiFontSize, RiDashboardLine, RiTranslate, RiChatAiLine } from 'react-icons/ri';
 import { VscSymbolColor } from 'react-icons/vsc';
 import { LiaHandPointerSolid } from 'react-icons/lia';
 import { IoAccessibilityOutline } from 'react-icons/io5';
@@ -153,6 +153,7 @@ const panelIcons: Record<SettingsPanelType, IconType> = {
   Control: LiaHandPointerSolid,
   Language: RiTranslate,
   AI: PiRobot,
+  AiTranslate: RiChatAiLine,
   Custom: IoAccessibilityOutline,
 };
 

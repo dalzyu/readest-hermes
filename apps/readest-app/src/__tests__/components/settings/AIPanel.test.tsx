@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import AIPanel from '@/components/settings/AIPanel';
+import SettingsDialog from '@/components/settings/SettingsDialog';
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 import {
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
@@ -111,5 +112,10 @@ describe('AIPanel', () => {
   test('shows Add Dictionary button in User Dictionaries section', () => {
     render(<AIPanel />);
     expect(screen.getByText('Add Dictionary')).toBeTruthy();
+  });
+
+  test('SettingsDialog renders AI Translate tab button', () => {
+    render(<SettingsDialog bookKey="test" />);
+    expect(screen.getByRole('button', { name: /AI Translate/i })).toBeTruthy();
   });
 });

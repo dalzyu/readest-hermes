@@ -5,7 +5,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { useTranslation } from '@/hooks/useTranslation';
 import { RiFontSize } from 'react-icons/ri';
-import { RiDashboardLine, RiTranslate } from 'react-icons/ri';
+import { RiDashboardLine, RiTranslate, RiChatAiLine } from 'react-icons/ri';
 import { VscSymbolColor } from 'react-icons/vsc';
 import { PiDotsThreeVerticalBold, PiRobot } from 'react-icons/pi';
 import { LiaHandPointerSolid } from 'react-icons/lia';
@@ -24,6 +24,7 @@ import ControlPanel from './ControlPanel';
 import LangPanel from './LangPanel';
 import MiscPanel from './MiscPanel';
 import AIPanel from './AIPanel';
+import AITranslatePanel from './AITranslatePanel';
 import { useCommandPalette } from '@/components/command-palette';
 
 export type SettingsPanelType =
@@ -33,6 +34,7 @@ export type SettingsPanelType =
   | 'Control'
   | 'Language'
   | 'AI'
+  | 'AiTranslate'
   | 'Custom';
 export type SettingsPanelPanelProp = {
   bookKey: string;
@@ -95,6 +97,11 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       label: _('AI Assistant'),
     },
     {
+      tab: 'AiTranslate',
+      icon: RiChatAiLine,
+      label: _('AI Translate'),
+    },
+    {
       tab: 'Custom',
       icon: IoAccessibilityOutline,
       label: _('Custom'),
@@ -134,6 +141,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     Control: null,
     Language: null,
     AI: null,
+    AiTranslate: null,
     Custom: null,
   });
 
@@ -166,6 +174,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         control: 'Control',
         language: 'Language',
         ai: 'AI',
+        aitranslate: 'AiTranslate',
         custom: 'Custom',
       };
       const panelKey = parts[1]?.toLowerCase();
@@ -379,6 +388,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           />
         )}
         {activePanel === 'AI' && <AIPanel />}
+        {activePanel === 'AiTranslate' && <AITranslatePanel />}
         {activePanel === 'Custom' && (
           <MiscPanel
             bookKey={bookKey}
