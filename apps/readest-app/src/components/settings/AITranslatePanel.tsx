@@ -209,6 +209,38 @@ const AITranslatePanel: React.FC = () => {
     }
   };
 
+  const toggleBundledDict = useCallback(
+    (id: string) => {
+      const currentSettings = settingsRef.current;
+      if (!currentSettings) return;
+      const current: ContextTranslationSettings =
+        currentSettings.globalReadSettings.contextTranslation ??
+        DEFAULT_CONTEXT_TRANSLATION_SETTINGS;
+      const disabled = current.disabledBundledDicts ?? [];
+      const isCurrentlyDisabled = disabled.includes(id);
+      const disabledBundledDicts = isCurrentlyDisabled
+        ? disabled.filter((d) => d !== id)
+        : [...disabled, id];
+      saveCtxTransSetting({ disabledBundledDicts });
+    },
+    [saveCtxTransSetting],
+  );
+
+  const toggleUserDict = useCallback(
+    (id: string) => {
+      const currentSettings = settingsRef.current;
+      if (!currentSettings) return;
+      const updated = userDictionaries.map((d) =>
+        d.id === id ? { ...d, enabled: !(d.enabled ?? true) } : d,
+      );
+      currentSettings.userDictionaryMeta = updated;
+      setSettings(currentSettings);
+      saveSettings(envConfig, currentSettings);
+      setUserDictionaries(updated);
+    },
+    [userDictionaries, envConfig, setSettings, saveSettings],
+  );
+
   return (
     <div className='my-4 w-full space-y-6'>
       {/* Hidden file input for web dictionary import */}
@@ -521,17 +553,30 @@ const AITranslatePanel: React.FC = () => {
           <div className='border-base-200 border-b px-4 py-3'>
             <h3 className='mb-2 text-sm font-medium'>{_('Bundled Dictionaries')}</h3>
             <div className='space-y-1'>
-              {BUNDLED_DICTIONARIES.map((dict) => (
-                <div key={dict.id} className='flex items-center justify-between text-sm'>
-                  <span>
-                    {getLanguageName(dict.language)} → {getLanguageName(dict.targetLanguage)}
-                  </span>
-                  <span className='text-base-content/60'>
-                    {dict.language.toUpperCase()} → {dict.targetLanguage.toUpperCase()} ·{' '}
-                    <span className='text-success'>✓ {_('ready')}</span>
-                  </span>
-                </div>
-              ))}
+              {BUNDLED_DICTIONARIES.map((dict) => {
+                const disabledBundledDicts = ctxTransSettings.disabledBundledDicts ?? [];
+                const isEnabled = !disabledBundledDicts.includes(dict.id);
+                return (
+                  <div key={dict.id} className='flex items-center justify-between text-sm'>
+                    <span>
+                      {getLanguageName(dict.language)} → {getLanguageName(dict.targetLanguage)}
+                    </span>
+                    <div className='flex items-center gap-2'>
+                      <span className='text-base-content/60'>
+                        {dict.language.toUpperCase()} → {dict.targetLanguage.toUpperCase()} ·{' '}
+                        <span className='text-success'>✓ {_('ready')}</span>
+                      </span>
+                      <input
+                        type='checkbox'
+                        data-testid={`bundled-dict-toggle-${dict.id}`}
+                        className='toggle toggle-sm'
+                        checked={isEnabled}
+                        onChange={() => toggleBundledDict(dict.id)}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -554,13 +599,22 @@ const AITranslatePanel: React.FC = () => {
                       {dict.name} · {getLanguageName(dict.language)} →{' '}
                       {getLanguageName(dict.targetLanguage)} · {dict.entryCount} entries
                     </span>
-                    <button
-                      className='btn btn-ghost btn-xs text-error'
-                      onClick={() => handleDeleteDictionary(dict.id)}
-                      title={_('Delete dictionary')}
-                    >
-                      <PiTrash className='size-3' />
-                    </button>
+                    <div className='flex items-center gap-2'>
+                      <input
+                        type='checkbox'
+                        data-testid={`user-dict-toggle-${dict.id}`}
+                        className='toggle toggle-sm'
+                        checked={dict.enabled !== false}
+                        onChange={() => toggleUserDict(dict.id)}
+                      />
+                      <button
+                        className='btn btn-ghost btn-xs text-error'
+                        onClick={() => handleDeleteDictionary(dict.id)}
+                        title={_('Delete dictionary')}
+                      >
+                        <PiTrash className='size-3' />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

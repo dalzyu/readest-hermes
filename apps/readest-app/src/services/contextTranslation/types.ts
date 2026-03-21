@@ -116,6 +116,8 @@ export interface PopupContextBundle {
 export interface ContextDictionarySettings {
   enabled: boolean;
   sourceExamples: boolean;
+  /** Custom prompt instructions keyed by field id (e.g. 'simpleDefinition'). Overrides defaults. */
+  promptInstructions?: Record<string, string>;
 }
 
 /** Settings for the context-aware translation feature */
@@ -129,6 +131,8 @@ export interface ContextTranslationSettings {
   sameBookChunkCount: number;
   priorVolumeChunkCount: number;
   outputFields: TranslationOutputField[];
+  /** IDs of bundled dictionaries that have been explicitly disabled. */
+  disabledBundledDicts?: string[];
 }
 
 /** A single entry from a StarDict dictionary. */
@@ -150,4 +154,6 @@ export interface UserDictionary {
   importedAt: number;
   /** Only when source === 'bundled'. Must match BUNDLED_DICTIONARIES version. */
   bundledVersion?: string;
+  /** Whether the dictionary is enabled for lookups. Default true (undefined === enabled). */
+  enabled?: boolean;
 }

@@ -401,6 +401,11 @@ export async function lookupDefinitions(
   const MAX_RESULTS = 3;
 
   // Gather all dictionaries (bundled + user)
+  const { useSettingsStore } = await import('@/store/settingsStore');
+  const currentSettings = useSettingsStore.getState().settings;
+  const disabledBundledDicts: string[] =
+    currentSettings.globalReadSettings.contextTranslation?.disabledBundledDicts ?? [];
+
   const allBundled: UserDictionary[] = BUNDLED_DICTIONARIES.map((b) => ({
     id: b.id,
     name: b.id,
@@ -410,11 +415,14 @@ export async function lookupDefinitions(
     source: 'bundled' as const,
     importedAt: 0,
     bundledVersion: b.bundledVersion,
+    enabled: !disabledBundledDicts.includes(b.id),
   }));
 
   const allUser = await getUserDictionaryMeta();
 
-  const allDicts: UserDictionary[] = [...allBundled, ...allUser];
+  const allDicts: UserDictionary[] = [...allBundled, ...allUser].filter(
+    (d) => d.enabled !== false,
+  );
 
   // Filter to matching dictionaries
   const matching = allDicts.filter((d) => {
