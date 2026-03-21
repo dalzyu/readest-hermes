@@ -181,6 +181,10 @@ describe('AIPanel', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   test('renders separate toggles for same-book and prior-volume memory', () => {
     render(<AITranslatePanel />);
 

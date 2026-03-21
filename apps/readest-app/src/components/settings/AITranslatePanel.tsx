@@ -23,6 +23,10 @@ import {
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
 } from '@/services/contextTranslation/defaults';
 
+const DEFAULT_BY_ID: Record<string, string> = Object.fromEntries(
+  DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields.map((f) => [f.id, f.promptInstruction]),
+);
+
 const AITranslatePanel: React.FC = () => {
   const _ = useTranslation();
   const { envConfig } = useEnv();
@@ -54,24 +58,6 @@ const AITranslatePanel: React.FC = () => {
     ctxTransSettings.priorVolumeChunkCount,
   );
   const [ctxOutputFields, setCtxOutputFields] = useState(ctxTransSettings.outputFields);
-
-  const DEFAULT_BY_ID: Record<string, string> = {};
-  for (const field of DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields) {
-    DEFAULT_BY_ID[field.id] = field.promptInstruction;
-  }
-
-  const updatePrompt = (fieldId: string, instruction: string) => {
-    const updated = ctxOutputFields.map((f) =>
-      f.id === fieldId ? { ...f, promptInstruction: instruction } : f,
-    );
-    setCtxOutputFields(updated);
-    saveCtxTransSetting({ outputFields: updated });
-  };
-
-  const resetToDefault = (fieldId: string) => {
-    const defaultInstruction = DEFAULT_BY_ID[fieldId] ?? '';
-    updatePrompt(fieldId, defaultInstruction);
-  };
 
   const [ctxDictEnabled, setCtxDictEnabled] = useState(ctxDictSettings.enabled);
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
@@ -124,6 +110,25 @@ const AITranslatePanel: React.FC = () => {
       saveSettings(envConfig, currentSettings);
     },
     [envConfig, setSettings, saveSettings],
+  );
+
+  const updatePrompt = useCallback(
+    (fieldId: string, instruction: string) => {
+      const updated = ctxOutputFields.map((f) =>
+        f.id === fieldId ? { ...f, promptInstruction: instruction } : f,
+      );
+      setCtxOutputFields(updated);
+      saveCtxTransSetting({ outputFields: updated });
+    },
+    [ctxOutputFields, saveCtxTransSetting],
+  );
+
+  const resetToDefault = useCallback(
+    (fieldId: string) => {
+      const defaultInstruction = DEFAULT_BY_ID[fieldId] ?? '';
+      updatePrompt(fieldId, defaultInstruction);
+    },
+    [updatePrompt],
   );
 
   // Initialize bundled dictionaries on mount
