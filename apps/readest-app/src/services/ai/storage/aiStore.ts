@@ -6,7 +6,7 @@ import { aiLogger } from '../logger';
 const lunr = require('lunr') as typeof import('lunr');
 
 const DB_NAME = 'readest-ai';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const CHUNKS_STORE = 'chunks';
 const META_STORE = 'bookMeta';
 const BM25_STORE = 'bm25Indices';
@@ -14,6 +14,7 @@ const CONVERSATIONS_STORE = 'conversations';
 const MESSAGES_STORE = 'messages';
 const VOCAB_STORE = 'vocabulary';
 const SERIES_STORE = 'bookSeries';
+const DICTIONARY_STORE = 'dictionaryData';
 
 export interface PageSearchBounds {
   minPage?: number;
@@ -167,6 +168,11 @@ class AIStore {
         }
         if (!db.objectStoreNames.contains(SERIES_STORE)) {
           db.createObjectStore(SERIES_STORE, { keyPath: 'id' });
+        }
+
+        // v5: user dictionary store
+        if (!db.objectStoreNames.contains(DICTIONARY_STORE)) {
+          db.createObjectStore(DICTIONARY_STORE, { keyPath: 'id' });
         }
       };
     });
@@ -673,6 +679,35 @@ class AIStore {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(SERIES_STORE, 'readwrite');
       tx.objectStore(SERIES_STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async getRecord<T>(store: string, id: string): Promise<T | null> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(store, 'readonly').objectStore(store).get(id);
+      req.onsuccess = () => resolve((req.result as T) ?? null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async putRecord<T>(store: string, record: T): Promise<void> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(store, 'readwrite');
+      tx.objectStore(store).put(record);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async deleteRecord(store: string, id: string): Promise<void> {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(store, 'readwrite');
+      tx.objectStore(store).delete(id);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });

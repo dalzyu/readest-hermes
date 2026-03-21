@@ -129,3 +129,24 @@ export interface ContextTranslationSettings {
   priorVolumeChunkCount: number;
   outputFields: TranslationOutputField[];
 }
+
+/** A single entry from a StarDict dictionary. */
+export interface DictionaryEntry {
+  headword: string;
+  definition: string;
+}
+
+/** A dictionary installed in the app. */
+export interface UserDictionary {
+  id: string;
+  name: string;
+  /** ISO 639-1 source language (headword language). */
+  language: string;
+  /** ISO 639-1 definition language. Same as language for monolingual. */
+  targetLanguage: string;
+  entryCount: number;
+  source: 'bundled' | 'user';
+  importedAt: number;
+  /** Only when source === 'bundled'. Must match BUNDLED_DICTIONARIES version. */
+  bundledVersion?: string;
+}

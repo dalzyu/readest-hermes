@@ -7,6 +7,7 @@ import type { AISettings } from '@/services/ai/types';
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
+  UserDictionary,
 } from '@/services/contextTranslation/types';
 import type { NotebookTab } from '@/store/notebookStore';
 
@@ -109,6 +110,7 @@ export interface SystemSettings {
   libraryColumns: number;
   customFonts: CustomFont[];
   customTextures: CustomTexture[];
+  userDictionaryMeta: UserDictionary[];
   opdsCatalogs: OPDSCatalog[];
   metadataSeriesCollapsed: boolean;
   metadataOthersCollapsed: boolean;
