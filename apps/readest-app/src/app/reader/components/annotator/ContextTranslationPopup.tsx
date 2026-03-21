@@ -8,7 +8,6 @@ import useOpenAIInNotebook from '@/app/reader/hooks/useOpenAIInNotebook';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   getCJKLanguage,
-  isChineseText,
   getPinyinLabel,
   getRetrievalStatusMeta,
   buildRetrievalInfoText,
@@ -74,13 +73,18 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
     settings,
   });
 
+  const source = settings.source ?? 'ai';
+  const showExtendedFields = source === 'ai';
+
   const enabledFields = settings.outputFields
     .filter((field) => field.enabled)
+    .filter((field) => showExtendedFields || field.id === 'translation')
     .sort((a, b) => a.order - b.order);
   const displayedResult = result ?? partialResult ?? {};
   const hasDisplayedResult = Object.keys(displayedResult).length > 0;
+  // Use plugin-enriched examples when available; otherwise parse from raw LLM text (during streaming too)
   const displayedExamples =
-    examples.length > 0
+    result !== null && examples.length > 0
       ? examples
       : displayedResult['examples']
         ? filterRenderableExamples(
@@ -88,9 +92,10 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
             selectedText,
           )
         : [];
+  const sourceCJKLang = getCJKLanguage(selectedText, popupContext?.localPastContext ?? '');
   const selectedTextPinyin =
     annotations?.source?.phonetic ??
-    (isChineseText(selectedText) ? getPinyinLabel(selectedText) : '');
+    (popupContext !== null && sourceCJKLang === 'chinese' ? getPinyinLabel(selectedText) : '');
   const retrievalStatusMeta = getRetrievalStatusMeta(retrievalStatus);
   const retrievalInfoText = buildRetrievalInfoText(retrievalStatus, retrievalHints);
 

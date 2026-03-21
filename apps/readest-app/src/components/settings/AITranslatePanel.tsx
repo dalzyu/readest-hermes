@@ -27,6 +27,8 @@ const DEFAULT_BY_ID: Record<string, string> = Object.fromEntries(
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields.map((f) => [f.id, f.promptInstruction]),
 );
 
+type TranslationSource = 'ai' | 'dictionary' | 'azure' | 'deepl' | 'google' | 'yandex';
+
 const AITranslatePanel: React.FC = () => {
   const _ = useTranslation();
   const { envConfig } = useEnv();
@@ -58,6 +60,7 @@ const AITranslatePanel: React.FC = () => {
     ctxTransSettings.priorVolumeChunkCount,
   );
   const [ctxOutputFields, setCtxOutputFields] = useState(ctxTransSettings.outputFields);
+  const [ctxSource, setCtxSource] = useState<TranslationSource>(ctxTransSettings.source ?? 'ai');
 
   const [ctxDictEnabled, setCtxDictEnabled] = useState(ctxDictSettings.enabled);
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
@@ -110,6 +113,14 @@ const AITranslatePanel: React.FC = () => {
       saveSettings(envConfig, currentSettings);
     },
     [envConfig, setSettings, saveSettings],
+  );
+
+  const updateSource = useCallback(
+    (source: TranslationSource) => {
+      setCtxSource(source);
+      saveCtxTransSetting({ source });
+    },
+    [saveCtxTransSetting],
   );
 
   const updatePrompt = useCallback(
@@ -273,6 +284,28 @@ const AITranslatePanel: React.FC = () => {
                   saveCtxTransSetting({ enabled: next });
                 }}
               />
+            </div>
+
+            <div
+              className={clsx(
+                'config-item',
+                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+              )}
+            >
+              <span>{_('Translation Source')}</span>
+              <select
+                data-testid='translation-source'
+                className='select select-bordered select-sm'
+                value={ctxSource}
+                onChange={(e) => updateSource(e.target.value as TranslationSource)}
+              >
+                <option value='ai' disabled={!aiEnabled}>{_('AI')}</option>
+                <option value='dictionary'>{_('Dictionary')}</option>
+                <option value='azure'>{_('Azure')}</option>
+                <option value='deepl'>{_('DeepL')}</option>
+                <option value='google'>{_('Google')}</option>
+                <option value='yandex'>{_('Yandex')}</option>
+              </select>
             </div>
 
             <div

@@ -297,6 +297,13 @@ describe('AIPanel', () => {
     // If no user dicts, test passes trivially (no dicts to toggle)
     expect(true).toBe(true);
   });
+
+  test('source dropdown allows selecting Dictionary', () => {
+    render(<AITranslatePanel />);
+    const dropdown = screen.getByTestId('translation-source');
+    expect(dropdown).toBeTruthy();
+    fireEvent.change(dropdown, { target: { value: 'deepl' } });
+  });
 });
 
 describe('LangPanel', () => {
