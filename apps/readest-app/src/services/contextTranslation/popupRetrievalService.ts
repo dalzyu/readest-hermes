@@ -7,6 +7,7 @@ import { getPriorVolumes, getSeriesForBook } from './seriesService';
 import type { ContextTranslationSettings, PopupContextBundle } from './types';
 
 interface BuildPopupContextBundleOptions {
+  bookKey: string;
   bookHash: string;
   currentPage: number;
   selectedText: string;
@@ -19,13 +20,18 @@ function formatChunk(chunk: ScoredChunk, prefix?: string): string {
   return `[${header}] ${chunk.text}`;
 }
 
-function buildRetrievalQuery(selectedText: string, localPastContext: string, localFutureBuffer: string): string {
+function buildRetrievalQuery(
+  selectedText: string,
+  localPastContext: string,
+  localFutureBuffer: string,
+): string {
   const tailContext = localPastContext.slice(-240);
   const headFuture = localFutureBuffer.slice(0, 120);
   return [selectedText, tailContext, headFuture].filter(Boolean).join('\n');
 }
 
 export async function buildPopupContextBundle({
+  bookKey,
   bookHash,
   currentPage,
   selectedText,
@@ -33,6 +39,7 @@ export async function buildPopupContextBundle({
   aiSettings,
 }: BuildPopupContextBundleOptions): Promise<PopupContextBundle> {
   const localContext = await getPopupLocalContext(
+    bookKey,
     bookHash,
     currentPage,
     settings.recentContextPages,
@@ -43,7 +50,8 @@ export async function buildPopupContextBundle({
   const series = await getSeriesForBook(bookHash);
   const priorVolumes = settings.priorVolumeRagEnabled ? await getPriorVolumes(bookHash) : [];
   const currentVolumeIndexed =
-    (settings.sameBookRagEnabled || settings.priorVolumeRagEnabled) && (await aiStore.isIndexed(bookHash));
+    (settings.sameBookRagEnabled || settings.priorVolumeRagEnabled) &&
+    (await aiStore.isIndexed(bookHash));
 
   if (!currentVolumeIndexed) {
     const missingPriorVolumes: number[] = [];
@@ -78,13 +86,9 @@ export async function buildPopupContextBundle({
   const sameBookChunks =
     settings.sameBookRagEnabled && localContext.windowStartPage > 1
       ? (
-          await boundedHybridSearch(
-            bookHash,
-            query,
-            aiSettings,
-            settings.sameBookChunkCount,
-            { maxPage: localContext.windowStartPage - 1 },
-          )
+          await boundedHybridSearch(bookHash, query, aiSettings, settings.sameBookChunkCount, {
+            maxPage: localContext.windowStartPage - 1,
+          })
         ).map((chunk) => formatChunk(chunk))
       : [];
 

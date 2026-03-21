@@ -2,13 +2,16 @@ import type { ContextLookupMode } from './modes';
 import type { ContextDictionarySettings, TranslationRequest } from './types';
 import { DEFAULT_CONTEXT_DICTIONARY_SETTINGS, getContextDictionaryOutputFields } from './defaults';
 import { getTranslatorLanguageLabel } from '@/services/translatorLanguages';
+import { getCJKLanguage } from '@/app/reader/components/annotator/LookupPopupUtils';
 
 function languageName(code: string): string {
   return getTranslatorLanguageLabel(code);
 }
 
 function isChineseSource(request: TranslationRequest): boolean {
-  return request.sourceLanguage === 'zh' || /[\u3400-\u9fff]/u.test(request.selectedText);
+  if (request.sourceLanguage === 'zh') return true;
+  // Use page context to disambiguate when selected text is pure kanji
+  return getCJKLanguage(request.selectedText, request.popupContext.localPastContext) === 'chinese';
 }
 
 function isChineseTarget(request: TranslationRequest): boolean {

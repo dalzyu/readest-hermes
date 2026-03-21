@@ -1,8 +1,10 @@
 import type { LanguageModel } from 'ai';
 import type { TranslationRequest, TranslationResult, TranslationStreamResult } from './types';
+import type { ContextLookupMode } from './modes';
 import { formatTranslationResult } from './exampleFormatter';
-import { buildTranslationPrompt } from './promptBuilder';
+import { buildTranslationPrompt, buildLookupPrompt } from './promptBuilder';
 import { parseStreamingTranslationResponse, parseTranslationResponse } from './responseParser';
+import { normalizeLookupResponse } from './normalizer';
 import { callLLM, streamLLM } from './llmClient';
 
 /**
@@ -41,7 +43,52 @@ export async function* streamTranslationWithContext(
   }
 
   yield {
-    fields: formatTranslationResult(parseTranslationResponse(rawText, request.outputFields), request),
+    fields: formatTranslationResult(
+      parseTranslationResponse(rawText, request.outputFields),
+      request,
+    ),
+    activeFieldId: null,
+    rawText,
+    done: true,
+  };
+}
+
+export type LookupStreamResult = {
+  fields: TranslationResult;
+  activeFieldId: string | null;
+  rawText: string;
+  done: boolean;
+};
+
+/**
+ * Streams a context-aware dictionary lookup, yielding partial results as XML tags arrive,
+ * then uses <lookup_json> for the authoritative final parse.
+ */
+export async function* streamLookupWithContext(
+  request: TranslationRequest & { mode: ContextLookupMode },
+  model: LanguageModel,
+  abortSignal?: AbortSignal,
+): AsyncGenerator<LookupStreamResult> {
+  const { systemPrompt, userPrompt } = buildLookupPrompt({
+    ...request,
+    popupContext: request.popupContext,
+  });
+  let rawText = '';
+
+  for await (const chunk of streamLLM(systemPrompt, userPrompt, model, abortSignal)) {
+    rawText += chunk;
+    const parsed = parseStreamingTranslationResponse(rawText, request.outputFields);
+    yield {
+      fields: parsed.fields,
+      activeFieldId: parsed.activeFieldId,
+      rawText,
+      done: false,
+    };
+  }
+
+  // Final: use normalizeLookupResponse with the complete raw text for authoritative parse
+  yield {
+    fields: normalizeLookupResponse(rawText, request.mode),
     activeFieldId: null,
     rawText,
     done: true,

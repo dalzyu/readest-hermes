@@ -176,6 +176,7 @@ export async function runContextLookup(
             sourceLanguage,
             targetLanguage: request.targetLanguage,
             outputFields: request.outputFields,
+            pageContext: request.popupContext.localPastContext,
           })
         : normalized;
     const validation = validateLookupResult(fields, primaryField, request.selectedText);

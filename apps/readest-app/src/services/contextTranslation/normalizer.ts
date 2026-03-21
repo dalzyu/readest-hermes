@@ -17,10 +17,20 @@ function extractLookupJson(raw: string): Record<string, string> | null {
   try {
     const parsed: unknown = JSON.parse(match[1].trim());
     if (typeof parsed === 'object' && parsed !== null) {
-      // Ensure all leaf values are strings (LLM may return arrays or objects for structured fields)
+      // Ensure all leaf values are strings (LLM may return arrays for structured fields like sourceExamples)
       const stringified: Record<string, string> = {};
       for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-        stringified[key] = typeof value === 'string' ? value : JSON.stringify(value);
+        if (Array.isArray(value)) {
+          // Join array elements with double-newline so parseStructuredExamples can split them into separate examples
+          stringified[key] = value
+            .map((v) => (typeof v === 'string' ? v.trim() : JSON.stringify(v)))
+            .filter(Boolean)
+            .join('\n\n');
+        } else if (typeof value === 'string') {
+          stringified[key] = value;
+        } else {
+          stringified[key] = JSON.stringify(value);
+        }
       }
       return stringified;
     }

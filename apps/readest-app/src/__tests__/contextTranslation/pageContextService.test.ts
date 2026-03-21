@@ -7,6 +7,22 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
   },
 }));
 
+vi.mock('@/store/bookDataStore', () => ({
+  useBookDataStore: {
+    getState: vi.fn(() => ({
+      getBookData: vi.fn(() => ({ bookDoc: { sections: [] } })),
+    })),
+  },
+}));
+
+vi.mock('@/store/readerStore', () => ({
+  useReaderStore: {
+    getState: vi.fn(() => ({
+      getView: vi.fn(() => null),
+    })),
+  },
+}));
+
 import { aiStore } from '@/services/ai/storage/aiStore';
 import { getPopupLocalContext } from '@/services/contextTranslation/pageContextService';
 
@@ -39,7 +55,7 @@ describe('getPopupLocalContext', () => {
   test('returns text from the last N pages up to the selected text', async () => {
     mockAiStore.getChunks.mockResolvedValueOnce(chunks);
 
-    const result = await getPopupLocalContext('book-abc', 3, 3, '知己', 0);
+    const result = await getPopupLocalContext('book-key', 'book-abc', 3, 3, '知己', 0);
 
     expect(result.localPastContext).toContain('page one');
     expect(result.localPastContext).toContain('page two');
@@ -50,7 +66,7 @@ describe('getPopupLocalContext', () => {
   test('does not include chunks beyond currentPage in the local past context', async () => {
     mockAiStore.getChunks.mockResolvedValueOnce(chunks);
 
-    const result = await getPopupLocalContext('book-abc', 3, 2, '知己', 0);
+    const result = await getPopupLocalContext('book-key', 'book-abc', 3, 2, '知己', 0);
 
     expect(result.localPastContext).not.toContain('page four');
     expect(result.localPastContext).not.toContain('page five');
@@ -59,7 +75,7 @@ describe('getPopupLocalContext', () => {
   test('returns empty sections when no chunks exist', async () => {
     mockAiStore.getChunks.mockResolvedValueOnce([]);
 
-    const result = await getPopupLocalContext('book-abc', 3, 5, '知己', 5);
+    const result = await getPopupLocalContext('book-key', 'book-abc', 3, 5, '知己', 5);
 
     expect(result.localPastContext).toBe('');
     expect(result.localFutureBuffer).toBe('');
@@ -68,7 +84,7 @@ describe('getPopupLocalContext', () => {
   test('handles currentPage beyond available chunks', async () => {
     mockAiStore.getChunks.mockResolvedValueOnce(chunks);
 
-    const result = await getPopupLocalContext('book-abc', 99, 2, 'missing', 0);
+    const result = await getPopupLocalContext('book-key', 'book-abc', 99, 2, 'missing', 0);
 
     expect(result.localPastContext).toContain('page four');
     expect(result.localPastContext).toContain('page five');
@@ -82,7 +98,7 @@ describe('getPopupLocalContext', () => {
     ];
     mockAiStore.getChunks.mockResolvedValueOnce(multiChunks);
 
-    const result = await getPopupLocalContext('book-abc', 2, 2, 'missing', 0);
+    const result = await getPopupLocalContext('book-key', 'book-abc', 2, 2, 'missing', 0);
 
     expect(result.localPastContext).toContain('First chunk on page 1.');
     expect(result.localPastContext).toContain('Second chunk on page 1.');
@@ -92,7 +108,7 @@ describe('getPopupLocalContext', () => {
   test('builds a bounded future buffer from later words and pages', async () => {
     mockAiStore.getChunks.mockResolvedValueOnce(chunks);
 
-    const result = await getPopupLocalContext('book-abc', 3, 2, '知己', 8);
+    const result = await getPopupLocalContext('book-key', 'book-abc', 3, 2, '知己', 8);
 
     expect(result.localFutureBuffer.length).toBeGreaterThan(0);
   });

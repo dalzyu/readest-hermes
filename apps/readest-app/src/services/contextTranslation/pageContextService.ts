@@ -1,4 +1,6 @@
 import { aiStore } from '@/services/ai/storage/aiStore';
+import { useBookDataStore } from '@/store/bookDataStore';
+import { useReaderStore } from '@/store/readerStore';
 
 import {
   assemblePopupLocalContext,
@@ -7,7 +9,10 @@ import {
   type PopupLocalContext,
 } from './contextAssembler';
 
-function groupChunksByPage(bookHash: string, chunks: Awaited<ReturnType<typeof aiStore.getChunks>>): PageContent[] {
+function groupChunksByPage(
+  bookHash: string,
+  chunks: Awaited<ReturnType<typeof aiStore.getChunks>>,
+): PageContent[] {
   const pages = new Map<number, string[]>();
 
   for (const chunk of chunks) {
@@ -25,7 +30,35 @@ function groupChunksByPage(bookHash: string, chunks: Awaited<ReturnType<typeof a
     }));
 }
 
+/**
+ * Fallback: get text from the bookDoc section corresponding to the current page.
+ * Uses the view's CFI resolution to find the current section.
+ */
+async function getSectionTextFromBookDoc(bookKey: string): Promise<string> {
+  try {
+    const bookData = useBookDataStore.getState().getBookData(bookKey);
+    const bookDoc = bookData?.bookDoc;
+    if (!bookDoc?.sections?.length) return '';
+
+    const view = useReaderStore.getState().getView(bookKey);
+    if (!view) return '';
+
+    // Try to get current section index via the view's CFI progress
+    const cfiProgress = await view.getCFIProgress('');
+    const sectionIndex = cfiProgress?.section.current ?? 0;
+    const section = bookDoc.sections[sectionIndex];
+    if (!section) return '';
+
+    const doc = await section.createDocument();
+    const body = doc.body?.textContent ?? doc.documentElement?.textContent ?? '';
+    return body.trim();
+  } catch {
+    return '';
+  }
+}
+
 export async function getPopupLocalContext(
+  bookKey: string,
   bookHash: string,
   currentPage: number,
   windowSize: number,
@@ -34,6 +67,20 @@ export async function getPopupLocalContext(
 ): Promise<PopupLocalContext> {
   const chunks = await aiStore.getChunks(bookHash);
   if (chunks.length === 0) {
+    // Fallback: try to get section text directly from bookDoc when not indexed
+    const sectionText = await getSectionTextFromBookDoc(bookKey);
+    if (sectionText) {
+      const selectionIndex = sectionText.indexOf(selectedText);
+      if (selectionIndex !== -1) {
+        const pastText = sectionText.slice(0, selectionIndex + selectedText.length).trim();
+        const futureText = sectionText.slice(selectionIndex + selectedText.length).trim();
+        return {
+          localPastContext: pastText,
+          localFutureBuffer: futureText.slice(0, lookAheadWords * 5), // rough word-based trim
+          windowStartPage: currentPage,
+        };
+      }
+    }
     return {
       localPastContext: '',
       localFutureBuffer: '',

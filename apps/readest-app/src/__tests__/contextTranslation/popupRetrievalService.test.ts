@@ -86,6 +86,7 @@ describe('buildPopupContextBundle', () => {
     mockIsIndexed.mockImplementation(async (bookHash: string) => bookHash === 'vol-1');
 
     const bundle = await buildPopupContextBundle({
+      bookKey: 'vol-2-hash',
       bookHash: 'vol-2',
       currentPage: 6,
       selectedText: '殿下',
@@ -124,6 +125,7 @@ describe('buildPopupContextBundle', () => {
       .mockResolvedValueOnce([makeChunk('vol-2', 'Volume two repeated the title.', 0.8)]);
 
     const bundle = await buildPopupContextBundle({
+      bookKey: 'vol-3-hash',
       bookHash: 'vol-3',
       currentPage: 6,
       selectedText: '殿下',

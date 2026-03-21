@@ -206,12 +206,16 @@ export const useTextSelector = (
   };
 
   const handleShowPopup = (showPopup: boolean) => {
-    setTimeout(() => {
-      if (showPopup && !isPopuped.current) {
-        isUpToPopup.current = false;
-      }
-      isPopuped.current = showPopup;
-    }, 500);
+    // Set isPopuped immediately so outside-click dismissal works right away
+    isPopuped.current = showPopup;
+    if (showPopup) {
+      // Only defer clearing isUpToPopup flag
+      setTimeout(() => {
+        if (!isPopuped.current) {
+          isUpToPopup.current = false;
+        }
+      }, 500);
+    }
   };
 
   const handleUpToPopup = () => {

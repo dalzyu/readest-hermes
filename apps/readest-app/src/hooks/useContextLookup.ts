@@ -4,7 +4,11 @@ import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 import { getAIProvider } from '@/services/ai/providers';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
-import { streamTranslationWithContext } from '@/services/contextTranslation/translationService';
+import {
+  streamTranslationWithContext,
+  streamLookupWithContext,
+} from '@/services/contextTranslation/translationService';
+import type { ContextLookupMode } from '@/services/contextTranslation/modes';
 import type { TranslationRequest } from '@/services/contextTranslation/types';
 import type {
   LookupAnnotationSlots,
@@ -56,6 +60,7 @@ const EMPTY_RETRIEVAL_HINTS: PopupRetrievalHints = {
 
 export function useContextLookup({
   mode,
+  bookKey,
   bookHash,
   selectedText,
   currentPage,
@@ -105,6 +110,7 @@ export function useContextLookup({
     const run = async () => {
       try {
         const bundle = await buildPopupContextBundle({
+          bookKey,
           bookHash,
           currentPage: requestSnapshot.currentPage,
           selectedText,
@@ -150,6 +156,9 @@ export function useContextLookup({
 
           setStreaming(false);
 
+          // If streaming yielded no fields, call without preNormalizedFields to force a fresh LLM request
+          const hasStreamingResult = Object.keys(finalFields).length > 0;
+
           // Post-stream: repair (if needed) + enrichment + telemetry via runContextLookup
           const lookupResult = await runContextLookup({
             mode: 'translation',
@@ -159,8 +168,9 @@ export function useContextLookup({
             outputFields: requestSnapshot.settings.outputFields,
             model,
             abortSignal: abortController.signal,
-            preNormalizedFields: finalFields,
-            rawResponse: finalRawText,
+            ...(hasStreamingResult
+              ? { preNormalizedFields: finalFields, rawResponse: finalRawText }
+              : {}),
           });
 
           if (cancelled) return;
@@ -170,7 +180,40 @@ export function useContextLookup({
           setAnnotations(lookupResult.annotations ?? {});
           setValidationDecision(lookupResult.validationDecision);
         } else {
-          // Dictionary mode — non-streaming final-result-first
+          // Dictionary mode — streaming with real-time partial results + post-stream repair/enrichment
+          setStreaming(true);
+
+          const dictionaryRequest = {
+            selectedText,
+            popupContext: bundle,
+            sourceLanguage: undefined,
+            targetLanguage: requestSnapshot.settings.targetLanguage,
+            outputFields: requestSnapshot.settings.outputFields,
+            dictionarySettings: requestSnapshot.dictionarySettings,
+          } as TranslationRequest & { dictionarySettings?: ContextDictionarySettings };
+
+          let finalRawText = '';
+          let finalFields: TranslationResult = {};
+
+          for await (const chunk of streamLookupWithContext(
+            { ...dictionaryRequest, mode: 'dictionary' as ContextLookupMode },
+            model,
+            abortController.signal,
+          )) {
+            if (cancelled) return;
+            finalRawText = chunk.rawText;
+            finalFields = chunk.fields;
+            setPartialResult(chunk.fields);
+            setActiveFieldId(chunk.activeFieldId);
+          }
+
+          if (cancelled) return;
+
+          setStreaming(false);
+
+          // If streaming yielded no fields, call without preNormalizedFields to force a fresh LLM request
+          const hasStreamingResult = Object.keys(finalFields).length > 0;
+
           const lookupResult = await runContextLookup({
             mode: 'dictionary',
             selectedText,
@@ -180,6 +223,9 @@ export function useContextLookup({
             dictionarySettings: requestSnapshot.dictionarySettings,
             model,
             abortSignal: abortController.signal,
+            ...(hasStreamingResult
+              ? { preNormalizedFields: finalFields, rawResponse: finalRawText }
+              : {}),
           });
 
           if (cancelled) return;
@@ -205,7 +251,7 @@ export function useContextLookup({
       cancelled = true;
       abortController.abort();
     };
-  }, [selectedText, bookHash, requestSnapshot, mode]);
+  }, [selectedText, bookKey, bookHash, requestSnapshot, mode]);
 
   const saveToVocabulary = useCallback(async () => {
     if (!result) return;

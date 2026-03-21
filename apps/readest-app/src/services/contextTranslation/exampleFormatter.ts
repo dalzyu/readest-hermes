@@ -1,15 +1,17 @@
 import { pinyin } from 'pinyin-pro';
 import type { LookupExample, TranslationOutputField, TranslationResult } from './types';
 import { classifyExampleMatch } from './exampleMatcher';
+import { getCJKLanguage, HAN_REGEX } from '@/app/reader/components/annotator/LookupPopupUtils';
 
 type FormatRequest = {
   selectedText: string;
   sourceLanguage?: string;
   targetLanguage: string;
   outputFields: TranslationOutputField[];
+  /** Page context (localPastContext) used to disambiguate Japanese vs Chinese when the selected text is pure kanji. */
+  pageContext?: string;
 };
 
-const HAN_REGEX = /[\u3400-\u9fff]/u;
 const NUMBERED_EXAMPLE_REGEX = /^(\d+\.\s*)(.+)$/u;
 const ENGLISH_LINE_REGEX = /^English:\s*/iu;
 const PINYIN_LINE_REGEX = /^Pinyin:\s*/iu;
@@ -19,7 +21,8 @@ function shouldFormatChineseExamples(request: FormatRequest, result: Translation
   return (
     !!result['examples'] &&
     request.outputFields.some((field) => field.enabled && field.id === 'examples') &&
-    (request.sourceLanguage === 'zh' || HAN_REGEX.test(request.selectedText))
+    (request.sourceLanguage === 'zh' ||
+      getCJKLanguage(request.selectedText, request.pageContext ?? '') === 'chinese')
   );
 }
 
