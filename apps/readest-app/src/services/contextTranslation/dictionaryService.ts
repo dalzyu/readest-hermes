@@ -205,6 +205,25 @@ async function loadDictionaryEntries(id: string): Promise<DictionaryEntry[]> {
 }
 
 /**
+ * Preview a StarDict zip file without fully importing it.
+ * Phase 1: extractFromZip -> parseIfo (get name and wordcount for display).
+ * Returns metadata needed to show the import confirmation dialog.
+ */
+export async function previewDictionaryZip(
+  zipFile: File | Uint8Array,
+): Promise<{ name: string; wordcount: number }> {
+  const buffer = zipFile instanceof File ? new Uint8Array(await zipFile.arrayBuffer()) : zipFile;
+
+  const { ifo } = await extractFromZip(buffer);
+  const ifoResult = (await import('./dictionaryParser')).parseIfo(ifo);
+
+  return {
+    name: ifoResult.name,
+    wordcount: ifoResult.wordcount,
+  };
+}
+
+/**
  * Import a user dictionary from a StarDict zip file.
  *
  * Phase 1: extractFromZip -> parseIfo (get wordcount for display)

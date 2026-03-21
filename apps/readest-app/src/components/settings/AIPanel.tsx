@@ -1,6 +1,12 @@
 import clsx from 'clsx';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { PiCheckCircle, PiWarningCircle, PiArrowsClockwise, PiSpinner } from 'react-icons/pi';
+import {
+  PiCheckCircle,
+  PiWarningCircle,
+  PiArrowsClockwise,
+  PiSpinner,
+  PiTrash,
+} from 'react-icons/pi';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -15,7 +21,15 @@ import {
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
+  UserDictionary,
 } from '@/services/contextTranslation/types';
+import {
+  BUNDLED_DICTIONARIES,
+  initBundledDictionaries,
+  previewDictionaryZip,
+  importUserDictionary,
+  deleteUserDictionary,
+} from '@/services/contextTranslation/dictionaryService';
 import { getTranslatorLanguageOptions } from '@/services/translatorLanguages';
 
 type ConnectionStatus = 'idle' | 'testing' | 'success' | 'error';
@@ -104,6 +118,22 @@ const AIPanel: React.FC = () => {
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
     ctxDictSettings.sourceExamples,
   );
+
+  // Dictionaries section state
+  const [dictionaryUnavailableBanner, setDictionaryUnavailableBanner] = useState(false);
+  const [userDictionaries, setUserDictionaries] = useState<UserDictionary[]>(
+    settings?.userDictionaryMeta ?? [],
+  );
+  const [showModal, setShowModal] = useState(false);
+  const [importPreview, setImportPreview] = useState<{ name: string; wordcount: number } | null>(
+    null,
+  );
+  const [selectedZipFile, setSelectedZipFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSourceLang, setImportSourceLang] = useState('');
+  const [importTargetLang, setImportTargetLang] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [enabled, setEnabled] = useState(aiSettings.enabled);
   const [provider, setProvider] = useState<AIProviderName>(aiSettings.provider);
@@ -235,6 +265,19 @@ const AIPanel: React.FC = () => {
   useEffect(() => {
     isMounted.current = true;
   }, []);
+
+  // Initialize bundled dictionaries on mount
+  useEffect(() => {
+    initBundledDictionaries().catch(() => {
+      setDictionaryUnavailableBanner(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync userDictionaries from settings
+  useEffect(() => {
+    setUserDictionaries(settings?.userDictionaryMeta ?? []);
+  }, [settings?.userDictionaryMeta]);
 
   useEffect(() => {
     if (!isMounted.current) return;
@@ -458,10 +501,85 @@ const AIPanel: React.FC = () => {
     }
   };
 
+  // Language code to display name helper
+  const getLanguageName = (code: string): string => {
+    const options = getTranslatorLanguageOptions();
+    const found = options.find((o) => o.value === code);
+    return found ? found.label : code.toUpperCase();
+  };
+
+  // File picker for web (native input)
+  const handleAddDictionaryClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportError(null);
+    try {
+      const preview = await previewDictionaryZip(file);
+      setSelectedZipFile(file);
+      setImportPreview({ name: preview.name, wordcount: preview.wordcount });
+      setImportSourceLang('');
+      setImportTargetLang('');
+      setShowModal(true);
+    } catch (err) {
+      setImportError(_('Failed to read dictionary file'));
+    } finally {
+      // Reset input value so same file can be selected again
+      e.target.value = '';
+    }
+  };
+
+  const handleImportConfirm = async () => {
+    if (!importPreview || !selectedZipFile || !importSourceLang) return;
+
+    setImporting(true);
+    setImportError(null);
+    try {
+      const targetLang = importTargetLang || importSourceLang;
+      await importUserDictionary(selectedZipFile, {
+        name: importPreview.name,
+        language: importSourceLang,
+        targetLanguage: targetLang,
+      });
+      // Refresh user dictionaries list
+      const { useSettingsStore: useSettingsStoreLocal } = await import('@/store/settingsStore');
+      setUserDictionaries(useSettingsStoreLocal.getState().settings.userDictionaryMeta ?? []);
+      setShowModal(false);
+      setImportPreview(null);
+      setSelectedZipFile(null);
+    } catch (err) {
+      setImportError((err as Error).message || _('Failed to import dictionary'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleDeleteDictionary = async (id: string) => {
+    try {
+      await deleteUserDictionary(id);
+      setUserDictionaries((prev) => prev.filter((d) => d.id !== id));
+    } catch (err) {
+      // Handle error silently or show toast
+    }
+  };
+
   const disabledSection = !enabled ? 'opacity-50 pointer-events-none select-none' : '';
 
   return (
     <div className='my-4 w-full space-y-6'>
+      {/* Hidden file input for web dictionary import */}
+      <input
+        ref={fileInputRef}
+        type='file'
+        accept='.zip'
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
       <div className='w-full'>
         <h2 className='mb-2 font-medium'>{_('AI Assistant')}</h2>
         <div className='card border-base-200 bg-base-100 border shadow'>
@@ -1060,6 +1178,156 @@ const AIPanel: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <div className='w-full'>
+        <h2 className='mb-2 font-medium'>{_('Dictionaries')}</h2>
+
+        {dictionaryUnavailableBanner && (
+          <div className='alert alert-warning mb-3'>
+            <PiWarningCircle className='size-5' />
+            <span>{_('Some bundled dictionaries are not available')}</span>
+            <button
+              className='btn btn-ghost btn-xs'
+              onClick={() => setDictionaryUnavailableBanner(false)}
+            >
+              {_('Dismiss')}
+            </button>
+          </div>
+        )}
+
+        <div className='card border-base-200 bg-base-100 border shadow'>
+          {/* Bundled Dictionaries sub-section */}
+          <div className='border-base-200 border-b px-4 py-3'>
+            <h3 className='mb-2 text-sm font-medium'>{_('Bundled Dictionaries')}</h3>
+            <div className='space-y-1'>
+              {BUNDLED_DICTIONARIES.map((dict) => (
+                <div key={dict.id} className='flex items-center justify-between text-sm'>
+                  <span>
+                    {getLanguageName(dict.language)} → {getLanguageName(dict.targetLanguage)}
+                  </span>
+                  <span className='text-base-content/60'>
+                    {dict.language.toUpperCase()} → {dict.targetLanguage.toUpperCase()} ·{' '}
+                    <span className='text-success'>✓ {_('ready')}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* User Dictionaries sub-section */}
+          <div className='px-4 py-3'>
+            <div className='mb-2 flex items-center justify-between'>
+              <h3 className='text-sm font-medium'>{_('User Dictionaries')}</h3>
+              <button className='btn btn-outline btn-xs' onClick={handleAddDictionaryClick}>
+                {_('Add Dictionary')}
+              </button>
+            </div>
+
+            {userDictionaries.length === 0 ? (
+              <p className='text-base-content/50 text-sm'>{_('No user dictionaries imported')}</p>
+            ) : (
+              <div className='space-y-1'>
+                {userDictionaries.map((dict) => (
+                  <div key={dict.id} className='flex items-center justify-between text-sm'>
+                    <span>
+                      {dict.name} · {getLanguageName(dict.language)} →{' '}
+                      {getLanguageName(dict.targetLanguage)} · {dict.entryCount} entries
+                    </span>
+                    <button
+                      className='btn btn-ghost btn-xs text-error'
+                      onClick={() => handleDeleteDictionary(dict.id)}
+                      title={_('Delete dictionary')}
+                    >
+                      <PiTrash className='size-3' />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Import Modal */}
+      {showModal && importPreview && (
+        <div className='modal modal-open'>
+          <div className='modal-box'>
+            <h3 className='mb-4 font-bold'>{_('Import Dictionary')}</h3>
+
+            <div className='space-y-4'>
+              <div>
+                <label className='mb-1 block text-sm'>{_('Name')}</label>
+                <input
+                  type='text'
+                  className='input input-bordered input-sm w-full'
+                  value={importPreview.name}
+                  readOnly
+                />
+              </div>
+
+              <div>
+                <label className='mb-1 block text-sm'>{_('Source Language')}</label>
+                <select
+                  className='select select-bordered select-sm w-full'
+                  value={importSourceLang}
+                  onChange={(e) => setImportSourceLang(e.target.value)}
+                >
+                  <option value=''>{_('Select source language')}</option>
+                  {getTranslatorLanguageOptions().map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className='mb-1 block text-sm'>{_('Target Language')}</label>
+                <select
+                  className='select select-bordered select-sm w-full'
+                  value={importTargetLang}
+                  onChange={(e) => setImportTargetLang(e.target.value)}
+                >
+                  <option value=''>{_('Same as source')}</option>
+                  {getTranslatorLanguageOptions().map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className='text-base-content/70 text-sm'>
+                {importPreview.wordcount.toLocaleString()} entries
+              </div>
+
+              {importError && <div className='text-error text-sm'>{importError}</div>}
+            </div>
+
+            <div className='modal-action'>
+              <button
+                className='btn btn-ghost'
+                onClick={() => {
+                  setShowModal(false);
+                  setImportPreview(null);
+                  setImportError(null);
+                }}
+                disabled={importing}
+              >
+                {_('Cancel')}
+              </button>
+              <button
+                className='btn btn-primary'
+                onClick={handleImportConfirm}
+                disabled={!selectedZipFile || !importSourceLang || importing}
+              >
+                {importing ? <PiSpinner className='size-4 animate-spin' /> : _('Import')}
+              </button>
+            </div>
+          </div>
+          <div className='modal-backdrop' onClick={() => setShowModal(false)} />
+        </div>
+      )}
     </div>
   );
 };

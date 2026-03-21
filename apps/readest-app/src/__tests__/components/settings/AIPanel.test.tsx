@@ -1,6 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import AIPanel from '@/components/settings/AIPanel';
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
@@ -38,13 +38,29 @@ vi.mock('@/store/settingsStore', () => ({
         },
         contextDictionary: DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
       },
+      userDictionaryMeta: [],
     },
     setSettings: setSettingsMock,
     saveSettings: saveSettingsMock,
   }),
 }));
 
+vi.mock('@/services/contextTranslation/dictionaryService', () => ({
+  BUNDLED_DICTIONARIES: [
+    { id: 'bundled-zh-en', language: 'zh', targetLanguage: 'en', bundledVersion: '1.0.0' },
+    { id: 'bundled-ja-en', language: 'ja', targetLanguage: 'en', bundledVersion: '1.0.0' },
+  ],
+  initBundledDictionaries: vi.fn().mockResolvedValue(undefined),
+  previewDictionaryZip: vi.fn().mockResolvedValue({ name: 'TestDict', wordcount: 100 }),
+  importUserDictionary: vi.fn().mockResolvedValue({}),
+  deleteUserDictionary: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe('AIPanel', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -83,5 +99,17 @@ describe('AIPanel', () => {
   test('ai panel persists dictionary settings separately from translation settings', () => {
     render(<AIPanel />);
     expect(screen.getByLabelText(/enable dictionary lookup/i)).toBeTruthy();
+  });
+
+  test('renders Dictionaries section with bundled and user sections', () => {
+    render(<AIPanel />);
+    expect(screen.getByText('Dictionaries')).toBeTruthy();
+    expect(screen.getByText('Bundled Dictionaries')).toBeTruthy();
+    expect(screen.getByText('User Dictionaries')).toBeTruthy();
+  });
+
+  test('shows Add Dictionary button in User Dictionaries section', () => {
+    render(<AIPanel />);
+    expect(screen.getByText('Add Dictionary')).toBeTruthy();
   });
 });
