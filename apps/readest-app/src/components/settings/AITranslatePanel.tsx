@@ -55,6 +55,24 @@ const AITranslatePanel: React.FC = () => {
   );
   const [ctxOutputFields, setCtxOutputFields] = useState(ctxTransSettings.outputFields);
 
+  const DEFAULT_BY_ID: Record<string, string> = {};
+  for (const field of DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields) {
+    DEFAULT_BY_ID[field.id] = field.promptInstruction;
+  }
+
+  const updatePrompt = (fieldId: string, instruction: string) => {
+    const updated = ctxOutputFields.map((f) =>
+      f.id === fieldId ? { ...f, promptInstruction: instruction } : f,
+    );
+    setCtxOutputFields(updated);
+    saveCtxTransSetting({ outputFields: updated });
+  };
+
+  const resetToDefault = (fieldId: string) => {
+    const defaultInstruction = DEFAULT_BY_ID[fieldId] ?? '';
+    updatePrompt(fieldId, defaultInstruction);
+  };
+
   const [ctxDictEnabled, setCtxDictEnabled] = useState(ctxDictSettings.enabled);
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
     ctxDictSettings.sourceExamples,
@@ -384,22 +402,49 @@ const AITranslatePanel: React.FC = () => {
                 .slice()
                 .sort((a, b) => a.order - b.order)
                 .map((field) => (
-                  <div key={field.id} className='config-item border-base-200 border-t'>
-                    <span className='text-sm'>{_(field.label)}</span>
-                    <input
-                      type='checkbox'
-                      className='toggle toggle-sm'
-                      checked={field.enabled}
-                      disabled={!ctxEnabled || field.id === 'translation'}
-                      onChange={() => {
-                        if (field.id === 'translation') return;
-                        const updated = ctxOutputFields.map((f) =>
-                          f.id === field.id ? { ...f, enabled: !f.enabled } : f,
-                        );
-                        setCtxOutputFields(updated);
-                        saveCtxTransSetting({ outputFields: updated });
-                      }}
-                    />
+                  <div key={field.id} className='border-base-200 border-t px-4 py-2'>
+                    <div className='config-item !px-0'>
+                      <span className='text-sm'>{_(field.label)}</span>
+                      <input
+                        type='checkbox'
+                        className='toggle toggle-sm'
+                        checked={field.enabled}
+                        disabled={!ctxEnabled || field.id === 'translation'}
+                        onChange={() => {
+                          if (field.id === 'translation') return;
+                          const updated = ctxOutputFields.map((f) =>
+                            f.id === field.id ? { ...f, enabled: !f.enabled } : f,
+                          );
+                          setCtxOutputFields(updated);
+                          saveCtxTransSetting({ outputFields: updated });
+                        }}
+                      />
+                    </div>
+                    <details>
+                      <summary
+                        data-testid={`advanced-${field.id}-summary`}
+                        className='cursor-pointer text-sm text-base-content/60'
+                      >
+                        {_('Advanced')}
+                      </summary>
+                      <div className='space-y-2 pl-4 pt-2'>
+                        <label className='text-sm'>{_('Prompt instruction:')}</label>
+                        <textarea
+                          data-testid={`prompt-textarea-${field.id}`}
+                          className='textarea textarea-bordered w-full text-sm'
+                          rows={3}
+                          value={field.promptInstruction}
+                          onChange={(e) => updatePrompt(field.id, e.target.value)}
+                        />
+                        <button
+                          data-testid={`reset-prompt-${field.id}`}
+                          className='btn btn-ghost btn-sm'
+                          onClick={() => resetToDefault(field.id)}
+                        >
+                          {_('Reset to defaults')}
+                        </button>
+                      </div>
+                    </details>
                   </div>
                 ))}
             </div>
