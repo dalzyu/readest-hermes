@@ -395,12 +395,12 @@ export async function lookupDefinitions(
   text: string,
   sourceLang: string,
   targetLang: string,
+  disabledBundledDicts: string[] = [],
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
 
   const MAX_RESULTS = 3;
 
-  // Gather all dictionaries (bundled + user)
   const allBundled: UserDictionary[] = BUNDLED_DICTIONARIES.map((b) => ({
     id: b.id,
     name: b.id,
@@ -410,11 +410,14 @@ export async function lookupDefinitions(
     source: 'bundled' as const,
     importedAt: 0,
     bundledVersion: b.bundledVersion,
+    enabled: !disabledBundledDicts.includes(b.id),
   }));
 
   const allUser = await getUserDictionaryMeta();
 
-  const allDicts: UserDictionary[] = [...allBundled, ...allUser];
+  const allDicts: UserDictionary[] = [...allBundled, ...allUser].filter(
+    (d) => d.enabled !== false,
+  );
 
   // Filter to matching dictionaries
   const matching = allDicts.filter((d) => {

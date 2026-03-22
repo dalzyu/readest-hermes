@@ -2,7 +2,9 @@ import { describe, test, expect } from 'vitest';
 import {
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+  DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS,
   CONTEXT_LOOKUP_MODES,
+  getContextDictionaryOutputFields,
 } from '@/services/contextTranslation/defaults';
 import type {
   BookSeries,
@@ -88,5 +90,49 @@ describe('CONTEXT_LOOKUP_MODES and dictionary defaults', () => {
   test('provides dictionary defaults separate from translation defaults', () => {
     expect(DEFAULT_CONTEXT_DICTIONARY_SETTINGS.enabled).toBe(false);
     expect(DEFAULT_CONTEXT_TRANSLATION_SETTINGS.targetLanguage).toBe('en');
+  });
+});
+
+describe('getContextDictionaryOutputFields', () => {
+  test('returns default fields when no custom promptInstructions', () => {
+    const fields = getContextDictionaryOutputFields(DEFAULT_CONTEXT_DICTIONARY_SETTINGS);
+    expect(fields).toHaveLength(DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS.length);
+    fields.forEach((f, i) => {
+      expect(f.promptInstruction).toBe(DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS[i]!.promptInstruction);
+    });
+  });
+
+  test('applies custom promptInstruction for a field', () => {
+    const fields = getContextDictionaryOutputFields({
+      ...DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+      promptInstructions: { simpleDefinition: 'Custom instruction.' },
+    });
+    const field = fields.find((f) => f.id === 'simpleDefinition')!;
+    expect(field.promptInstruction).toBe('Custom instruction.');
+  });
+
+  test('leaves other fields unchanged when one is customized', () => {
+    const fields = getContextDictionaryOutputFields({
+      ...DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+      promptInstructions: { simpleDefinition: 'Custom instruction.' },
+    });
+    const ctxField = fields.find((f) => f.id === 'contextualMeaning')!;
+    const defaultCtxField = DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS.find(
+      (f) => f.id === 'contextualMeaning',
+    )!;
+    expect(ctxField.promptInstruction).toBe(defaultCtxField.promptInstruction);
+  });
+
+  test('sourceExamples enabled follows settings.sourceExamples regardless of custom instructions', () => {
+    const fieldsOn = getContextDictionaryOutputFields({
+      ...DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+      sourceExamples: true,
+    });
+    const fieldsOff = getContextDictionaryOutputFields({
+      ...DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+      sourceExamples: false,
+    });
+    expect(fieldsOn.find((f) => f.id === 'sourceExamples')!.enabled).toBe(true);
+    expect(fieldsOff.find((f) => f.id === 'sourceExamples')!.enabled).toBe(false);
   });
 });

@@ -16,7 +16,10 @@ export interface PopupLocalContext {
   windowStartPage: number;
 }
 
-const TOKEN_REGEX = /[\p{Script=Han}]|[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*|[^\s]/gu;
+// Simplified: Han chars are individual tokens, words are alphanumeric sequences
+// (apostrophes/hyphens allowed mid-word). Punctuation/symbols are ignored and
+// not counted as tokens, preventing incomplete tokens when slicing.
+const TOKEN_REGEX = /[\p{Script=Han}]|[\p{L}\p{N}]+(?:['\u2019'-][\p{L}\p{N}]+)*/gu;
 
 function trimToTokenCount(text: string, tokenCount: number): string {
   if (tokenCount <= 0) return '';

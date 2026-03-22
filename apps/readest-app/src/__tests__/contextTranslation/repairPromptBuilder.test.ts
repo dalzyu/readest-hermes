@@ -7,6 +7,7 @@ describe('buildRepairPrompt', () => {
       originalSystemPrompt: 'Always respond in simplified Chinese.',
       originalUserPrompt: 'Translate 知己',
       issue: 'empty translation field',
+      orderedFieldIds: 'translation,contextualMeaning,examples',
     });
     expect(userPrompt).toContain('Translate 知己');
     expect(userPrompt).toContain('empty translation field');
@@ -17,6 +18,7 @@ describe('buildRepairPrompt', () => {
       originalSystemPrompt: 'Always respond in French.',
       originalUserPrompt: 'Translate x',
       issue: 'missing field',
+      orderedFieldIds: 'translation',
     });
     expect(systemPrompt).toContain('Always respond in French.');
     expect(systemPrompt).toContain('<lookup_json>');

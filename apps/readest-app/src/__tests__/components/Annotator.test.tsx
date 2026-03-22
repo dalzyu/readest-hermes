@@ -1,4 +1,19 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
+
+vi.mock('@/utils/simplecc', () => ({
+  initSimpleCC: vi.fn().mockResolvedValue(undefined),
+  runSimpleCC: vi.fn((text: string) => text),
+}));
+
+vi.mock('@/services/contextTranslation/simpleLookup', () => ({
+  runSimpleLookup: vi.fn(),
+}));
+
+vi.mock('@/utils/supabase', () => ({
+  supabase: {
+    auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) },
+  },
+}));
 
 // We just test that ContextDictionaryPopup can be imported
 // (since Annotator is too complex to unit test here)

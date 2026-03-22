@@ -33,6 +33,8 @@ export interface ContextLookupRequest {
   sourceLanguage?: string;
   outputFields: TranslationOutputField[];
   dictionarySettings?: ContextDictionarySettings;
+  /** IDs of bundled dictionaries disabled by the user. Passed through to lookupDefinitions. */
+  disabledBundledDicts?: string[];
   model?: LanguageModel;
   abortSignal?: AbortSignal;
   /**
@@ -151,6 +153,7 @@ export async function runContextLookup(
       request.selectedText,
       sourceLanguage,
       request.targetLanguage,
+      request.disabledBundledDicts ?? [],
     );
     dictionaryEntries = entries.map((e) => `${e.headword}: ${e.definition}`);
   } catch {
@@ -200,7 +203,7 @@ export async function runContextLookup(
             pageContext: request.popupContext.localPastContext,
           })
         : normalized;
-    const validation = validateLookupResult(fields, primaryField, request.selectedText);
+    const validation = validateLookupResult(fields, primaryField, request.selectedText, sourceLanguage, request.targetLanguage);
 
     return { raw, fields, validation };
   };
@@ -215,10 +218,17 @@ export async function runContextLookup(
   if (attempt.validation.decision === 'degrade' && CONTEXT_LOOKUP_ROLLOUT.repairOnDegrade) {
     repairCount = 1;
 
+    const orderedFieldIds = request.outputFields
+      .filter((f) => f.enabled)
+      .sort((a, b) => a.order - b.order)
+      .map((f) => f.id)
+      .join(', ');
+
     const repairPrompt = buildRepairPrompt({
       originalSystemPrompt: systemPrompt,
       originalUserPrompt: userPrompt,
       issue: attempt.validation.reason ?? `${primaryField} field is empty or missing`,
+      orderedFieldIds,
     });
 
     attempt = await runAttempt(repairPrompt.systemPrompt, repairPrompt.userPrompt);

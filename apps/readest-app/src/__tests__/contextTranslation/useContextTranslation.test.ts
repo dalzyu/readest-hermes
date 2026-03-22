@@ -24,6 +24,10 @@ vi.mock('@/services/contextTranslation/contextLookupService', () => ({
   buildContextLookupTelemetryPayload: vi.fn(),
   contextLookupTelemetry: { logOutcome: vi.fn() },
 }));
+
+vi.mock('@/services/contextTranslation/simpleLookup', () => ({
+  runSimpleLookup: vi.fn(),
+}));
 vi.mock('@/services/contextTranslation/translationService', () => ({
   streamTranslationWithContext: vi.fn(function* () {
     yield {

@@ -120,7 +120,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const transPopupHeight = Math.min(265, maxHeight);
   const proofreadPopupWidth = Math.min(440, maxWidth);
   const proofreadPopupHeight = Math.min(200, maxHeight);
-  const ctxTransPopupWidth = Math.min(480, maxWidth);
+  const ctxTransPopupWidth = Math.min(600, maxWidth);
   const ctxTransPopupHeight = Math.min(200, maxHeight);
   const ctxDictPopupWidth = Math.min(480, maxWidth);
   const ctxDictPopupHeight = Math.min(200, maxHeight);

@@ -4,6 +4,8 @@ import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 import { getAIProvider } from '@/services/ai/providers';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
+import { runSimpleLookup } from '@/services/contextTranslation/simpleLookup';
+import type { TranslationSource } from '@/services/contextTranslation/simpleLookup';
 import {
   streamTranslationWithContext,
   streamLookupWithContext,
@@ -123,6 +125,32 @@ export function useContextLookup({
 
         setPopupContext(bundle);
 
+        // Pre-detect language so all paths (AI and non-AI) have accurate sourceLanguage
+        const detectedLanguage = detectLookupLanguage(selectedText);
+
+        // Route non-AI sources to simpleLookup
+        const source: TranslationSource = requestSnapshot.settings.source ?? 'ai';
+
+        if (source !== 'ai') {
+          const simpleLookupRequest = {
+            mode: 'translation' as const,
+            selectedText,
+            popupContext: bundle,
+            sourceLanguage: detectedLanguage.language,
+            targetLanguage: requestSnapshot.settings.targetLanguage,
+            outputFields: requestSnapshot.settings.outputFields,
+            disabledBundledDicts: requestSnapshot.settings.disabledBundledDicts ?? [],
+          };
+          const lookupResult = await runSimpleLookup(simpleLookupRequest, source);
+          if (cancelled) return;
+          setResult(lookupResult.fields);
+          setExamples(lookupResult.examples ?? []);
+          setAnnotations(lookupResult.annotations ?? {});
+          setValidationDecision(lookupResult.validationDecision);
+          setLoading(false);
+          return;
+        }
+
         const model = getAIProvider(requestSnapshot.aiSettings).getModel();
 
         if (mode === 'translation') {
@@ -132,7 +160,7 @@ export function useContextLookup({
           const translationRequest: TranslationRequest = {
             selectedText,
             popupContext: bundle,
-            sourceLanguage: undefined,
+            sourceLanguage: detectedLanguage.language,
             targetLanguage: requestSnapshot.settings.targetLanguage,
             outputFields: requestSnapshot.settings.outputFields,
           };
@@ -164,6 +192,7 @@ export function useContextLookup({
             mode: 'translation',
             selectedText,
             popupContext: bundle,
+            sourceLanguage: detectedLanguage.language,
             targetLanguage: requestSnapshot.settings.targetLanguage,
             outputFields: requestSnapshot.settings.outputFields,
             model,
@@ -186,7 +215,7 @@ export function useContextLookup({
           const dictionaryRequest = {
             selectedText,
             popupContext: bundle,
-            sourceLanguage: undefined,
+            sourceLanguage: detectedLanguage.language,
             targetLanguage: requestSnapshot.settings.targetLanguage,
             outputFields: requestSnapshot.settings.outputFields,
             dictionarySettings: requestSnapshot.dictionarySettings,
@@ -218,6 +247,7 @@ export function useContextLookup({
             mode: 'dictionary',
             selectedText,
             popupContext: bundle,
+            sourceLanguage: detectedLanguage.language,
             targetLanguage: requestSnapshot.settings.targetLanguage,
             outputFields: requestSnapshot.settings.outputFields,
             dictionarySettings: requestSnapshot.dictionarySettings,

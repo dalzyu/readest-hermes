@@ -8,7 +8,6 @@ import useOpenAIInNotebook from '@/app/reader/hooks/useOpenAIInNotebook';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   getCJKLanguage,
-  isChineseText,
   getPinyinLabel,
   getRetrievalStatusMeta,
   buildRetrievalInfoText,
@@ -74,13 +73,18 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
     settings,
   });
 
+  const source = settings.source ?? 'ai';
+  const showExtendedFields = source === 'ai';
+
   const enabledFields = settings.outputFields
     .filter((field) => field.enabled)
+    .filter((field) => showExtendedFields || field.id === 'translation')
     .sort((a, b) => a.order - b.order);
   const displayedResult = result ?? partialResult ?? {};
   const hasDisplayedResult = Object.keys(displayedResult).length > 0;
+  // Use plugin-enriched examples when available; otherwise parse from raw LLM text (during streaming too)
   const displayedExamples =
-    examples.length > 0
+    result !== null && examples.length > 0
       ? examples
       : displayedResult['examples']
         ? filterRenderableExamples(
@@ -88,16 +92,17 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
             selectedText,
           )
         : [];
+  const sourceCJKLang = getCJKLanguage(selectedText, popupContext?.localPastContext ?? '');
   const selectedTextPinyin =
     annotations?.source?.phonetic ??
-    (isChineseText(selectedText) ? getPinyinLabel(selectedText) : '');
+    (popupContext !== null && sourceCJKLang === 'chinese' ? getPinyinLabel(selectedText) : '');
   const retrievalStatusMeta = getRetrievalStatusMeta(retrievalStatus);
   const retrievalInfoText = buildRetrievalInfoText(retrievalStatus, retrievalHints);
 
-  const handleSpeak = () => {
+  const handleSpeak = (text: string) => {
     eventDispatcher.dispatch('tts-speak', {
       bookKey,
-      text: selectedText,
+      text,
       oneTime: true,
     });
   };
@@ -118,7 +123,7 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
   };
 
   return (
-    <div>
+    <div data-testid='context-translation-popup' style={{ maxWidth: '600px' }}>
       <Popup
         trianglePosition={trianglePosition}
         width={popupWidth}
@@ -134,7 +139,7 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
             <span className='not-eink:text-yellow-300 flex min-w-0 select-text items-center gap-2 font-medium'>
               <button
                 type='button'
-                onClick={handleSpeak}
+                onClick={() => handleSpeak(selectedText)}
                 title={_('Speak')}
                 className='flex-shrink-0 text-green-200/70 transition-colors hover:text-green-100'
                 aria-label={_('Speak')}
@@ -197,9 +202,21 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
 
               return (
                 <div key={field.id}>
-                  <h3 className='mb-1 text-xs font-medium uppercase tracking-wide text-gray-400'>
-                    {_(field.label)}
-                  </h3>
+                  <div className='mb-1 flex items-center gap-1'>
+                    <h3 className='text-xs font-medium uppercase tracking-wide text-gray-400'>
+                      {_(field.label)}
+                    </h3>
+                    {(field.id === 'translation' || field.id === 'contextualMeaning') && value && (
+                      <button
+                        data-testid={`tts-${field.id === 'contextualMeaning' ? 'contextual-meaning' : field.id}`}
+                        onClick={() => handleSpeak(value)}
+                        title={_('Speak')}
+                        className='flex-shrink-0 text-green-200/70 transition-colors hover:text-green-100'
+                      >
+                        <RiVolumeUpLine size={14} />
+                      </button>
+                    )}
+                  </div>
                   {field.id === 'examples' && displayedExamples.length > 0 ? (
                     <ol className='not-eink:text-white/90 select-text list-decimal space-y-4 pl-5 text-sm leading-relaxed'>
                       {displayedExamples.map((example, index) => {
