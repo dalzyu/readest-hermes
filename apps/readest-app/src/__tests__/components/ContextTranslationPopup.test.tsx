@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import ContextTranslationPopup from '@/app/reader/components/annotator/ContextTranslationPopup';
 import type { ContextTranslationSettings } from '@/services/contextTranslation/types';
@@ -82,6 +82,10 @@ const defaultProps = {
 };
 
 describe('ContextTranslationPopup', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -289,6 +293,144 @@ describe('ContextTranslationPopup', () => {
     expect(container.textContent).toContain('Mr. Dursley worked at Grunnings.');
     // The Chinese translation should appear (from Chinese: label in formatted text)
     expect(container.textContent).toContain('格林尼斯公司');
+  });
+
+  test('translation field has TTS button', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: { translation: 'by his side', contextualMeaning: 'trusted companion' },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      examples: [],
+      annotations: {},
+      saveToVocabulary: vi.fn(),
+    });
+
+    render(<ContextTranslationPopup {...defaultProps} />);
+    expect(screen.getByTestId('tts-translation')).toBeTruthy();
+  });
+
+  test('contextual meaning field has TTS button', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: { translation: 'by his side', contextualMeaning: 'trusted companion' },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      examples: [],
+      annotations: {},
+      saveToVocabulary: vi.fn(),
+    });
+
+    render(<ContextTranslationPopup {...defaultProps} />);
+    expect(screen.getByTestId('tts-contextual-meaning')).toBeTruthy();
+  });
+
+  test('TTS button on translation field dispatches tts-speak with translation text', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: { translation: 'by his side', contextualMeaning: 'trusted companion' },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      examples: [],
+      annotations: {},
+      saveToVocabulary: vi.fn(),
+    });
+
+    render(<ContextTranslationPopup {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('tts-translation'));
+
+    expect(mockDispatch).toHaveBeenCalledWith('tts-speak', {
+      bookKey: 'book-key-1',
+      text: 'by his side',
+      oneTime: true,
+    });
+  });
+
+  test('TTS button on contextual meaning field dispatches tts-speak with contextual meaning text', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: { translation: 'by his side', contextualMeaning: 'trusted companion' },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      examples: [],
+      annotations: {},
+      saveToVocabulary: vi.fn(),
+    });
+
+    render(<ContextTranslationPopup {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('tts-contextual-meaning'));
+
+    expect(mockDispatch).toHaveBeenCalledWith('tts-speak', {
+      bookKey: 'book-key-1',
+      text: 'trusted companion',
+      oneTime: true,
+    });
+  });
+
+  test('popup wrapper has maxWidth 600px constraint', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: { translation: 'by his side' },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      examples: [],
+      annotations: {},
+      saveToVocabulary: vi.fn(),
+    });
+
+    render(<ContextTranslationPopup {...defaultProps} popupWidth={800} />);
+    const popup = screen.getByTestId('context-translation-popup');
+    expect(popup.style.maxWidth).toBe('600px');
   });
 
   test('renders english-to-chinese examples with grouped english highlights and chinese ruby translation', () => {
