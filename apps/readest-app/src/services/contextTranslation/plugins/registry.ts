@@ -4,9 +4,11 @@ import type { LookupPlugin } from './types';
 import { fallbackPlugin } from './fallbackPlugin';
 import { zhPlugin } from './zhPlugin';
 import { enPlugin } from './enPlugin';
+import { jaPlugin } from './jaPlugin';
 
 const PLUGIN_MAP: Record<string, LookupPlugin> = {
   zh: zhPlugin,
+  ja: jaPlugin,
   en: enPlugin,
   fallback: fallbackPlugin,
 };

@@ -1,11 +1,12 @@
 import type { LanguageModel } from 'ai';
-import type { TranslationRequest, TranslationResult, TranslationStreamResult } from './types';
+import type { ContextDictionarySettings, TranslationRequest, TranslationResult, TranslationStreamResult } from './types';
 import type { ContextLookupMode } from './modes';
 import { formatTranslationResult } from './exampleFormatter';
 import { buildTranslationPrompt, buildLookupPrompt } from './promptBuilder';
 import { parseStreamingTranslationResponse, parseTranslationResponse } from './responseParser';
 import { normalizeLookupResponse } from './normalizer';
 import { callLLM, streamLLM } from './llmClient';
+import { getContextDictionaryOutputFields, DEFAULT_CONTEXT_DICTIONARY_SETTINGS } from './defaults';
 
 /**
  * Orchestrates context-aware translation:
@@ -65,7 +66,7 @@ export type LookupStreamResult = {
  * then uses <lookup_json> for the authoritative final parse.
  */
 export async function* streamLookupWithContext(
-  request: TranslationRequest & { mode: ContextLookupMode },
+  request: TranslationRequest & { mode: ContextLookupMode; dictionarySettings?: ContextDictionarySettings },
   model: LanguageModel,
   abortSignal?: AbortSignal,
 ): AsyncGenerator<LookupStreamResult> {
@@ -73,11 +74,15 @@ export async function* streamLookupWithContext(
     ...request,
     popupContext: request.popupContext,
   });
+  const streamFields =
+    request.mode === 'dictionary'
+      ? getContextDictionaryOutputFields(request.dictionarySettings ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS)
+      : request.outputFields;
   let rawText = '';
 
   for await (const chunk of streamLLM(systemPrompt, userPrompt, model, abortSignal)) {
     rawText += chunk;
-    const parsed = parseStreamingTranslationResponse(rawText, request.outputFields);
+    const parsed = parseStreamingTranslationResponse(rawText, streamFields);
     yield {
       fields: parsed.fields,
       activeFieldId: parsed.activeFieldId,

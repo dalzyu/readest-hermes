@@ -8,7 +8,6 @@ import { useOpenAIInNotebook } from '@/app/reader/hooks/useOpenAIInNotebook';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   getCJKLanguage,
-  isChineseText,
   getPinyinLabel,
   getRetrievalStatusMeta,
   buildRetrievalInfoText,
@@ -82,22 +81,23 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
 
   const displayedResult = result ?? partialResult ?? {};
   const hasDisplayedResult = Object.keys(displayedResult).length > 0;
+  // Only show examples when streaming is complete (result is finalized with plugin annotations)
   const displayedExamples =
-    examples.length > 0
+    result !== null && examples.length > 0
       ? examples
-      : displayedResult['sourceExamples']
+      : displayedResult['sourceExamples'] && !streaming
         ? filterRenderableExamples(
             parseStructuredExamples(displayedResult['sourceExamples']),
             selectedText,
           )
         : [];
 
+  const sourceCJKLang = getCJKLanguage(selectedText, popupContext?.localPastContext ?? '');
   const selectedTextPinyin =
     annotations?.source?.phonetic ??
-    (isChineseText(selectedText) ? getPinyinLabel(selectedText) : '');
+    (popupContext !== null && sourceCJKLang === 'chinese' ? getPinyinLabel(selectedText) : '');
   const retrievalStatusMeta = getRetrievalStatusMeta(retrievalStatus);
   const retrievalInfoText = buildRetrievalInfoText(retrievalStatus, retrievalHints);
-  const sourceCJKLang = getCJKLanguage(selectedText, popupContext?.localPastContext ?? '');
 
   const handleSpeak = () => {
     eventDispatcher.dispatch('tts-speak', {

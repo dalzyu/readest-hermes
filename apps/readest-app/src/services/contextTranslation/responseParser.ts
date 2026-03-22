@@ -5,40 +5,70 @@ export interface StreamingParseResult {
   activeFieldId: string | null;
 }
 
-function getEnabledFields(fields: TranslationOutputField[]): TranslationOutputField[] {
-  return fields.filter((f) => f.enabled).sort((a, b) => a.order - b.order);
-}
-
-export function parseStreamingTranslationResponse(
+/**
+ * Single-pass XML tag scanner: finds all matching field tags in the response
+ * and extracts their content. Does not depend on field order matching response order.
+ * Handles partial (incomplete) tags during streaming.
+ */
+function scanFieldsInDocumentOrder(
   response: string,
   fields: TranslationOutputField[],
-): StreamingParseResult {
+): { fields: TranslationResult; activeFieldId: string | null } {
   const result: TranslationResult = {};
-  const enabledFields = getEnabledFields(fields);
+  const enabledIds = new Set(fields.filter((f) => f.enabled).map((f) => f.id));
+
+  // Per-field extraction: handles partial tags during streaming
+  for (const field of fields) {
+    if (!enabledIds.has(field.id)) continue;
+
+    const openTag = `<${field.id}>`;
+    const closeTag = `</${field.id}>`;
+    const openPos = response.indexOf(openTag);
+
+    if (openPos === -1) continue;
+
+    const contentStart = openPos + openTag.length;
+    const closePos = response.indexOf(closeTag, contentStart);
+
+    if (closePos !== -1) {
+      // Complete tag pair
+      result[field.id] = response.slice(contentStart, closePos).trim();
+    } else {
+      // Partial — streaming in progress
+      result[field.id] = response.slice(contentStart).trim();
+    }
+  }
+
+  // Determine active field: the field that has an opening tag but no closing tag yet.
+  // If multiple fields are open, pick the one whose opening tag appears last.
   let activeFieldId: string | null = null;
+  let latestOpenPos = -1;
 
-  for (const field of enabledFields) {
-    const startTag = `<${field.id}>`;
-    const endTag = `</${field.id}>`;
-    const startIndex = response.indexOf(startTag);
-
-    if (startIndex === -1) continue;
-
-    const contentStart = startIndex + startTag.length;
-    const endIndex = response.indexOf(endTag, contentStart);
-    const content =
-      endIndex === -1
-        ? response.slice(contentStart)
-        : response.slice(contentStart, endIndex);
-
-    result[field.id] = content.trim();
-
-    if (endIndex === -1) {
-      activeFieldId = field.id;
+  for (const id of fields.map((f) => f.id)) {
+    if (result[id] === undefined) continue; // Field not started
+    const closeTag = `</${id}>`;
+    const closePos = response.indexOf(closeTag);
+    if (closePos !== -1) continue; // Field is complete
+    // Field is open (started but not closed)
+    const openTag = `<${id}>`;
+    const openPos = response.indexOf(openTag);
+    if (openPos > latestOpenPos) {
+      latestOpenPos = openPos;
+      activeFieldId = id;
     }
   }
 
   return { fields: result, activeFieldId };
+}
+
+/**
+ * Alias for the single-pass scanner — used for incremental streaming parsing.
+ */
+export function parseStreamingTranslationResponse(
+  response: string,
+  fields: TranslationOutputField[],
+): StreamingParseResult {
+  return scanFieldsInDocumentOrder(response, fields);
 }
 
 /**
@@ -50,15 +80,14 @@ export function parseTranslationResponse(
   response: string,
   fields: TranslationOutputField[],
 ): TranslationResult {
-  const enabledFields = getEnabledFields(fields);
-  const parsed = parseStreamingTranslationResponse(response, fields);
+  const { fields: parsed } = scanFieldsInDocumentOrder(response, fields);
 
-  if (Object.keys(parsed.fields).length > 0) {
-    return parsed.fields;
+  if (Object.keys(parsed).length > 0) {
+    return parsed;
   }
 
   // No tags — treat entire response as the translation field
-  const translationField = enabledFields.find((f) => f.id === 'translation');
+  const translationField = fields.find((f) => f.enabled && f.id === 'translation');
   if (translationField) {
     return { translation: response.trim() };
   }

@@ -159,6 +159,17 @@ describe('buildLookupPrompt', () => {
     expect(userPrompt).toContain('zhiji');
   });
 
+  test('dictionary prompt globally prohibits pinyin in all response fields', () => {
+    const { systemPrompt } = buildLookupPrompt({
+      mode: 'dictionary',
+      ...baseRequest,
+      sourceLanguage: 'zh',
+    });
+    expect(systemPrompt.toLowerCase()).toContain('pinyin');
+    // Must be a prohibition, not an instruction to include it
+    expect(systemPrompt).toMatch(/do not include pinyin|without pinyin|no pinyin/i);
+  });
+
   test('dictionary prompt requests source-language simplification fields', () => {
     const { systemPrompt } = buildLookupPrompt({
       mode: 'dictionary',

@@ -13,8 +13,10 @@ vi.mock('@/services/contextTranslation/llmClient', () => ({
 import { callLLM, streamLLM } from '@/services/contextTranslation/llmClient';
 import {
   streamTranslationWithContext,
+  streamLookupWithContext,
   translateWithContext,
 } from '@/services/contextTranslation/translationService';
+import type { ContextLookupMode } from '@/services/contextTranslation/modes';
 
 const mockCallLLM = vi.mocked(callLLM);
 const mockStreamLLM = vi.mocked(streamLLM);
@@ -139,6 +141,30 @@ describe('streamTranslationWithContext', () => {
     expect(updates[1]!.fields['contextualMeaning']).toBe('trusted ally');
     expect(updates.at(-1)!.done).toBe(true);
     expect(updates.at(-1)!.fields['contextualMeaning']).toBe('trusted ally');
+  });
+
+  test('streams dictionary fields simpleDefinition and contextualMeaning in real-time', async () => {
+    mockStreamLLM.mockImplementation(async function* () {
+      yield '<simpleDefinition>A close confidant';
+      yield '</simpleDefinition><contextualMeaning>In this passage, a trusted ally';
+      yield '</contextualMeaning>';
+    });
+
+    const updates: { fields: Record<string, string>; activeFieldId: string | null }[] = [];
+
+    for await (const chunk of streamLookupWithContext(
+      { ...baseRequest, mode: 'dictionary' as ContextLookupMode },
+      'mock-model' as never,
+    )) {
+      updates.push(chunk);
+    }
+
+    // simpleDefinition must stream in real-time, not wait for final parse
+    expect(updates[0]!.fields['simpleDefinition']).toBe('A close confidant');
+    expect(updates[0]!.activeFieldId).toBe('simpleDefinition');
+    // contextualMeaning should also appear during streaming
+    const finalUpdate = updates.at(-2)!; // last streaming chunk before final
+    expect(finalUpdate.fields['contextualMeaning']).toContain('trusted ally');
   });
 
   test('streams chinese examples with deterministic pinyin', async () => {

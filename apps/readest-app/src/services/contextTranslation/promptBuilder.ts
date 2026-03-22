@@ -2,7 +2,7 @@ import type { ContextLookupMode } from './modes';
 import type { ContextDictionarySettings, TranslationRequest } from './types';
 import { DEFAULT_CONTEXT_DICTIONARY_SETTINGS, getContextDictionaryOutputFields } from './defaults';
 import { getTranslatorLanguageLabel } from '@/services/translatorLanguages';
-import { getCJKLanguage } from '@/app/reader/components/annotator/LookupPopupUtils';
+import { getCJKLanguage } from '@/services/contextTranslation/utils';
 
 function languageName(code: string): string {
   return getTranslatorLanguageLabel(code);
@@ -51,7 +51,7 @@ export function buildTranslationPrompt(request: TranslationRequest): {
 
   const targetLang = languageName(request.targetLanguage);
   const sourceLangHint = request.sourceLanguage
-    ? ` The source language is ${request.sourceLanguage}.`
+    ? ` The source language is ${languageName(request.sourceLanguage)}.`
     : '';
   const orderedFieldIds = enabledFields.map((field) => field.id).join(', ');
 
@@ -96,7 +96,13 @@ If a <reference_dictionary> block is present, use it as an authoritative referen
 
   const systemPrompt = `You are a literary translation assistant. Translate and explain text for a reader learning a foreign language.${sourceLangHint}
 
-Always respond in ${targetLang}. For each request, provide the following fields, each wrapped in the specified XML tags:
+Critical rules:
+- The selected text is always written in the source language — never mistake it for an English word due to visual or phonetic similarity.
+- Compound words, idioms, and set phrases must be translated as a single semantic unit; never decompose them character-by-character or word-by-word.
+- When a word has multiple senses, choose the literary or emotional sense that fits a reader encountering the text in a book.
+- For culturally unique terms with no exact equivalent, give the closest approximation and briefly note the cultural specificity.
+
+You MUST respond entirely in ${targetLang} — every word in every field must be in ${targetLang}, not in English or any other language. For each request, provide the following fields, each wrapped in the specified XML tags:
 
 ${fieldInstructions}
 
@@ -107,7 +113,7 @@ Respond with ONLY the tagged fields. Do not add any preamble or extra commentary
 
 ${buildContextSections(request)}
 
-Please translate and explain the selected text using the context provided.`;
+Please translate and explain the selected text using the context provided. Remember: your entire response must be in ${targetLang}.`;
 
   return { systemPrompt, userPrompt };
 }
@@ -125,7 +131,8 @@ function buildDictionaryPrompt(request: LookupPromptRequest): {
   const enabledFields = getContextDictionaryOutputFields(dictionarySettings)
     .filter((field) => field.enabled)
     .sort((a, b) => a.order - b.order);
-  const sourceLanguage = request.sourceLanguage ?? 'the source language';
+  const sourceLanguage =
+    request.sourceLanguage ? languageName(request.sourceLanguage) : 'the source language';
   const orderedFieldIds = enabledFields.map((field) => field.id).join(', ');
 
   const fieldInstructions = enabledFields
@@ -139,21 +146,44 @@ function buildDictionaryPrompt(request: LookupPromptRequest): {
 
 If a <reference_dictionary> block is present, use it as an authoritative reference to ground your translation and explanation. Do not contradict it without strong contextual reason.`;
 
+  // Chinese source examples layout guidance — tell LLM how to format Chinese examples in source language
+  const sourceExamplesField = enabledFields.find((f) => f.id === 'sourceExamples');
+  const examplesLayoutInstruction =
+    sourceExamplesField && isChineseSource(request)
+      ? `
+
+If <sourceExamples> is requested, each numbered example must use this exact layout:
+1. 中文句子
+
+Do not include pinyin, English translation, or any other language — provide only the source-language example sentence. The application will generate phonetic annotations separately.
+`
+      : '';
+
+  const pinyinProhibition = isChineseSource(request)
+    ? '\n\nDo not include pinyin or any phonetic annotations in any field. The application will generate phonetic annotations separately.'
+    : '';
+
   const systemPrompt = `You are a literary dictionary assistant.
 Explain the selected text in simpler terms using only the source language.
 The source language is ${sourceLanguage}. Do not translate the primary explanation into another language.
+
+Critical rules:
+- The selected text is always written in the source language — never mistake it for a word from another language due to visual similarity.
+- Compound words, idioms, and set phrases must be explained as single semantic units; never decompose them part-by-part.
+- When a word has multiple senses, choose the literary or emotional sense that fits a reader encountering the text in a book.
 
 Provide the following fields:
 ${fieldInstructions}
 
 Emit fields in this exact order: ${orderedFieldIds}.
-Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.${referenceDictionaryInstruction}`;
+You MUST respond entirely in ${sourceLanguage} — every word in every field must be in ${sourceLanguage}.
+Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.${examplesLayoutInstruction}${pinyinProhibition}${referenceDictionaryInstruction}`;
 
   const userPrompt = `<selected_text>${request.selectedText}</selected_text>
 
 ${buildContextSections(request)}
 
-Please explain the selected text in simpler source-language terms using the context provided.`;
+Please explain the selected text in simpler source-language terms using the context provided. Remember: your entire response must be in ${sourceLanguage}.`;
 
   return { systemPrompt, userPrompt };
 }

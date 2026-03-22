@@ -1,7 +1,7 @@
 import { pinyin } from 'pinyin-pro';
 import type { LookupExample, TranslationOutputField, TranslationResult } from './types';
 import { classifyExampleMatch } from './exampleMatcher';
-import { getCJKLanguage, HAN_REGEX } from '@/app/reader/components/annotator/LookupPopupUtils';
+import { getCJKLanguage, HAN_REGEX } from '@/services/contextTranslation/utils';
 
 type FormatRequest = {
   selectedText: string;
@@ -17,20 +17,27 @@ const ENGLISH_LINE_REGEX = /^English:\s*/iu;
 const PINYIN_LINE_REGEX = /^Pinyin:\s*/iu;
 const CHINESE_LINE_REGEX = /^Chinese:\s*/iu;
 
+/** Returns which example field is present in the result ('examples' | 'sourceExamples' | null) */
+function getExampleField(result: TranslationResult): 'examples' | 'sourceExamples' | null {
+  if (result['examples']) return 'examples';
+  if (result['sourceExamples']) return 'sourceExamples';
+  return null;
+}
+
 function shouldFormatChineseExamples(request: FormatRequest, result: TranslationResult): boolean {
+  const field = getExampleField(result);
+  if (!field) return false;
+  const hasExamples = request.outputFields.some((f) => f.enabled && f.id === field);
+  if (!hasExamples) return false;
   return (
-    !!result['examples'] &&
-    request.outputFields.some((field) => field.enabled && field.id === 'examples') &&
-    (request.sourceLanguage === 'zh' ||
-      getCJKLanguage(request.selectedText, request.pageContext ?? '') === 'chinese')
+    request.sourceLanguage === 'zh' ||
+    getCJKLanguage(request.selectedText, request.pageContext ?? '') === 'chinese'
   );
 }
 
 function shouldProcessExamples(request: FormatRequest, result: TranslationResult): boolean {
-  return (
-    !!result['examples'] &&
-    request.outputFields.some((field) => field.enabled && field.id === 'examples')
-  );
+  const field = getExampleField(result);
+  return field !== null && request.outputFields.some((f) => f.enabled && f.id === field);
 }
 
 function toHanyuPinyin(text: string): string {
@@ -41,12 +48,31 @@ function toHanyuPinyin(text: string): string {
   }).trim();
 }
 
+/**
+ * Normalizes LLM example output by:
+ * 1. Converting line endings to \n
+ * 2. Forcing whitespace before label keywords (Pinyin:, English:, Chinese:) even when LLM omits it
+ * 3. Separating numbered examples with blank lines
+ *
+ * Handles cases like:
+ * - `中文句子English: xxx` → `中文句子\nEnglish: xxx`  (no space before English)
+ * - `中文句子 English: xxx` → `中文句子\nEnglish: xxx` (space before English)
+ * - `1. 中文句子 English: xxx` → `\n1. 中文句子\nEnglish: xxx` (number separated)
+ */
 function normalizeExampleLayout(examples: string): string {
   return examples
     .replace(/\r\n?/g, '\n')
-    .replace(/\s+(Pinyin:\s*)/giu, '\n$1')
-    .replace(/\s+(English:\s*)/giu, '\n$1')
-    .replace(/\s+(\d+\.\s)/gu, '\n\n$1')
+    // Force newline before Pinyin: even without preceding whitespace
+    .replace(/([^\n])Pinyin:\s*/gu, '$1\nPinyin: ')
+    .replace(/^Pinyin:\s*/gu, 'Pinyin: ')
+    // Force newline before English: even without preceding whitespace
+    .replace(/([^\n])English:\s*/gu, '$1\nEnglish: ')
+    .replace(/^English:\s*/gu, 'English: ')
+    // Force newline before Chinese: even without preceding whitespace
+    .replace(/([^\n])Chinese:\s*/gu, '$1\nChinese: ')
+    .replace(/^Chinese:\s*/gu, 'Chinese: ')
+    // Separate numbered examples with blank lines
+    .replace(/\s*(\d+\.\s)/gu, '\n\n$1')
     .trim();
 }
 
@@ -147,19 +173,27 @@ function formatExamples(examples: string, request: FormatRequest): string {
     .join('\n\n');
 }
 
+/**
+ * Formats example fields in a lookup result for both translation mode (examples)
+ * and dictionary mode (sourceExamples). Applies Chinese layout normalization
+ * so that parseStructuredExamples can reliably split them.
+ */
 export function formatTranslationResult(
   result: TranslationResult,
   request: FormatRequest,
 ): TranslationResult {
-  const examples = result['examples'];
-
-  if (!examples || !shouldProcessExamples(request, result)) {
+  if (!shouldProcessExamples(request, result)) {
     return result;
   }
 
+  // Apply formatting to whichever example field is present
+  const examples = result['examples'];
+  const sourceExamples = result['sourceExamples'];
+
   return {
     ...result,
-    examples: formatExamples(examples, request),
+    ...(examples ? { examples: formatExamples(examples, request) } : {}),
+    ...(sourceExamples ? { sourceExamples: formatExamples(sourceExamples, request) } : {}),
   };
 }
 
