@@ -5,13 +5,20 @@ import { getTranslatorLanguageLabel } from '@/services/translatorLanguages';
 import { getCJKLanguage } from '@/services/contextTranslation/utils';
 
 function languageName(code: string): string {
-  return getTranslatorLanguageLabel(code);
+  return getTranslatorLanguageLabel(code) || code;
 }
 
+/**
+ * Returns true when the source text is Chinese.
+ * Checks sourceLanguage first; falls back to page-context script analysis so that
+ * pure-kanji text (which could be Japanese or Chinese) is correctly disambiguated
+ * by looking for hiragana/katakana markers in the surrounding page.
+ */
 function isChineseSource(request: TranslationRequest): boolean {
   if (request.sourceLanguage === 'zh') return true;
-  // Use page context to disambiguate when selected text is pure kanji
-  return getCJKLanguage(request.selectedText, request.popupContext.localPastContext) === 'chinese';
+  return (
+    getCJKLanguage(request.selectedText, request.popupContext?.localPastContext ?? '') === 'chinese'
+  );
 }
 
 function isChineseTarget(request: TranslationRequest): boolean {

@@ -395,16 +395,11 @@ export async function lookupDefinitions(
   text: string,
   sourceLang: string,
   targetLang: string,
+  disabledBundledDicts: string[] = [],
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
 
   const MAX_RESULTS = 3;
-
-  // Gather all dictionaries (bundled + user)
-  const { useSettingsStore } = await import('@/store/settingsStore');
-  const currentSettings = useSettingsStore.getState().settings;
-  const disabledBundledDicts: string[] =
-    currentSettings.globalReadSettings.contextTranslation?.disabledBundledDicts ?? [];
 
   const allBundled: UserDictionary[] = BUNDLED_DICTIONARIES.map((b) => ({
     id: b.id,

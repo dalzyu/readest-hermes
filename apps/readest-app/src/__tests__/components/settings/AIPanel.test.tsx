@@ -71,7 +71,18 @@ const { stableSettings } = vi.hoisted(() => {
         sourceExamples: true,
       },
     },
-    userDictionaryMeta: [] as unknown[],
+    userDictionaryMeta: [
+      {
+        id: 'user-1',
+        name: 'My Test Dict',
+        language: 'zh',
+        targetLanguage: 'en',
+        entryCount: 42,
+        source: 'user' as const,
+        importedAt: 1_700_000_000,
+        enabled: true,
+      },
+    ],
     globalViewSettings: {
       uiLanguage: '',
       translationEnabled: false,
@@ -282,20 +293,17 @@ describe('AIPanel', () => {
     expect((zhToggle as HTMLInputElement).checked).toBe(true);
   });
 
-  test('user dictionary enable toggle persists after toggle', async () => {
+  test('user dictionary enable toggle updates checked state when clicked', async () => {
     render(<AITranslatePanel />);
-    // No user dicts in mock by default — queryAllByTestId returns empty array
-    const userDictToggles = screen.queryAllByTestId(/^user-dict-toggle-/);
-    if (userDictToggles.length > 0) {
-      const toggle = userDictToggles[0]!;
-      const wasChecked = (toggle as HTMLInputElement).checked;
-      fireEvent.click(toggle);
-      await waitFor(() => {
-        expect((toggle as HTMLInputElement).checked).not.toBe(wasChecked);
-      });
-    }
-    // If no user dicts, test passes trivially (no dicts to toggle)
-    expect(true).toBe(true);
+    // stableSettings has 'user-1' enabled:true — toggle should appear checked
+    const toggle = screen.getByTestId('user-dict-toggle-user-1') as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    fireEvent.click(toggle);
+    await waitFor(() => {
+      expect((screen.getByTestId('user-dict-toggle-user-1') as HTMLInputElement).checked).toBe(
+        false,
+      );
+    });
   });
 
   test('source dropdown allows selecting Dictionary', () => {

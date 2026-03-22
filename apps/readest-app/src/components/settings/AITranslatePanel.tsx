@@ -95,9 +95,15 @@ const AITranslatePanel: React.FC = () => {
       const current: ContextTranslationSettings =
         currentSettings.globalReadSettings.contextTranslation ??
         DEFAULT_CONTEXT_TRANSLATION_SETTINGS;
-      currentSettings.globalReadSettings.contextTranslation = { ...current, ...patch };
-      setSettings(currentSettings);
-      saveSettings(envConfig, currentSettings);
+      const newSettings = {
+        ...currentSettings,
+        globalReadSettings: {
+          ...currentSettings.globalReadSettings,
+          contextTranslation: { ...current, ...patch },
+        },
+      };
+      setSettings(newSettings);
+      saveSettings(envConfig, newSettings);
     },
     [envConfig, setSettings, saveSettings],
   );
@@ -108,9 +114,15 @@ const AITranslatePanel: React.FC = () => {
       if (!currentSettings) return;
       const current: ContextDictionarySettings =
         currentSettings.globalReadSettings.contextDictionary ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS;
-      currentSettings.globalReadSettings.contextDictionary = { ...current, ...patch };
-      setSettings(currentSettings);
-      saveSettings(envConfig, currentSettings);
+      const newSettings = {
+        ...currentSettings,
+        globalReadSettings: {
+          ...currentSettings.globalReadSettings,
+          contextDictionary: { ...current, ...patch },
+        },
+      };
+      setSettings(newSettings);
+      saveSettings(envConfig, newSettings);
     },
     [envConfig, setSettings, saveSettings],
   );
@@ -244,9 +256,9 @@ const AITranslatePanel: React.FC = () => {
       const updated = userDictionaries.map((d) =>
         d.id === id ? { ...d, enabled: !(d.enabled ?? true) } : d,
       );
-      currentSettings.userDictionaryMeta = updated;
-      setSettings(currentSettings);
-      saveSettings(envConfig, currentSettings);
+      const newSettings = { ...currentSettings, userDictionaryMeta: updated };
+      setSettings(newSettings);
+      saveSettings(envConfig, newSettings);
       setUserDictionaries(updated);
     },
     [userDictionaries, envConfig, setSettings, saveSettings],

@@ -125,6 +125,9 @@ export function useContextLookup({
 
         setPopupContext(bundle);
 
+        // Pre-detect language so all paths (AI and non-AI) have accurate sourceLanguage
+        const detectedLanguage = detectLookupLanguage(selectedText);
+
         // Route non-AI sources to simpleLookup
         const source: TranslationSource = requestSnapshot.settings.source ?? 'ai';
 
@@ -133,8 +136,10 @@ export function useContextLookup({
             mode: 'translation' as const,
             selectedText,
             popupContext: bundle,
+            sourceLanguage: detectedLanguage.language,
             targetLanguage: requestSnapshot.settings.targetLanguage,
             outputFields: requestSnapshot.settings.outputFields,
+            disabledBundledDicts: requestSnapshot.settings.disabledBundledDicts ?? [],
           };
           const lookupResult = await runSimpleLookup(simpleLookupRequest, source);
           if (cancelled) return;
@@ -145,9 +150,6 @@ export function useContextLookup({
           setLoading(false);
           return;
         }
-
-        // Pre-detect language before streaming so the prompt gets accurate sourceLanguage
-        const detectedLanguage = detectLookupLanguage(selectedText);
 
         const model = getAIProvider(requestSnapshot.aiSettings).getModel();
 
