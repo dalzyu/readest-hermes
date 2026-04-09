@@ -7,8 +7,13 @@ const repoRoot = path.resolve(import.meta.dirname, '../../../../../..');
 const tauriConfigPath = path.resolve(import.meta.dirname, '../../../../src-tauri/tauri.conf.json');
 const defaultCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/default.json');
 const desktopCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/desktop.json');
+const tursoPluginCargoPath = path.resolve(
+  import.meta.dirname,
+  '../../../../src-tauri/plugins/tauri-plugin-turso/Cargo.toml',
+);
 const releaseWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8');
 const prWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pull-request.yml'), 'utf8');
+const tursoPluginCargo = fs.readFileSync(tursoPluginCargoPath, 'utf8');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8')) as {
   build: { beforeDevCommand: string; beforeBuildCommand: string };
 };
@@ -71,6 +76,13 @@ describe('workflow alignment', () => {
   test('armhf release builds include the io-uring arch workaround', () => {
     expect(releaseWorkflow).toContain(
       "echo 'CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_RUSTFLAGS=--cfg=io_uring_skip_arch_check' >> $GITHUB_ENV",
+    );
+  });
+
+  test('turso plugin stays pinned to the stable 0.5.3 crate line', () => {
+    expect(tursoPluginCargo).toContain('turso = { version = "=0.5.3", default-features = false }');
+    expect(tursoPluginCargo).toContain(
+      'turso_core = { version = "=0.5.3", default-features = false, features = ["fts"] }',
     );
   });
 
