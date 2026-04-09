@@ -1,5 +1,18 @@
 name: Release Readest
 
+# Required secrets for this fork's release workflow:
+# - GITHUB_TOKEN (automatic)
+# - NEXT_PUBLIC_POSTHOG_KEY
+# - NEXT_PUBLIC_POSTHOG_HOST
+# - NEXT_PUBLIC_SUPABASE_URL
+# - NEXT_PUBLIC_SUPABASE_ANON_KEY
+#
+# Secrets used only by upstream (NOT needed for this fork, already gated by if: github.repository == 'readest/readest'):
+# - TAURI_SIGNING_PRIVATE_KEY / PASSWORD
+# - APPLE_CERTIFICATE / PASSWORD / SIGNING_IDENTITY / ID / PASSWORD / TEAM_ID
+# - ANDROID_KEY_ALIAS / PASSWORD / BASE64
+# - RELEASE_R2_ACCOUNT_ID / ACCESS_KEY_ID / SECRET_ACCESS_KEY
+
 on:
   workflow_dispatch:
   release:
@@ -101,6 +114,7 @@ jobs:
 
   build-koreader-plugin:
     needs: get-release
+    if: github.repository == 'readest/readest'
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -486,14 +500,3 @@ jobs:
 
           echo "Uploading updated latest.json to GitHub release"
           gh release upload ${{ needs.get-release.outputs.release_tag }} latest.json --clobber
-
-  upload-to-r2:
-    if: github.repository == 'readest/readest'
-    needs: [get-release, build-tauri]
-    permissions:
-      contents: read
-      actions: write
-    uses: ./.github/workflows/upload-to-r2.yml
-    with:
-      tag: ${{ needs.get-release.outputs.release_tag }}
-    secrets: inherit
