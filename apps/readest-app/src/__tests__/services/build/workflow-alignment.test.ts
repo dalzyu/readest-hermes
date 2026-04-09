@@ -45,8 +45,11 @@ describe('workflow alignment', () => {
     expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository != 'readest/readest'");
     expect(releaseWorkflow).toContain("name: upload Android apks to GitHub release (fork only)");
     expect(releaseWorkflow).toContain("name: upload desktop bundles to GitHub release (fork only)");
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: testing literal workflow YAML content
-    expect(releaseWorkflow).toContain("gh release upload ${{ needs.get-release.outputs.release_tag }} \"$asset\" --clobber");
+    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.AppImage");
+    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.deb");
+    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.dmg");
+    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.exe");
+    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.msi");
     expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository == 'readest/readest'");
     expect(releaseWorkflow).toContain("if: github.repository == 'readest/readest'");
   });

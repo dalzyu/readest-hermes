@@ -382,7 +382,13 @@ jobs:
         shell: bash
         run: |
           shopt -s globstar nullglob
-          assets=(target/**/release/bundle/**/*)
+          assets=(
+            target/**/release/bundle/**/*.AppImage
+            target/**/release/bundle/**/*.deb
+            target/**/release/bundle/**/*.dmg
+            target/**/release/bundle/**/*.exe
+            target/**/release/bundle/**/*.msi
+          )
           uploaded=0
           for asset in "${assets[@]}"; do
             [ -f "$asset" ] || continue
