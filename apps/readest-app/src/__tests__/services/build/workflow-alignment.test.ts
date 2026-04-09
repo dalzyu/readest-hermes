@@ -7,13 +7,9 @@ const repoRoot = path.resolve(import.meta.dirname, '../../../../../..');
 const tauriConfigPath = path.resolve(import.meta.dirname, '../../../../src-tauri/tauri.conf.json');
 const defaultCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/default.json');
 const desktopCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/desktop.json');
-const tursoPluginCargoPath = path.resolve(
-  import.meta.dirname,
-  '../../../../src-tauri/plugins/tauri-plugin-turso/Cargo.toml',
-);
 const releaseWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8');
 const prWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pull-request.yml'), 'utf8');
-const tursoPluginCargo = fs.readFileSync(tursoPluginCargoPath, 'utf8');
+const tauriCargo = fs.readFileSync(path.resolve(import.meta.dirname, '../../../../src-tauri/Cargo.toml'), 'utf8');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8')) as {
   build: { beforeDevCommand: string; beforeBuildCommand: string };
 };
@@ -79,11 +75,9 @@ describe('workflow alignment', () => {
     );
   });
 
-  test('turso plugin stays pinned to the stable 0.5.3 crate line', () => {
-    expect(tursoPluginCargo).toContain('turso = { version = "=0.5.3", default-features = false }');
-    expect(tursoPluginCargo).toContain(
-      'turso_core = { version = "=0.5.3", default-features = false, features = ["fts"] }',
-    );
+  test('src-tauri pins the stable turso crate line', () => {
+    expect(tauriCargo).toContain('turso = "=0.5.3"');
+    expect(tauriCargo).toContain('turso_core = "=0.5.3"');
   });
 
   test('workflow dispatch can create a release when the fork has no existing release object', () => {
