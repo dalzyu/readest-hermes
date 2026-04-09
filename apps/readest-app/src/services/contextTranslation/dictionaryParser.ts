@@ -21,19 +21,20 @@ export function parseIfo(buffer: Uint8Array): {
     parsed[key] = value;
   }
 
-  if (!parsed.bookname) {
+  if (!parsed['bookname']) {
     throw new Error('bookname not found in .ifo file');
   }
 
-  const wordcount = parseInt(parsed.wordcount, 10);
+  const wordcountStr = parsed['wordcount'];
+  const wordcount = parseInt(wordcountStr ?? '', 10);
   if (isNaN(wordcount)) {
     throw new Error('wordcount not found or invalid in .ifo file');
   }
 
   return {
-    name: parsed.bookname,
+    name: parsed['bookname'] ?? '',
     wordcount,
-    sametypesequence: parsed.sametypesequence,
+    sametypesequence: parsed['sametypesequence'],
   };
 }
 
@@ -77,13 +78,13 @@ export function parseStarDict(buffers: {
     // Read 4-byte big-endian offset
     if (offset + 4 > idx.length) break;
     const entryOffset =
-      (idx[offset] << 24) | (idx[offset + 1] << 16) | (idx[offset + 2] << 8) | idx[offset + 3];
+      ((idx[offset] ?? 0) << 24) | ((idx[offset + 1] ?? 0) << 16) | ((idx[offset + 2] ?? 0) << 8) | (idx[offset + 3] ?? 0);
     offset += 4;
 
     // Read 4-byte big-endian size
     if (offset + 4 > idx.length) break;
     const size =
-      (idx[offset] << 24) | (idx[offset + 1] << 16) | (idx[offset + 2] << 8) | idx[offset + 3];
+      ((idx[offset] ?? 0) << 24) | ((idx[offset + 1] ?? 0) << 16) | ((idx[offset + 2] ?? 0) << 8) | (idx[offset + 3] ?? 0);
     offset += 4;
 
     // Slice dict buffer
