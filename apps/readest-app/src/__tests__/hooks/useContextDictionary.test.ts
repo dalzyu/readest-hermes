@@ -10,7 +10,11 @@ vi.mock('@/services/contextTranslation/vocabularyService', () => ({
 }));
 
 vi.mock('@/store/settingsStore', () => ({
-  useSettingsStore: vi.fn(() => ({ settings: null })),
+  useSettingsStore: vi.fn(() => ({
+    settings: {
+      aiSettings: { enabled: true, provider: 'ollama', ollamaModel: 'llama3.2' },
+    },
+  })),
 }));
 
 vi.mock('@/services/ai/providers', () => ({
@@ -21,6 +25,23 @@ vi.mock('@/services/contextTranslation/contextLookupService', () => ({
   runContextLookup: vi.fn(),
   buildContextLookupTelemetryPayload: vi.fn(),
   contextLookupTelemetry: { logOutcome: vi.fn() },
+}));
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({ token: null }),
+}));
+vi.mock('@/services/contextTranslation/simpleLookup', () => ({
+  runSimpleLookup: vi.fn(),
+}));
+vi.mock('@/services/contextTranslation/translationService', () => ({
+  streamTranslationWithContext: vi.fn(function* () {}),
+  streamLookupWithContext: vi.fn(function* () {
+    yield {
+      fields: { simpleDefinition: 'simple definition' },
+      activeFieldId: null,
+      rawText: '<lookup_json>{"simpleDefinition":"simple definition"}</lookup_json>',
+      done: true,
+    };
+  }),
 }));
 
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
@@ -41,6 +62,7 @@ const popupContextBundle: PopupContextBundle = {
   localFutureBuffer: '',
   sameBookChunks: [],
   priorVolumeChunks: [],
+  dictionaryEntries: [],
   retrievalStatus: 'local-only',
   retrievalHints: {
     currentVolumeIndexed: true,

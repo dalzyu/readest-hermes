@@ -62,7 +62,7 @@ async function gzip(data) {
   const chunks = [];
   const gzipStream = createGzip();
   const writer = new Writable({
-    write(chunk, encoding, callback) {
+    write(chunk, _encoding, callback) {
       chunks.push(chunk);
       callback();
     }

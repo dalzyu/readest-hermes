@@ -22,7 +22,7 @@ pnpm tauri:dev:test        # Start Tauri app with webdriver
 pnpm test:tauri            # Run Tauri integration tests
 
 # Linting & Formatting
-pnpm lint                  # ESLint
+pnpm lint                  # Biome (linter) + tsgo (type check)
 pnpm format                # Prettier (runs from monorepo root)
 pnpm format:check          # Check formatting without writing
 
@@ -58,7 +58,7 @@ Platform-specific code lives in `src-tauri/src/{macos,windows,android,ios}/`. Cu
 
 ## Project Rules
 
-Rules are in `.claude/rules/`: test-first, typescript, build-constraints, verification.
+Rules are in `.claude/rules/`: test-first, typescript, verification.
 
 ### i18n
 

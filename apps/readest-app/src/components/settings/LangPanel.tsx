@@ -1,12 +1,18 @@
 import clsx from 'clsx';
 import React, { useEffect, useState } from 'react';
 import { useEnv } from '@/context/EnvContext';
+import { useAuth } from '@/context/AuthContext';
 import { useReaderStore } from '@/store/readerStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { saveViewSettings } from '@/helpers/settings';
+import {
+  getTranslatorDisplayLabel,
+  getTranslators,
+  isTranslatorAvailable,
+} from '@/services/translators';
 import { useResetViewSettings } from '@/hooks/useResetSettings';
-import { TRANSLATED_LANGS } from '@/services/constants';
+import { TRANSLATED_LANGS, TRANSLATOR_LANGS } from '@/services/constants';
 import { ConvertChineseVariant } from '@/types/book';
 import { SettingsPanelPanelProp } from './SettingsDialog';
 import { getDirFromLanguage } from '@/utils/rtl';
@@ -15,13 +21,19 @@ import Select from '@/components/Select';
 
 const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }) => {
   const _ = useTranslation();
+  const { token } = useAuth();
   const { envConfig } = useEnv();
   const { settings, applyUILanguage } = useSettingsStore();
-  const { getView, getViewSettings, recreateViewer } = useReaderStore();
+  const { getView, getViewSettings, setViewSettings, recreateViewer } = useReaderStore();
   const view = getView(bookKey);
   const viewSettings = getViewSettings(bookKey) || settings.globalViewSettings;
 
   const [uiLanguage, setUILanguage] = useState(viewSettings.uiLanguage);
+  const [translationEnabled, setTranslationEnabled] = useState(viewSettings.translationEnabled);
+  const [translationProvider, setTranslationProvider] = useState(viewSettings.translationProvider);
+  const [translateTargetLang, setTranslateTargetLang] = useState(viewSettings.translateTargetLang);
+  const [showTranslateSource, setShowTranslateSource] = useState(viewSettings.showTranslateSource);
+  const [ttsReadAloudText, setTtsReadAloudText] = useState(viewSettings.ttsReadAloudText);
   const [replaceQuotationMarks, setReplaceQuotationMarks] = useState(
     viewSettings.replaceQuotationMarks,
   );
@@ -34,6 +46,11 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
   const handleReset = () => {
     resetToDefaults({
       uiLanguage: setUILanguage,
+      translationEnabled: setTranslationEnabled,
+      translationProvider: setTranslationProvider,
+      translateTargetLang: setTranslateTargetLang,
+      showTranslateSource: setShowTranslateSource,
+      ttsReadAloudText: setTtsReadAloudText,
       replaceQuotationMarks: setReplaceQuotationMarks,
     });
   };
@@ -66,6 +83,62 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     setUILanguage(option);
   };
 
+  const getTranslationProviderOptions = () => {
+    return getTranslators().map((t) => ({
+      value: t.name,
+      label: getTranslatorDisplayLabel(t, !!token, _),
+      // Providers marked `disabled` (e.g. upstream relay is down) stay in the
+      // dropdown so users can see them, but cannot be selected.
+      disabled: !!t.disabled,
+    }));
+  };
+
+  const getCurrentTranslationProviderOption = () => {
+    const value = translationProvider;
+    const allProviders = getTranslationProviderOptions();
+    const availableTranslators = getTranslators().filter((t) => isTranslatorAvailable(t, !!token));
+    const currentProvider = availableTranslators.find((t) => t.name === value)
+      ? value
+      : availableTranslators[0]?.name;
+    return allProviders.find((p) => p.value === currentProvider) || allProviders[0]!;
+  };
+
+  const handleSelectTranslationProvider = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const option = event.target.value;
+    setTranslationProvider(option);
+    saveViewSettings(envConfig, bookKey, 'translationProvider', option, false, false);
+    viewSettings.translationProvider = option;
+    setViewSettings(bookKey, { ...viewSettings });
+  };
+
+  const getCurrentTargetLangOption = () => {
+    const value = translateTargetLang;
+    const availableOptions = getLangOptions(TRANSLATOR_LANGS);
+    return availableOptions.find((o) => o.value === value) || availableOptions[0]!;
+  };
+
+  const handleSelectTargetLang = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const option = event.target.value;
+    setTranslateTargetLang(option);
+    saveViewSettings(envConfig, bookKey, 'translateTargetLang', option, false, false);
+    viewSettings.translateTargetLang = option;
+    setViewSettings(bookKey, { ...viewSettings });
+  };
+
+  const handleSelectTTSText = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const option = event.target.value;
+    setTtsReadAloudText(option);
+    saveViewSettings(envConfig, bookKey, 'ttsReadAloudText', option, false, false);
+  };
+
+  const getTTSTextOptions = () => {
+    return [
+      { value: 'both', label: _('Source and Translated') },
+      { value: 'translated', label: _('Translated Only') },
+      { value: 'source', label: _('Source Only') },
+    ];
+  };
+
   useEffect(() => {
     if (uiLanguage === viewSettings.uiLanguage) return;
     const sameDir = getDirFromLanguage(uiLanguage) === getDirFromLanguage(viewSettings.uiLanguage);
@@ -75,6 +148,44 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uiLanguage]);
+
+  useEffect(() => {
+    if (translationEnabled === viewSettings.translationEnabled) return;
+    saveViewSettings(
+      envConfig,
+      bookKey,
+      'translationEnabled',
+      translationEnabled,
+      true,
+      false,
+    ).then(() => {
+      if (!showTranslateSource && translationEnabled) {
+        recreateViewer(envConfig, bookKey);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [translationEnabled]);
+
+  useEffect(() => {
+    if (showTranslateSource === viewSettings.showTranslateSource) return;
+    saveViewSettings(
+      envConfig,
+      bookKey,
+      'showTranslateSource',
+      showTranslateSource,
+      false,
+      false,
+    ).then(() => {
+      recreateViewer(envConfig, bookKey);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTranslateSource]);
+
+  useEffect(() => {
+    if (ttsReadAloudText === viewSettings.ttsReadAloudText) return;
+    saveViewSettings(envConfig, bookKey, 'ttsReadAloudText', ttsReadAloudText, false, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttsReadAloudText]);
 
   useEffect(() => {
     if (replaceQuotationMarks === viewSettings.replaceQuotationMarks) return;
@@ -143,6 +254,61 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
                 value={getCurrentUILangOption().value}
                 onChange={handleSelectUILang}
                 options={getLangOptions(TRANSLATED_LANGS)}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className='w-full' data-setting-id='settings.language.translationEnabled'>
+        <h2 className='mb-2 font-medium'>{_('Translation')}</h2>
+        <div className='card border-base-200 bg-base-100 border shadow'>
+          <div className='divide-base-200'>
+            <div className='config-item'>
+              <span className=''>{_('Enable Translation')}</span>
+              <input
+                type='checkbox'
+                className='toggle'
+                checked={translationEnabled}
+                onChange={() => setTranslationEnabled(!translationEnabled)}
+                disabled={!bookKey}
+              />
+            </div>
+
+            <div className='config-item'>
+              <span className=''>{_('Show Source Text')}</span>
+              <input
+                type='checkbox'
+                className='toggle'
+                checked={showTranslateSource}
+                onChange={() => setShowTranslateSource(!showTranslateSource)}
+              />
+            </div>
+
+            <div className='config-item' data-setting-id='settings.language.ttsTextTranslation'>
+              <span className=''>{_('TTS Text')}</span>
+              <Select
+                value={ttsReadAloudText}
+                onChange={handleSelectTTSText}
+                options={getTTSTextOptions()}
+              />
+            </div>
+
+            <div className='config-item' data-setting-id='settings.language.translationProvider'>
+              <span className=''>{_('Translation Service')}</span>
+              <Select
+                value={getCurrentTranslationProviderOption().value}
+                onChange={handleSelectTranslationProvider}
+                options={getTranslationProviderOptions()}
+              />
+            </div>
+
+            <div className='config-item' data-setting-id='settings.language.targetLanguage'>
+              <span className=''>{_('Translate To')}</span>
+              <Select
+                value={getCurrentTargetLangOption().value}
+                onChange={handleSelectTargetLang}
+                options={getLangOptions(TRANSLATOR_LANGS)}
               />
             </div>
           </div>

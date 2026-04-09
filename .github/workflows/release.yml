@@ -189,7 +189,7 @@ jobs:
 
       - name: setup Android SDK (for Android build only)
         if: matrix.config.release == 'android'
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: install NDK (for Android build only)
         if: matrix.config.release == 'android'
@@ -490,6 +490,9 @@ jobs:
   upload-to-r2:
     if: github.repository == 'readest/readest'
     needs: [get-release, build-tauri]
+    permissions:
+      contents: read
+      actions: write
     uses: ./.github/workflows/upload-to-r2.yml
     with:
       tag: ${{ needs.get-release.outputs.release_tag }}

@@ -187,7 +187,7 @@ const getPathResolver = ({ customRootDir }: { customRootDir?: string } = {}) => 
 // Resolve an fp from resolvePath to an absolute path.
 // When customRootDir is set, fp is already absolute; otherwise join with the base prefix.
 async function toAbsolute(resolved: ResolvedPath): Promise<string> {
-  if (nodePath.isAbsolute(resolved.fp)) return resolved.fp;
+  if (nodePath.isAbsolute(resolved.fp)) return nodePath.normalize(resolved.fp);
   const prefix = (await resolved.basePrefix()).replace(/\/+$/, '');
   return resolved.fp ? nodePath.join(prefix, resolved.fp) : prefix;
 }
@@ -344,6 +344,12 @@ export class NodeAppService extends BaseAppService {
     return this.fs.resolvePath(fp, base);
   }
 
+  // Override to ensure native path separators on all platforms (especially Windows).
+  override async resolveFilePath(fp: string, base: BaseDir): Promise<string> {
+    const prefix = await this.fs.getPrefix(base);
+    return fp ? nodePath.join(prefix, fp) : prefix;
+  }
+
   async init(): Promise<void> {
     await this.prepareBooksDir();
   }
@@ -364,9 +370,10 @@ export class NodeAppService extends BaseAppService {
   async saveFile(
     _filename: string,
     content: string | ArrayBuffer,
-    filepath: string,
+    options?: { filePath?: string; mimeType?: string },
   ): Promise<boolean> {
     try {
+      const filepath = options?.filePath ?? '';
       await fsp.mkdir(nodePath.dirname(filepath), { recursive: true });
       if (typeof content === 'string') {
         await fsp.writeFile(filepath, content, 'utf-8');

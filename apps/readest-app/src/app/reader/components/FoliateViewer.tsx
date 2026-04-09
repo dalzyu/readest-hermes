@@ -30,6 +30,7 @@ import {
   applyThemeModeClass,
   applyTranslationStyle,
   getStyles,
+  getThemeCode,
   keepTextAlignment,
   transformStylesheet,
 } from '@/utils/style';
@@ -203,7 +204,8 @@ const FoliateViewer: React.FC<{
     const detail = (event as CustomEvent).detail;
     console.log('doc index loaded:', detail.index);
     if (detail.doc) {
-      const writingDir = viewRef.current?.renderer.setStyles && getDirection(detail.doc);
+      const renderer = viewRef.current?.renderer;
+      const writingDir = renderer?.setStyles && getDirection(detail.doc);
       const viewSettings = getViewSettings(bookKey)!;
       const bookData = getBookData(bookKey)!;
 
@@ -230,6 +232,15 @@ const FoliateViewer: React.FC<{
 
       if (bookDoc.rendition?.layout === 'pre-paginated') {
         applyFixedlayoutStyles(detail.doc, viewSettings);
+        const themeCode = getThemeCode();
+        if (bookData.book?.format === 'PDF' && themeCode && renderer) {
+          renderer.pageColors = viewSettings.applyThemeToPDF
+            ? {
+                background: themeCode.bg,
+                foreground: themeCode.fg,
+              }
+            : undefined;
+        }
       }
 
       applyImageStyle(detail.doc);
@@ -264,7 +275,13 @@ const FoliateViewer: React.FC<{
               item.style &&
               getIndexFromCfi(item.cfi) === sectionIndex,
           )
-          .forEach((annotation) => viewRef.current?.addAnnotation(annotation));
+          .map((annotation) => {
+            try {
+              viewRef.current?.addAnnotation(annotation);
+            } catch (err) {
+              console.warn('Failed to add annotation', { annotation, error: err });
+            }
+          });
       }, 100);
 
       if (!detail.doc.isEventListenersAdded) {
@@ -323,9 +340,9 @@ const FoliateViewer: React.FC<{
     }
   };
 
-  const { handlePageFlip, handleContinuousScroll } = usePagination(bookKey, viewRef, containerRef);
-  const mouseHandlers = useMouseEvent(bookKey, handlePageFlip, handleContinuousScroll);
-  const touchHandlers = useTouchEvent(bookKey, handlePageFlip, handleContinuousScroll);
+  const { handlePageFlip } = usePagination(bookKey, viewRef, containerRef);
+  const mouseHandlers = useMouseEvent(bookKey, handlePageFlip);
+  const touchHandlers = useTouchEvent(bookKey);
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedTableHtml, setSelectedTableHtml] = useState<string | null>(null);
@@ -594,11 +611,17 @@ const FoliateViewer: React.FC<{
     viewRef.current?.renderer.setAttribute('gap', `${viewSettings.gapPercent}%`);
     if (viewSettings.scrolled) {
       viewRef.current?.renderer.setAttribute('flow', 'scrolled');
+      if (viewSettings.noContinuousScroll) {
+        viewRef.current?.renderer.setAttribute('no-continuous-scroll', '');
+      } else {
+        viewRef.current?.renderer.removeAttribute('no-continuous-scroll');
+      }
     }
   };
 
   useEffect(() => {
     if (viewRef.current && viewRef.current.renderer) {
+      const renderer = viewRef.current.renderer;
       const viewSettings = getViewSettings(bookKey)!;
       viewRef.current.renderer.setStyles?.(getStyles(viewSettings));
       const docs = viewRef.current.renderer.getContents();
@@ -610,6 +633,15 @@ const FoliateViewer: React.FC<{
         applyScrollModeClass(doc, viewSettings.scrolled || false);
         applyScrollbarStyle(document, viewSettings.hideScrollbar || false);
       });
+
+      if (bookData?.book?.format === 'PDF' && themeCode && renderer) {
+        renderer.pageColors = viewSettings.applyThemeToPDF
+          ? {
+              background: themeCode.bg,
+              foreground: themeCode.fg,
+            }
+          : undefined;
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -618,6 +650,7 @@ const FoliateViewer: React.FC<{
     viewSettings?.scrolled,
     viewSettings?.overrideColor,
     viewSettings?.invertImgColorInDark,
+    viewSettings?.applyThemeToPDF,
     viewSettings?.hideScrollbar,
   ]);
 
@@ -670,6 +703,7 @@ const FoliateViewer: React.FC<{
     viewSettings?.showBarsOnScroll,
     viewSettings?.showMarginsOnScroll,
     viewSettings?.scrolled,
+    viewSettings?.noContinuousScroll,
     viewState?.ttsEnabled,
   ]);
 

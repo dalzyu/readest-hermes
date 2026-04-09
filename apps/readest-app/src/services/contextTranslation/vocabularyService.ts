@@ -73,11 +73,11 @@ export function exportAsCSV(
   enabledFields: TranslationOutputField[],
 ): string {
   const fields = enabledFields.filter((f) => f.enabled).sort((a, b) => a.order - b.order);
-  const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
-  const header = ['Term', 'Context', ...fields.map((f) => f.label)].map(escape).join(',');
+  const csvEscape = (s: string) => `"${s.replace(/"/g, '""')}"`;
+  const header = ['Term', 'Context', ...fields.map((f) => f.label)].map(csvEscape).join(',');
   const rows = entries.map((e) => {
     const cols = [e.term, e.context.slice(0, 200), ...fields.map((f) => e.result[f.id] ?? '')].map(
-      escape,
+      csvEscape,
     );
     return cols.join(',');
   });

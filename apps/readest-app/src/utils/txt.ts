@@ -475,7 +475,13 @@ export class TxtToEpubConverter {
   ): Chapter[] {
     const { language } = metadata;
     const { fallbackParagraphsPerChapter } = option;
-    const trimmedSegment = segment.replace(/<!--.*?-->/g, '').trim();
+    let sanitizedSegment = segment;
+    let previousSegment: string;
+    do {
+      previousSegment = sanitizedSegment;
+      sanitizedSegment = sanitizedSegment.replace(/<!--.*?-->/gs, '');
+    } while (sanitizedSegment !== previousSegment);
+    const trimmedSegment = sanitizedSegment.trim();
     if (!trimmedSegment) return [];
 
     const chapterRegexps = this.createChapterRegexps(language);
@@ -547,7 +553,13 @@ export class TxtToEpubConverter {
   ): number {
     const { language } = metadata;
     const { fallbackParagraphsPerChapter } = option;
-    const trimmedSegment = segment.replace(/<!--.*?-->/g, '').trim();
+    let sanitizedSegment = segment;
+    let previousSegment: string;
+    do {
+      previousSegment = sanitizedSegment;
+      sanitizedSegment = sanitizedSegment.replace(/<!--.*?-->/gs, '');
+    } while (sanitizedSegment !== previousSegment);
+    const trimmedSegment = sanitizedSegment.trim();
     if (!trimmedSegment) return 0;
 
     const chapterRegexps = this.createChapterRegexps(language);
@@ -655,7 +667,7 @@ export class TxtToEpubConverter {
       'Afterword',
     ];
 
-    const numberPattern = String.raw`(\d+|(?:[IVXLCDM]{2,}|V|X|L|C|D|M)\b)`;
+    const numberPattern = String.raw`(?:\d+|(?:[IVXLCDM]{2,}|V|X|L|C|D|M)\b)`;
     const dotNumberPattern = String.raw`\.\d{1,4}`;
     const titlePattern = String.raw`[^\n]{0,50}`;
 
@@ -670,8 +682,15 @@ export class TxtToEpubConverter {
       .map((k) => String.raw`${k}(?:[:.\-–—]?\s*${titlePattern})?`)
       .join('|');
 
-    const combinedPattern = String.raw`(?:^|\n|\s)(?:${normalChapterPattern}|${prefacePattern})(?=\s|$)`;
+    const combinedPattern = String.raw`(?:^|\n)(${normalChapterPattern}|${prefacePattern})(?=\s|$)`;
     chapterRegexps.push(new RegExp(combinedPattern, 'gi'));
+
+    // Second-tier: bare numbered headings like "1.1The Elements" or "1Building Data"
+    // Dotted numbers (1.1, 1.2.3) allow an optional space before the title.
+    // Single bare digits (1, 2) require the title to start immediately (no space)
+    // to avoid matching footnotes like "1 The Lisp...".
+    const numberedHeadingPattern = String.raw`(?:^|\n)(\d+\.\d+(?:\.\d+)* ?[A-Z][^\n]{0,80}|\d+[A-Z][^\n]{0,80})`;
+    chapterRegexps.push(new RegExp(numberedHeadingPattern, 'g'));
 
     return chapterRegexps;
   }

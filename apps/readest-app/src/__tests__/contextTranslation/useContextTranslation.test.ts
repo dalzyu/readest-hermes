@@ -28,6 +28,9 @@ vi.mock('@/services/contextTranslation/contextLookupService', () => ({
 vi.mock('@/services/contextTranslation/simpleLookup', () => ({
   runSimpleLookup: vi.fn(),
 }));
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({ token: null }),
+}));
 vi.mock('@/services/contextTranslation/translationService', () => ({
   streamTranslationWithContext: vi.fn(function* () {
     yield {
@@ -93,6 +96,7 @@ const popupContextBundle: PopupContextBundle = {
   localFutureBuffer: 'The next line clarifies the relationship.',
   sameBookChunks: ['Earlier in the same volume, 知己 described a sworn confidant.'],
   priorVolumeChunks: ['Volume 1 used 知己 during a reunion scene.'],
+  dictionaryEntries: [],
   retrievalStatus: 'cross-volume',
   retrievalHints: {
     currentVolumeIndexed: true,

@@ -4,6 +4,11 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, test } from 'vitest';
 
+// On Windows the pnpm-managed npm_execpath gets re-injected by the runtime into
+// child processes spawned by vitest, so the fake-exec intercept does not work.
+// The tauri-local.mjs logic is verified on Linux/macOS in CI.
+const describeUnix = process.platform === 'win32' ? describe.skip : describe;
+
 const scriptPath = path.resolve(import.meta.dirname, '../../../../scripts/tauri-local.mjs');
 
 const tempDirs: string[] = [];
@@ -40,7 +45,7 @@ function runWrapper(args: string[]) {
   };
 }
 
-describe('tauri-local wrapper', () => {
+describeUnix('tauri-local wrapper', () => {
   test('uses exec -- so npm does not consume tauri flags', () => {
     const { args } = runWrapper(['build', '--target', 'x86_64-pc-windows-msvc']);
 

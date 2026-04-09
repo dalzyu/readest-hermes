@@ -26,6 +26,9 @@ vi.mock('@/services/contextTranslation/contextLookupService', () => ({
 vi.mock('@/services/contextTranslation/simpleLookup', () => ({
   runSimpleLookup: vi.fn(),
 }));
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({ token: null }),
+}));
 
 vi.mock('@/services/contextTranslation/translationService', () => ({
   streamTranslationWithContext: vi.fn(function* () {
@@ -49,6 +52,7 @@ const popupContextBundle: PopupContextBundle = {
   localFutureBuffer: '',
   sameBookChunks: [],
   priorVolumeChunks: [],
+  dictionaryEntries: [],
   retrievalStatus: 'local-only',
   retrievalHints: {
     currentVolumeIndexed: true,

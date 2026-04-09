@@ -5,8 +5,6 @@ import * as React from 'react';
 import { MdChevronRight } from 'react-icons/md';
 import { useState, useRef, useEffect, Suspense, useCallback } from 'react';
 import { ReadonlyURLSearchParams, useSearchParams } from 'next/navigation';
-import { OverlayScrollbarsComponent, OverlayScrollbarsComponentRef } from 'overlayscrollbars-react';
-import 'overlayscrollbars/overlayscrollbars.css';
 
 import { Book } from '@/types/book';
 import type { BookSeries } from '@/services/contextTranslation/types';
@@ -55,10 +53,12 @@ import {
 import { LibraryGroupByType } from '@/types/settings';
 import { BookMetadata } from '@/libs/document';
 import { AboutWindow } from '@/components/AboutWindow';
+import { KeyboardShortcutsHelp } from '@/components/KeyboardShortcutsHelp';
 import { BookDetailModal } from '@/components/metadata';
 import { UpdaterWindow } from '@/components/UpdaterWindow';
 import { CatalogDialog } from './components/OPDSDialog';
 import { MigrateDataWindow } from './components/MigrateDataWindow';
+import { BackupWindow } from './components/BackupWindow';
 import { useDragDropImport } from './hooks/useDragDropImport';
 import { useTransferQueue } from '@/hooks/useTransferQueue';
 import { useAppRouter } from '@/hooks/useAppRouter';
@@ -78,7 +78,11 @@ import DropIndicator from '@/components/DropIndicator';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import ModalPortal from '@/components/ModalPortal';
 import TransferQueuePanel from './components/TransferQueuePanel';
-import { addBookToSeries, getAllSeries, updateSeriesVolume } from '@/services/contextTranslation/seriesService';
+import {
+  addBookToSeries,
+  getAllSeries,
+  updateSeriesVolume,
+} from '@/services/contextTranslation/seriesService';
 
 interface ImportSeriesSuggestion {
   book: Book;
@@ -95,8 +99,7 @@ const normalizeSuggestionText = (value: string | undefined) =>
 const extractVolumeNumber = (title: string | undefined): number | undefined => {
   if (!title) return undefined;
   const match =
-    title.match(/(?:vol(?:ume)?|book)?\s*(\d+)\s*$/i) ||
-    title.match(/\b(\d+)\b(?!.*\b\d+\b)/);
+    title.match(/(?:vol(?:ume)?|book)?\s*(\d+)\s*$/i) || title.match(/\b(\d+)\b(?!.*\b\d+\b)/);
   if (!match?.[1]) return undefined;
   const parsed = Number.parseInt(match[1], 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
@@ -207,28 +210,22 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const iconSize = useResponsiveSize(18);
   const viewSettings = settings.globalViewSettings;
   const demoBooks = useDemoBooks();
-  const osRef = useRef<OverlayScrollbarsComponentRef>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const containerRef: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
   const pageRef = useRef<HTMLDivElement>(null);
 
   const getScrollKey = (group: string) => `library-scroll-${group || 'all'}`;
 
   const saveScrollPosition = (group: string) => {
-    const viewport = osRef.current?.osInstance()?.elements().viewport;
-    if (viewport) {
-      const scrollTop = viewport.scrollTop;
-      sessionStorage.setItem(getScrollKey(group), scrollTop.toString());
+    if (scrollRef.current) {
+      sessionStorage.setItem(getScrollKey(group), scrollRef.current.scrollTop.toString());
     }
   };
 
   const restoreScrollPosition = useCallback((group: string) => {
     const savedPosition = sessionStorage.getItem(getScrollKey(group));
-    if (savedPosition) {
-      const scrollTop = parseInt(savedPosition, 10);
-      const viewport = osRef.current?.osInstance()?.elements().viewport;
-      if (viewport) {
-        viewport.scrollTop = scrollTop;
-      }
+    if (savedPosition && scrollRef.current) {
+      scrollRef.current.scrollTop = parseInt(savedPosition, 10);
     }
   }, []);
 
@@ -930,7 +927,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   return (
     <div
       ref={pageRef}
-      aria-label='Your Library'
+      aria-label={_('Your Library')}
       className={clsx(
         'library-page text-base-content full-height flex select-none flex-col overflow-hidden',
         viewSettings?.isEink ? 'bg-base-100' : 'bg-base-200',
@@ -1014,22 +1011,13 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       )}
       {showBookshelf &&
         (libraryBooks.some((book) => !book.deletedAt) ? (
-          <OverlayScrollbarsComponent
-            defer
-            aria-label=''
-            ref={osRef}
-            className='flex-grow'
-            options={{ scrollbars: { autoHide: 'scroll' } }}
-            events={{
-              initialized: (instance) => {
-                const { content } = instance.elements();
-                if (content) {
-                  containerRef.current = content as HTMLDivElement;
-                }
-              },
-            }}
+          <div
+            ref={scrollRef}
+            aria-label={_('Your Bookshelf')}
+            className='library-scroller flex-grow'
           >
             <div
+              ref={containerRef}
               className={clsx(
                 'scroll-container drop-zone flex h-full min-h-full flex-col',
                 isDragging && 'drag-over',
@@ -1058,7 +1046,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
                 handlePushLibrary={pushLibrary}
               />
             </div>
-          </OverlayScrollbarsComponent>
+          </div>
         ) : (
           <div className='hero drop-zone h-screen items-center justify-center'>
             <DropIndicator />
@@ -1095,13 +1083,13 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           <dialog open className='modal modal-open z-[120]'>
             <div className='modal-box max-w-md'>
               <h3 className='text-base font-semibold'>{_('Add to series?')}</h3>
-              <p className='mt-2 text-sm text-base-content/70'>
+              <p className='text-base-content/70 mt-2 text-sm'>
                 {_('{{title}} looks like it belongs in {{series}}.', {
                   title: pendingSeriesSuggestions[0].book.title,
                   series: pendingSeriesSuggestions[0].series.name,
                 })}
               </p>
-              <div className='mt-4 rounded-lg border border-base-300 px-3 py-2 text-sm'>
+              <div className='border-base-300 mt-4 rounded-lg border px-3 py-2 text-sm'>
                 <div className='font-medium'>{pendingSeriesSuggestions[0].series.name}</div>
                 {pendingSeriesSuggestions[0].suggestedVolumeIndex ? (
                   <div className='text-base-content/60 mt-1'>
@@ -1134,8 +1122,10 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         </ModalPortal>
       )}
       <AboutWindow />
+      <KeyboardShortcutsHelp />
       <UpdaterWindow />
       <MigrateDataWindow />
+      <BackupWindow onPullLibrary={pullLibrary} />
       {isSettingsDialogOpen && <SettingsDialog bookKey={''} />}
       {showCatalogManager && <CatalogDialog onClose={handleDismissOPDSDialog} />}
       <Toast />

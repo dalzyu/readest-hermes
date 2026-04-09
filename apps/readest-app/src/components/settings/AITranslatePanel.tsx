@@ -5,6 +5,7 @@ import { PiSpinner, PiTrash, PiWarningCircle } from 'react-icons/pi';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
+import { useAuth } from '@/context/AuthContext';
 import {
   BUNDLED_DICTIONARIES,
   initBundledDictionaries,
@@ -32,10 +33,10 @@ type TranslationSource = 'ai' | 'dictionary' | 'azure' | 'deepl' | 'google' | 'y
 const AITranslatePanel: React.FC = () => {
   const _ = useTranslation();
   const { envConfig } = useEnv();
+  const { token } = useAuth();
   const { settings, setSettings, saveSettings } = useSettingsStore();
 
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
-  const disabledSection = !aiEnabled ? 'opacity-50 pointer-events-none select-none' : '';
 
   const ctxTransSettings: ContextTranslationSettings =
     settings?.globalReadSettings?.contextTranslation ?? DEFAULT_CONTEXT_TRANSLATION_SETTINGS;
@@ -65,6 +66,9 @@ const AITranslatePanel: React.FC = () => {
   const [ctxDictEnabled, setCtxDictEnabled] = useState(ctxDictSettings.enabled);
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
     ctxDictSettings.sourceExamples,
+  );
+  const [ctxDictSource, setCtxDictSource] = useState<'ai' | 'dictionary'>(
+    ctxDictSettings.source ?? 'ai',
   );
 
   // Dictionaries section state
@@ -191,7 +195,7 @@ const AITranslatePanel: React.FC = () => {
       setImportSourceLang('');
       setImportTargetLang('');
       setShowModal(true);
-    } catch (err) {
+    } catch {
       setImportError(_('Failed to read dictionary file'));
     } finally {
       // Reset input value so same file can be selected again
@@ -264,6 +268,11 @@ const AITranslatePanel: React.FC = () => {
     [userDictionaries, envConfig, setSettings, saveSettings],
   );
 
+  // Derived helpers
+  const isAiSource = ctxSource === 'ai';
+  const aiOnlyDisabled = !ctxEnabled || !isAiSource || !aiEnabled;
+  const deeplNeedsLogin = ctxSource === 'deepl' && !token;
+
   return (
     <div className='my-4 w-full space-y-6'>
       {/* Hidden file input for web dictionary import */}
@@ -275,15 +284,17 @@ const AITranslatePanel: React.FC = () => {
         onChange={handleFileChange}
       />
 
-      <div className={clsx('w-full', disabledSection)}>
+      {/* ── Context-Aware Translation ───────────────────────────────── */}
+      <div className='w-full'>
         <h2 className='mb-2 font-medium'>{_('Context-Aware Translation')}</h2>
         <p className='text-base-content/70 mb-3 text-sm'>
           {_(
-            'When enabled, selecting text in the reader sends surrounding page context to the AI model for a richer, context-aware translation.',
+            'When enabled, selecting text in the reader sends surrounding page context for a richer, context-aware translation.',
           )}
         </p>
         <div className='card border-base-200 bg-base-100 border shadow'>
           <div className='divide-base-200 divide-y'>
+            {/* Enable toggle */}
             <div className='config-item'>
               <span>{_('Enable Context-Aware Translation')}</span>
               <input
@@ -298,28 +309,7 @@ const AITranslatePanel: React.FC = () => {
               />
             </div>
 
-            <div
-              className={clsx(
-                'config-item',
-                !ctxEnabled && 'pointer-events-none select-none opacity-50',
-              )}
-            >
-              <span>{_('Translation Source')}</span>
-              <select
-                data-testid='translation-source'
-                className='select select-bordered select-sm'
-                value={ctxSource}
-                onChange={(e) => updateSource(e.target.value as TranslationSource)}
-              >
-                <option value='ai' disabled={!aiEnabled}>{_('AI')}</option>
-                <option value='dictionary'>{_('Dictionary')}</option>
-                <option value='azure'>{_('Azure')}</option>
-                <option value='deepl'>{_('DeepL')}</option>
-                <option value='google'>{_('Google')}</option>
-                <option value='yandex'>{_('Yandex')}</option>
-              </select>
-            </div>
-
+            {/* Target Language */}
             <div
               className={clsx(
                 'config-item !h-auto flex-col !items-start gap-2 py-3',
@@ -344,10 +334,11 @@ const AITranslatePanel: React.FC = () => {
               </select>
             </div>
 
+            {/* Recent Context Pages — only meaningful for AI path */}
             <div
               className={clsx(
                 'config-item',
-                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+                (!ctxEnabled || !isAiSource) && 'pointer-events-none select-none opacity-50',
               )}
             >
               <span>{_('Recent Context Pages')}</span>
@@ -357,7 +348,7 @@ const AITranslatePanel: React.FC = () => {
                 min={1}
                 max={20}
                 value={ctxRecentPages}
-                disabled={!ctxEnabled}
+                disabled={!ctxEnabled || !isAiSource}
                 onChange={(e) => {
                   const val = Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1));
                   setCtxRecentPages(val);
@@ -366,10 +357,11 @@ const AITranslatePanel: React.FC = () => {
               />
             </div>
 
+            {/* Look-ahead Words — only meaningful for AI path */}
             <div
               className={clsx(
                 'config-item',
-                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+                (!ctxEnabled || !isAiSource) && 'pointer-events-none select-none opacity-50',
               )}
             >
               <span>{_('Look-ahead Words')}</span>
@@ -379,7 +371,7 @@ const AITranslatePanel: React.FC = () => {
                 min={0}
                 max={300}
                 value={ctxLookAheadWords}
-                disabled={!ctxEnabled}
+                disabled={!ctxEnabled || !isAiSource}
                 onChange={(e) => {
                   const val = Math.max(0, Math.min(300, parseInt(e.target.value, 10) || 0));
                   setCtxLookAheadWords(val);
@@ -388,10 +380,11 @@ const AITranslatePanel: React.FC = () => {
               />
             </div>
 
+            {/* Memory settings — AI only */}
             <div
               className={clsx(
                 'config-item',
-                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+                aiOnlyDisabled && 'pointer-events-none select-none opacity-50',
               )}
             >
               <label className='flex items-center gap-2' htmlFor='ctx-same-book-memory-toggle'>
@@ -402,7 +395,7 @@ const AITranslatePanel: React.FC = () => {
                 type='checkbox'
                 className='toggle'
                 checked={ctxSameBookRagEnabled}
-                disabled={!ctxEnabled}
+                disabled={aiOnlyDisabled}
                 onChange={() => {
                   const next = !ctxSameBookRagEnabled;
                   setCtxSameBookRagEnabled(next);
@@ -414,7 +407,7 @@ const AITranslatePanel: React.FC = () => {
             <div
               className={clsx(
                 'config-item',
-                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+                aiOnlyDisabled && 'pointer-events-none select-none opacity-50',
               )}
             >
               <span>{_('Same-book memory chunks')}</span>
@@ -424,7 +417,7 @@ const AITranslatePanel: React.FC = () => {
                 min={1}
                 max={10}
                 value={ctxSameBookChunkCount}
-                disabled={!ctxEnabled || !ctxSameBookRagEnabled}
+                disabled={aiOnlyDisabled || !ctxSameBookRagEnabled}
                 onChange={(e) => {
                   const val = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1));
                   setCtxSameBookChunkCount(val);
@@ -436,7 +429,7 @@ const AITranslatePanel: React.FC = () => {
             <div
               className={clsx(
                 'config-item',
-                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+                aiOnlyDisabled && 'pointer-events-none select-none opacity-50',
               )}
             >
               <label className='flex items-center gap-2' htmlFor='ctx-prior-volume-memory-toggle'>
@@ -447,7 +440,7 @@ const AITranslatePanel: React.FC = () => {
                 type='checkbox'
                 className='toggle'
                 checked={ctxPriorVolumeRagEnabled}
-                disabled={!ctxEnabled}
+                disabled={aiOnlyDisabled}
                 onChange={() => {
                   const next = !ctxPriorVolumeRagEnabled;
                   setCtxPriorVolumeRagEnabled(next);
@@ -459,7 +452,7 @@ const AITranslatePanel: React.FC = () => {
             <div
               className={clsx(
                 'config-item',
-                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+                aiOnlyDisabled && 'pointer-events-none select-none opacity-50',
               )}
             >
               <span>{_('Prior-volume memory chunks')}</span>
@@ -469,7 +462,7 @@ const AITranslatePanel: React.FC = () => {
                 min={1}
                 max={10}
                 value={ctxPriorVolumeChunkCount}
-                disabled={!ctxEnabled || !ctxPriorVolumeRagEnabled}
+                disabled={aiOnlyDisabled || !ctxPriorVolumeRagEnabled}
                 onChange={(e) => {
                   const val = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1));
                   setCtxPriorVolumeChunkCount(val);
@@ -478,6 +471,7 @@ const AITranslatePanel: React.FC = () => {
               />
             </div>
 
+            {/* Output Fields */}
             <div className={clsx(!ctxEnabled && 'pointer-events-none select-none opacity-50')}>
               <div className='px-4 py-2 text-sm font-medium'>{_('Output Fields')}</div>
               {ctxOutputFields
@@ -502,31 +496,69 @@ const AITranslatePanel: React.FC = () => {
                         }}
                       />
                     </div>
-                    <details>
-                      <summary
-                        data-testid={`advanced-${field.id}-summary`}
-                        className='cursor-pointer text-sm text-base-content/60'
-                      >
-                        {_('Advanced')}
-                      </summary>
-                      <div className='space-y-2 pl-4 pt-2'>
-                        <label className='text-sm'>{_('Prompt instruction:')}</label>
-                        <textarea
-                          data-testid={`prompt-textarea-${field.id}`}
-                          className='textarea textarea-bordered w-full text-sm'
-                          rows={3}
-                          value={field.promptInstruction}
-                          onChange={(e) => updatePrompt(field.id, e.target.value)}
-                        />
-                        <button
-                          data-testid={`reset-prompt-${field.id}`}
-                          className='btn btn-ghost btn-sm'
-                          onClick={() => resetToDefault(field.id)}
-                        >
-                          {_('Reset to defaults')}
-                        </button>
+
+                    {/* Translation Source — nested under the Translation field (Fix 3) */}
+                    {field.id === 'translation' && (
+                      <div className='mt-2 pl-1'>
+                        <div className='config-item !px-0 !py-1'>
+                          <span className='text-base-content/70 text-xs'>{_('Source')}</span>
+                          <select
+                            data-testid='translation-source'
+                            className='select select-bordered select-xs'
+                            value={ctxSource}
+                            onChange={(e) => updateSource(e.target.value as TranslationSource)}
+                          >
+                            <option value='ai' disabled={!aiEnabled}>
+                              {_('AI')}
+                              {!aiEnabled ? ` (${_('Enable AI first')})` : ''}
+                            </option>
+                            <option value='dictionary'>{_('Dictionary')}</option>
+                            <option value='azure'>{_('Azure')}</option>
+                            <option value='deepl'>{_('DeepL')}</option>
+                            <option value='google'>{_('Google')}</option>
+                            <option value='yandex'>{_('Yandex')}</option>
+                          </select>
+                        </div>
+                        {deeplNeedsLogin && (
+                          <p className='text-warning mt-1 text-xs'>
+                            {_('DeepL requires a Readest account. Please log in.')}
+                          </p>
+                        )}
                       </div>
-                    </details>
+                    )}
+
+                    {/* Advanced prompt — only shown for AI source on non-translation fields,
+                        or for translation field when AI is the source */}
+                    {(field.id !== 'translation' || isAiSource) && (
+                      <details>
+                        <summary
+                          data-testid={`advanced-${field.id}-summary`}
+                          className={clsx(
+                            'text-base-content/60 cursor-pointer text-sm',
+                            !isAiSource && 'pointer-events-none opacity-50',
+                          )}
+                        >
+                          {_('Advanced')}
+                        </summary>
+                        <div className='space-y-2 pl-4 pt-2'>
+                          <label className='text-sm'>{_('Prompt instruction:')}</label>
+                          <textarea
+                            data-testid={`prompt-textarea-${field.id}`}
+                            className='textarea textarea-bordered w-full text-sm'
+                            rows={3}
+                            value={field.promptInstruction}
+                            onChange={(e) => updatePrompt(field.id, e.target.value)}
+                          />
+                          <button
+                            data-testid={`reset-prompt-${field.id}`}
+                            className='btn btn-ghost btn-sm'
+                            onClick={() => resetToDefault(field.id)}
+                          >
+                            {_('Reset to defaults')}
+                          </button>
+                        </div>
+                      </details>
+                    )}
                   </div>
                 ))}
             </div>
@@ -534,11 +566,12 @@ const AITranslatePanel: React.FC = () => {
         </div>
       </div>
 
-      <div className={clsx('w-full', disabledSection)}>
+      {/* ── Dictionary Lookup ───────────────────────────────────────── */}
+      <div className='w-full'>
         <h2 className='mb-2 font-medium'>{_('Dictionary Lookup')}</h2>
         <p className='text-base-content/70 mb-3 text-sm'>
           {_(
-            'When enabled, selecting text in the reader can trigger a context-aware dictionary lookup using the AI model.',
+            'When enabled, selecting text in the reader triggers a dictionary lookup. Use AI for context-aware definitions or a traditional dictionary for instant results.',
           )}
         </p>
         <div className='card border-base-200 bg-base-100 border shadow'>
@@ -557,7 +590,41 @@ const AITranslatePanel: React.FC = () => {
                 }}
               />
             </div>
-            <div className='config-item'>
+
+            {/* Dictionary source — available even when AI is disabled */}
+            <div
+              className={clsx(
+                'config-item',
+                !ctxDictEnabled && 'pointer-events-none select-none opacity-50',
+              )}
+            >
+              <label htmlFor='ctx-dict-source-select'>{_('Lookup Source')}</label>
+              <select
+                id='ctx-dict-source-select'
+                className='select select-bordered select-sm'
+                value={ctxDictSource}
+                disabled={!ctxDictEnabled}
+                onChange={(e) => {
+                  const next = e.target.value as 'ai' | 'dictionary';
+                  setCtxDictSource(next);
+                  saveCtxDictSetting({ source: next });
+                }}
+              >
+                <option value='ai' disabled={!aiEnabled}>
+                  {_('AI')}
+                  {!aiEnabled ? ` (${_('Enable AI first')})` : ''}
+                </option>
+                <option value='dictionary'>{_('Traditional Dictionary')}</option>
+              </select>
+            </div>
+
+            <div
+              className={clsx(
+                'config-item',
+                (!ctxDictEnabled || ctxDictSource !== 'ai') &&
+                  'pointer-events-none select-none opacity-50',
+              )}
+            >
               <label htmlFor='ctx-dict-source-examples-toggle'>
                 {_('Include Source Examples')}
               </label>
@@ -566,6 +633,7 @@ const AITranslatePanel: React.FC = () => {
                 type='checkbox'
                 className='toggle'
                 checked={ctxDictSourceExamples}
+                disabled={!ctxDictEnabled || ctxDictSource !== 'ai'}
                 onChange={() => {
                   const next = !ctxDictSourceExamples;
                   setCtxDictSourceExamples(next);
@@ -577,7 +645,8 @@ const AITranslatePanel: React.FC = () => {
         </div>
       </div>
 
-      <div className={clsx('w-full', disabledSection)}>
+      {/* ── Dictionaries ───────────────────────────────────────────── */}
+      <div className='w-full'>
         <h2 className='mb-2 font-medium'>{_('Dictionaries')}</h2>
 
         {dictionaryUnavailableBanner && (

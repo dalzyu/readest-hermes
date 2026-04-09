@@ -62,7 +62,8 @@ const { stableSettings } = vi.hoisted(() => {
             label: 'Usage Examples',
             enabled: false,
             order: 2,
-            promptInstruction: 'Provide 2\u20133 short example sentences using the selected term in similar contexts.',
+            promptInstruction:
+              'Provide 2\u20133 short example sentences using the selected term in similar contexts.',
           },
         ],
       },
@@ -194,10 +195,6 @@ vi.mock('@/services/contextTranslation/dictionaryService', () => ({
 }));
 
 describe('AIPanel', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -255,7 +252,7 @@ describe('AIPanel', () => {
   });
 
   test('SettingsDialog renders AI Translate tab button', () => {
-    render(<SettingsDialog bookKey="test" />);
+    render(<SettingsDialog bookKey='test' />);
     expect(screen.getByRole('button', { name: /AI Translate/i })).toBeTruthy();
   });
 
@@ -319,18 +316,24 @@ describe('LangPanel', () => {
     cleanup();
   });
 
-  test('Language tab does not have Translation section', async () => {
+  test('Language tab has built-in Translation section but not AI context-translation section', async () => {
     // Use importActual to get the real LangPanel (bypassing the module-level mock)
     const { default: RealLangPanel } = await vi.importActual<{
       default: React.ComponentType<{ bookKey: string; onRegisterReset: (fn: () => void) => void }>;
     }>('@/components/settings/LangPanel');
 
-    render(<RealLangPanel bookKey="test" onRegisterReset={() => {}} />);
+    render(<RealLangPanel bookKey='test' onRegisterReset={() => {}} />);
 
-    // Target the specific data-setting-id attribute (NOT data-testid)
+    // Built-in translation section IS in LangPanel
     const translationSection = document.querySelector(
       '[data-setting-id="settings.language.translationEnabled"]',
     );
-    expect(translationSection).toBeNull();
+    expect(translationSection).not.toBeNull();
+
+    // AI context-translation section should NOT be in LangPanel (it lives in AIPanel)
+    const aiTranslationSection = document.querySelector(
+      '[data-setting-id="settings.ai.contextTranslation"]',
+    );
+    expect(aiTranslationSection).toBeNull();
   });
 });

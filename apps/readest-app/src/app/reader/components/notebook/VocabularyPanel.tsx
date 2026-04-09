@@ -32,17 +32,23 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const loadEntries = useCallback(() => {
-    getVocabularyForBook(bookHash).then(setEntries).catch(() => setEntries([]));
+    getVocabularyForBook(bookHash)
+      .then(setEntries)
+      .catch(() => setEntries([]));
   }, [bookHash]);
 
   useEffect(() => {
     let active = true;
-    getVocabularyForBook(bookHash).then((data) => {
-      if (active) setEntries(data);
-    }).catch(() => {
-      if (active) setEntries([]);
-    });
-    return () => { active = false; };
+    getVocabularyForBook(bookHash)
+      .then((data) => {
+        if (active) setEntries(data);
+      })
+      .catch(() => {
+        if (active) setEntries([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [bookHash]);
 
   const handleSearch = async (q: string) => {
@@ -65,10 +71,9 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
       format === 'anki'
         ? exportAsAnkiTSV(entries, ctxSettings.outputFields)
         : exportAsCSV(entries, ctxSettings.outputFields);
-    const filename =
-      format === 'anki' ? 'vocabulary-anki.txt' : 'vocabulary.csv';
+    const filename = format === 'anki' ? 'vocabulary-anki.txt' : 'vocabulary.csv';
     if (appService) {
-      await appService.saveFile(filename, 'Downloads', content);
+      await appService.saveFile(filename, content);
     } else {
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -87,10 +92,10 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
   return (
     <div className='flex h-full flex-col'>
       {/* Toolbar */}
-      <div className='flex items-center gap-2 border-b border-base-300/50 px-3 py-2'>
+      <div className='border-base-300/50 flex items-center gap-2 border-b px-3 py-2'>
         <div className='relative flex-1'>
           <PiMagnifyingGlass
-            className='absolute left-2 top-1/2 -translate-y-1/2 text-base-content/40'
+            className='text-base-content/40 absolute left-2 top-1/2 -translate-y-1/2'
             size={14}
           />
           <input
@@ -116,7 +121,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
       {/* Entry list */}
       <div className='flex-1 overflow-y-auto px-3 py-2'>
         {entries.length === 0 && (
-          <p className='mt-8 text-center text-sm text-base-content/50'>
+          <p className='text-base-content/50 mt-8 text-center text-sm'>
             {isSearching || searchQuery
               ? _('No entries match your search')
               : _('No vocabulary saved yet.\nSelect text and tap the bookmark icon.')}
@@ -125,17 +130,17 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
         <ul className='space-y-2'>
           {entries.map((entry) => (
             <li key={entry.id}>
-              <div className='collapse collapse-arrow border border-base-300 bg-base-100 rounded-lg'>
+              <div className='collapse-arrow border-base-300 bg-base-100 collapse rounded-lg border'>
                 <input
                   type='checkbox'
                   checked={expandedId === entry.id}
                   onChange={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                 />
-                <div className='collapse-title flex items-center justify-between pe-8 py-2 px-3 min-h-0 h-auto'>
+                <div className='collapse-title flex h-auto min-h-0 items-center justify-between px-3 py-2 pe-8'>
                   <div className='min-w-0'>
-                    <p className='font-medium text-sm truncate'>{entry.term}</p>
+                    <p className='truncate text-sm font-medium'>{entry.term}</p>
                     {entry.context && (
-                      <p className='text-xs text-base-content/50 truncate mt-0.5'>
+                      <p className='text-base-content/50 mt-0.5 truncate text-xs'>
                         {entry.context.slice(0, 60)}
                         {entry.context.length > 60 ? '\u2026' : ''}
                       </p>
@@ -148,15 +153,15 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
                     if (!val) return null;
                     return (
                       <div key={field.id} className='mt-2'>
-                        <p className='text-xs font-medium uppercase tracking-wide text-base-content/50 mb-0.5'>
+                        <p className='text-base-content/50 mb-0.5 text-xs font-medium uppercase tracking-wide'>
                           {_(field.label)}
                         </p>
-                        <p className='text-sm leading-relaxed select-text'>{val}</p>
+                        <p className='select-text text-sm leading-relaxed'>{val}</p>
                       </div>
                     );
                   })}
-                  <div className='mt-3 flex justify-between items-center'>
-                    <p className='text-xs text-base-content/30'>
+                  <div className='mt-3 flex items-center justify-between'>
+                    <p className='text-base-content/30 text-xs'>
                       {new Date(entry.addedAt).toLocaleDateString()}
                     </p>
                     <button

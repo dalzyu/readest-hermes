@@ -19,6 +19,7 @@ import { useDeviceControlStore } from '@/store/deviceStore';
 import { useFoliateEvents } from '../../hooks/useFoliateEvents';
 import { useNotesSync } from '../../hooks/useNotesSync';
 import { useReadwiseSync } from '../../hooks/useReadwiseSync';
+import { useHardcoverSync } from '../../hooks/useHardcoverSync';
 import { useTextSelector } from '../../hooks/useTextSelector';
 import { Point, Position, TextSelection } from '@/utils/sel';
 import { getPopupPosition, getPosition, getTextFromRange } from '@/utils/sel';
@@ -55,6 +56,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   useNotesSync(bookKey);
   useReadwiseSync(bookKey);
+  useHardcoverSync(bookKey);
 
   const osPlatform = getOSPlatform();
   const config = getConfig(bookKey)!;
@@ -364,7 +366,11 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           getIndexFromCfi(booknote.cfi) === detail.index,
       )
       .map((annotation) => {
-        view?.addAnnotation(annotation);
+        try {
+          view?.addAnnotation(annotation);
+        } catch (err) {
+          console.warn('Failed to add annotation', { annotation, error: err });
+        }
       });
   };
 
@@ -946,7 +952,9 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     }, 100);
 
     const filename = `${makeSafeFilename(book.title)}.md`;
-    const saved = await appService?.saveFile(filename, markdownContent, 'text/markdown');
+    const saved = await appService?.saveFile(filename, markdownContent, {
+      mimeType: 'text/markdown',
+    });
     eventDispatcher.dispatch('toast', {
       type: 'info',
       message: saved ? _('Exported successfully') : _('Copied to clipboard'),

@@ -32,7 +32,7 @@ export class TTSController extends EventTarget {
   #nossmlCnt: number = 0;
   #currentSpeakAbortController: AbortController | null = null;
   #currentSpeakPromise: Promise<void> | null = null;
-  #isPreloading: boolean = false;
+
   #ttsSectionIndex: number = -1;
 
   state: TTSState = 'stopped';
@@ -261,17 +261,27 @@ export class TTSController extends EventTarget {
     const tts = this.view.tts;
     if (!tts) return;
 
-    this.#isPreloading = true;
-    const ssmls: string[] = [];
+    // Gather all next SSMLs and rewind synchronously to avoid a race condition:
+    // tts.next() replaces TTS.#ranges (used by setMark() during playback).
+    // If async gaps exist between next()/prev() calls, a concurrent #speak()
+    // can dispatch marks against the wrong #ranges, causing incorrect highlights
+    // and accidental page turns.
+    const rawSsmls: string[] = [];
     for (let i = 0; i < count; i++) {
-      const ssml = await this.#preprocessSSML(tts.next());
+      const ssml = tts.next();
+      if (!ssml) break;
+      rawSsmls.push(ssml);
+    }
+    for (let i = 0; i < rawSsmls.length; i++) {
+      tts.prev();
+    }
+
+    const ssmls: string[] = [];
+    for (const raw of rawSsmls) {
+      const ssml = await this.#preprocessSSML(raw);
       if (!ssml) break;
       ssmls.push(ssml);
     }
-    for (let i = 0; i < ssmls.length; i++) {
-      tts.prev();
-    }
-    this.#isPreloading = false;
     await Promise.all(ssmls.map((ssml) => this.preloadSSML(ssml, new AbortController().signal)));
   }
 
@@ -533,15 +543,11 @@ export class TTSController extends EventTarget {
   dispatchSpeakMark(mark?: TTSMark) {
     this.dispatchEvent(new CustomEvent('tts-speak-mark', { detail: mark || { text: '' } }));
     if (mark && mark.name !== '-1') {
-      if (this.#isPreloading) {
-        setTimeout(() => this.dispatchSpeakMark(mark), 500);
-      } else {
+      try {
         const range = this.view.tts?.setMark(mark.name);
-        try {
-          const cfi = this.view.getCFI(this.#ttsSectionIndex, range);
-          this.dispatchEvent(new CustomEvent('tts-highlight-mark', { detail: { cfi } }));
-        } catch {}
-      }
+        const cfi = this.view.getCFI(this.#ttsSectionIndex, range);
+        this.dispatchEvent(new CustomEvent('tts-highlight-mark', { detail: { cfi } }));
+      } catch {}
     }
   }
 

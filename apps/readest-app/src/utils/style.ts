@@ -128,6 +128,7 @@ const getColorStyles = (
   isEink: boolean,
 ) => {
   const { bg, fg, primary, isDarkMode } = themeCode;
+  const hasBackgroundTexture = !!backgroundTextureId && backgroundTextureId !== 'none';
   const colorStyles = `
     html {
       --bg-texture-id: ${backgroundTextureId};
@@ -153,9 +154,9 @@ const getColorStyles = (
     }
     section, aside, blockquote, article, nav, header, footer, main, figure,
     div, p, font, h1, h2, h3, h4, h5, h6, li, span {
-      ${overrideColor ? `background-color: ${bg} !important;` : ''}
-      ${overrideColor ? `color: ${fg} !important;` : ''}
-      ${overrideColor ? `border-color: ${fg} !important;` : ''}
+      ${overrideColor && !hasBackgroundTexture ? `background-color: ${bg} !important;` : ''}
+      ${overrideColor && !hasBackgroundTexture ? `color: ${fg} !important;` : ''}
+      ${overrideColor && !hasBackgroundTexture ? `border-color: ${fg} !important;` : ''}
     }
     pre, span { /* inline code blocks */
       ${overrideColor ? `background-color: ${bg} !important;` : ''}
@@ -553,8 +554,8 @@ export const getThemeCode = () => {
   if (typeof window !== 'undefined') {
     themeColor = localStorage.getItem('themeColor') || 'default';
     themeMode = localStorage.getItem('themeMode') || 'auto';
+    systemIsDarkMode = localStorage.getItem('systemIsDarkMode') === 'true';
     customThemes = JSON.parse(localStorage.getItem('customThemes') || '[]');
-    systemIsDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
   }
   const isDarkMode = themeMode === 'dark' || (themeMode === 'auto' && systemIsDarkMode);
   let currentTheme = themes.find((theme) => theme.name === themeColor);
@@ -763,6 +764,20 @@ export const transformStylesheet = (css: string, vw: number, vh: number, vertica
     return selector + block;
   });
 
+  // clip hardcoded pixel widths to available width when they exceed viewport
+  css = css.replace(ruleRegex, (match, selector, block) => {
+    const widthMatch = /(?:^|[^a-z-])width\s*:\s*(\d+(?:\.\d+)?)px/.exec(block);
+    const pxWidth = widthMatch ? parseFloat(widthMatch[1] ?? '0') : 0;
+    if (pxWidth > vw && !/max-width\s*:/.test(block)) {
+      block = block.replace(
+        /}$/,
+        ' max-width: calc(var(--available-width) * 1px); box-sizing: border-box; }',
+      );
+      return selector + block;
+    }
+    return match;
+  });
+
   // replace absolute font sizes with rem units
   // replace vw and vh as they cause problems with layout
   // replace hardcoded colors
@@ -794,9 +809,9 @@ export const transformStylesheet = (css: string, vw: number, vh: number, vertica
     .replace(/([\s;])-o-user-select\s*:\s*none/gi, '$1-o-user-select: unset')
     .replace(/([\s;])user-select\s*:\s*none/gi, '$1user-select: unset')
     .replace(/(font-family\s*:[^;]*?)\bsans-serif\b/gi, '$1READEST_SS_PLACEHOLDER')
-    .replace(/(font-family\s*:[^;]*?)\bserif\b(?!-)/gi, '$1var(--serif)')
-    .replace(/READEST_SS_PLACEHOLDER/g, 'var(--sans-serif)')
-    .replace(/(font-family\s*:[^;]*?)\bmonospace\b/gi, '$1var(--monospace)')
+    .replace(/(font-family\s*:[^;]*?)\bserif\b(?!-)/gi, '$1var(--serif, serif)')
+    .replace(/READEST_SS_PLACEHOLDER/g, 'var(--sans-serif, sans-serif)')
+    .replace(/(font-family\s*:[^;]*?)\bmonospace\b/gi, '$1var(--monospace, monospace)')
     .replace(/([\s;])font-weight\s*:\s*normal/gi, '$1font-weight: var(--font-weight)')
     .replace(/([\s;])color\s*:\s*black/gi, '$1color: var(--theme-fg-color)')
     .replace(/([\s;])color\s*:\s*#000000/gi, '$1color: var(--theme-fg-color)')
