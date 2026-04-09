@@ -58,7 +58,7 @@ describe('workflow alignment', () => {
     expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository != 'readest/readest'");
     expect(releaseWorkflow).toContain("name: upload Android apks to GitHub release (fork only)");
     expect(releaseWorkflow).toContain("name: upload desktop bundles to GitHub release (fork only)");
-    expect(releaseWorkflow).toContain("find target -type f");
+    expect(releaseWorkflow).toContain("find target -path '*/release/bundle/*' -type f");
     expect(releaseWorkflow).toContain("-name '*.AppImage'");
     expect(releaseWorkflow).toContain("-name '*.deb'");
     expect(releaseWorkflow).toContain("-name '*.dmg'");

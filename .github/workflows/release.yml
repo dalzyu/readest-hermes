@@ -384,7 +384,7 @@ jobs:
           assets=()
           while IFS= read -r -d '' asset; do
             assets+=("$asset")
-          done < <(find target -type f \( \
+          done < <(find target -path '*/release/bundle/*' -type f \( \
             -name '*.AppImage' -o \
             -name '*.deb' -o \
             -name '*.dmg' -o \
