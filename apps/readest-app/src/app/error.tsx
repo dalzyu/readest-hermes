@@ -122,7 +122,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
             <p className='text-base-content/60 text-sm'>
               {_('Need help?')}{' '}
               <a href='mailto:support@readest.com' className='link link-primary'>
-                {_('Contact Support')}
+                {_('Contact the original project support team')}
               </a>
             </p>
           </div>

@@ -626,13 +626,13 @@ const actionItems = [
   },
   {
     id: 'action.about',
-    labelKey: _('About Readest'),
-    keywords: ['about', 'readest', 'version', 'info'],
+    labelKey: _('About Hermes'),
+    keywords: ['about', 'hermes', 'version', 'info'],
   },
   {
     id: 'action.telemetry',
-    labelKey: _('Help improve Readest'),
-    keywords: ['telemetry', 'analytics', 'improve', 'statistics'],
+    labelKey: _('Help improve Hermes'),
+    keywords: ['telemetry', 'analytics', 'improve', 'statistics', 'hermes'],
   },
 ];
 

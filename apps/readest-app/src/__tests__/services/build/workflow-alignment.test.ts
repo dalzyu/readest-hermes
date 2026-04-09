@@ -12,6 +12,9 @@ const prWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pull-r
 const workspaceCargo = fs.readFileSync(path.join(repoRoot, 'Cargo.toml'), 'utf8');
 const sparseIo = fs.readFileSync(path.join(repoRoot, 'packages/turso-sync-engine/src/sparse_io.rs'), 'utf8');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8')) as {
+  productName: string;
+  mainBinaryName: string;
+  version: string;
   build: { beforeDevCommand: string; beforeBuildCommand: string };
 };
 const defaultCapability = JSON.parse(fs.readFileSync(defaultCapabilityPath, 'utf8')) as {
@@ -87,6 +90,15 @@ describe('workflow alignment', () => {
     expect(releaseWorkflow).toContain('createRelease');
     // biome-ignore lint/suspicious/noTemplateCurlyInString: testing literal JS code content in workflow file
     expect(releaseWorkflow).toContain("const tag = `v${process.env.PACKAGE_VERSION}`;");
+  });
+
+  test('Hermes release metadata stays decoupled from upstream versioning', () => {
+    expect(packageJson.version).toBe('0.0.1');
+    expect(releaseWorkflow).toContain('name: Release Hermes');
+    expect(releaseWorkflow).toContain('name: `Hermes ${process.env.PACKAGE_VERSION}`');
+    expect(tauriConfig.productName).toBe('Hermes');
+    expect(tauriConfig.mainBinaryName).toBe('hermes');
+    expect(tauriConfig.version).toBe('../package.json');
   });
 
   test('tauri hooks use the same package-manager entrypoint as local builds', () => {

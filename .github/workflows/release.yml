@@ -1,4 +1,4 @@
-name: Release Readest
+name: Release Hermes
 
 # Required secrets for this fork's release workflow:
 # - GITHUB_TOKEN (automatic)
@@ -57,7 +57,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 tag_name: tag,
-                name: `Readest ${process.env.PACKAGE_VERSION}`,
+                name: `Hermes ${process.env.PACKAGE_VERSION}`,
                 draft: false,
                 prerelease: false,
               }));
@@ -126,7 +126,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           version=${{ needs.get-release.outputs.release_version }}
-          plugin_zip="Readest-${version}-1.koplugin.zip"
+          plugin_zip="Hermes-${version}-1.koplugin.zip"
           meta_file="apps/readest.koplugin/_meta.lua"
           perl -i -pe "s/^}/    version = \"${version}\",\n}/" "${meta_file}"
 
@@ -312,8 +312,8 @@ jobs:
           popd
           version=${{ needs.get-release.outputs.release_version }}
           apk_path=src-tauri/gen/android/app/build/outputs/apk/universal/release
-          universial_apk=Readest_${version}_universal.apk
-          arm64_apk=Readest_${version}_arm64.apk
+          universial_apk=Hermes_${version}_universal.apk
+          arm64_apk=Hermes_${version}_arm64.apk
           pnpm tauri android build
           cp ${apk_path}/app-universal-release.apk $universial_apk
           pnpm tauri android build -t aarch64
@@ -335,14 +335,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd apps/readest-app/
-          curl -sL https://github.com/readest/readest/releases/latest/download/latest.json -o latest.json
+          curl -sL https://github.com/${{ github.repository }}/releases/latest/download/latest.json -o latest.json
 
           version=${{ needs.get-release.outputs.release_version }}
-          universial_apk_url="https://github.com/readest/readest/releases/download/${{ needs.get-release.outputs.release_tag }}/Readest_${version}_universal.apk"
-          arm64_apk_url="https://github.com/readest/readest/releases/download/${{ needs.get-release.outputs.release_tag }}/Readest_${version}_arm64.apk"
+          universial_apk_url="https://github.com/${{ github.repository }}/releases/download/${{ needs.get-release.outputs.release_tag }}/Hermes_${version}_universal.apk"
+          arm64_apk_url="https://github.com/${{ github.repository }}/releases/download/${{ needs.get-release.outputs.release_tag }}/Hermes_${version}_arm64.apk"
 
-          universial_sig=$(cat Readest_${version}_universal.apk.sig)
-          arm64_sig=$(cat Readest_${version}_arm64.apk.sig)
+          universial_sig=$(cat Hermes_${version}_universal.apk.sig)
+          arm64_sig=$(cat Hermes_${version}_arm64.apk.sig)
 
           jq --arg url "$universial_apk_url" \
               --arg sig "$universial_sig" \
@@ -424,7 +424,6 @@ jobs:
           args: ${{ matrix.config.args || '' }}
 
       - name: upload release notes to GitHub release
-        if: github.repository == 'readest/readest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -452,15 +451,15 @@ jobs:
           version=${{ needs.get-release.outputs.release_version }}
 
           if [ "$arch" = "x86_64" ]; then
-            bin_file="Readest_${version}_x64-portable.exe"
+            bin_file="Hermes_${version}_x64-portable.exe"
           elif [ "$arch" = "aarch64" ]; then
-            bin_file="Readest_${version}_arm64-portable.exe"
+            bin_file="Hermes_${version}_arm64-portable.exe"
           else
             echo "Unknown architecture: $arch"
             exit 1
           fi
 
-          exe_file="target/${{ matrix.config.rust_target }}/release/readest.exe"
+          exe_file="target/${{ matrix.config.rust_target }}/release/hermes.exe"
           # Browsers on Windows won't download zip files that contain exe files
           # so upload the exe files instead. This is totally stupid.
           # powershell.exe -Command "Compress-Archive -Path $exe_file -DestinationPath $bin_file -Force"
@@ -482,23 +481,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          curl -sL https://github.com/readest/readest/releases/latest/download/latest.json -o latest.json
+          curl -sL https://github.com/${{ github.repository }}/releases/latest/download/latest.json -o latest.json
 
           version=${{ needs.get-release.outputs.release_version }}
           arch=${{ matrix.config.arch }}
 
           if [ "$arch" = "x86_64" ]; then
-            bin_file="Readest_${version}_x64-portable.exe"
+            bin_file="Hermes_${version}_x64-portable.exe"
             platform_key="windows-x86_64-portable"
           elif [ "$arch" = "aarch64" ]; then
-            bin_file="Readest_${version}_arm64-portable.exe"
+            bin_file="Hermes_${version}_arm64-portable.exe"
             platform_key="windows-aarch64-portable"
           else
             echo "Unknown architecture: $arch"
             exit 1
           fi
 
-          portable_url="https://github.com/readest/readest/releases/download/${{ needs.get-release.outputs.release_tag }}/$bin_file"
+          portable_url="https://github.com/${{ github.repository }}/releases/download/${{ needs.get-release.outputs.release_tag }}/$bin_file"
           portable_sig=$(cat $bin_file.sig)
 
           jq --arg url "$portable_url" \

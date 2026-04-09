@@ -1,5 +1,13 @@
 {
   "releases": {
+    "0.0.1": {
+      "date": "2026-04-10",
+      "notes": [
+        "Hermes now starts its own independent version line at 0.0.1",
+        "Release naming and visible app branding now identify the app as Hermes",
+        "Links to upstream Readest resources are labeled as the original project"
+      ]
+    },
     "0.10.4": {
       "date": "2026-04-06",
       "notes": [
