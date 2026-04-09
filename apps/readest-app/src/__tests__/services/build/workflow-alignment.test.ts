@@ -9,7 +9,8 @@ const defaultCapabilityPath = path.resolve(import.meta.dirname, '../../../../src
 const desktopCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/desktop.json');
 const releaseWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8');
 const prWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pull-request.yml'), 'utf8');
-const tauriCargo = fs.readFileSync(path.resolve(import.meta.dirname, '../../../../src-tauri/Cargo.toml'), 'utf8');
+const workspaceCargo = fs.readFileSync(path.join(repoRoot, 'Cargo.toml'), 'utf8');
+const sparseIo = fs.readFileSync(path.join(repoRoot, 'packages/turso-sync-engine/src/sparse_io.rs'), 'utf8');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8')) as {
   build: { beforeDevCommand: string; beforeBuildCommand: string };
 };
@@ -75,9 +76,10 @@ describe('workflow alignment', () => {
     );
   });
 
-  test('src-tauri pins the stable turso crate line', () => {
-    expect(tauriCargo).toContain('turso = "=0.5.3"');
-    expect(tauriCargo).toContain('turso_core = "=0.5.3"');
+  test('workspace patches turso_sync_engine to the local armhf-safe fork', () => {
+    expect(workspaceCargo).toContain('turso_sync_engine = { path = "packages/turso-sync-engine" }');
+    expect(sparseIo).toContain('pos as libc::off_t');
+    expect(sparseIo).toContain('len as libc::off_t');
   });
 
   test('workflow dispatch can create a release when the fork has no existing release object', () => {
