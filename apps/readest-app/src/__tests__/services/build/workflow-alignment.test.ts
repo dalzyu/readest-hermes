@@ -5,10 +5,18 @@ import packageJson from '../../../../package.json';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../../../../..');
 const tauriConfigPath = path.resolve(import.meta.dirname, '../../../../src-tauri/tauri.conf.json');
+const defaultCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/default.json');
+const desktopCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/desktop.json');
 const releaseWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8');
 const prWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pull-request.yml'), 'utf8');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8')) as {
   build: { beforeDevCommand: string; beforeBuildCommand: string };
+};
+const defaultCapability = JSON.parse(fs.readFileSync(defaultCapabilityPath, 'utf8')) as {
+  permissions: Array<string | { identifier: string }>;
+};
+const desktopCapability = JSON.parse(fs.readFileSync(desktopCapabilityPath, 'utf8')) as {
+  permissions: Array<string | { identifier: string }>;
 };
 const prLines = prWorkflow.split('\n').map((line) => line.trim());
 const releaseLines = releaseWorkflow.split('\n').map((line) => line.trim());
@@ -40,16 +48,22 @@ describe('workflow alignment', () => {
     expect(packageJson.scripts['build-macos-universal']).toContain('universal-apple-darwin');
   });
 
+  test('desktop-only permissions stay out of the shared capability set', () => {
+    expect(defaultCapability.permissions).not.toContain('turso:default');
+    expect(desktopCapability.permissions).toContain('turso:default');
+  });
+
   test('fork release workflow uses unsigned local packaging instead of release uploads', () => {
     expect(releaseWorkflow).toContain("if: matrix.config.release == 'android' && github.repository != 'readest/readest'");
     expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository != 'readest/readest'");
     expect(releaseWorkflow).toContain("name: upload Android apks to GitHub release (fork only)");
     expect(releaseWorkflow).toContain("name: upload desktop bundles to GitHub release (fork only)");
-    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.AppImage");
-    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.deb");
-    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.dmg");
-    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.exe");
-    expect(releaseWorkflow).toContain("target/**/release/bundle/**/*.msi");
+    expect(releaseWorkflow).toContain("find target -type f");
+    expect(releaseWorkflow).toContain("-name '*.AppImage'");
+    expect(releaseWorkflow).toContain("-name '*.deb'");
+    expect(releaseWorkflow).toContain("-name '*.dmg'");
+    expect(releaseWorkflow).toContain("-name '*.exe'");
+    expect(releaseWorkflow).toContain("-name '*.msi'");
     expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository == 'readest/readest'");
     expect(releaseWorkflow).toContain("if: github.repository == 'readest/readest'");
   });

@@ -381,14 +381,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          shopt -s globstar nullglob
-          assets=(
-            target/**/release/bundle/**/*.AppImage
-            target/**/release/bundle/**/*.deb
-            target/**/release/bundle/**/*.dmg
-            target/**/release/bundle/**/*.exe
-            target/**/release/bundle/**/*.msi
-          )
+          assets=()
+          while IFS= read -r -d '' asset; do
+            assets+=("$asset")
+          done < <(find target -type f \( \
+            -name '*.AppImage' -o \
+            -name '*.deb' -o \
+            -name '*.dmg' -o \
+            -name '*.exe' -o \
+            -name '*.msi' \
+          \) -print0)
           uploaded=0
           for asset in "${assets[@]}"; do
             [ -f "$asset" ] || continue
