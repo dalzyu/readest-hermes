@@ -37,7 +37,6 @@ import AnnotationRangeEditor from './AnnotationRangeEditor';
 import AnnotationPopup from './AnnotationPopup';
 import WiktionaryPopup from './WiktionaryPopup';
 import WikipediaPopup from './WikipediaPopup';
-import TranslatorPopup from './TranslatorPopup';
 import ContextTranslationPopup from './ContextTranslationPopup';
 import ContextDictionaryPopup from './ContextDictionaryPopup';
 import useShortcuts from '@/hooks/useShortcuts';
@@ -72,14 +71,12 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const [showAnnotPopup, setShowAnnotPopup] = useState(false);
   const [showWiktionaryPopup, setShowWiktionaryPopup] = useState(false);
   const [showWikipediaPopup, setShowWikipediaPopup] = useState(false);
-  const [showDeepLPopup, setShowDeepLPopup] = useState(false);
   const [showProofreadPopup, setShowProofreadPopup] = useState(false);
   const [showContextTranslationPopup, setShowContextTranslationPopup] = useState(false);
   const [showContextDictionaryPopup, setShowContextDictionaryPopup] = useState(false);
   const [trianglePosition, setTrianglePosition] = useState<Position>();
   const [annotPopupPosition, setAnnotPopupPosition] = useState<Position>();
   const [dictPopupPosition, setDictPopupPosition] = useState<Position>();
-  const [translatorPopupPosition, setTranslatorPopupPosition] = useState<Position>();
   const [proofreadPopupPosition, setProofreadPopupPosition] = useState<Position>();
   const [contextTranslationPopupPosition, setContextTranslationPopupPosition] =
     useState<Position>();
@@ -107,7 +104,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     showAnnotPopup ||
     showWiktionaryPopup ||
     showWikipediaPopup ||
-    showDeepLPopup ||
     showProofreadPopup ||
     showContextTranslationPopup ||
     showContextDictionaryPopup;
@@ -118,8 +114,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const maxHeight = window.innerHeight - 2 * popupPadding;
   const dictPopupWidth = Math.min(480, maxWidth);
   const dictPopupHeight = Math.min(300, maxHeight);
-  const transPopupWidth = Math.min(480, maxWidth);
-  const transPopupHeight = Math.min(265, maxHeight);
   const proofreadPopupWidth = Math.min(440, maxWidth);
   const proofreadPopupHeight = Math.min(200, maxHeight);
   const ctxTransPopupWidth = Math.min(600, maxWidth);
@@ -155,13 +149,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       dictPopupHeight,
       popupPadding,
     );
-    const transPopupPos = getPopupPosition(
-      triangPos,
-      rect,
-      transPopupWidth,
-      transPopupHeight,
-      popupPadding,
-    );
     const proofreadPopupPos = getPopupPosition(
       triangPos,
       rect,
@@ -186,7 +173,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     if (triangPos.point.x == 0 || triangPos.point.y == 0) return;
     setAnnotPopupPosition(annotPopupPos);
     setDictPopupPosition(dictPopupPos);
-    setTranslatorPopupPosition(transPopupPos);
     setProofreadPopupPosition(proofreadPopupPos);
     setContextTranslationPopupPosition(ctxTransPopupPos);
     setContextDictionaryPopupPosition(ctxDictPopupPos);
@@ -230,7 +216,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       setShowAnnotPopup(false);
       setShowWiktionaryPopup(false);
       setShowWikipediaPopup(false);
-      setShowDeepLPopup(false);
       setShowProofreadPopup(false);
       setShowContextTranslationPopup(false);
       setShowContextDictionaryPopup(false);
@@ -334,9 +319,9 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
                 cfi: view?.getCFI(index, range),
                 page: index + 1,
               });
-              // Show translation popup preferentially for PDF right-click
+              // Show context translation popup for PDF right-click
               setShowAnnotPopup(false);
-              setShowDeepLPopup(true);
+              setShowContextTranslationPopup(true);
               setShowWiktionaryPopup(false);
               setShowWikipediaPopup(false);
             }
@@ -579,13 +564,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         dictPopupHeight,
         popupPadding,
       );
-      const transPopupPos = getPopupPosition(
-        triangPos,
-        rect,
-        transPopupWidth,
-        transPopupHeight,
-        popupPadding,
-      );
       const proofreadPopupPos = getPopupPosition(
         triangPos,
         rect,
@@ -610,7 +588,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       if (triangPos.point.x == 0 || triangPos.point.y == 0) return;
       setAnnotPopupPosition(annotPopupPos);
       setDictPopupPosition(dictPopupPos);
-      setTranslatorPopupPosition(transPopupPos);
       setProofreadPopupPosition(proofreadPopupPos);
       setContextTranslationPopupPosition(ctxTransPopupPos);
       setContextDictionaryPopupPosition(ctxDictPopupPos);
@@ -671,7 +648,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       containerRef.current?.focus();
     }
     setShowAnnotPopup(true);
-    setShowDeepLPopup(false);
     setShowWiktionaryPopup(false);
     setShowWikipediaPopup(false);
   };
@@ -815,8 +791,17 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   const handleTranslation = () => {
     if (!selection || !selection.text) return;
+    if (!settings.globalReadSettings.contextTranslation?.enabled) {
+      eventDispatcher.dispatch('toast', {
+        type: 'info',
+        message: _('Enable Context-Aware Translation in Settings → AI Translate.'),
+        timeout: 3000,
+      });
+      handleDismissPopup();
+      return;
+    }
     setShowAnnotPopup(false);
-    setShowDeepLPopup(true);
+    setShowContextTranslationPopup(true);
   };
 
   const handleContextTranslation = () => {
@@ -1052,16 +1037,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           trianglePosition={trianglePosition}
           popupWidth={dictPopupWidth}
           popupHeight={dictPopupHeight}
-          onDismiss={handleDismissPopupAndSelection}
-        />
-      )}
-      {showDeepLPopup && trianglePosition && translatorPopupPosition && (
-        <TranslatorPopup
-          text={selection?.text as string}
-          position={translatorPopupPosition}
-          trianglePosition={trianglePosition}
-          popupWidth={transPopupWidth}
-          popupHeight={transPopupHeight}
           onDismiss={handleDismissPopupAndSelection}
         />
       )}

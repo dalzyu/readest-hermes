@@ -237,12 +237,14 @@ export const useTextSelector = (
     // Set isPopuped immediately so outside-click dismissal works right away
     isPopuped.current = showPopup;
     if (showPopup) {
-      // Only defer clearing isUpToPopup flag
+      // Unconditionally clear the isUpToPopup guard after a short settle
+      // period. On platforms where text selection is a long-hold gesture,
+      // the corresponding iframe-single-click event is suppressed, leaving
+      // isUpToPopup === true. Without this clear the first tap outside the
+      // popup is swallowed instead of dismissing it.
       setTimeout(() => {
-        if (!isPopuped.current) {
-          isUpToPopup.current = false;
-        }
-      }, 500);
+        isUpToPopup.current = false;
+      }, 300);
     }
   };
 

@@ -316,7 +316,7 @@ describe('LangPanel', () => {
     cleanup();
   });
 
-  test('Language tab has built-in Translation section but not AI context-translation section', async () => {
+  test('Language tab does not contain the inline Translation section (moved to AITranslatePanel)', async () => {
     // Use importActual to get the real LangPanel (bypassing the module-level mock)
     const { default: RealLangPanel } = await vi.importActual<{
       default: React.ComponentType<{ bookKey: string; onRegisterReset: (fn: () => void) => void }>;
@@ -324,13 +324,13 @@ describe('LangPanel', () => {
 
     render(<RealLangPanel bookKey='test' onRegisterReset={() => {}} />);
 
-    // Built-in translation section IS in LangPanel
+    // Inline translation section was removed from LangPanel (it now lives in AITranslatePanel)
     const translationSection = document.querySelector(
       '[data-setting-id="settings.language.translationEnabled"]',
     );
-    expect(translationSection).not.toBeNull();
+    expect(translationSection).toBeNull();
 
-    // AI context-translation section should NOT be in LangPanel (it lives in AIPanel)
+    // AI context-translation section should also NOT be in LangPanel (it lives in AIPanel)
     const aiTranslationSection = document.querySelector(
       '[data-setting-id="settings.ai.contextTranslation"]',
     );

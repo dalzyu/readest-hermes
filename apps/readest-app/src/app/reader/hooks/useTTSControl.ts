@@ -421,7 +421,14 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
 
   // handleTTSSpeak / handleTTSStop (plain functions, registered once at mount via closure)
   const handleTTSSpeak = async (event: CustomEvent) => {
-    const { bookKey: ttsBookKey, range, index, oneTime = false, text: speakText } = event.detail;
+    const {
+      bookKey: ttsBookKey,
+      range,
+      index,
+      oneTime = false,
+      text: speakText,
+      lang: overrideLang,
+    } = event.detail;
     if (bookKey !== ttsBookKey) return;
     // Guard against concurrent starts (e.g. rapid double-clicks on the TTS
     // icon). Without this, both invocations race past the `await`s below and
@@ -511,7 +518,9 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
                 ? view.tts?.from(ttsFromRange)
                 : view.tts?.start();
         if (ssml) {
-          const lang = parseSSMLLang(ssml, primaryLang) || 'en';
+          // Use explicit language override when provided (e.g. from translation popup
+          // speaking target-language text), otherwise detect from SSML / book metadata.
+          const lang = (overrideLang as string) || parseSSMLLang(ssml, primaryLang) || 'en';
           setIsPlaying(true);
           setTtsLang(lang);
 
