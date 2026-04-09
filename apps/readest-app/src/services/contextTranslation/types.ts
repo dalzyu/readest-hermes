@@ -116,6 +116,8 @@ export interface PopupContextBundle {
 export interface ContextDictionarySettings {
   enabled: boolean;
   sourceExamples: boolean;
+  /** Lookup backend: 'ai' uses the LLM (default); 'dictionary' uses bundled/user dictionaries. */
+  source?: 'ai' | 'dictionary';
   /** Custom prompt instructions keyed by field id (e.g. 'simpleDefinition'). Overrides defaults. */
   promptInstructions?: Record<string, string>;
 }
