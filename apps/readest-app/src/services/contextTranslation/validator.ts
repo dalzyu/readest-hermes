@@ -32,9 +32,17 @@ export function validateLookupResult(
 
   // Skip echo warning when source and target are the same language, since identical
   // translations are expected for proper nouns, loanwords, and single-char CJK.
-  const isSameLanguage = sourceLanguage !== undefined && targetLanguage !== undefined && sourceLanguage === targetLanguage;
+  const isSameLanguage =
+    sourceLanguage !== undefined &&
+    targetLanguage !== undefined &&
+    sourceLanguage === targetLanguage;
 
-  if (!isSameLanguage && selectedText !== undefined && value === selectedText && selectedText.length > 1) {
+  if (
+    !isSameLanguage &&
+    selectedText !== undefined &&
+    value === selectedText &&
+    selectedText.length > 1
+  ) {
     return {
       decision: 'accept-with-warning',
       reason: 'Translation echoes the source text (possible proper noun or untranslated term)',

@@ -415,9 +415,7 @@ export async function lookupDefinitions(
 
   const allUser = await getUserDictionaryMeta();
 
-  const allDicts: UserDictionary[] = [...allBundled, ...allUser].filter(
-    (d) => d.enabled !== false,
-  );
+  const allDicts: UserDictionary[] = [...allBundled, ...allUser].filter((d) => d.enabled !== false);
 
   // Filter to matching dictionaries
   const matching = allDicts.filter((d) => {

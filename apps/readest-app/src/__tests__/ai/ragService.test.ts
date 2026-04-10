@@ -157,12 +157,9 @@ describe('ragService', () => {
 
     await boundedHybridSearch('book-hash', 'query text', settings, 3, { maxPage: 7, minPage: 2 });
 
-    expect(mockHybridSearch).toHaveBeenCalledWith(
-      'book-hash',
-      [0.1, 0.2],
-      'query text',
-      3,
-      { maxPage: 7, minPage: 2 },
-    );
+    expect(mockHybridSearch).toHaveBeenCalledWith('book-hash', [0.1, 0.2], 'query text', 3, {
+      maxPage: 7,
+      minPage: 2,
+    });
   });
 });

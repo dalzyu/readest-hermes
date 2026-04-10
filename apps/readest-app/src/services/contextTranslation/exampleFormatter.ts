@@ -60,20 +60,22 @@ function toHanyuPinyin(text: string): string {
  * - `1. 中文句子 English: xxx` → `\n1. 中文句子\nEnglish: xxx` (number separated)
  */
 function normalizeExampleLayout(examples: string): string {
-  return examples
-    .replace(/\r\n?/g, '\n')
-    // Force newline before Pinyin: even without preceding whitespace
-    .replace(/([^\n])Pinyin:\s*/gu, '$1\nPinyin: ')
-    .replace(/^Pinyin:\s*/gu, 'Pinyin: ')
-    // Force newline before English: even without preceding whitespace
-    .replace(/([^\n])English:\s*/gu, '$1\nEnglish: ')
-    .replace(/^English:\s*/gu, 'English: ')
-    // Force newline before Chinese: even without preceding whitespace
-    .replace(/([^\n])Chinese:\s*/gu, '$1\nChinese: ')
-    .replace(/^Chinese:\s*/gu, 'Chinese: ')
-    // Separate numbered examples with blank lines
-    .replace(/\s*(\d+\.\s)/gu, '\n\n$1')
-    .trim();
+  return (
+    examples
+      .replace(/\r\n?/g, '\n')
+      // Force newline before Pinyin: even without preceding whitespace
+      .replace(/([^\n])Pinyin:\s*/gu, '$1\nPinyin: ')
+      .replace(/^Pinyin:\s*/gu, 'Pinyin: ')
+      // Force newline before English: even without preceding whitespace
+      .replace(/([^\n])English:\s*/gu, '$1\nEnglish: ')
+      .replace(/^English:\s*/gu, 'English: ')
+      // Force newline before Chinese: even without preceding whitespace
+      .replace(/([^\n])Chinese:\s*/gu, '$1\nChinese: ')
+      .replace(/^Chinese:\s*/gu, 'Chinese: ')
+      // Separate numbered examples with blank lines
+      .replace(/\s*(\d+\.\s)/gu, '\n\n$1')
+      .trim()
+  );
 }
 
 function formatExampleBlock(

@@ -98,7 +98,9 @@ describe('getContextDictionaryOutputFields', () => {
     const fields = getContextDictionaryOutputFields(DEFAULT_CONTEXT_DICTIONARY_SETTINGS);
     expect(fields).toHaveLength(DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS.length);
     fields.forEach((f, i) => {
-      expect(f.promptInstruction).toBe(DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS[i]!.promptInstruction);
+      expect(f.promptInstruction).toBe(
+        DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS[i]!.promptInstruction,
+      );
     });
   });
 

@@ -23,7 +23,11 @@ export function useOpenAIInNotebook() {
       if (options?.conversationId) {
         // Load existing conversation
         await setActiveConversation(options.conversationId);
-      } else if (options?.bookHash && options?.newConversationTitle && options?.firstMessageContent) {
+      } else if (
+        options?.bookHash &&
+        options?.newConversationTitle &&
+        options?.firstMessageContent
+      ) {
         await createConversationWithFirstMessage(
           options.bookHash,
           options.newConversationTitle,

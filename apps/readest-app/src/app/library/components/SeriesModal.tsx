@@ -47,7 +47,10 @@ const SeriesModal: React.FC = () => {
 
     const states = Object.fromEntries(
       await Promise.all(
-        series.volumes.map(async (volume) => [volume.bookHash, await aiStore.isIndexed(volume.bookHash)]),
+        series.volumes.map(async (volume) => [
+          volume.bookHash,
+          await aiStore.isIndexed(volume.bookHash),
+        ]),
       ),
     );
     setIndexStates(states);
@@ -157,10 +160,10 @@ const SeriesModal: React.FC = () => {
           <PiX size={16} />
         </button>
         <h3 className='mb-1 text-base font-bold'>{_('Manage Series')}</h3>
-        <p className='mb-4 truncate text-sm text-base-content/60'>{bookTitle}</p>
+        <p className='text-base-content/60 mb-4 truncate text-sm'>{bookTitle}</p>
 
         {currentSeries && (
-          <section className='mb-4 rounded-xl border border-base-300 p-3'>
+          <section className='border-base-300 mb-4 rounded-xl border p-3'>
             <div className='mb-3 flex items-center gap-2'>
               <h4 className='text-sm font-semibold'>{currentSeries.name}</h4>
               <button className='btn btn-ghost btn-xs ml-auto' onClick={handleRemoveFromSeries}>
@@ -182,7 +185,7 @@ const SeriesModal: React.FC = () => {
                 return (
                   <li
                     key={volume.bookHash}
-                    className='grid grid-cols-[64px,1fr,auto] items-center gap-2 rounded-lg border border-base-300 px-2 py-2'
+                    className='border-base-300 grid grid-cols-[64px,1fr,auto] items-center gap-2 rounded-lg border px-2 py-2'
                   >
                     <input
                       type='number'
@@ -202,9 +205,11 @@ const SeriesModal: React.FC = () => {
                         aria-label={_('Volume label for {{title}}', {
                           title: book?.title || volume.bookHash,
                         })}
-                        onBlur={(event) => handleVolumeLabelBlur(volume.bookHash, event.target.value)}
+                        onBlur={(event) =>
+                          handleVolumeLabelBlur(volume.bookHash, event.target.value)
+                        }
                       />
-                      <div className='truncate text-xs text-base-content/60'>
+                      <div className='text-base-content/60 truncate text-xs'>
                         {book?.title || volume.bookHash}
                       </div>
                     </div>
@@ -222,21 +227,26 @@ const SeriesModal: React.FC = () => {
           </section>
         )}
 
-        <p className='mb-2 text-xs font-medium uppercase tracking-wide text-base-content/50'>
+        <p className='text-base-content/50 mb-2 text-xs font-medium uppercase tracking-wide'>
           {_('Existing Series')}
         </p>
         {allSeries.length === 0 && !creating && (
-          <p className='mb-3 text-sm text-base-content/40'>{_('No series yet.')}</p>
+          <p className='text-base-content/40 mb-3 text-sm'>{_('No series yet.')}</p>
         )}
         <ul className='mb-3 space-y-1'>
           {allSeries.map((series) => (
             <li
               key={series.id}
-              className='flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-base-200'
+              className='hover:bg-base-200 flex items-center justify-between rounded-lg px-2 py-1.5'
             >
-              <button className='flex-1 text-left text-sm' onClick={() => handleAddToSeries(series.id)}>
+              <button
+                className='flex-1 text-left text-sm'
+                onClick={() => handleAddToSeries(series.id)}
+              >
                 {series.name}
-                {currentSeries?.id === series.id && <span className='ml-2 text-xs text-success'>&#10003;</span>}
+                {currentSeries?.id === series.id && (
+                  <span className='text-success ml-2 text-xs'>&#10003;</span>
+                )}
               </button>
               <button
                 className='btn btn-ghost btn-xs text-error'

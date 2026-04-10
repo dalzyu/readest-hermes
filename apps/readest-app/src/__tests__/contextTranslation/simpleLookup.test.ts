@@ -2,9 +2,9 @@ import { describe, expect, test, vi } from 'vitest';
 import { runSimpleLookup } from '@/services/contextTranslation/simpleLookup';
 import type { ContextLookupRequest } from '@/services/contextTranslation/contextLookupService';
 
-const mockLookupDefinitions = vi.fn().mockResolvedValue([
-  { headword: 'hello', definition: 'a greeting' },
-]);
+const mockLookupDefinitions = vi
+  .fn()
+  .mockResolvedValue([{ headword: 'hello', definition: 'a greeting' }]);
 vi.mock('@/services/contextTranslation/dictionaryService', () => ({
   lookupDefinitions: (...args: unknown[]) => mockLookupDefinitions(...args),
 }));

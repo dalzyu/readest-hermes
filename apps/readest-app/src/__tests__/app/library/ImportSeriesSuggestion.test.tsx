@@ -226,11 +226,9 @@ vi.mock('@/components/Toast', () => ({
 }));
 
 vi.mock('@/app/library/components/LibraryHeader', () => ({
-  default: ({
-    onImportBooksFromFiles,
-  }: {
-    onImportBooksFromFiles: () => void;
-  }) => <button onClick={onImportBooksFromFiles}>Import Books</button>,
+  default: ({ onImportBooksFromFiles }: { onImportBooksFromFiles: () => void }) => (
+    <button onClick={onImportBooksFromFiles}>Import Books</button>
+  ),
 }));
 
 vi.mock('@/app/library/components/Bookshelf', () => ({
@@ -262,7 +260,9 @@ vi.mock('@/app/library/components/TransferQueuePanel', () => ({
 }));
 
 vi.mock('overlayscrollbars-react', () => ({
-  OverlayScrollbarsComponent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  OverlayScrollbarsComponent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 vi.mock('@/services/contextTranslation/seriesService', () => ({

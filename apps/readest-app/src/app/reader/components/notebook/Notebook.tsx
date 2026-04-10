@@ -342,10 +342,7 @@ const Notebook: React.FC = ({}) => {
           </div>
         ) : notebookActiveTab === 'vocabulary' ? (
           <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-            <VocabularyPanel
-              bookKey={sideBarBookKey}
-              bookHash={bookData.book?.hash ?? ''}
-            />
+            <VocabularyPanel bookKey={sideBarBookKey} bookHash={bookData.book?.hash ?? ''} />
           </div>
         ) : (
           <div className='flex-grow overflow-y-auto px-3'>

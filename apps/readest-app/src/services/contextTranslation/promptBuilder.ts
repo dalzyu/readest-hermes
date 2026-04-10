@@ -138,8 +138,9 @@ function buildDictionaryPrompt(request: LookupPromptRequest): {
   const enabledFields = getContextDictionaryOutputFields(dictionarySettings)
     .filter((field) => field.enabled)
     .sort((a, b) => a.order - b.order);
-  const sourceLanguage =
-    request.sourceLanguage ? languageName(request.sourceLanguage) : 'the source language';
+  const sourceLanguage = request.sourceLanguage
+    ? languageName(request.sourceLanguage)
+    : 'the source language';
   const orderedFieldIds = enabledFields.map((field) => field.id).join(', ');
 
   const fieldInstructions = enabledFields

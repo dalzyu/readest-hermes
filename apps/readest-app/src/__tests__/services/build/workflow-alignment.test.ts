@@ -7,6 +7,10 @@ const repoRoot = path.resolve(import.meta.dirname, '../../../../../..');
 const tauriConfigPath = path.resolve(import.meta.dirname, '../../../../src-tauri/tauri.conf.json');
 const defaultCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/default.json');
 const desktopCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/desktop.json');
+const webdriverCapabilityPath = path.resolve(
+  import.meta.dirname,
+  '../../../../src-tauri/capabilities-extra/webdriver.json',
+);
 const releaseWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8');
 const prWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pull-request.yml'), 'utf8');
 const workspaceCargo = fs.readFileSync(path.join(repoRoot, 'Cargo.toml'), 'utf8');
@@ -16,12 +20,16 @@ const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8')) as {
   mainBinaryName: string;
   version: string;
   build: { beforeDevCommand: string; beforeBuildCommand: string };
+  app: { security: { assetProtocol: { scope: { allow: string[] } } } };
 };
 const defaultCapability = JSON.parse(fs.readFileSync(defaultCapabilityPath, 'utf8')) as {
   permissions: Array<string | { identifier: string }>;
 };
 const desktopCapability = JSON.parse(fs.readFileSync(desktopCapabilityPath, 'utf8')) as {
   permissions: Array<string | { identifier: string }>;
+};
+const webdriverCapability = JSON.parse(fs.readFileSync(webdriverCapabilityPath, 'utf8')) as {
+  permissions: Array<string | { identifier: string; allow?: Array<{ path: string }> }>;
 };
 const prLines = prWorkflow.split('\n').map((line) => line.trim());
 const releaseLines = releaseWorkflow.split('\n').map((line) => line.trim());
@@ -107,5 +115,19 @@ describe('workflow alignment', () => {
   test('tauri hooks use the same package-manager entrypoint as local builds', () => {
     expect(tauriConfig.build.beforeDevCommand).toBe('corepack pnpm dev');
     expect(tauriConfig.build.beforeBuildCommand).toBe('corepack pnpm build');
+  });
+
+  test('desktop tauri scopes preserve legacy Readest paths and webdriver fixture access', () => {
+    expect(tauriConfig.app.security.assetProtocol.scope.allow).toContain('**/Readest/**/*');
+
+    const webdriverFsScope = webdriverCapability.permissions.find(
+      (permission): permission is { identifier: string; allow: Array<{ path: string }> } =>
+        typeof permission !== 'string' && permission.identifier === 'fs:scope',
+    );
+
+    expect(webdriverFsScope?.allow.map((entry) => entry.path)).toContain(
+      '**/src/__tests__/fixtures/data/**/*',
+    );
+    expect(webdriverCapability.permissions).toContain('fs:allow-open');
   });
 });

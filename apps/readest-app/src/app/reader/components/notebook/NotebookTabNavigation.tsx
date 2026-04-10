@@ -21,8 +21,7 @@ const NotebookTabNavigation: React.FC<NotebookTabNavigationProps> = ({
   const { settings } = useSettingsStore();
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
 
-  const ctxEnabled =
-    settings?.globalReadSettings?.contextTranslation?.enabled ?? false;
+  const ctxEnabled = settings?.globalReadSettings?.contextTranslation?.enabled ?? false;
   const tabs: NotebookTab[] = aiEnabled
     ? ctxEnabled
       ? ['notes', 'ai', 'vocabulary']

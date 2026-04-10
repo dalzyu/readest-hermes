@@ -29,7 +29,9 @@ export interface LegacyBookSeriesRecord {
   updatedAt: number;
 }
 
-function isLegacySeriesRecord(value: BookSeries | LegacyBookSeriesRecord): value is LegacyBookSeriesRecord {
+function isLegacySeriesRecord(
+  value: BookSeries | LegacyBookSeriesRecord,
+): value is LegacyBookSeriesRecord {
   return 'bookHashes' in value;
 }
 
@@ -671,7 +673,9 @@ class AIStore {
 
   async getSeriesForBook(bookHash: string): Promise<BookSeries | null> {
     const all = await this.getAllSeries();
-    return all.find((series) => series.volumes.some((volume) => volume.bookHash === bookHash)) || null;
+    return (
+      all.find((series) => series.volumes.some((volume) => volume.bookHash === bookHash)) || null
+    );
   }
 
   async deleteSeries(id: string): Promise<void> {

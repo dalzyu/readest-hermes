@@ -1,5 +1,10 @@
 import type { LanguageModel } from 'ai';
-import type { ContextDictionarySettings, TranslationRequest, TranslationResult, TranslationStreamResult } from './types';
+import type {
+  ContextDictionarySettings,
+  TranslationRequest,
+  TranslationResult,
+  TranslationStreamResult,
+} from './types';
 import type { ContextLookupMode } from './modes';
 import { formatTranslationResult } from './exampleFormatter';
 import { buildTranslationPrompt, buildLookupPrompt } from './promptBuilder';
@@ -66,7 +71,10 @@ export type LookupStreamResult = {
  * then uses <lookup_json> for the authoritative final parse.
  */
 export async function* streamLookupWithContext(
-  request: TranslationRequest & { mode: ContextLookupMode; dictionarySettings?: ContextDictionarySettings },
+  request: TranslationRequest & {
+    mode: ContextLookupMode;
+    dictionarySettings?: ContextDictionarySettings;
+  },
   model: LanguageModel,
   abortSignal?: AbortSignal,
 ): AsyncGenerator<LookupStreamResult> {
@@ -76,7 +84,9 @@ export async function* streamLookupWithContext(
   });
   const streamFields =
     request.mode === 'dictionary'
-      ? getContextDictionaryOutputFields(request.dictionarySettings ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS)
+      ? getContextDictionaryOutputFields(
+          request.dictionarySettings ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+        )
       : request.outputFields;
   let rawText = '';
 

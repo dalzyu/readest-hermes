@@ -33,9 +33,7 @@ function trimToTokenCount(text: string, tokenCount: number): string {
     return text.trim();
   }
 
-  return text
-    .slice(0, lastMatch.index + lastMatch[0].length)
-    .trim();
+  return text.slice(0, lastMatch.index + lastMatch[0].length).trim();
 }
 
 function splitCurrentPageText(currentPageText: string, selectedText: string) {
@@ -69,7 +67,10 @@ export function assemblePopupLocalContext(
   const eligiblePages = [...pages]
     .filter((page) => page.pageNumber <= options.currentPage)
     .sort((a, b) => a.pageNumber - b.pageNumber);
-  const effectivePages = eligiblePages.length > 0 ? eligiblePages : [...pages].sort((a, b) => a.pageNumber - b.pageNumber);
+  const effectivePages =
+    eligiblePages.length > 0
+      ? eligiblePages
+      : [...pages].sort((a, b) => a.pageNumber - b.pageNumber);
   const windowPages = effectivePages.slice(-options.windowSize);
   const currentPageContent = windowPages[windowPages.length - 1];
 
@@ -81,7 +82,10 @@ export function assemblePopupLocalContext(
     };
   }
 
-  const { pastText, futureText } = splitCurrentPageText(currentPageContent.text, options.selectedText);
+  const { pastText, futureText } = splitCurrentPageText(
+    currentPageContent.text,
+    options.selectedText,
+  );
   const earlierPages = windowPages
     .filter((page) => page.pageNumber < currentPageContent.pageNumber)
     .map((page) => page.text.trim())

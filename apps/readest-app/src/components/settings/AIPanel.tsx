@@ -1,11 +1,6 @@
 import clsx from 'clsx';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  PiCheckCircle,
-  PiWarningCircle,
-  PiArrowsClockwise,
-  PiSpinner,
-} from 'react-icons/pi';
+import { PiCheckCircle, PiWarningCircle, PiArrowsClockwise, PiSpinner } from 'react-icons/pi';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';

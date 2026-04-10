@@ -711,7 +711,8 @@ export const DOWNLOAD_READEST_URL = 'https://readest.com?utm_source=hermes_app';
 export const READEST_WEB_BASE_URL = 'https://web.readest.com';
 export const READEST_NODE_BASE_URL = 'https://node.readest.com';
 
-const LATEST_DOWNLOAD_BASE_URL = 'https://github.com/dalzyu/readest-hermes/releases/latest/download';
+const LATEST_DOWNLOAD_BASE_URL =
+  'https://github.com/dalzyu/readest-hermes/releases/latest/download';
 
 export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 

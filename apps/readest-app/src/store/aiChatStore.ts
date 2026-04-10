@@ -8,12 +8,10 @@ interface AIChatState {
   messages: AIMessage[];
   isLoadingHistory: boolean;
   currentBookHash: string | null;
-  pendingSeedMessage:
-    | {
-        conversationId: string;
-        content: string;
-      }
-    | null;
+  pendingSeedMessage: {
+    conversationId: string;
+    content: string;
+  } | null;
 
   loadConversations: (bookHash: string) => Promise<void>;
   setActiveConversation: (id: string | null) => Promise<void>;

@@ -15,7 +15,10 @@ import type { BookSeries } from '@/services/contextTranslation/types';
 
 export async function loadSeriesIndexStates(series: BookSeries): Promise<Record<string, boolean>> {
   const entries = await Promise.all(
-    series.volumes.map(async (volume) => [volume.bookHash, await aiStore.isIndexed(volume.bookHash)]),
+    series.volumes.map(async (volume) => [
+      volume.bookHash,
+      await aiStore.isIndexed(volume.bookHash),
+    ]),
   );
 
   return Object.fromEntries(entries);
@@ -99,11 +102,11 @@ const SeriesCard: React.FC<SeriesCardProps> = ({ series, libraryBooks, onIndexed
   };
 
   return (
-    <article className='bg-base-100 rounded-2xl border border-base-300 p-4 shadow-sm'>
+    <article className='bg-base-100 border-base-300 rounded-2xl border p-4 shadow-sm'>
       <div className='mb-3 flex items-start justify-between gap-3'>
         <div className='min-w-0'>
           <h3 className='truncate text-base font-semibold'>{series.name}</h3>
-          <p className='text-sm text-base-content/60'>
+          <p className='text-base-content/60 text-sm'>
             {_('{{count}} volume(s)', { count: orderedVolumes.length })}
           </p>
         </div>
@@ -111,11 +114,7 @@ const SeriesCard: React.FC<SeriesCardProps> = ({ series, libraryBooks, onIndexed
           <button className='btn btn-ghost btn-sm' onClick={handleManage}>
             {_('Manage')}
           </button>
-          <button
-            className='btn btn-primary btn-sm'
-            onClick={handleIndexAll}
-            disabled={isIndexing}
-          >
+          <button className='btn btn-primary btn-sm' onClick={handleIndexAll} disabled={isIndexing}>
             {isIndexing ? _('Indexing...') : _('Index All')}
           </button>
         </div>
@@ -128,13 +127,13 @@ const SeriesCard: React.FC<SeriesCardProps> = ({ series, libraryBooks, onIndexed
           return (
             <li
               key={volume.bookHash}
-              className='flex items-center justify-between gap-3 rounded-xl border border-base-300 px-3 py-2'
+              className='border-base-300 flex items-center justify-between gap-3 rounded-xl border px-3 py-2'
             >
               <div className='min-w-0'>
                 <div className='text-sm font-medium'>
                   {volume.label || _('Vol. {{n}}', { n: volume.volumeIndex })}
                 </div>
-                <div className='truncate text-xs text-base-content/60'>
+                <div className='text-base-content/60 truncate text-xs'>
                   {book?.title || volume.bookHash}
                 </div>
               </div>

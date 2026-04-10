@@ -135,6 +135,8 @@ describe('seriesService', () => {
     const all = await mockGetAllSeries();
     expect(mockMigrateLegacySeriesRecords).toHaveBeenCalled();
     expect(all.every((series: BookSeries) => 'volumes' in series)).toBe(true);
-    expect(all.find((series: BookSeries) => series.id === 'legacy-1')?.volumes[1]?.volumeIndex).toBe(2);
+    expect(
+      all.find((series: BookSeries) => series.id === 'legacy-1')?.volumes[1]?.volumeIndex,
+    ).toBe(2);
   });
 });

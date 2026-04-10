@@ -78,13 +78,19 @@ export function parseStarDict(buffers: {
     // Read 4-byte big-endian offset
     if (offset + 4 > idx.length) break;
     const entryOffset =
-      ((idx[offset] ?? 0) << 24) | ((idx[offset + 1] ?? 0) << 16) | ((idx[offset + 2] ?? 0) << 8) | (idx[offset + 3] ?? 0);
+      ((idx[offset] ?? 0) << 24) |
+      ((idx[offset + 1] ?? 0) << 16) |
+      ((idx[offset + 2] ?? 0) << 8) |
+      (idx[offset + 3] ?? 0);
     offset += 4;
 
     // Read 4-byte big-endian size
     if (offset + 4 > idx.length) break;
     const size =
-      ((idx[offset] ?? 0) << 24) | ((idx[offset + 1] ?? 0) << 16) | ((idx[offset + 2] ?? 0) << 8) | (idx[offset + 3] ?? 0);
+      ((idx[offset] ?? 0) << 24) |
+      ((idx[offset + 1] ?? 0) << 16) |
+      ((idx[offset + 2] ?? 0) << 8) |
+      (idx[offset + 3] ?? 0);
     offset += 4;
 
     // Slice dict buffer

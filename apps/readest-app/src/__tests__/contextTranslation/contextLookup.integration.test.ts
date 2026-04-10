@@ -34,12 +34,7 @@ type Scenario = {
   response: string;
 };
 
-async function runScenario({
-  selectedText,
-  sourceLanguage,
-  targetLanguage,
-  response,
-}: Scenario) {
+async function runScenario({ selectedText, sourceLanguage, targetLanguage, response }: Scenario) {
   vi.mocked(callLLM).mockResolvedValueOnce(response);
 
   const result = await runContextLookup({
@@ -107,9 +102,12 @@ describe('context lookup integration scenarios', () => {
           '<lookup_json>{"translation":"punctuation marks","contextualMeaning":"an emphatic punctuation sequence"}</lookup_json>',
       },
     ],
-  ])('handles %s to %s representative lookups', async (_sourceLanguage, _targetLanguage, scenario) => {
-    await expect(runScenario(scenario)).resolves.toMatchObject({ ok: true });
-  });
+  ])(
+    'handles %s to %s representative lookups',
+    async (_sourceLanguage, _targetLanguage, scenario) => {
+      await expect(runScenario(scenario)).resolves.toMatchObject({ ok: true });
+    },
+  );
 
   test('marks mixed-language selections as mixed without degrading a valid result', async () => {
     const result = await runScenario({

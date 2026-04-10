@@ -207,8 +207,12 @@ const ThreadWrapper = ({
   const [sources, setSources] = useState(getLastSources());
   const assistantRuntime = useAssistantRuntime();
   const composerRuntime = useComposerRuntime();
-  const { activeConversationId, pendingSeedMessage, clearPendingSeedMessage, setActiveConversation } =
-    useAIChatStore();
+  const {
+    activeConversationId,
+    pendingSeedMessage,
+    clearPendingSeedMessage,
+    setActiveConversation,
+  } = useAIChatStore();
 
   useEffect(() => {
     const interval = setInterval(() => {
