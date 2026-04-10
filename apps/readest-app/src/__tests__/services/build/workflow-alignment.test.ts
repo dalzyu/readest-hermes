@@ -62,6 +62,7 @@ describe('workflow alignment', () => {
     expect(releaseWorkflow).toContain("if: matrix.config.release == 'android' && github.repository != 'readest/readest'");
     expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository != 'readest/readest'");
     expect(releaseWorkflow).toContain("name: upload Android apks to GitHub release (fork only)");
+    expect(releaseWorkflow).toContain('upload_name="Hermes_${version}_${flavor}"');
     expect(releaseWorkflow).toContain("name: upload desktop bundles to GitHub release (fork only)");
     expect(releaseWorkflow).toContain("case \"${{ matrix.config.release }}\" in");
     expect(releaseWorkflow).toContain("-path '*/release/bundle/appimage/*.AppImage'");

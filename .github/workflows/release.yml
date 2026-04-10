@@ -288,10 +288,21 @@ jobs:
             echo "No Android APKs found to upload"
             exit 1
           fi
+          version=${{ needs.get-release.outputs.release_version }}
           for asset in "${assets[@]}"; do
             [ -f "$asset" ] || continue
-            echo "Uploading $asset to GitHub release"
-            gh release upload ${{ needs.get-release.outputs.release_tag }} "$asset" --clobber
+            relative_path="${asset#*outputs/apk/}"
+            flavor="$(cut -d/ -f1 <<< "$relative_path")"
+            build_type="$(cut -d/ -f2 <<< "$relative_path")"
+            upload_name="Hermes_${version}_${flavor}"
+            if [ -n "$build_type" ] && [ "$build_type" != "$flavor" ]; then
+              upload_name="${upload_name}-${build_type}"
+            fi
+            upload_name="${upload_name}.apk"
+            upload_path="$RUNNER_TEMP/$upload_name"
+            cp "$asset" "$upload_path"
+            echo "Uploading $upload_name to GitHub release"
+            gh release upload ${{ needs.get-release.outputs.release_tag }} "$upload_path" --clobber
           done
 
       - name: build and upload Android apks
