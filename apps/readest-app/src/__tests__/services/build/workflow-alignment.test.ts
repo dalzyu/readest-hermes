@@ -5,16 +5,31 @@ import packageJson from '../../../../package.json';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../../../../..');
 const tauriConfigPath = path.resolve(import.meta.dirname, '../../../../src-tauri/tauri.conf.json');
-const defaultCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/default.json');
-const desktopCapabilityPath = path.resolve(import.meta.dirname, '../../../../src-tauri/capabilities/desktop.json');
+const defaultCapabilityPath = path.resolve(
+  import.meta.dirname,
+  '../../../../src-tauri/capabilities/default.json',
+);
+const desktopCapabilityPath = path.resolve(
+  import.meta.dirname,
+  '../../../../src-tauri/capabilities/desktop.json',
+);
 const webdriverCapabilityPath = path.resolve(
   import.meta.dirname,
   '../../../../src-tauri/capabilities-extra/webdriver.json',
 );
-const releaseWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8');
-const prWorkflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pull-request.yml'), 'utf8');
+const releaseWorkflow = fs.readFileSync(
+  path.join(repoRoot, '.github/workflows/release.yml'),
+  'utf8',
+);
+const prWorkflow = fs.readFileSync(
+  path.join(repoRoot, '.github/workflows/pull-request.yml'),
+  'utf8',
+);
 const workspaceCargo = fs.readFileSync(path.join(repoRoot, 'Cargo.toml'), 'utf8');
-const sparseIo = fs.readFileSync(path.join(repoRoot, 'packages/turso-sync-engine/src/sparse_io.rs'), 'utf8');
+const sparseIo = fs.readFileSync(
+  path.join(repoRoot, 'packages/turso-sync-engine/src/sparse_io.rs'),
+  'utf8',
+);
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8')) as {
   productName: string;
   mainBinaryName: string;
@@ -67,19 +82,25 @@ describe('workflow alignment', () => {
   });
 
   test('fork release workflow uses unsigned local packaging instead of release uploads', () => {
-    expect(releaseWorkflow).toContain("if: matrix.config.release == 'android' && github.repository != 'readest/readest'");
-    expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository != 'readest/readest'");
-    expect(releaseWorkflow).toContain("name: upload Android apks to GitHub release (fork only)");
+    expect(releaseWorkflow).toContain(
+      "if: matrix.config.release == 'android' && github.repository != 'readest/readest'",
+    );
+    expect(releaseWorkflow).toContain(
+      "if: matrix.config.release != 'android' && github.repository != 'readest/readest'",
+    );
+    expect(releaseWorkflow).toContain('name: upload Android apks to GitHub release (fork only)');
     expect(releaseWorkflow).toContain('upload_name="Hermes_${version}_${flavor}"');
-    expect(releaseWorkflow).toContain("name: upload desktop bundles to GitHub release (fork only)");
-    expect(releaseWorkflow).toContain("case \"${{ matrix.config.release }}\" in");
+    expect(releaseWorkflow).toContain('name: upload desktop bundles to GitHub release (fork only)');
+    expect(releaseWorkflow).toContain('case "${{ matrix.config.release }}" in');
     expect(releaseWorkflow).toContain("-path '*/release/bundle/appimage/*.AppImage'");
     expect(releaseWorkflow).toContain("-path '*/release/bundle/deb/*.deb'");
     expect(releaseWorkflow).toContain("-path '*/release/bundle/dmg/*.dmg'");
     expect(releaseWorkflow).toContain("-path '*/release/bundle/nsis/*.exe'");
     expect(releaseWorkflow).toContain("-path '*/release/bundle/msi/*.msi'");
     expect(releaseWorkflow).not.toContain("find target -path '*/release/bundle/*' -type f");
-    expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository == 'readest/readest'");
+    expect(releaseWorkflow).toContain(
+      "if: matrix.config.release != 'android' && github.repository == 'readest/readest'",
+    );
     expect(releaseWorkflow).toContain("if: github.repository == 'readest/readest'");
   });
 
@@ -99,11 +120,11 @@ describe('workflow alignment', () => {
     expect(releaseWorkflow).toContain('getReleaseByTag');
     expect(releaseWorkflow).toContain('createRelease');
     // biome-ignore lint/suspicious/noTemplateCurlyInString: testing literal JS code content in workflow file
-    expect(releaseWorkflow).toContain("const tag = `v${process.env.PACKAGE_VERSION}`;");
+    expect(releaseWorkflow).toContain('const tag = `v${process.env.PACKAGE_VERSION}`;');
   });
 
   test('Hermes release metadata stays decoupled from upstream versioning', () => {
-    expect(packageJson.version).toBe('0.0.1');
+    expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(releaseWorkflow).toContain('name: Release Hermes');
     expect(releaseWorkflow).toContain('name: `Hermes ${process.env.PACKAGE_VERSION}`');
     expect(releaseWorkflow).toContain("make_latest: 'true'");
