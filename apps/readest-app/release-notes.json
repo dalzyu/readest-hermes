@@ -1,5 +1,13 @@
 {
   "releases": {
+    "0.0.2": {
+      "date": "2026-04-11",
+      "notes": [
+        "Lookup popups now share a reusable shell for more consistent dictionary and translation UI behavior",
+        "Popup interaction tests were tightened to better protect speaking, saving, and notebook handoff flows",
+        "Build and formatting checks were aligned with the new Hermes popup structure"
+      ]
+    },
     "0.0.1": {
       "date": "2026-04-10",
       "notes": [
