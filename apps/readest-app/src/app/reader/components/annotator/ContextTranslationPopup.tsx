@@ -224,9 +224,14 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
                             {targetLang !== 'chinese' &&
                               renderExamplePhonetic(annotations?.target, example.exampleId)}
                             {targetLang === 'chinese' ? (
-                              <RubyText text={example.targetText} className='not-eink:text-white/90' />
+                              <RubyText
+                                text={example.targetText}
+                                className='not-eink:text-white/90'
+                              />
                             ) : (
-                              <p className='whitespace-pre-wrap text-white/80'>{example.targetText}</p>
+                              <p className='whitespace-pre-wrap text-white/80'>
+                                {example.targetText}
+                              </p>
                             )}
                           </div>
                         ) : null}

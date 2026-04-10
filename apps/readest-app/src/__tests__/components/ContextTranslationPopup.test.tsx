@@ -225,7 +225,7 @@ describe('ContextTranslationPopup', () => {
     mockUseContextTranslation.mockReturnValue({
       result: {
         translation: 'kindred spirit',
-        examples: '1. Öª¼ºÄÑ·ê\nPinyin: zh¨© j¨« n¨¢n f¨¦ng\nEnglish: True friends are hard to find.',
+        examples: '1. Öªï¿½ï¿½ï¿½Ñ·ï¿½\nPinyin: zhï¿½ï¿½ jï¿½ï¿½ nï¿½ï¿½n fï¿½ï¿½ng\nEnglish: True friends are hard to find.',
       },
       partialResult: null,
       loading: false,
@@ -248,7 +248,7 @@ describe('ContextTranslationPopup', () => {
     render(
       <ContextTranslationPopup
         {...defaultProps}
-        selectedText='Öª¼º'
+        selectedText='Öªï¿½ï¿½'
         settings={{ ...settings, targetLanguage: 'en', outputFields: settings.outputFields }}
       />,
     );
@@ -260,8 +260,8 @@ describe('ContextTranslationPopup', () => {
   test('renders english-to-chinese examples without requiring language-label parsing in popup', () => {
     mockUseContextTranslation.mockReturnValue({
       result: {
-        translation: '¸ñÁÖÄáË¹¹«Ë¾',
-        examples: '1. Mr. Dursley worked at Grunnings.\nChinese: ¶ÅË¹ÀñÏÈÉúÔÚ¸ñÁÖÄáË¹¹«Ë¾¹¤×÷¡£',
+        translation: 'ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¹ï¿½ï¿½Ë¾',
+        examples: '1. Mr. Dursley worked at Grunnings.\nChinese: ï¿½ï¿½Ë¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë¹ï¿½ï¿½Ë¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½',
       },
       partialResult: null,
       loading: false,
@@ -292,7 +292,7 @@ describe('ContextTranslationPopup', () => {
     // The example sentence text should be visible
     expect(container.textContent).toContain('Mr. Dursley worked at Grunnings.');
     // The Chinese translation should appear (from Chinese: label in formatted text)
-    expect(container.textContent).toContain('¸ñÁÖÄáË¹¹«Ë¾');
+    expect(container.textContent).toContain('ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¹ï¿½ï¿½Ë¾');
   });
 
   test('translation field has TTS button', () => {

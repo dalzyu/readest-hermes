@@ -132,7 +132,9 @@ const ContextLookupPopup: React.FC<ContextLookupPopupProps> = ({
             <div className='mt-1 flex items-start gap-1.5 rounded-md border border-cyan-400/20 bg-cyan-400/10 px-3 py-2'>
               <PiLightbulb size={14} className='mt-0.5 flex-shrink-0 text-cyan-300' />
               <p className='text-xs leading-snug text-cyan-200/80'>
-                {_('Enable AI Assistant in Settings for contextual meaning, usage examples, and more.')}
+                {_(
+                  'Enable AI Assistant in Settings for contextual meaning, usage examples, and more.',
+                )}
               </p>
             </div>
           )}
