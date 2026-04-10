@@ -19,6 +19,7 @@ const popupContext: PopupContextBundle = {
   localFutureBuffer: '',
   sameBookChunks: [],
   priorVolumeChunks: [],
+  dictionaryEntries: [],
   retrievalStatus: 'local-only',
   retrievalHints: {
     currentVolumeIndexed: true,
