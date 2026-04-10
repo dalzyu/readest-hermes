@@ -57,9 +57,11 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 tag_name: tag,
+                target_commitish: context.sha,
                 name: `Hermes ${process.env.PACKAGE_VERSION}`,
                 draft: false,
                 prerelease: false,
+                make_latest: 'true',
               }));
             }
             core.setOutput('release_id', data.id);
@@ -92,6 +94,7 @@ jobs:
         env:
           release_id: ${{ needs.get-release.outputs.release_id }}
           release_tag: ${{ needs.get-release.outputs.release_tag }}
+          release_version: ${{ needs.get-release.outputs.release_version }}
           release_note: ${{ needs.get-release.outputs.release_note }}
         with:
           script: |
@@ -107,9 +110,11 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: process.env.release_id,
+              name: `Hermes ${process.env.release_version}`,
               body: body,
               draft: false,
-              prerelease: false
+              prerelease: false,
+              make_latest: 'true',
             })
 
   build-koreader-plugin:
@@ -382,15 +387,33 @@ jobs:
         shell: bash
         run: |
           assets=()
-          while IFS= read -r -d '' asset; do
-            assets+=("$asset")
-          done < <(find target -path '*/release/bundle/*' -type f \( \
-            -name '*.AppImage' -o \
-            -name '*.deb' -o \
-            -name '*.dmg' -o \
-            -name '*.exe' -o \
-            -name '*.msi' \
-          \) -print0)
+          case "${{ matrix.config.release }}" in
+            linux)
+              while IFS= read -r -d '' asset; do
+                assets+=("$asset")
+              done < <(find target -type f \( \
+                -path '*/release/bundle/appimage/*.AppImage' -o \
+                -path '*/release/bundle/deb/*.deb' \
+              \) -print0)
+              ;;
+            macos)
+              while IFS= read -r -d '' asset; do
+                assets+=("$asset")
+              done < <(find target -type f -path '*/release/bundle/dmg/*.dmg' -print0)
+              ;;
+            windows)
+              while IFS= read -r -d '' asset; do
+                assets+=("$asset")
+              done < <(find target -type f \( \
+                -path '*/release/bundle/nsis/*.exe' -o \
+                -path '*/release/bundle/msi/*.msi' \
+              \) -print0)
+              ;;
+            *)
+              echo "Unsupported desktop release target: ${{ matrix.config.release }}"
+              exit 1
+              ;;
+          esac
           uploaded=0
           for asset in "${assets[@]}"; do
             [ -f "$asset" ] || continue

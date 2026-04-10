@@ -63,12 +63,13 @@ describe('workflow alignment', () => {
     expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository != 'readest/readest'");
     expect(releaseWorkflow).toContain("name: upload Android apks to GitHub release (fork only)");
     expect(releaseWorkflow).toContain("name: upload desktop bundles to GitHub release (fork only)");
-    expect(releaseWorkflow).toContain("find target -path '*/release/bundle/*' -type f");
-    expect(releaseWorkflow).toContain("-name '*.AppImage'");
-    expect(releaseWorkflow).toContain("-name '*.deb'");
-    expect(releaseWorkflow).toContain("-name '*.dmg'");
-    expect(releaseWorkflow).toContain("-name '*.exe'");
-    expect(releaseWorkflow).toContain("-name '*.msi'");
+    expect(releaseWorkflow).toContain("case \"${{ matrix.config.release }}\" in");
+    expect(releaseWorkflow).toContain("-path '*/release/bundle/appimage/*.AppImage'");
+    expect(releaseWorkflow).toContain("-path '*/release/bundle/deb/*.deb'");
+    expect(releaseWorkflow).toContain("-path '*/release/bundle/dmg/*.dmg'");
+    expect(releaseWorkflow).toContain("-path '*/release/bundle/nsis/*.exe'");
+    expect(releaseWorkflow).toContain("-path '*/release/bundle/msi/*.msi'");
+    expect(releaseWorkflow).not.toContain("find target -path '*/release/bundle/*' -type f");
     expect(releaseWorkflow).toContain("if: matrix.config.release != 'android' && github.repository == 'readest/readest'");
     expect(releaseWorkflow).toContain("if: github.repository == 'readest/readest'");
   });
@@ -96,6 +97,7 @@ describe('workflow alignment', () => {
     expect(packageJson.version).toBe('0.0.1');
     expect(releaseWorkflow).toContain('name: Release Hermes');
     expect(releaseWorkflow).toContain('name: `Hermes ${process.env.PACKAGE_VERSION}`');
+    expect(releaseWorkflow).toContain("make_latest: 'true'");
     expect(tauriConfig.productName).toBe('Hermes');
     expect(tauriConfig.mainBinaryName).toBe('hermes');
     expect(tauriConfig.version).toBe('../package.json');
