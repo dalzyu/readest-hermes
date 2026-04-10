@@ -225,7 +225,7 @@ describe('ContextTranslationPopup', () => {
     mockUseContextTranslation.mockReturnValue({
       result: {
         translation: 'kindred spirit',
-        examples: '1. çŸ¥å·±éš¾é€¢\nPinyin: zhÄ« jÇ nÃ¡n fÃ©ng\nEnglish: True friends are hard to find.',
+        examples: '1. Öª¼ºÄÑ·ê\nPinyin: zh¨© j¨« n¨¢n f¨¦ng\nEnglish: True friends are hard to find.',
       },
       partialResult: null,
       loading: false,
@@ -248,7 +248,7 @@ describe('ContextTranslationPopup', () => {
     render(
       <ContextTranslationPopup
         {...defaultProps}
-        selectedText='çŸ¥å·±'
+        selectedText='Öª¼º'
         settings={{ ...settings, targetLanguage: 'en', outputFields: settings.outputFields }}
       />,
     );
@@ -260,8 +260,8 @@ describe('ContextTranslationPopup', () => {
   test('renders english-to-chinese examples without requiring language-label parsing in popup', () => {
     mockUseContextTranslation.mockReturnValue({
       result: {
-        translation: 'æ ¼æž—å°¼æ–¯å…¬å¸',
-        examples: '1. Mr. Dursley worked at Grunnings.\nChinese: æœæ–¯ç¤¼å…ˆç”Ÿåœ¨æ ¼æž—å°¼æ–¯å…¬å¸å·¥ä½œã€‚',
+        translation: '¸ñÁÖÄáË¹¹«Ë¾',
+        examples: '1. Mr. Dursley worked at Grunnings.\nChinese: ¶ÅË¹ÀñÏÈÉúÔÚ¸ñÁÖÄáË¹¹«Ë¾¹¤×÷¡£',
       },
       partialResult: null,
       loading: false,
@@ -292,7 +292,7 @@ describe('ContextTranslationPopup', () => {
     // The example sentence text should be visible
     expect(container.textContent).toContain('Mr. Dursley worked at Grunnings.');
     // The Chinese translation should appear (from Chinese: label in formatted text)
-    expect(container.textContent).toContain('æ ¼æž—å°¼æ–¯å…¬å¸');
+    expect(container.textContent).toContain('¸ñÁÖÄáË¹¹«Ë¾');
   });
 
   test('translation field has TTS button', () => {
@@ -373,6 +373,7 @@ describe('ContextTranslationPopup', () => {
       bookKey: 'book-key-1',
       text: 'by his side',
       oneTime: true,
+      lang: 'en',
     });
   });
 
@@ -404,6 +405,7 @@ describe('ContextTranslationPopup', () => {
       bookKey: 'book-key-1',
       text: 'trusted companion',
       oneTime: true,
+      lang: 'en',
     });
   });
 
