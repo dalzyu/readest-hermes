@@ -114,6 +114,7 @@ const AIAssistantChat = ({
   });
 
   const handleRecap = useCallback(async () => {
+    if (currentPage <= 0) return;
     const recapPrompt = `Please give me a spoiler-safe recap of "${bookTitle}" by ${authorName} up to page ${currentPage}. Only summarize events and information that have been revealed up to that point. Do not include any content beyond page ${currentPage}.`;
     await createConversationWithFirstMessage(bookHash, 'Recap so far', recapPrompt);
   }, [bookHash, bookTitle, authorName, currentPage, createConversationWithFirstMessage]);

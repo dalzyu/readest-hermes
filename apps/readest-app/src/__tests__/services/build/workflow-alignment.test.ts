@@ -159,6 +159,7 @@ describe('workflow alignment', () => {
 
   test('Hermes release metadata stays decoupled from upstream versioning', () => {
     expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(packageJson.version).toBe('0.1.0');
     expect(releaseWorkflow).toContain('name: Release Hermes');
     // biome-ignore lint/suspicious/noTemplateCurlyInString: testing literal JS template expression embedded in workflow YAML
     expect(releaseWorkflow).toContain('name: `Hermes ' + '${process.env.PACKAGE_VERSION}' + '`');
@@ -166,6 +167,25 @@ describe('workflow alignment', () => {
     expect(tauriConfig.productName).toBe('Hermes');
     expect(tauriConfig.mainBinaryName).toBe('hermes');
     expect(tauriConfig.version).toBe('../package.json');
+  });
+
+  test('Cargo.toml version matches package.json version', () => {
+    const cargoToml = fs.readFileSync(
+      path.resolve(import.meta.dirname, '../../../../src-tauri/Cargo.toml'),
+      'utf8',
+    );
+    const cargoVersionMatch = cargoToml.match(/^version\s*=\s*"([^"]+)"/m);
+    expect(cargoVersionMatch?.[1]).toBe(packageJson.version);
+  });
+
+  test('release-notes.json has an entry for the current version', () => {
+    const releaseNotes = JSON.parse(
+      fs.readFileSync(
+        path.resolve(import.meta.dirname, '../../../../release-notes.json'),
+        'utf8',
+      ),
+    ) as { releases: Record<string, unknown> };
+    expect(releaseNotes.releases).toHaveProperty(packageJson.version);
   });
 
   test('tauri hooks use the same package-manager entrypoint as local builds', () => {

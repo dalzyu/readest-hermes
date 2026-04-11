@@ -386,9 +386,15 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
                     <div className='flex items-center justify-between'>
                       <label className='text-sm font-medium'>{_('Export Template')}</label>
                       <button
-                        onClick={() =>
-                          setExportConfig({ ...exportConfig, customTemplate: defaultTemplate })
-                        }
+                        onClick={() => {
+                          const activePreset = NOTE_EXPORT_PRESETS.find(
+                            (p) => p.id === selectedPresetId,
+                          );
+                          setExportConfig({
+                            ...exportConfig,
+                            customTemplate: activePreset?.template ?? defaultTemplate,
+                          });
+                        }}
                         className='text-sm text-blue-500 hover:underline'
                       >
                         {_('Reset Template')}

@@ -1,5 +1,7 @@
 import React from 'react';
 import { pinyin as pinyinPro } from 'pinyin-pro';
+import { toRomaji } from 'wanakana';
+import { getReadingRomaji, isTokenizerReady } from '@/services/contextTranslation/plugins/jpTokenizer';
 import type {
   LookupAnnotations,
   PopupContextBundle,
@@ -35,6 +37,23 @@ export function getPinyinLabel(value: string): string {
 
 export function getPinyinParts(value: string): string[] {
   return pinyinPro(value, { toneType: 'symbol', type: 'array' });
+}
+
+/**
+ * Returns romaji for Japanese text. Uses kuromoji for kanji-containing text
+ * (when the tokenizer is ready) and wanakana for kana-only text.
+ * The LLM is NEVER used as the source of truth for phonetics.
+ */
+export function getRomajiLabel(value: string): string {
+  if (HAN_REGEX.test(value)) {
+    // kuromoji provides deterministic, context-aware readings for kanji
+    if (isTokenizerReady()) {
+      return getReadingRomaji(value);
+    }
+    return ''; // tokenizer not ready — no instant romaji for kanji yet
+  }
+  const romaji = toRomaji(value).trim();
+  return romaji !== value ? romaji : '';
 }
 
 export function getHighlightedIndices(value: string, highlightText: string): Set<number> {

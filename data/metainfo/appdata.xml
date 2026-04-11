@@ -53,8 +53,8 @@
 
   <url type="homepage">https://github.com/dalzyu/readest-hermes</url>
   <url type="bugtracker">https://github.com/dalzyu/readest-hermes/issues</url>
-  <url type="help">https://github.com/readest/readest/wiki</url>
-  <url type="donation">https://github.com/sponsors/readest</url>
+  <url type="help">https://github.com/dalzyu/readest-hermes/wiki</url>
+  <url type="donation">https://github.com/sponsors/dalzyu</url>
 
   <launchable type="desktop-id">com.bilingify.readest.desktop</launchable>
 

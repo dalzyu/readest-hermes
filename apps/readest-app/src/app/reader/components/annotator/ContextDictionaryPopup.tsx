@@ -8,6 +8,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import {
   getCJKLanguage,
   getPinyinLabel,
+  getRomajiLabel,
   getRetrievalStatusMeta,
   buildRetrievalInfoText,
   buildAskAboutThisMessage,
@@ -96,7 +97,11 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
   const sourceCJKLang = getCJKLanguage(selectedText, popupContext?.localPastContext ?? '');
   const selectedTextPinyin =
     annotations?.source?.phonetic ??
-    (popupContext !== null && sourceCJKLang === 'chinese' ? getPinyinLabel(selectedText) : '');
+    (popupContext !== null && sourceCJKLang === 'chinese'
+      ? getPinyinLabel(selectedText)
+      : popupContext !== null && sourceCJKLang === 'japanese'
+        ? getRomajiLabel(selectedText)
+        : '');
   const retrievalStatusMeta = getRetrievalStatusMeta(retrievalStatus);
   const retrievalInfoText = buildRetrievalInfoText(retrievalStatus, retrievalHints);
 

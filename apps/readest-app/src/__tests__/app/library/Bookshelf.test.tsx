@@ -205,13 +205,12 @@ describe('Bookshelf', () => {
     expect(container.querySelector('.bookshelf-items > article')).toBeTruthy();
   });
 
-  test('hides the reading stats card and any spacer in the no-stats state', () => {
+  test('shows the reading stats card in zero-state so new users can set goals', () => {
     mockGetDailyStats.mockReturnValue([]);
 
-    const { container } = renderBookshelf({ surface: 'books' });
+    renderBookshelf({ surface: 'books' });
 
-    expect(screen.queryByRole('heading', { name: 'Reading stats' })).toBeNull();
-    expect(container.querySelector('.bookshelf-items > div.mb-4')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Reading stats' })).toBeTruthy();
   });
 
   test.each([

@@ -97,13 +97,16 @@ describe('LibraryStatsCard', () => {
     expect(within(card as HTMLElement).getByTestId('library-stats-today').textContent).toBe('1m');
   });
 
-  test('renders nothing when there are no stats', () => {
+  test('renders zero-state card with edit goals button when there are no stats', () => {
     mockGetDailyStats.mockReturnValue([]);
 
-    const { container } = render(<LibraryStatsCard />);
+    render(<LibraryStatsCard />);
 
     expect(mockGetDailyStats).toHaveBeenCalledTimes(1);
-    expect(container.innerHTML).toBe('');
+    // Card should still render so new users can set goals
+    expect(screen.getByRole('heading', { name: 'Reading stats' })).toBeTruthy();
+    expect(screen.getByTestId('library-stats-edit-goals-btn')).toBeTruthy();
+    expect(screen.getByTestId('library-stats-today').textContent).toBe('0m');
   });
 
   test('shows time goal progress bar when timeGoalMinutes > 0', () => {

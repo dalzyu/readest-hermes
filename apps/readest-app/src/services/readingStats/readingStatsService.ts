@@ -1,6 +1,14 @@
 const STORAGE_KEY = 'readest:reading-sessions:v1';
 const GOALS_KEY = 'readest:reading-goals:v1';
 
+/** Formats a Date as YYYY-MM-DD in the user's local timezone. */
+function formatLocalDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export interface DailyGoals {
   /** Daily reading time goal in minutes (0 = no goal) */
   timeGoalMinutes: number;
@@ -48,8 +56,10 @@ function normalizeSession(raw: Partial<ReadingSession>): ReadingSession | null {
     return null;
   }
 
-  // calendarDate derived deterministically from startedAt if not provided
-  const date = raw.calendarDate ?? new Date(raw.startedAt).toISOString().split('T')[0] ?? '';
+  // calendarDate derived from startedAt using the user's local timezone.
+  // Using local dates ensures streaks and goals align with the user's actual day
+  // boundaries rather than UTC (which can split a local day across two UTC dates).
+  const date = raw.calendarDate ?? formatLocalDate(new Date(raw.startedAt));
 
   return {
     bookHash: raw.bookHash,
@@ -108,8 +118,7 @@ export class ReadingStatsService {
   }
 
   /** Returns aggregated stats grouped by calendar date, newest first. */
-  getDailyStats(goals?: DailyGoals): DailyStats[] {
-    void goals;
+  getDailyStats(): DailyStats[] {
     const sessions = loadSessions();
     const byDate = new Map<string, { secondsRead: number; pageDelta: number; count: number }>();
 
@@ -177,7 +186,9 @@ export class ReadingStatsService {
     return updated;
   }
 
-  /** Returns current streak: consecutive days meeting the goal threshold. */
+  /** Returns current streak: consecutive days meeting the goal threshold.
+   *  If the user hasn't met their goal today but did yesterday, the streak
+   *  still counts (it only breaks after a full missed day). */
   getCurrentStreak(dailyStats: DailyStats[], goals?: DailyGoals, today = new Date()): number {
     const g = goals ?? { timeGoalMinutes: 0, pageGoal: 0 };
     const hasGoal = g.timeGoalMinutes > 0 || g.pageGoal > 0;
@@ -193,15 +204,18 @@ export class ReadingStatsService {
     }
 
     const qualifyingDates = new Set(dailyStats.filter(dayMeetsGoal).map((stat) => stat.date));
-    const cursor = new Date(
-      Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
-    );
+    const todayKey = formatLocalDate(today);
+    // Start counting from today; if today hasn't met the goal yet, start
+    // from yesterday so the streak doesn't show 0 during an active day.
+    const cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (!qualifyingDates.has(todayKey)) {
+      cursor.setDate(cursor.getDate() - 1);
+    }
     let streak = 0;
-    const getKey = (date: Date) => date.toISOString().slice(0, 10);
 
-    while (qualifyingDates.has(getKey(cursor))) {
+    while (qualifyingDates.has(formatLocalDate(cursor))) {
       streak += 1;
-      cursor.setUTCDate(cursor.getUTCDate() - 1);
+      cursor.setDate(cursor.getDate() - 1);
     }
 
     return streak;

@@ -42,7 +42,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
   const { sideBarBookKey, setSideBarBookKey } = useSidebarStore();
   const { saveSettings } = useSettingsStore();
   const { getConfig, getBookData, saveConfig } = useBookDataStore();
-  const { getView, setBookKeys, getViewSettings } = useReaderStore();
+  const { getView, setBookKeys, getViewSettings, setViewSettings } = useReaderStore();
   const { initViewState, getViewState, clearViewState, recordSession } = useReaderStore();
   const { isSettingsDialogOpen, settingsDialogBookKey } = useSettingsStore();
   const [showDetailsBook, setShowDetailsBook] = useState<Book | null>(null);
@@ -224,6 +224,11 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
   }
   const chromeSuppressed = !!viewSettings.focusMode;
 
+  const exitFocusMode = () => {
+    if (!bookKeys?.[0]) return;
+    setViewSettings(bookKeys[0], { ...viewSettings, focusMode: false });
+  };
+
   return (
     <div className='reader-content full-height flex'>
       {!chromeSuppressed && <SideBar />}
@@ -234,6 +239,15 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
       />
       {isSettingsDialogOpen && <SettingsDialog bookKey={settingsDialogBookKey} />}
       {!chromeSuppressed && <Notebook />}
+      {chromeSuppressed && (
+        <button
+          onClick={exitFocusMode}
+          className='fixed left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-base-300/70 px-3 py-1 text-xs text-base-content/60 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100'
+          title={_('Exit focus mode (Esc)')}
+        >
+          {_('Exit focus mode')}
+        </button>
+      )}
       {showDetailsBook && (
         <BookDetailModal
           isOpen={!!showDetailsBook}

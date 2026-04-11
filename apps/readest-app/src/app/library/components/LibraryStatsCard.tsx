@@ -25,12 +25,15 @@ function formatDuration(totalSeconds: number): string {
   return `${hours}h ${minutes}m`;
 }
 
-function getUtcDateKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
+function formatLocalDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function getTodayStats(dailyStats: DailyStats[], today = new Date()): DailyStats | undefined {
-  const todayKey = getUtcDateKey(today);
+  const todayKey = formatLocalDateKey(today);
   return dailyStats.find((stat) => stat.date === todayKey);
 }
 
@@ -52,8 +55,6 @@ const LibraryStatsCard: React.FC<LibraryStatsCardProps> = ({ className }) => {
   }, []);
 
   const summary = useMemo(() => {
-    if (dailyStats.length === 0) return null;
-
     const todayStats = getTodayStats(dailyStats);
     const currentStreak = readingStatsService.getCurrentStreak(dailyStats, goals);
     const todaySeconds = todayStats?.totalSecondsRead ?? 0;
@@ -84,8 +85,6 @@ const LibraryStatsCard: React.FC<LibraryStatsCardProps> = ({ className }) => {
     setGoals(updated);
     setIsEditingGoals(false);
   };
-
-  if (!summary) return null;
 
   return (
     <article

@@ -51,15 +51,15 @@ We would also like to thank the [Web Chinese Fonts Plan](https://chinese-font.ne
 
 ---
 
-<div align="center" style="color: gray;">Happy reading with Readest!</div>
+<div align="center" style="color: gray;">Happy reading with Hermes!</div>
 
 [badge-website]: https://img.shields.io/badge/website-readest.com-orange
 [badge-web-app]: https://img.shields.io/badge/read%20online-web.readest.com-orange
-[badge-license]: https://img.shields.io/github/license/readest/readest?color=teal
-[badge-release]: https://img.shields.io/github/release/readest/readest?color=green
+[badge-license]: https://img.shields.io/github/license/dalzyu/readest-hermes?color=teal
+[badge-release]: https://img.shields.io/github/release/dalzyu/readest-hermes?color=green
 [badge-platforms]: https://img.shields.io/badge/platforms-macOS%2C%20Windows%2C%20Linux%2C%20Android%2C%20iOS%2C%20Web%2C%20PWA-green
-[badge-last-commit]: https://img.shields.io/github/last-commit/readest/readest?color=blue
-[badge-commit-activity]: https://img.shields.io/github/commit-activity/m/readest/readest?color=blue
+[badge-last-commit]: https://img.shields.io/github/last-commit/dalzyu/readest-hermes?color=blue
+[badge-commit-activity]: https://img.shields.io/github/commit-activity/m/dalzyu/readest-hermes?color=blue
 [badge-discord]: https://img.shields.io/discord/1314226120886976544?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square
 [badge-hellogithub]: https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=8a5b6ade2aee461a8bd94e59200682a7&claim_uid=eRLUbPOy2qZtDgw&theme=small
 [badge-donate]: https://donate.readest.com/badge.svg
@@ -72,9 +72,9 @@ We would also like to thank the [Web Chinese Fonts Plan](https://chinese-font.ne
 [link-flathub]: https://flathub.org/en/apps/com.bilingify.readest
 [link-web-readest]: https://web.readest.com
 [link-gh-releases]: https://github.com/dalzyu/readest-hermes/releases
-[link-gh-commits]: https://github.com/readest/readest/commits/main
-[link-gh-pulse]: https://github.com/readest/readest/pulse
-[link-gh-wiki]: https://github.com/readest/readest/wiki
+[link-gh-commits]: https://github.com/dalzyu/readest-hermes/commits/main
+[link-gh-pulse]: https://github.com/dalzyu/readest-hermes/pulse
+[link-gh-wiki]: https://github.com/dalzyu/readest-hermes/wiki
 [link-discord]: https://discord.gg/gntyVNk3BJ
 [link-parallel-read]: https://readest.com/#parallel-read
 [link-koreader]: https://github.com/koreader/koreader

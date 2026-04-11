@@ -66,4 +66,35 @@ expect(aiTranslatePanel).toContain('DeepL requires your own API key.');
     expect(opdsCatalog).toContain('proxied through the original project servers');
     expect(opdsCatalog).toContain('If I do not trust the original project with these credentials');
   });
+
+  test('OPDS user-agent identifies as Hermes', () => {
+    const constants = readRepoFile('apps/readest-app/src/services/constants.ts');
+    expect(constants).toContain("'Hermes/");
+    expect(constants).not.toMatch(/READEST_OPDS_USER_AGENT\s*=\s*'Readest\//);
+  });
+
+  test('SECURITY.md references Hermes, not Readest', () => {
+    const security = readRepoFile('SECURITY.md');
+    expect(security).toContain('Hermes is a cross-platform e-reader');
+    expect(security).toContain("outside of Hermes's control");
+    expect(security).toContain('Hermes does not currently maintain');
+    expect(security).toContain('dalzyu/readest-hermes');
+    expect(security).toContain('0.1.x');
+  });
+
+  test('no translation file contains stale Readest-branded keys', () => {
+    const fs = require('node:fs');
+    const localesDir = path.join(repoRoot, 'apps/readest-app/public/locales');
+    const localeDirs = fs.readdirSync(localesDir) as string[];
+
+    for (const locale of localeDirs) {
+      const translationPath = path.join(localesDir, locale, 'translation.json');
+      if (!fs.existsSync(translationPath)) continue;
+
+      const content = fs.readFileSync(translationPath, 'utf8');
+      expect(content).not.toContain('"About Readest"');
+      expect(content).not.toContain('"Download Readest"');
+      expect(content).not.toContain('"Upgrade to Readest Premium"');
+    }
+  });
 });

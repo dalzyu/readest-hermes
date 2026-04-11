@@ -179,36 +179,53 @@ describe('ReadingStatsService', () => {
   });
 
   describe('getCurrentStreak', () => {
+    // Use local dates to avoid timezone-dependent failures
+    function localDateStr(daysAgo: number): string {
+      const d = new Date();
+      d.setDate(d.getDate() - daysAgo);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
     test('counts only days meeting the time goal threshold', () => {
       const service = new ReadingStatsService();
       const dailyStats: DailyStats[] = [
-        { date: '2024-01-20', totalSecondsRead: 1800, totalPagesRead: 0, sessions: 1 },
-        { date: '2024-01-19', totalSecondsRead: 1200, totalPagesRead: 0, sessions: 1 },
-        { date: '2024-01-18', totalSecondsRead: 1800, totalPagesRead: 0, sessions: 1 },
+        { date: localDateStr(0), totalSecondsRead: 1800, totalPagesRead: 0, sessions: 1 },
+        { date: localDateStr(1), totalSecondsRead: 1200, totalPagesRead: 0, sessions: 1 },
+        { date: localDateStr(2), totalSecondsRead: 1800, totalPagesRead: 0, sessions: 1 },
       ];
 
+      // Only today (1800s) meets the 30-min goal; yesterday (1200s = 20min) doesn't
       expect(
-        service.getCurrentStreak(
-          dailyStats,
-          { timeGoalMinutes: 30, pageGoal: 0 },
-          new Date('2024-01-20T12:00:00Z'),
-        ),
+        service.getCurrentStreak(dailyStats, { timeGoalMinutes: 30, pageGoal: 0 }),
       ).toBe(1);
     });
 
     test('counts any reading day when both goals are zero', () => {
       const service = new ReadingStatsService();
       const dailyStats: DailyStats[] = [
-        { date: '2024-01-20', totalSecondsRead: 60, totalPagesRead: 1, sessions: 1 },
-        { date: '2024-01-19', totalSecondsRead: 120, totalPagesRead: 2, sessions: 1 },
+        { date: localDateStr(0), totalSecondsRead: 60, totalPagesRead: 1, sessions: 1 },
+        { date: localDateStr(1), totalSecondsRead: 120, totalPagesRead: 2, sessions: 1 },
       ];
 
       expect(
-        service.getCurrentStreak(
-          dailyStats,
-          { timeGoalMinutes: 0, pageGoal: 0 },
-          new Date('2024-01-20T12:00:00Z'),
-        ),
+        service.getCurrentStreak(dailyStats, { timeGoalMinutes: 0, pageGoal: 0 }),
+      ).toBe(2);
+    });
+
+    test('streak starts from yesterday when today has not yet met the goal', () => {
+      const service = new ReadingStatsService();
+      const dailyStats: DailyStats[] = [
+        { date: localDateStr(0), totalSecondsRead: 60, totalPagesRead: 0, sessions: 1 },
+        { date: localDateStr(1), totalSecondsRead: 1800, totalPagesRead: 0, sessions: 1 },
+        { date: localDateStr(2), totalSecondsRead: 1800, totalPagesRead: 0, sessions: 1 },
+      ];
+
+      // Today doesn't meet 30-min goal, but yesterday and day before do → streak = 2
+      expect(
+        service.getCurrentStreak(dailyStats, { timeGoalMinutes: 30, pageGoal: 0 }),
       ).toBe(2);
     });
   });
