@@ -104,6 +104,41 @@ export function getDictionaryForm(text: string): string {
     .join('');
 }
 
+/**
+ * Expand a Japanese text selection to kuromoji token boundaries.
+ *
+ * Given a `text` (the broader context around the selection) and the `selected`
+ * substring, tokenizes the full text and returns the minimal span of tokens
+ * that covers the selection.
+ *
+ * Returns the original selection if the tokenizer is not ready.
+ */
+export function expandJapaneseSelection(text: string, selected: string): string {
+  if (!tokenizer) return selected;
+  const idx = text.indexOf(selected);
+  if (idx === -1) return selected;
+
+  const tokens = tokenizer.tokenize(text);
+  let pos = 0;
+  let start = -1;
+  let end = -1;
+
+  for (const t of tokens) {
+    const tokenStart = pos;
+    const tokenEnd = pos + t.surface_form.length;
+
+    // Token overlaps with the selection range
+    if (tokenEnd > idx && tokenStart < idx + selected.length) {
+      if (start === -1) start = tokenStart;
+      end = tokenEnd;
+    }
+    pos = tokenEnd;
+  }
+
+  if (start === -1 || end === -1) return selected;
+  return text.slice(start, end);
+}
+
 // ---------------------------------------------------------------------------
 // Test helpers — allow tests to inject / reset a mock tokenizer
 // ---------------------------------------------------------------------------

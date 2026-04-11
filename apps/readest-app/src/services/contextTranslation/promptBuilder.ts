@@ -3,6 +3,7 @@ import type { ContextDictionarySettings, TranslationRequest } from './types';
 import { DEFAULT_CONTEXT_DICTIONARY_SETTINGS, getContextDictionaryOutputFields } from './defaults';
 import { getTranslatorLanguageLabel } from '@/services/translatorLanguages';
 import { getCJKLanguage } from '@/services/contextTranslation/utils';
+import { getLanguagePairHints } from './languagePairHints';
 
 function languageName(code: string): string {
   return getTranslatorLanguageLabel(code) || code;
@@ -101,6 +102,10 @@ Do not include pinyin. The application will generate it separately.
 
 If a <reference_dictionary> block is present, use it as an authoritative reference to ground your translation and explanation. Do not contradict it without strong contextual reason.`;
 
+  const pairHints = request.sourceLanguage
+    ? getLanguagePairHints(request.sourceLanguage, request.targetLanguage)
+    : '';
+
   const systemPrompt = `You are a literary translation assistant. Translate and explain text for a reader learning a foreign language.${sourceLangHint}
 
 Critical rules:
@@ -114,7 +119,7 @@ You MUST respond entirely in ${targetLang} — every word in every field must be
 ${fieldInstructions}
 
 Emit fields in this exact order: ${orderedFieldIds}.
-Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.${examplesLayoutInstruction}${referenceDictionaryInstruction}`;
+Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.${examplesLayoutInstruction}${referenceDictionaryInstruction}${pairHints}`;
 
   const userPrompt = `<selected_text>${request.selectedText}</selected_text>
 
@@ -245,11 +250,15 @@ export function buildPerFieldPrompt(
       ? '\nIf a <reference_dictionary> block is present, use it as an authoritative reference.'
       : '';
 
+  const pairHints = request.sourceLanguage
+    ? getLanguagePairHints(request.sourceLanguage, request.targetLanguage)
+    : '';
+
   const systemPrompt = `You are a literary translation assistant.${sourceLangHint}
 
 Task: ${field.promptInstruction}
 
-Respond entirely in ${targetLang}. Output ONLY the requested content — no preamble, no XML tags, no labels.${examplesLayout}${referenceDictNote}`;
+Respond entirely in ${targetLang}. Output ONLY the requested content — no preamble, no XML tags, no labels.${examplesLayout}${referenceDictNote}${pairHints}`;
 
   const userPrompt = `<selected_text>${request.selectedText}</selected_text>
 

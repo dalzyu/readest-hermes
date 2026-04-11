@@ -2,6 +2,7 @@ import { pinyin } from 'pinyin-pro';
 import type { LookupExample, TranslationOutputField, TranslationResult } from './types';
 import { classifyExampleMatch } from './exampleMatcher';
 import { getCJKLanguage, HAN_REGEX } from '@/services/contextTranslation/utils';
+import { isCJKStr } from '@/utils/lang';
 
 type FormatRequest = {
   selectedText: string;
@@ -239,13 +240,69 @@ export function parseStructuredExamples(value: string): LookupExample[] {
     .filter((example) => example.sourceText.length > 0 && example.targetText.length > 0);
 }
 
+/**
+ * Script-family regexes for validating that example target text is written
+ * in the expected script for the target language.
+ */
+const SCRIPT_PATTERNS: Record<string, RegExp> = {
+  // CJK
+  zh: /[\p{Script=Han}]/u,
+  ja: /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u,
+  ko: /[\p{Script=Hangul}]/u,
+  // Cyrillic
+  ru: /[\p{Script=Cyrillic}]/u,
+  uk: /[\p{Script=Cyrillic}]/u,
+  bg: /[\p{Script=Cyrillic}]/u,
+  // Arabic script
+  ar: /[\p{Script=Arabic}]/u,
+  fa: /[\p{Script=Arabic}]/u,
+  ur: /[\p{Script=Arabic}]/u,
+  // Hebrew
+  he: /[\p{Script=Hebrew}]/u,
+  // Devanagari
+  hi: /[\p{Script=Devanagari}]/u,
+  // Thai
+  th: /[\p{Script=Thai}]/u,
+  // Greek
+  el: /[\p{Script=Greek}]/u,
+};
+
+/**
+ * Returns true if the example's target text plausibly matches the expected
+ * target language's script. For Latin-script target languages we only reject
+ * when the text is entirely CJK (clear LLM confusion). For non-Latin targets
+ * we check for presence of the expected script.
+ */
+function isTargetScriptPlausible(targetText: string, targetLanguage?: string): boolean {
+  if (!targetLanguage || !targetText) return true;
+  const lang = targetLanguage.split('-')[0]!.toLowerCase();
+
+  const pattern = SCRIPT_PATTERNS[lang];
+  if (pattern) {
+    // Non-Latin target: at least some characters should be in the expected script
+    return pattern.test(targetText);
+  }
+
+  // Latin-script target: reject if text is entirely CJK (LLM mixed source into target)
+  const stripped = targetText.replace(/[\s\d\p{P}]/gu, '');
+  if (stripped.length > 0 && isCJKStr(stripped)) {
+    // Check if ALL characters are CJK — that's clearly wrong for a Latin target
+    const cjkChars = stripped.replace(/[^\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu, '');
+    if (cjkChars.length === stripped.length) return false;
+  }
+
+  return true;
+}
+
 export function filterRenderableExamples(
   examples: LookupExample[],
   selectedText: string,
+  targetLanguage?: string,
 ): LookupExample[] {
   return examples.filter(
     (example) =>
-      classifyExampleMatch(example.sourceText, selectedText).kind !== 'none' ||
-      classifyExampleMatch(example.targetText, selectedText).kind !== 'none',
+      (classifyExampleMatch(example.sourceText, selectedText).kind !== 'none' ||
+        classifyExampleMatch(example.targetText, selectedText).kind !== 'none') &&
+      isTargetScriptPlausible(example.targetText, targetLanguage),
   );
 }

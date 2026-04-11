@@ -472,8 +472,11 @@ describe('ContextTranslationPopup', () => {
       saveToVocabulary: vi.fn(),
     });
 
+    // Use targetLanguage 'zh' since the examples contain Chinese target text
+    const zhSettings = { ...settings, targetLanguage: 'zh' };
+
     const { container } = render(
-      <ContextTranslationPopup {...defaultProps} selectedText='Grunnings' />,
+      <ContextTranslationPopup {...defaultProps} settings={zhSettings} selectedText='Grunnings' />,
     );
 
     expect(container.textContent).toContain(

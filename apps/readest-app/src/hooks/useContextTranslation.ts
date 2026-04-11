@@ -15,6 +15,7 @@ interface UseContextTranslationOptions {
   selectedText: string;
   currentPage: number;
   settings: ContextTranslationSettings;
+  bookLanguage?: string;
 }
 
 interface UseContextTranslationResult {
@@ -24,6 +25,7 @@ interface UseContextTranslationResult {
   streaming: boolean;
   activeFieldId: string | null;
   error: string | null;
+  aiUnavailable: boolean;
   retrievalStatus: RetrievalStatus;
   retrievalHints: PopupRetrievalHints;
   popupContext: PopupContextBundle | null;
@@ -38,6 +40,7 @@ export function useContextTranslation({
   selectedText,
   currentPage,
   settings,
+  bookLanguage,
 }: UseContextTranslationOptions): UseContextTranslationResult {
   const {
     result,
@@ -46,6 +49,7 @@ export function useContextTranslation({
     streaming,
     activeFieldId,
     error,
+    aiUnavailable,
     retrievalStatus,
     retrievalHints,
     popupContext,
@@ -59,6 +63,7 @@ export function useContextTranslation({
     selectedText,
     currentPage,
     settings,
+    bookLanguage,
   });
 
   return {
@@ -68,6 +73,7 @@ export function useContextTranslation({
     streaming,
     activeFieldId,
     error,
+    aiUnavailable,
     retrievalStatus,
     retrievalHints,
     popupContext,

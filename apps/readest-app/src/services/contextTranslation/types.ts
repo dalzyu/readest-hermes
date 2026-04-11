@@ -162,6 +162,8 @@ export interface ContextTranslationSettings {
    * - 'multi' = per-field prompts with parallel LLM calls
    */
   fieldStrategy?: 'single' | 'multi';
+  /** Auto-expand selection to word boundaries before lookup (default: true). */
+  autoExpandSelection?: boolean;
 }
 
 /** A single entry from a StarDict dictionary. */

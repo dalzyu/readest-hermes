@@ -1,7 +1,7 @@
 import { gzip } from 'fflate';
 import { aiStore } from '@/services/ai/storage/aiStore';
 import type { DictionaryEntry, UserDictionary } from './types';
-import { extractFromZip, parseStarDict } from './dictionaryParser';
+import { extractFromZip } from './dictionaryParser';
 import { parseDictionary, detectFormat } from './parsers/formatRouter';
 import { getDictionaryForm, isTokenizerReady } from './plugins/jpTokenizer';
 

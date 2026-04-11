@@ -11,6 +11,7 @@ export interface UseContextDictionaryInput {
   currentPage: number;
   translationSettings: ContextTranslationSettings;
   dictionarySettings: ContextDictionarySettings;
+  bookLanguage?: string;
 }
 
 export function useContextDictionary(input: UseContextDictionaryInput): UseContextLookupResult {
@@ -22,5 +23,6 @@ export function useContextDictionary(input: UseContextDictionaryInput): UseConte
     currentPage: input.currentPage,
     settings: input.translationSettings,
     dictionarySettings: input.dictionarySettings,
+    bookLanguage: input.bookLanguage,
   });
 }

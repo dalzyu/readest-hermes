@@ -8,7 +8,7 @@ import type {
 import type { ContextLookupMode } from './modes';
 import { formatTranslationResult } from './exampleFormatter';
 import { buildTranslationPrompt, buildLookupPrompt, buildPerFieldPrompt } from './promptBuilder';
-import { parseStreamingTranslationResponse, parseTranslationResponse, StreamingParser } from './responseParser';
+import { parseTranslationResponse, StreamingParser } from './responseParser';
 import { normalizeLookupResponse } from './normalizer';
 import { callLLM, streamLLM } from './llmClient';
 import { getContextDictionaryOutputFields, DEFAULT_CONTEXT_DICTIONARY_SETTINGS } from './defaults';

@@ -11,6 +11,7 @@ import TOCView from './TOCView';
 import BooknoteView from './BooknoteView';
 import TabNavigation from './TabNavigation';
 import ChatHistoryView from './ChatHistoryView';
+import LookupHistoryView from './LookupHistoryView';
 
 const SidebarContent: React.FC<{
   bookDoc: BookDoc;
@@ -26,6 +27,9 @@ const SidebarContent: React.FC<{
   const [targetTab, setTargetTab] = useState(activeTab);
   const isMobile = window.innerWidth < 640 || window.innerHeight < 640;
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
+  const ctxEnabled =
+    settings?.globalReadSettings?.contextTranslation?.enabled ||
+    settings?.globalReadSettings?.contextDictionary?.enabled;
 
   useEffect(() => {
     if (!sideBarBookKey) return;
@@ -40,7 +44,11 @@ const SidebarContent: React.FC<{
       setActiveTab('toc');
       setTargetTab('toc');
     }
-  }, [aiEnabled, activeTab, targetTab]);
+    if ((activeTab === 'lookups' || targetTab === 'lookups') && !ctxEnabled) {
+      setActiveTab('toc');
+      setTargetTab('toc');
+    }
+  }, [aiEnabled, ctxEnabled, activeTab, targetTab]);
 
   const handleTabChange = (tab: string) => {
     if (activeTab === tab) {
@@ -74,6 +82,8 @@ const SidebarContent: React.FC<{
       >
         {targetTab === 'history' ? (
           <ChatHistoryView bookKey={sideBarBookKey} />
+        ) : targetTab === 'lookups' ? (
+          <LookupHistoryView bookKey={sideBarBookKey} />
         ) : (
           <div className='min-h-0 flex-1'>
             <div

@@ -34,6 +34,7 @@ interface ContextTranslationPopupProps {
   trianglePosition: Position;
   popupWidth: number;
   popupHeight: number;
+  bookLanguage?: string;
   onDismiss?: () => void;
 }
 
@@ -47,6 +48,7 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
   trianglePosition,
   popupWidth,
   popupHeight,
+  bookLanguage,
   onDismiss,
 }) => {
   const _ = useTranslation();
@@ -62,6 +64,7 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
     streaming,
     activeFieldId,
     error,
+    aiUnavailable,
     retrievalStatus,
     retrievalHints,
     popupContext,
@@ -74,6 +77,7 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
     selectedText,
     currentPage,
     settings,
+    bookLanguage,
   });
 
   const source = settings.source ?? 'ai';
@@ -102,6 +106,7 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
         ? filterRenderableExamples(
             parseStructuredExamples(displayedResult['examples']),
             selectedText,
+            settings.targetLanguage,
           )
         : [];
   const sourceCJKLang = getCJKLanguage(selectedText, popupContext?.localPastContext ?? '');
@@ -166,6 +171,11 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
         <p className='text-sm italic text-gray-400'>{_('Translating...')}</p>
       )}
       {error && <p className='text-sm text-red-400'>{error}</p>}
+      {aiUnavailable && (
+        <p className='mb-1 text-xs text-amber-400/80'>
+          {_('AI translation unavailable — showing dictionary results only')}
+        </p>
+      )}
       {popupContext?.dictionaryResults && popupContext.dictionaryResults.length > 0 && (
         <details className='mb-2'>
           <summary className='cursor-pointer text-xs font-medium uppercase tracking-wide text-gray-400'>

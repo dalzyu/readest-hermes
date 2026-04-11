@@ -31,7 +31,7 @@ import { getWordCount } from '@/utils/word';
 import { getIndexFromCfi, isCfiInLocation } from '@/utils/cfi';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
-import { startPrefetch, cancelPrefetch } from '@/services/contextTranslation/prefetchService';
+import { startPrefetch } from '@/services/contextTranslation/prefetchService';
 import { getHighlightColorHex } from '../../utils/annotatorUtil';
 import { annotationToolButtons } from './AnnotationTools';
 import AnnotationRangeEditor from './AnnotationRangeEditor';
@@ -1100,6 +1100,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
             trianglePosition={trianglePosition}
             popupWidth={ctxTransPopupWidth}
             popupHeight={ctxTransPopupHeight}
+            bookLanguage={primaryLang}
             onDismiss={handleDismissPopupAndSelection}
           />
         )}
@@ -1121,6 +1122,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
             trianglePosition={trianglePosition}
             popupWidth={ctxDictPopupWidth}
             popupHeight={ctxDictPopupHeight}
+            bookLanguage={primaryLang}
             onDismiss={handleDismissPopupAndSelection}
           />
         )}

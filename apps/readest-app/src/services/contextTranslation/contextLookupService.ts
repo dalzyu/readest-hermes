@@ -283,6 +283,7 @@ export async function runContextLookup(
     ? filterRenderableExamples(
         parseStructuredExamples(attempt.fields['examples']),
         request.selectedText,
+        request.targetLanguage,
       )
     : [];
   const sourceAnnotations = plugins.source.enrichSourceAnnotations?.(

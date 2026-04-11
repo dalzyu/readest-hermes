@@ -65,6 +65,9 @@ const AITranslatePanel: React.FC = () => {
   const [ctxFieldStrategy, setCtxFieldStrategy] = useState<'single' | 'multi'>(
     ctxTransSettings.fieldStrategy ?? 'single',
   );
+  const [ctxAutoExpand, setCtxAutoExpand] = useState(
+    ctxTransSettings.autoExpandSelection !== false,
+  );
 
   const [ctxDictEnabled, setCtxDictEnabled] = useState(ctxDictSettings.enabled);
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
@@ -508,6 +511,20 @@ const AITranslatePanel: React.FC = () => {
                     {_('Parallel mode uses one API call per field — costs 3-4× more per lookup.')}
                   </p>
                 )}
+                <div className='config-item !px-0 mt-2'>
+                  <span className='text-sm'>{_('Auto-expand selection to word boundary')}</span>
+                  <input
+                    type='checkbox'
+                    className='toggle toggle-sm'
+                    checked={ctxAutoExpand}
+                    disabled={!ctxEnabled}
+                    onChange={() => {
+                      const next = !ctxAutoExpand;
+                      setCtxAutoExpand(next);
+                      saveCtxTransSetting({ autoExpandSelection: next });
+                    }}
+                  />
+                </div>
               </div>
               {ctxOutputFields
                 .slice()

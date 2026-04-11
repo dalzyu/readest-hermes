@@ -4,6 +4,7 @@ import { MdBookmarkBorder } from 'react-icons/md';
 import { IoIosList } from 'react-icons/io';
 import { PiNotePencil } from 'react-icons/pi';
 import { LuMessageSquare } from 'react-icons/lu';
+import { RiTranslate } from 'react-icons/ri';
 
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -18,7 +19,17 @@ const TabNavigation: React.FC<{
   const { settings } = useSettingsStore();
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
 
-  const tabs = ['toc', 'annotations', 'bookmarks', ...(aiEnabled ? ['history'] : [])];
+  const ctxEnabled =
+    settings?.globalReadSettings?.contextTranslation?.enabled ||
+    settings?.globalReadSettings?.contextDictionary?.enabled;
+
+  const tabs = [
+    'toc',
+    'annotations',
+    'bookmarks',
+    ...(ctxEnabled ? ['lookups'] : []),
+    ...(aiEnabled ? ['history'] : []),
+  ];
 
   const getTabLabel = (tab: string) => {
     switch (tab) {
@@ -28,6 +39,8 @@ const TabNavigation: React.FC<{
         return _('Annotate');
       case 'bookmarks':
         return _('Bookmark');
+      case 'lookups':
+        return _('Lookups');
       case 'history':
         return _('Chat');
       default:
@@ -69,6 +82,8 @@ const TabNavigation: React.FC<{
               <PiNotePencil className='mx-auto' />
             ) : tab === 'bookmarks' ? (
               <MdBookmarkBorder className='mx-auto' />
+            ) : tab === 'lookups' ? (
+              <RiTranslate className='mx-auto' />
             ) : (
               <LuMessageSquare className='mx-auto' />
             )}

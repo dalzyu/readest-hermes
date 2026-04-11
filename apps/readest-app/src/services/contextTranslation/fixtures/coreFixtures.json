@@ -1,0 +1,116 @@
+[
+  {
+    "id": "ja-en-verb",
+    "sourceText": "食べた",
+    "sourceLanguage": "ja",
+    "targetLanguage": "en",
+    "bookContext": "昨日、友達と一緒にレストランで食べた。とても美味しかった。",
+    "expectedFields": {
+      "translation": "ate"
+    }
+  },
+  {
+    "id": "ja-en-kanji-compound",
+    "sourceText": "図書館",
+    "sourceLanguage": "ja",
+    "targetLanguage": "en",
+    "bookContext": "放課後、図書館で勉強することにした。静かな場所が好きだから。",
+    "expectedFields": {
+      "translation": "library"
+    }
+  },
+  {
+    "id": "zh-en-idiom",
+    "sourceText": "画蛇添足",
+    "sourceLanguage": "zh",
+    "targetLanguage": "en",
+    "bookContext": "他说了太多解释，真是画蛇添足。",
+    "expectedFields": {
+      "translation": "superfluous"
+    }
+  },
+  {
+    "id": "en-ja-simple",
+    "sourceText": "serendipity",
+    "sourceLanguage": "en",
+    "targetLanguage": "ja",
+    "bookContext": "It was pure serendipity that led them to discover the hidden garden behind the old house."
+  },
+  {
+    "id": "en-zh-simple",
+    "sourceText": "resilience",
+    "sourceLanguage": "en",
+    "targetLanguage": "zh",
+    "bookContext": "Her resilience in the face of adversity inspired everyone around her."
+  },
+  {
+    "id": "fr-en-literary",
+    "sourceText": "dépaysement",
+    "sourceLanguage": "fr",
+    "targetLanguage": "en",
+    "bookContext": "Ce sentiment de dépaysement l'envahit dès qu'il descendit du train dans cette petite ville inconnue.",
+    "expectedFields": {
+      "translation": "disorientation"
+    }
+  },
+  {
+    "id": "de-en-compound",
+    "sourceText": "Schadenfreude",
+    "sourceLanguage": "de",
+    "targetLanguage": "en",
+    "bookContext": "Er konnte seine Schadenfreude kaum verbergen, als sein Rivale stolperte.",
+    "expectedFields": {
+      "translation": "schadenfreude"
+    }
+  },
+  {
+    "id": "ko-en-honorific",
+    "sourceText": "감사합니다",
+    "sourceLanguage": "ko",
+    "targetLanguage": "en",
+    "bookContext": "도와주셔서 정말 감사합니다. 큰 도움이 되었어요.",
+    "expectedFields": {
+      "translation": "thank"
+    }
+  },
+  {
+    "id": "es-en-false-friend",
+    "sourceText": "embarazada",
+    "sourceLanguage": "es",
+    "targetLanguage": "en",
+    "bookContext": "Mi hermana está embarazada. Nacerá en marzo.",
+    "expectedFields": {
+      "translation": "pregnant"
+    }
+  },
+  {
+    "id": "ru-en-simple",
+    "sourceText": "тоска",
+    "sourceLanguage": "ru",
+    "targetLanguage": "en",
+    "bookContext": "Глядя на бескрайние поля, он ощутил тоску по дому.",
+    "expectedFields": {
+      "translation": "longing"
+    }
+  },
+  {
+    "id": "pt-en-context",
+    "sourceText": "saudade",
+    "sourceLanguage": "pt",
+    "targetLanguage": "en",
+    "bookContext": "A saudade da terra natal era tão forte que às vezes chorava à noite.",
+    "expectedFields": {
+      "translation": "longing"
+    }
+  },
+  {
+    "id": "ar-en-simple",
+    "sourceText": "كتاب",
+    "sourceLanguage": "ar",
+    "targetLanguage": "en",
+    "bookContext": "وضع الكتاب على الطاولة بعد أن انتهى من القراءة.",
+    "expectedFields": {
+      "translation": "book"
+    }
+  }
+]

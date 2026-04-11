@@ -47,6 +47,8 @@ const lookupResult: UseContextLookupResult = {
   streaming: false,
   activeFieldId: null,
   error: null,
+  aiUnavailable: false,
+  expandedText: null,
   validationDecision: null,
   retrievalStatus: 'local-only' as RetrievalStatus,
   retrievalHints,
