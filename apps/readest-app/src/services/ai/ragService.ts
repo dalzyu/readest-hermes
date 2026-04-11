@@ -230,6 +230,37 @@ export async function hybridSearch(
   return boundedHybridSearch(bookHash, query, settings, topK, maxPage);
 }
 
+// ---------------------------------------------------------------------------
+// Embedding query LRU cache — avoids re-embedding the same query text
+// ---------------------------------------------------------------------------
+const EMBEDDING_CACHE_MAX = 500;
+const embeddingCache = new Map<string, number[]>();
+let embeddingCacheProviderId = '';
+
+function getCachedEmbedding(query: string): number[] | undefined {
+  const value = embeddingCache.get(query);
+  if (value) {
+    // Move to end (most recently used)
+    embeddingCache.delete(query);
+    embeddingCache.set(query, value);
+  }
+  return value;
+}
+
+function setCachedEmbedding(query: string, embedding: number[], providerId: string): void {
+  // Invalidate cache on provider change
+  if (providerId !== embeddingCacheProviderId) {
+    embeddingCache.clear();
+    embeddingCacheProviderId = providerId;
+  }
+  if (embeddingCache.size >= EMBEDDING_CACHE_MAX) {
+    // Evict oldest entry (first key)
+    const oldest = embeddingCache.keys().next().value;
+    if (oldest !== undefined) embeddingCache.delete(oldest);
+  }
+  embeddingCache.set(query, embedding);
+}
+
 export async function boundedHybridSearch(
   bookHash: string,
   query: string,
@@ -243,17 +274,23 @@ export async function boundedHybridSearch(
   let queryEmbedding: number[] | null = null;
 
   try {
-    // use AI SDK embed with provider's embedding model
-    const { embedding } = await withRetryAndTimeout(
-      () =>
-        embed({
-          model: provider.getEmbeddingModel(),
-          value: query,
-        }),
-      AI_TIMEOUTS.EMBEDDING_SINGLE,
-      AI_RETRY_CONFIGS.EMBEDDING,
-    );
-    queryEmbedding = embedding;
+    // Check LRU cache first
+    const cached = getCachedEmbedding(query);
+    if (cached) {
+      queryEmbedding = cached;
+    } else {
+      const { embedding } = await withRetryAndTimeout(
+        () =>
+          embed({
+            model: provider.getEmbeddingModel(),
+            value: query,
+          }),
+        AI_TIMEOUTS.EMBEDDING_SINGLE,
+        AI_RETRY_CONFIGS.EMBEDDING,
+      );
+      queryEmbedding = embedding;
+      setCachedEmbedding(query, embedding, provider.id);
+    }
   } catch {
     // bm25 only fallback
   }

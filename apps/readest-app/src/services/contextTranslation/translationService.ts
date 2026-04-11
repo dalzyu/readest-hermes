@@ -8,7 +8,7 @@ import type {
 import type { ContextLookupMode } from './modes';
 import { formatTranslationResult } from './exampleFormatter';
 import { buildTranslationPrompt, buildLookupPrompt } from './promptBuilder';
-import { parseStreamingTranslationResponse, parseTranslationResponse } from './responseParser';
+import { parseStreamingTranslationResponse, parseTranslationResponse, StreamingParser } from './responseParser';
 import { normalizeLookupResponse } from './normalizer';
 import { callLLM, streamLLM } from './llmClient';
 import { getContextDictionaryOutputFields, DEFAULT_CONTEXT_DICTIONARY_SETTINGS } from './defaults';
@@ -36,10 +36,11 @@ export async function* streamTranslationWithContext(
 ): AsyncGenerator<TranslationStreamResult> {
   const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
   let rawText = '';
+  const parser = new StreamingParser();
 
   for await (const chunk of streamLLM(systemPrompt, userPrompt, model, abortSignal)) {
     rawText += chunk;
-    const parsed = parseStreamingTranslationResponse(rawText, request.outputFields);
+    const parsed = parser.parse(rawText, request.outputFields);
     yield {
       fields: formatTranslationResult(parsed.fields, request),
       activeFieldId: parsed.activeFieldId,
@@ -89,10 +90,11 @@ export async function* streamLookupWithContext(
         )
       : request.outputFields;
   let rawText = '';
+  const parser = new StreamingParser();
 
   for await (const chunk of streamLLM(systemPrompt, userPrompt, model, abortSignal)) {
     rawText += chunk;
-    const parsed = parseStreamingTranslationResponse(rawText, streamFields);
+    const parsed = parser.parse(rawText, streamFields);
     yield {
       fields: parsed.fields,
       activeFieldId: parsed.activeFieldId,

@@ -46,6 +46,8 @@ export interface ContextLookupRequest {
   preNormalizedFields?: NormalizedLookupResult;
   /** The raw LLM response corresponding to preNormalizedFields. Required when preNormalizedFields is set. */
   rawResponse?: string;
+  /** Pre-resolved dictionary entries to inject into the context. Skips the internal lookupDefinitions call. */
+  preDictionaryEntries?: string[];
 }
 
 export interface ContextLookupResult {
@@ -162,18 +164,22 @@ export async function runContextLookup(
   const detectedLanguage = detectLookupLanguage(request.selectedText);
   const sourceLanguage = request.sourceLanguage ?? detectedLanguage.language;
 
-  // Look up dictionary entries for the selected text
+  // Use pre-resolved dictionary entries if provided, otherwise look them up
   let dictionaryEntries: string[] = [];
-  try {
-    const entries = await lookupDefinitions(
-      request.selectedText,
-      sourceLanguage,
-      request.targetLanguage,
-      request.disabledBundledDicts ?? [],
-    );
-    dictionaryEntries = entries.map((e) => `${e.headword}: ${e.definition}`);
-  } catch {
-    dictionaryEntries = [];
+  if (request.preDictionaryEntries) {
+    dictionaryEntries = request.preDictionaryEntries;
+  } else {
+    try {
+      const entries = await lookupDefinitions(
+        request.selectedText,
+        sourceLanguage,
+        request.targetLanguage,
+        request.disabledBundledDicts ?? [],
+      );
+      dictionaryEntries = entries.map((e) => `${e.headword}: ${e.definition}`);
+    } catch {
+      dictionaryEntries = [];
+    }
   }
 
   // Create popup context with dictionary entries

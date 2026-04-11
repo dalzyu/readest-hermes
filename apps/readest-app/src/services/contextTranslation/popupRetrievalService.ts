@@ -6,6 +6,30 @@ import { getPopupLocalContext } from './pageContextService';
 import { getPriorVolumes, getSeriesForBook } from './seriesService';
 import type { ContextTranslationSettings, PopupContextBundle } from './types';
 
+// ---------------------------------------------------------------------------
+// Page-level RAG chunk cache — subsequent lookups on the same page reuse results
+// ---------------------------------------------------------------------------
+interface PageCacheEntry {
+  sameBookChunks: string[];
+  priorVolumeChunks: string[];
+  missingPriorVolumes: number[];
+}
+
+const pageCache = new Map<string, PageCacheEntry>();
+let pageCacheBookHash = '';
+
+function getPageCacheKey(bookHash: string, page: number): string {
+  return `${bookHash}:${page}`;
+}
+
+/** Invalidate page cache on book change or navigation. */
+export function invalidatePageCache(bookHash?: string): void {
+  if (!bookHash || bookHash !== pageCacheBookHash) {
+    pageCache.clear();
+    pageCacheBookHash = bookHash ?? '';
+  }
+}
+
 interface BuildPopupContextBundleOptions {
   bookKey: string;
   bookHash: string;
@@ -84,44 +108,71 @@ export async function buildPopupContextBundle({
     localContext.localFutureBuffer,
   );
 
-  const sameBookChunks =
-    settings.sameBookRagEnabled && localContext.windowStartPage > 1
-      ? (
-          await boundedHybridSearch(bookHash, query, aiSettings, settings.sameBookChunkCount, {
+  // Check page-level cache
+  const pageCacheKey = getPageCacheKey(bookHash, currentPage);
+  if (bookHash !== pageCacheBookHash) {
+    invalidatePageCache(bookHash);
+  }
+  const cached = pageCache.get(pageCacheKey);
+
+  let sameBookChunks: string[];
+  let priorVolumeChunks: string[];
+  let missingPriorVolumes: number[];
+
+  if (cached) {
+    sameBookChunks = cached.sameBookChunks;
+    priorVolumeChunks = cached.priorVolumeChunks;
+    missingPriorVolumes = cached.missingPriorVolumes;
+  } else {
+    const sameBookPromise =
+      settings.sameBookRagEnabled && localContext.windowStartPage > 1
+        ? boundedHybridSearch(bookHash, query, aiSettings, settings.sameBookChunkCount, {
             maxPage: localContext.windowStartPage - 1,
-          })
-        ).map((chunk) => formatChunk(chunk))
-      : [];
+          }).then((chunks) => chunks.map((chunk) => formatChunk(chunk)))
+        : Promise.resolve([] as string[]);
 
-  const missingPriorVolumes: number[] = [];
-  const priorVolumeResults: Array<{ text: string; score: number }> = [];
-  if (settings.priorVolumeRagEnabled) {
-    for (const volume of priorVolumes) {
-      const indexed = await aiStore.isIndexed(volume.bookHash);
-      if (!indexed) {
-        missingPriorVolumes.push(volume.volumeIndex);
-        continue;
-      }
-
-      const results = await hybridSearch(
-        volume.bookHash,
-        query,
-        aiSettings,
-        settings.priorVolumeChunkCount,
-      );
-      for (const chunk of results) {
-        priorVolumeResults.push({
-          text: formatChunk(chunk, volume.label ?? `Vol. ${volume.volumeIndex}`),
-          score: chunk.score,
-        });
+    missingPriorVolumes = [];
+    // Launch all prior-volume searches concurrently
+    const priorVolumePromises: Promise<Array<{ text: string; score: number }>>[] = [];
+    if (settings.priorVolumeRagEnabled) {
+      for (const volume of priorVolumes) {
+        priorVolumePromises.push(
+          aiStore.isIndexed(volume.bookHash).then(async (indexed) => {
+            if (!indexed) {
+              missingPriorVolumes.push(volume.volumeIndex);
+              return [];
+            }
+            const results = await hybridSearch(
+              volume.bookHash,
+              query,
+              aiSettings,
+              settings.priorVolumeChunkCount,
+            );
+            return results.map((chunk) => ({
+              text: formatChunk(chunk, volume.label ?? `Vol. ${volume.volumeIndex}`),
+              score: chunk.score,
+            }));
+          }),
+        );
       }
     }
-  }
 
-  const priorVolumeChunks = priorVolumeResults
-    .sort((a, b) => b.score - a.score)
-    .slice(0, settings.priorVolumeChunkCount)
-    .map((chunk) => chunk.text);
+    // Await same-book and all prior-volume searches in parallel
+    const [sameBookResult, ...priorVolumeResultArrays] = await Promise.all([
+      sameBookPromise,
+      ...priorVolumePromises,
+    ]);
+
+    sameBookChunks = sameBookResult;
+    priorVolumeChunks = priorVolumeResultArrays
+      .flat()
+      .sort((a, b) => b.score - a.score)
+      .slice(0, settings.priorVolumeChunkCount)
+      .map((chunk) => chunk.text);
+
+    // Store in page cache
+    pageCache.set(pageCacheKey, { sameBookChunks, priorVolumeChunks, missingPriorVolumes });
+  }
 
   return {
     localPastContext: localContext.localPastContext,

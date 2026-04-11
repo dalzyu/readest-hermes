@@ -4,6 +4,7 @@ import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 
 import { getProviderForTask } from '@/services/ai/providers';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
+import { consumePrefetch } from '@/services/contextTranslation/prefetchService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
 import { runSimpleLookup } from '@/services/contextTranslation/simpleLookup';
 import type { TranslationSource } from '@/services/contextTranslation/simpleLookup';
@@ -11,6 +12,7 @@ import {
   streamTranslationWithContext,
   streamLookupWithContext,
 } from '@/services/contextTranslation/translationService';
+import { lookupDefinitions } from '@/services/contextTranslation/dictionaryService';
 import type { ContextLookupMode } from '@/services/contextTranslation/modes';
 import type { TranslationRequest } from '@/services/contextTranslation/types';
 import type {
@@ -115,22 +117,40 @@ export function useContextLookup({
 
     const run = async () => {
       try {
-        const bundle = await buildPopupContextBundle({
-          bookKey,
-          bookHash,
-          currentPage: requestSnapshot.currentPage,
-          selectedText,
-          settings: requestSnapshot.settings,
-          aiSettings: requestSnapshot.aiSettings,
-        });
+        // Pre-detect language so dictionary lookup can start concurrently with RAG
+        const detectedLanguage = detectLookupLanguage(selectedText);
+
+        // Launch bundle building (with prefetch check) and dictionary lookup in parallel
+        const [bundle, dictionaryEntries] = await Promise.all([
+          consumePrefetch(bookHash, requestSnapshot.currentPage, selectedText).then(
+            (prefetched) =>
+              prefetched ??
+              buildPopupContextBundle({
+                bookKey,
+                bookHash,
+                currentPage: requestSnapshot.currentPage,
+                selectedText,
+                settings: requestSnapshot.settings,
+                aiSettings: requestSnapshot.aiSettings,
+              }),
+          ),
+          lookupDefinitions(
+            selectedText,
+            detectedLanguage.language,
+            requestSnapshot.settings.targetLanguage,
+            requestSnapshot.settings.disabledBundledDicts ?? [],
+          )
+            .then((entries) => entries.map((e) => `${e.headword}: ${e.definition}`))
+            .catch(() => [] as string[]),
+        ]);
+
+        // Inject pre-resolved dictionary entries into the bundle
+        bundle.dictionaryEntries = dictionaryEntries;
         contextRef.current = bundle.localPastContext;
 
         if (cancelled) return;
 
         setPopupContext(bundle);
-
-        // Pre-detect language so all paths (AI and non-AI) have accurate sourceLanguage
-        const detectedLanguage = detectLookupLanguage(selectedText);
 
         // Route non-AI sources to simpleLookup
         const source: TranslationSource = requestSnapshot.settings.source ?? 'ai';
@@ -203,6 +223,7 @@ export function useContextLookup({
             outputFields: requestSnapshot.settings.outputFields,
             model,
             abortSignal: abortController.signal,
+            preDictionaryEntries: dictionaryEntries,
             ...(hasStreamingResult
               ? { preNormalizedFields: finalFields, rawResponse: finalRawText }
               : {}),
@@ -259,6 +280,7 @@ export function useContextLookup({
             dictionarySettings: requestSnapshot.dictionarySettings,
             model,
             abortSignal: abortController.signal,
+            preDictionaryEntries: dictionaryEntries,
             ...(hasStreamingResult
               ? { preNormalizedFields: finalFields, rawResponse: finalRawText }
               : {}),

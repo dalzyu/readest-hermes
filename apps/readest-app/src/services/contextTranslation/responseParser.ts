@@ -62,6 +62,64 @@ function scanFieldsInDocumentOrder(
 }
 
 /**
+ * Incremental streaming parser — caches completed field positions so that each
+ * successive call only searches for close tags of still-open fields. Over K
+ * streaming chunks this reduces total work from O(F·K·N) to closer to O(F·N).
+ */
+export class StreamingParser {
+  private completedFields = new Map<string, string>();
+  private openTagPositions = new Map<string, number>(); // field id → content start offset
+
+  parse(response: string, fields: TranslationOutputField[]): StreamingParseResult {
+    const result: TranslationResult = {};
+    const enabledIds = new Set(fields.filter((f) => f.enabled).map((f) => f.id));
+    let activeFieldId: string | null = null;
+    let latestOpenPos = -1;
+
+    for (const field of fields) {
+      if (!enabledIds.has(field.id)) continue;
+
+      // Already completed — return cached value with no further scanning
+      const cached = this.completedFields.get(field.id);
+      if (cached !== undefined) {
+        result[field.id] = cached;
+        continue;
+      }
+
+      // Find or recall the open-tag position
+      let contentStart = this.openTagPositions.get(field.id);
+      if (contentStart === undefined) {
+        const openTag = `<${field.id}>`;
+        const openPos = response.indexOf(openTag);
+        if (openPos === -1) continue;
+        contentStart = openPos + openTag.length;
+        this.openTagPositions.set(field.id, contentStart);
+      }
+
+      // Search for close tag only from contentStart
+      const closeTag = `</${field.id}>`;
+      const closePos = response.indexOf(closeTag, contentStart);
+
+      if (closePos !== -1) {
+        const value = response.slice(contentStart, closePos).trim();
+        result[field.id] = value;
+        this.completedFields.set(field.id, value);
+      } else {
+        // Still streaming
+        result[field.id] = response.slice(contentStart).trim();
+        const openPos = contentStart - `<${field.id}>`.length;
+        if (openPos > latestOpenPos) {
+          latestOpenPos = openPos;
+          activeFieldId = field.id;
+        }
+      }
+    }
+
+    return { fields: result, activeFieldId };
+  }
+}
+
+/**
  * Alias for the single-pass scanner — used for incremental streaming parsing.
  */
 export function parseStreamingTranslationResponse(

@@ -31,6 +31,7 @@ import { getWordCount } from '@/utils/word';
 import { getIndexFromCfi, isCfiInLocation } from '@/utils/cfi';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
+import { startPrefetch, cancelPrefetch } from '@/services/contextTranslation/prefetchService';
 import { getHighlightColorHex } from '../../utils/annotatorUtil';
 import { annotationToolButtons } from './AnnotationTools';
 import AnnotationRangeEditor from './AnnotationRangeEditor';
@@ -598,6 +599,20 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         handleQuickAction();
       } else {
         handleShowAnnotPopup();
+      }
+
+      // Prefetch RAG context while the annotation toolbar is visible, so that
+      // if the user taps "Context Translate" or "Dictionary", data is warm.
+      const ctxSettings = settings.globalReadSettings.contextTranslation;
+      if (ctxSettings?.enabled) {
+        startPrefetch({
+          bookKey,
+          bookHash: bookData.book?.hash ?? '',
+          currentPage: progress.page,
+          selectedText: selection.text,
+          settings: ctxSettings,
+          aiSettings: settings.aiSettings ?? { enabled: false, providers: [], activeProviderId: '', modelAssignments: {} },
+        });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
