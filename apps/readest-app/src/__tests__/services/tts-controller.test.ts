@@ -571,28 +571,33 @@ describe('TTSController', () => {
   });
 
   describe('forward and backward', () => {
-    test('forward stops at the end of the book after repeated empty sections', async () => {
-      mockView.book.sections = Array.from({ length: 10 }, (_, index) => ({
+    test('start keeps advancing through empty sections until the actual end of the book', async () => {
+      const sharedDoc = mockView.renderer.getContents()[0]!.doc as Document;
+      mockView.book.sections = Array.from({ length: 11 }, (_, index) => ({
         id: `section-${index}`,
         cfi: `cfi-${index}`,
         size: 1,
         linear: 'yes',
-        createDocument: vi.fn().mockResolvedValue({} as Document),
+        createDocument: vi.fn().mockResolvedValue(sharedDoc),
       }));
       mockView.tts = {
-        next: vi.fn().mockReturnValue(undefined),
         start: vi.fn().mockReturnValue(undefined),
+        resume: vi.fn().mockReturnValue(undefined),
+        next: vi.fn().mockReturnValue(undefined),
+        prev: vi.fn().mockReturnValue(undefined),
         nextMark: vi.fn().mockReturnValue(undefined),
-        doc: null,
+        prevMark: vi.fn().mockReturnValue(undefined),
+        setMark: vi.fn().mockReturnValue(new Range()),
+        doc: sharedDoc,
       } as unknown as FoliateView['tts'];
 
-      controller.state = 'playing';
-      await controller.forward();
+      await controller.start();
 
-      expect(controller.state).toBe('stopped');
-      expect(controller.ttsClient.stop).toHaveBeenCalled();
+      await vi.waitFor(() => {
+        expect(mockView.book.sections[10]!.createDocument).toHaveBeenCalled();
+        expect(controller.state).toBe('stopped');
+      });
     });
-
 
     test('forward sets forward-paused state when not playing', async () => {
       // Set up controller with a mock tts on the view

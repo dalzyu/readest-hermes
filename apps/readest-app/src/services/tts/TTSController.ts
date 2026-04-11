@@ -324,10 +324,12 @@ export class TTSController extends EventTarget {
         ssml = await this.#preprocessSSML(await ssml);
         if (!ssml) {
           this.#nossmlCnt++;
-          // FIXME: in case we are at the end of the book, need a better way to handle this
-          if (this.#nossmlCnt < 10 && this.state === 'playing' && !oneTime) {
+          // Detect end-of-book: if there is no next section, stop cleanly rather
+          // than burning through ten empty cycles.
+          if (this.state === 'playing' && !oneTime) {
             resolve();
-            if (await this.#initTTSForNextSection()) {
+            const hasNext = await this.#initTTSForNextSection();
+            if (hasNext) {
               await this.forward();
             } else {
               await this.stop();
