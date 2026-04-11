@@ -43,6 +43,7 @@ import GroupingModal from './GroupingModal';
 import SeriesModal from './SeriesModal';
 import SeriesShelf from './SeriesShelf';
 import SetStatusAlert from './SetStatusAlert';
+import LibraryStatsCard from './LibraryStatsCard';
 
 interface BookshelfProps {
   libraryBooks: Book[];
@@ -95,6 +96,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   const sortOrder = searchParams?.get('order') || (settings.librarySortAscending ? 'asc' : 'desc');
   const groupBy = ensureLibraryGroupByType(searchParams?.get('groupBy'), settings.libraryGroupBy);
   const coverFit = searchParams?.get('cover') || settings.libraryCoverFit;
+  const showLibraryStatsCard = surfaceMode === 'books' && !groupId && !queryTerm;
 
   const [loading, setLoading] = useState(false);
   const [showSelectModeActions, setShowSelectModeActions] = useState(false);
@@ -437,6 +439,11 @@ const Bookshelf: React.FC<BookshelfProps> = ({
             role='main'
             aria-label={_('Bookshelf')}
           >
+            {showLibraryStatsCard && (
+              <LibraryStatsCard
+                className={clsx(viewMode === 'grid' ? 'col-span-full' : '', 'mb-4')}
+              />
+            )}
             {sortedBookshelfItems.map((item) => (
               <BookshelfItem
                 key={`library-item-${'hash' in item ? item.hash : item.id}`}
