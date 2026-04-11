@@ -257,7 +257,7 @@ jobs:
           pnpm tauri android init
           pnpm tauri icon ../../data/icons/readest-book.png
           git checkout .
-          pnpm tauri android build -- --release
+          pnpm tauri android build
 
       - name: upload Android apk artifact (fork only)
         if: matrix.config.release == 'android' && github.repository != 'readest/readest'
@@ -323,7 +323,7 @@ jobs:
           arm64_apk=Hermes_${version}_arm64.apk
           pnpm tauri android build
           cp ${apk_path}/app-universal-release.apk $universial_apk
-          pnpm tauri android build -- -t aarch64
+          pnpm tauri android build -t aarch64
           cp ${apk_path}/app-universal-release.apk $arm64_apk
 
           echo "Uploading $universial_apk to GitHub release"
@@ -372,7 +372,7 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=8192'
           TAURI_BUNDLER_NEW_APPIMAGE_FORMAT: 'true'
         working-directory: apps/readest-app
-        run: pnpm tauri build -- ${{ matrix.config.args || '' }}
+        run: pnpm tauri build ${{ matrix.config.args || '' }}
 
       - name: upload desktop bundle artifact (fork only)
         if: matrix.config.release != 'android' && github.repository != 'readest/readest'
@@ -467,7 +467,7 @@ jobs:
           echo "Building Portable Binaries"
           pushd apps/readest-app/
           echo "NEXT_PUBLIC_PORTABLE_APP=true" >> .env.local
-          pnpm tauri build -- ${{ matrix.config.args }}
+          pnpm tauri build ${{ matrix.config.args }}
 
           popd
           echo "Uploading Portable Binaries"
