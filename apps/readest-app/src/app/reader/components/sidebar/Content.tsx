@@ -12,6 +12,7 @@ import BooknoteView from './BooknoteView';
 import TabNavigation from './TabNavigation';
 import ChatHistoryView from './ChatHistoryView';
 import LookupHistoryView from './LookupHistoryView';
+import ComprehensionView from './ComprehensionView';
 
 const SidebarContent: React.FC<{
   bookDoc: BookDoc;
@@ -45,6 +46,10 @@ const SidebarContent: React.FC<{
       setTargetTab('toc');
     }
     if ((activeTab === 'lookups' || targetTab === 'lookups') && !ctxEnabled) {
+      setActiveTab('toc');
+      setTargetTab('toc');
+    }
+    if ((activeTab === 'comprehension' || targetTab === 'comprehension') && !aiEnabled) {
       setActiveTab('toc');
       setTargetTab('toc');
     }
@@ -84,6 +89,8 @@ const SidebarContent: React.FC<{
           <ChatHistoryView bookKey={sideBarBookKey} />
         ) : targetTab === 'lookups' ? (
           <LookupHistoryView bookKey={sideBarBookKey} />
+        ) : targetTab === 'comprehension' ? (
+          <ComprehensionView bookKey={sideBarBookKey} />
         ) : (
           <div className='min-h-0 flex-1'>
             <div

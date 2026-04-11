@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { PiTrash, PiDownloadSimple, PiMagnifyingGlass } from 'react-icons/pi';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { PiTrash, PiDownloadSimple, PiMagnifyingGlass, PiSpeakerHigh } from 'react-icons/pi';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useEnv } from '@/context/EnvContext';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -37,6 +37,15 @@ function getRecentLookupPreview(entry: LookupHistoryEntry): string {
   return preview.length > 72 ? `${preview.slice(0, 71).trimEnd()}…` : preview;
 }
 
+function getTranslationPreview(entry: VocabularyEntry): string {
+  return (
+    entry.result['translation'] ??
+    entry.result['simpleDefinition'] ??
+    Object.values(entry.result).find((v) => v?.trim()) ??
+    ''
+  );
+}
+
 const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
   const _ = useTranslation();
   const { appService } = useEnv();
@@ -56,6 +65,22 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [isReviewSaving, setIsReviewSaving] = useState(false);
   const [recentLookups, setRecentLookups] = useState<LookupHistoryEntry[]>([]);
+
+  // Quiz mode state
+  type QuizMode = 'flashcard' | 'multiple-choice' | 'fill-blank' | 'listening' | 'reverse';
+  const [quizMode, setQuizMode] = useState<QuizMode>('flashcard');
+  const [mcChoices, setMcChoices] = useState<string[]>([]);
+  const [mcSelected, setMcSelected] = useState<number | null>(null);
+  const [fillBlankInput, setFillBlankInput] = useState('');
+  const [fillBlankCorrect, setFillBlankCorrect] = useState<boolean | null>(null);
+
+  // Session stats
+  const [sessionCorrect, setSessionCorrect] = useState(0);
+  const [sessionTotal, setSessionTotal] = useState(0);
+  const [sessionStreak, setSessionStreak] = useState(0);
+  const cardStartTimeRef = useRef<number>(0);
+  const [avgTimePerCard, setAvgTimePerCard] = useState(0);
+  const totalTimeRef = useRef<number>(0);
 
   const loadEntries = useCallback(async () => {
     try {
@@ -153,9 +178,48 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     setReviewIndex(0);
     setIsAnswerRevealed(false);
     setIsReviewSaving(false);
+    setMcChoices([]);
+    setMcSelected(null);
+    setFillBlankInput('');
+    setFillBlankCorrect(null);
+    setSessionCorrect(0);
+    setSessionTotal(0);
+    setSessionStreak(0);
+    totalTimeRef.current = 0;
+    setAvgTimePerCard(0);
     await loadEntries();
     await loadDueCount();
   }, [loadEntries, loadDueCount]);
+
+  const generateMcChoices = useCallback(
+    (correctEntry: VocabularyEntry, allEntries: VocabularyEntry[]) => {
+      const correctAnswer = getTranslationPreview(correctEntry);
+      const others = allEntries
+        .filter((e) => e.id !== correctEntry.id)
+        .map((e) => getTranslationPreview(e))
+        .filter((t) => t !== correctAnswer);
+      // Shuffle and pick up to 3 distractors
+      const shuffled = others.sort(() => Math.random() - 0.5).slice(0, 3);
+      const choices = [correctAnswer, ...shuffled].sort(() => Math.random() - 0.5);
+      return choices;
+    },
+    [],
+  );
+
+  const setupCardForMode = useCallback(
+    (entry: VocabularyEntry, allEntries: VocabularyEntry[]) => {
+      setMcSelected(null);
+      setFillBlankInput('');
+      setFillBlankCorrect(null);
+      setIsAnswerRevealed(false);
+      cardStartTimeRef.current = Date.now();
+
+      if (quizMode === 'multiple-choice') {
+        setMcChoices(generateMcChoices(entry, allEntries));
+      }
+    },
+    [quizMode, generateMcChoices],
+  );
 
   const startReview = useCallback(async () => {
     const queue = await getDueVocabularyForBook(bookHash);
@@ -168,7 +232,18 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     setReviewIndex(0);
     setIsAnswerRevealed(false);
     setIsReviewing(true);
-  }, [bookHash]);
+    setSessionCorrect(0);
+    setSessionTotal(0);
+    setSessionStreak(0);
+    totalTimeRef.current = 0;
+    setAvgTimePerCard(0);
+    cardStartTimeRef.current = Date.now();
+
+    if (quizMode === 'multiple-choice') {
+      const allEntries = await getVocabularyForBook(bookHash);
+      setMcChoices(generateMcChoices(queue[0]!, allEntries));
+    }
+  }, [bookHash, quizMode, generateMcChoices]);
 
   const handleSearch = async (q: string) => {
     setSearchQuery(q);
@@ -215,6 +290,49 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     await finishReviewSession();
   }, [finishReviewSession]);
 
+  const recordCardTime = useCallback(() => {
+    if (cardStartTimeRef.current > 0) {
+      const elapsed = Date.now() - cardStartTimeRef.current;
+      totalTimeRef.current += elapsed;
+    }
+  }, []);
+
+  const advanceToNext = useCallback(
+    async (passed: boolean) => {
+      recordCardTime();
+      setSessionTotal((t) => t + 1);
+      if (passed) {
+        setSessionCorrect((c) => c + 1);
+        setSessionStreak((s) => s + 1);
+      } else {
+        setSessionStreak(0);
+      }
+
+      const nextIndex = reviewIndex + 1;
+      const newTotal = sessionTotal + 1;
+      setAvgTimePerCard(Math.round(totalTimeRef.current / newTotal / 1000));
+
+      if (nextIndex >= reviewQueue.length) {
+        await finishReviewSession();
+        return;
+      }
+
+      setReviewIndex(nextIndex);
+      const nextEntry = reviewQueue[nextIndex]!;
+      const allEntries = await getVocabularyForBook(bookHash);
+      setupCardForMode(nextEntry, allEntries);
+    },
+    [
+      bookHash,
+      finishReviewSession,
+      recordCardTime,
+      reviewIndex,
+      reviewQueue,
+      sessionTotal,
+      setupCardForMode,
+    ],
+  );
+
   const handlePass = useCallback(async () => {
     const currentEntry = reviewQueue[reviewIndex];
     if (!currentEntry || isReviewSaving) return;
@@ -223,19 +341,11 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     try {
       const updated = await markVocabularyEntryReviewed(currentEntry, 4);
       setEntries((prev) => prev.map((entry) => (entry.id === updated.id ? updated : entry)));
-
-      const nextIndex = reviewIndex + 1;
-      if (nextIndex >= reviewQueue.length) {
-        await finishReviewSession();
-        return;
-      }
-
-      setReviewIndex(nextIndex);
-      setIsAnswerRevealed(false);
+      await advanceToNext(true);
     } finally {
       setIsReviewSaving(false);
     }
-  }, [finishReviewSession, isReviewSaving, reviewIndex, reviewQueue]);
+  }, [advanceToNext, isReviewSaving, reviewIndex, reviewQueue]);
 
   const handleFail = useCallback(async () => {
     const currentEntry = reviewQueue[reviewIndex];
@@ -245,19 +355,72 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     try {
       const updated = await markVocabularyEntryReviewed(currentEntry, 1);
       setEntries((prev) => prev.map((entry) => (entry.id === updated.id ? updated : entry)));
-
-      const nextIndex = reviewIndex + 1;
-      if (nextIndex >= reviewQueue.length) {
-        await finishReviewSession();
-        return;
-      }
-
-      setReviewIndex(nextIndex);
-      setIsAnswerRevealed(false);
+      await advanceToNext(false);
     } finally {
       setIsReviewSaving(false);
     }
-  }, [finishReviewSession, isReviewSaving, reviewIndex, reviewQueue]);
+  }, [advanceToNext, isReviewSaving, reviewIndex, reviewQueue]);
+
+  const handleMcSelect = useCallback(
+    async (choiceIndex: number) => {
+      if (mcSelected !== null || isReviewSaving) return;
+      const currentEntry = reviewQueue[reviewIndex];
+      if (!currentEntry) return;
+      setMcSelected(choiceIndex);
+      const correct = mcChoices[choiceIndex] === getTranslationPreview(currentEntry);
+      setIsAnswerRevealed(true);
+
+      setIsReviewSaving(true);
+      try {
+        const grade = correct ? 4 : 1;
+        const updated = await markVocabularyEntryReviewed(currentEntry, grade as 1 | 4);
+        setEntries((prev) => prev.map((entry) => (entry.id === updated.id ? updated : entry)));
+        // Brief delay so user sees the result before advancing
+        setTimeout(() => {
+          void advanceToNext(correct);
+          setIsReviewSaving(false);
+        }, 800);
+      } catch {
+        setIsReviewSaving(false);
+      }
+    },
+    [advanceToNext, isReviewSaving, mcChoices, mcSelected, reviewIndex, reviewQueue],
+  );
+
+  const handleFillBlankSubmit = useCallback(async () => {
+    if (fillBlankCorrect !== null || isReviewSaving) return;
+    const currentEntry = reviewQueue[reviewIndex];
+    if (!currentEntry) return;
+    const expected = currentEntry.term.toLowerCase().trim();
+    const correct = fillBlankInput.toLowerCase().trim() === expected;
+    setFillBlankCorrect(correct);
+    setIsAnswerRevealed(true);
+
+    setIsReviewSaving(true);
+    try {
+      const grade = correct ? 4 : 1;
+      const updated = await markVocabularyEntryReviewed(currentEntry, grade as 1 | 4);
+      setEntries((prev) => prev.map((entry) => (entry.id === updated.id ? updated : entry)));
+      setTimeout(() => {
+        void advanceToNext(correct);
+        setIsReviewSaving(false);
+      }, 1200);
+    } catch {
+      setIsReviewSaving(false);
+    }
+  }, [advanceToNext, fillBlankCorrect, fillBlankInput, isReviewSaving, reviewIndex, reviewQueue]);
+
+  const handleSpeakTerm = useCallback(
+    (entry: VocabularyEntry) => {
+      eventDispatcher.dispatch('tts-speak', {
+        bookKey: '',
+        text: entry.term,
+        oneTime: true,
+        ...(entry.sourceLanguage ? { lang: entry.sourceLanguage } : {}),
+      });
+    },
+    [],
+  );
 
   const enabledFields = ctxSettings.outputFields
     .filter((f) => f.enabled)
@@ -319,51 +482,189 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
 
       {isReviewing && currentReviewEntry ? (
         <div className='flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3'>
+          {/* Quiz mode selector */}
+          <div className='flex flex-wrap gap-1'>
+            {(['flashcard', 'multiple-choice', 'fill-blank', 'listening', 'reverse'] as const).map(
+              (m) => (
+                <button
+                  key={m}
+                  className={`btn btn-xs ${quizMode === m ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setQuizMode(m)}
+                  disabled={isReviewSaving}
+                >
+                  {m === 'flashcard'
+                    ? _('Flashcard')
+                    : m === 'multiple-choice'
+                      ? _('MC')
+                      : m === 'fill-blank'
+                        ? _('Fill')
+                        : m === 'listening'
+                          ? _('Listen')
+                          : _('Reverse')}
+                </button>
+              ),
+            )}
+          </div>
+
+          {/* Session stats bar */}
+          {sessionTotal > 0 && (
+            <div className='text-base-content/50 flex items-center gap-3 text-[11px]'>
+              <span>
+                {sessionCorrect}/{sessionTotal} {_('correct')}
+              </span>
+              {sessionStreak > 1 && <span>🔥 {sessionStreak}</span>}
+              {avgTimePerCard > 0 && <span>~{avgTimePerCard}s/{_('card')}</span>}
+            </div>
+          )}
+
           <div className='border-base-300 bg-base-100 rounded-lg border p-4'>
             <div className='text-base-content/50 mb-2 flex items-center justify-between text-xs uppercase tracking-wide'>
               <span>{_('Review session')}</span>
               <span>{`${reviewIndex + 1}/${reviewQueue.length}`}</span>
             </div>
-            <p className='text-lg font-medium'>{currentReviewEntry.term}</p>
-            {currentReviewEntry.context && (
-              <p className='text-base-content/50 mt-2 text-sm leading-relaxed'>
-                {currentReviewEntry.context}
-              </p>
-            )}
 
-            {isAnswerRevealed ? (
-              <div className='mt-4'>{renderEntryFields(currentReviewEntry)}</div>
-            ) : (
-              <p className='text-base-content/50 mt-4 text-sm'>
-                {_('Reveal the answer when you are ready, then choose Again or Good.')}
-              </p>
-            )}
-          </div>
-
-          <div className='flex items-center gap-2'>
-            {!isAnswerRevealed ? (
-              <button className='btn btn-secondary btn-sm' onClick={handleRevealAnswer}>
-                {_('Reveal answer')}
-              </button>
-            ) : (
+            {/* Card front — varies by quiz mode */}
+            {quizMode === 'reverse' ? (
+              <>
+                <p className='text-lg font-medium'>
+                  {getTranslationPreview(currentReviewEntry)}
+                </p>
+                {isAnswerRevealed && (
+                  <p className='text-base-content/70 mt-2 text-base'>
+                    {currentReviewEntry.term}
+                  </p>
+                )}
+              </>
+            ) : quizMode === 'listening' ? (
               <>
                 <button
-                  className='btn btn-error btn-sm'
-                  disabled={isReviewSaving}
-                  onClick={() => void handleFail()}
+                  className='btn btn-circle btn-ghost btn-sm mb-2'
+                  onClick={() => handleSpeakTerm(currentReviewEntry)}
+                  title={_('Listen')}
                 >
-                  {_('Again')}
+                  <PiSpeakerHigh size={20} />
                 </button>
-                <button
-                  className='btn btn-success btn-sm'
-                  disabled={isReviewSaving}
-                  onClick={() => void handlePass()}
-                >
-                  {_('Good')}
-                </button>
+                <p className='text-base-content/50 text-sm'>
+                  {_('Listen and type the word')}
+                </p>
+              </>
+            ) : quizMode === 'fill-blank' ? (
+              <>
+                <p className='text-base-content/60 text-sm'>
+                  {getTranslationPreview(currentReviewEntry)}
+                </p>
+                {currentReviewEntry.context && (
+                  <p className='text-base-content/40 mt-1 text-xs'>
+                    {currentReviewEntry.context}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className='text-lg font-medium'>{currentReviewEntry.term}</p>
+                {currentReviewEntry.context && (
+                  <p className='text-base-content/50 mt-2 text-sm leading-relaxed'>
+                    {currentReviewEntry.context}
+                  </p>
+                )}
               </>
             )}
+
+            {/* Card answer area — varies by quiz mode */}
+            {quizMode === 'flashcard' || quizMode === 'reverse' ? (
+              isAnswerRevealed ? (
+                <div className='mt-4'>{renderEntryFields(currentReviewEntry)}</div>
+              ) : (
+                <p className='text-base-content/50 mt-4 text-sm'>
+                  {_('Reveal the answer when you are ready, then choose Again or Good.')}
+                </p>
+              )
+            ) : quizMode === 'multiple-choice' ? (
+              <div className='mt-3 space-y-2'>
+                {mcChoices.map((choice, i) => {
+                  const isCorrectChoice =
+                    choice === getTranslationPreview(currentReviewEntry);
+                  const isSelectedChoice = mcSelected === i;
+                  let choiceClass = 'btn btn-sm btn-outline w-full text-left justify-start';
+                  if (mcSelected !== null) {
+                    if (isCorrectChoice) choiceClass += ' btn-success';
+                    else if (isSelectedChoice) choiceClass += ' btn-error';
+                  }
+                  return (
+                    <button
+                      key={i}
+                      className={choiceClass}
+                      disabled={mcSelected !== null}
+                      onClick={() => void handleMcSelect(i)}
+                    >
+                      <span className='truncate'>{choice}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : quizMode === 'fill-blank' || quizMode === 'listening' ? (
+              <div className='mt-3'>
+                <input
+                  type='text'
+                  className={`input input-bordered input-sm w-full ${
+                    fillBlankCorrect === true
+                      ? 'input-success'
+                      : fillBlankCorrect === false
+                        ? 'input-error'
+                        : ''
+                  }`}
+                  placeholder={_('Type the word...')}
+                  value={fillBlankInput}
+                  disabled={fillBlankCorrect !== null}
+                  onChange={(e) => setFillBlankInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleFillBlankSubmit();
+                  }}
+                />
+                {fillBlankCorrect === false && (
+                  <p className='mt-1 text-xs text-error'>
+                    {_('Answer:')} {currentReviewEntry.term}
+                  </p>
+                )}
+                {fillBlankCorrect === null && (
+                  <button
+                    className='btn btn-primary btn-sm mt-2'
+                    onClick={() => void handleFillBlankSubmit()}
+                  >
+                    {_('Check')}
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
+
+          {/* Action buttons — only for flashcard / reverse modes */}
+          {(quizMode === 'flashcard' || quizMode === 'reverse') && (
+            <div className='flex items-center gap-2'>
+              {!isAnswerRevealed ? (
+                <button className='btn btn-secondary btn-sm' onClick={handleRevealAnswer}>
+                  {_('Reveal answer')}
+                </button>
+              ) : (
+                <>
+                  <button
+                    className='btn btn-error btn-sm'
+                    disabled={isReviewSaving}
+                    onClick={() => void handleFail()}
+                  >
+                    {_('Again')}
+                  </button>
+                  <button
+                    className='btn btn-success btn-sm'
+                    disabled={isReviewSaving}
+                    onClick={() => void handlePass()}
+                  >
+                    {_('Good')}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className='flex-1 overflow-y-auto px-3 py-2'>

@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import React from 'react';
 import { MdBookmarkBorder } from 'react-icons/md';
 import { IoIosList } from 'react-icons/io';
-import { PiNotePencil } from 'react-icons/pi';
+import { PiNotePencil, PiBookOpen } from 'react-icons/pi';
 import { LuMessageSquare } from 'react-icons/lu';
 import { RiTranslate } from 'react-icons/ri';
 
@@ -28,6 +28,7 @@ const TabNavigation: React.FC<{
     'annotations',
     'bookmarks',
     ...(ctxEnabled ? ['lookups'] : []),
+    ...(aiEnabled ? ['comprehension'] : []),
     ...(aiEnabled ? ['history'] : []),
   ];
 
@@ -41,6 +42,8 @@ const TabNavigation: React.FC<{
         return _('Bookmark');
       case 'lookups':
         return _('Lookups');
+      case 'comprehension':
+        return _('Quiz');
       case 'history':
         return _('Chat');
       default:
@@ -84,6 +87,8 @@ const TabNavigation: React.FC<{
               <MdBookmarkBorder className='mx-auto' />
             ) : tab === 'lookups' ? (
               <RiTranslate className='mx-auto' />
+            ) : tab === 'comprehension' ? (
+              <PiBookOpen className='mx-auto' />
             ) : (
               <LuMessageSquare className='mx-auto' />
             )}

@@ -22,6 +22,8 @@ import {
   filterRenderableExamples,
   parseStructuredExamples,
 } from '@/services/contextTranslation/exampleFormatter';
+import { getJapaneseGrammarHint } from '@/services/contextTranslation/grammarHints';
+import { getFrequencyBadge } from '@/services/contextTranslation/frequencyService';
 import { Position } from '@/utils/sel';
 
 interface ContextTranslationPopupProps {
@@ -120,6 +122,14 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
   const retrievalStatusMeta = getRetrievalStatusMeta(retrievalStatus);
   const retrievalInfoText = buildRetrievalInfoText(retrievalStatus, retrievalHints);
 
+  // Deterministic grammar hint for Japanese (kuromoji POS analysis)
+  const japaneseGrammarHint =
+    sourceCJKLang === 'japanese' ? getJapaneseGrammarHint(selectedText) : null;
+
+  // Frequency / proficiency level badge
+  const detectedLang = sourceCJKLang === 'chinese' ? 'zh' : sourceCJKLang === 'japanese' ? 'ja' : (bookLanguage ?? 'en');
+  const frequencyBadge = getFrequencyBadge(selectedText, detectedLang);
+
   const handleSpeak = (text: string, lang?: string) => {
     eventDispatcher.dispatch('tts-speak', {
       bookKey,
@@ -175,6 +185,21 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
         <p className='mb-1 text-xs text-amber-400/80'>
           {_('AI translation unavailable — showing dictionary results only')}
         </p>
+      )}
+      {(japaneseGrammarHint || frequencyBadge) && (
+        <div className='mb-1 flex items-center gap-2'>
+          {japaneseGrammarHint && (
+            <span className='text-xs italic text-gray-400'>{japaneseGrammarHint.label}</span>
+          )}
+          {frequencyBadge && (
+            <span className='rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300'>
+              {frequencyBadge.level}
+            </span>
+          )}
+        </div>
+      )}
+      {japaneseGrammarHint?.explanation && (
+        <p className='mb-1 text-xs text-gray-400/90'>{japaneseGrammarHint.explanation}</p>
       )}
       {popupContext?.dictionaryResults && popupContext.dictionaryResults.length > 0 && (
         <details className='mb-2'>

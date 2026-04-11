@@ -139,6 +139,16 @@ export function expandJapaneseSelection(text: string, selected: string): string 
   return text.slice(start, end);
 }
 
+/**
+ * Tokenize text and return the raw IpadicToken array.
+ * Used by grammarHints.ts to build POS-based grammar labels.
+ * Returns empty array if the tokenizer is not ready.
+ */
+export function tokenizeRaw(text: string): ReturnType<Tokenizer['tokenize']> {
+  if (!tokenizer) return [];
+  return tokenizer.tokenize(text);
+}
+
 // ---------------------------------------------------------------------------
 // Test helpers — allow tests to inject / reset a mock tokenizer
 // ---------------------------------------------------------------------------

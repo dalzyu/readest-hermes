@@ -39,6 +39,14 @@ export const DEFAULT_CONTEXT_TRANSLATION_SETTINGS: ContextTranslationSettings = 
       promptInstruction:
         'Provide 2–3 short example sentences using the selected term in similar contexts.',
     },
+    {
+      id: 'grammarHint',
+      label: 'Grammar',
+      enabled: false,
+      order: 3,
+      promptInstruction:
+        'Briefly state the grammatical role of the selected text in this sentence (e.g. part of speech, tense, mood, case). Keep it to one short line.',
+    },
   ],
 };
 
