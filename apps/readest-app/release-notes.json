@@ -1,5 +1,15 @@
 {
   "releases": {
+    "0.2.0": {
+      "date": "2026-04-11",
+      "notes": [
+        "Context popups now include Japanese grammar hints and deterministic conjugation explanations (for example tense and pattern guidance)",
+        "Word frequency indicators now surface CEFR (English), JLPT (Japanese), and HSK (Chinese) levels directly in lookup popups",
+        "Vocabulary review mode now includes multiple-choice, fill-in-the-blank, listening, and reverse recall formats with live streak and timing stats",
+        "A new Comprehension tab can generate spoiler-safe reading questions from your current progress and score your responses",
+        "Translation and dictionary popup speech controls now consistently pass language context for better pronunciation"
+      ]
+    },
     "0.1.0": {
       "date": "2026-04-11",
       "notes": [
