@@ -114,6 +114,9 @@ vi.mock('@/app/library/components/SeriesShelf', () => ({
 vi.mock('@/services/readingStats/readingStatsService', () => ({
   readingStatsService: {
     getDailyStats: vi.fn(),
+    getGoals: vi.fn().mockReturnValue({ timeGoalMinutes: 0, pageGoal: 0 }),
+    setGoals: vi.fn(),
+    getCurrentStreak: vi.fn().mockReturnValue(0),
   },
 }));
 
