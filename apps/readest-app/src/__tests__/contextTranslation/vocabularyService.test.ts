@@ -18,6 +18,7 @@ import {
   getAllVocabulary,
   deleteVocabularyEntry,
   searchVocabulary,
+  markVocabularyEntryReviewed,
 } from '@/services/contextTranslation/vocabularyService';
 import { VOCABULARY_SCHEMA_VERSION } from '@/services/contextTranslation/types';
 
@@ -132,5 +133,33 @@ describe('saveVocabularyEntry with examples', () => {
     const entry = await saveVocabularyEntry(structuredEntry);
     expect(entry.examples![0]!.exampleId).toBeDefined();
     expect(entry.examples![0]!.exampleId).toBe('ex-abc');
+  });
+});
+
+describe('markVocabularyEntryReviewed', () => {
+  test('increments reviewCount without changing the entry identity or saved data', async () => {
+    mockStore.saveVocabularyEntry.mockResolvedValueOnce(undefined);
+
+    const reviewed = await markVocabularyEntryReviewed(sampleEntry);
+
+    expect(mockStore.saveVocabularyEntry).toHaveBeenCalledOnce();
+    expect(mockStore.saveVocabularyEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...sampleEntry,
+        reviewCount: 1,
+        mode: 'translation',
+        schemaVersion: VOCABULARY_SCHEMA_VERSION,
+        examples: [],
+      }),
+    );
+    expect(reviewed).toEqual(
+      expect.objectContaining({
+        ...sampleEntry,
+        reviewCount: 1,
+        mode: 'translation',
+        schemaVersion: VOCABULARY_SCHEMA_VERSION,
+        examples: [],
+      }),
+    );
   });
 });

@@ -25,6 +25,16 @@ export async function saveVocabularyEntry(input: NewEntry): Promise<VocabularyEn
   return entry;
 }
 
+export async function markVocabularyEntryReviewed(
+  entry: VocabularyEntry,
+): Promise<VocabularyEntry> {
+  const reviewedEntry: VocabularyEntry = {
+    ...entry,
+    reviewCount: entry.reviewCount + 1,
+  };
+  return saveVocabularyEntry(reviewedEntry);
+}
+
 export async function getVocabularyForBook(bookHash: string): Promise<VocabularyEntry[]> {
   const entries = await aiStore.getVocabularyByBook(bookHash);
   return entries.map((entry) => upgradeSavedVocabularyEntry(entry));
