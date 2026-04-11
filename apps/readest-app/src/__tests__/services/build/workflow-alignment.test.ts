@@ -129,6 +129,15 @@ describe('workflow alignment', () => {
     expect(releaseWorkflow).toContain("if: github.repository == 'readest/readest'");
   });
 
+  test('android release flow keeps the freshly generated project instead of restoring stale tracked sources', () => {
+    expect(releaseWorkflow).not.toContain('git checkout .');
+  });
+
+  test('android release flow restores the store flavor wiring after regenerating the project', () => {
+    expect(releaseWorkflow).toContain('missingDimensionStrategy("store", storeFlavor)');
+    expect(releaseWorkflow).toContain('ORG_GRADLE_PROJECT_storeFlavor=foss pnpm tauri android build');
+  });
+
   test('armhf release builds include the io-uring arch workaround', () => {
     expect(releaseWorkflow).toContain(
       "echo 'CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_RUSTFLAGS=--cfg=io_uring_skip_arch_check' >> $GITHUB_ENV",

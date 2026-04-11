@@ -256,8 +256,20 @@ jobs:
           rm -rf src-tauri/gen/android
           pnpm tauri android init
           pnpm tauri icon ../../data/icons/readest-book.png
-          git checkout .
-          pnpm tauri android build
+          python - <<'PY'
+          from pathlib import Path
+
+          build_gradle = Path("src-tauri/gen/android/app/build.gradle.kts")
+          needle = '        versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")\n'
+          patch = needle + '        val storeFlavor = project.findProperty("storeFlavor")?.toString() ?: "foss"\n        missingDimensionStrategy("store", storeFlavor)\n'
+          text = build_gradle.read_text()
+          if 'missingDimensionStrategy("store", storeFlavor)' not in text:
+              if needle not in text:
+                  raise SystemExit(f"Failed to patch {build_gradle}: versionName line not found")
+              text = text.replace(needle, patch, 1)
+              build_gradle.write_text(text)
+          PY
+          ORG_GRADLE_PROJECT_storeFlavor=foss pnpm tauri android build
 
       - name: upload Android apk artifact (fork only)
         if: matrix.config.release == 'android' && github.repository != 'readest/readest'
@@ -308,7 +320,19 @@ jobs:
           rm -rf src-tauri/gen/android
           pnpm tauri android init
           pnpm tauri icon ../../data/icons/readest-book.png
-          git checkout .
+          python - <<'PY'
+          from pathlib import Path
+
+          build_gradle = Path("src-tauri/gen/android/app/build.gradle.kts")
+          needle = '        versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")\n'
+          patch = needle + '        val storeFlavor = project.findProperty("storeFlavor")?.toString() ?: "foss"\n        missingDimensionStrategy("store", storeFlavor)\n'
+          text = build_gradle.read_text()
+          if 'missingDimensionStrategy("store", storeFlavor)' not in text:
+              if needle not in text:
+                  raise SystemExit(f"Failed to patch {build_gradle}: versionName line not found")
+              text = text.replace(needle, patch, 1)
+              build_gradle.write_text(text)
+          PY
 
           pushd src-tauri/gen/android
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
@@ -321,9 +345,9 @@ jobs:
           apk_path=src-tauri/gen/android/app/build/outputs/apk/universal/release
           universial_apk=Hermes_${version}_universal.apk
           arm64_apk=Hermes_${version}_arm64.apk
-          pnpm tauri android build
+          ORG_GRADLE_PROJECT_storeFlavor=foss pnpm tauri android build
           cp ${apk_path}/app-universal-release.apk $universial_apk
-          pnpm tauri android build -t aarch64
+          ORG_GRADLE_PROJECT_storeFlavor=foss pnpm tauri android build -t aarch64
           cp ${apk_path}/app-universal-release.apk $arm64_apk
 
           echo "Uploading $universial_apk to GitHub release"
