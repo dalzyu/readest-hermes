@@ -176,6 +176,7 @@
     "tauri-plugin-device-info-api": "^1.0.1",
     "tinycolor2": "^1.6.0",
     "uuid": "^11.1.0",
+    "wanakana": "^5.3.1",
     "ws": "^8.18.3",
     "zod": "^4.0.8",
     "zustand": "5.0.10"
