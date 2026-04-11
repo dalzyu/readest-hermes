@@ -213,9 +213,7 @@ describe('AnnotationPopup layout', () => {
     expect(metrics.colorStrip.className).toContain('min-w-0');
     expect(metrics.colorStrip.className).not.toContain('flex-1');
     expect(metrics.gap).toBeGreaterThan(40);
-    expect(metrics.colorStripScrollWidth).toBeLessThanOrEqual(
-      metrics.colorStripClientWidth + 1,
-    );
+    expect(metrics.colorStripScrollWidth).toBeLessThanOrEqual(metrics.colorStripClientWidth + 1);
   });
 
   it('adding 5 user colors expands the strip and shrinks the gap', async () => {
@@ -257,9 +255,9 @@ describe('AnnotationPopup layout', () => {
       { hex: '#6366f1' },
     ]);
 
-    expect(Math.abs(overflowMetrics.colorStripWidth - expandedMetrics.colorStripWidth)).toBeLessThanOrEqual(
-      2,
-    );
+    expect(
+      Math.abs(overflowMetrics.colorStripWidth - expandedMetrics.colorStripWidth),
+    ).toBeLessThanOrEqual(2);
     expect(overflowMetrics.colorStripScrollWidth).toBeGreaterThan(
       overflowMetrics.colorStripClientWidth + 20,
     );
