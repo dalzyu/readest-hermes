@@ -8,6 +8,11 @@
         "Annotation export now ships bundled Obsidian, Notion, and Study Notes markdown presets while keeping custom templates intact",
         "Reader focus mode now hides sidebar, notebook, header, footer, and page chrome with keyboard shortcuts for distraction-free reading",
         "Japanese lookup phonetics now use wanakana-backed romaji generation, improving small-tsu and long-vowel handling",
+        "Library home screen shows a compact reading stats card with today's reading time, pages, sessions, and current streak",
+        "Vocabulary panel now supports an in-panel review mode ordered by least-reviewed entries, with answer reveal and persistent review counts",
+        "All successful context lookups are recorded as lookup history and displayed as recent lookups in the vocabulary panel",
+        "AI recap entry point added to the notebook assistant for spoiler-safe book summaries up to the current page",
+        "Reading session tracking records duration and pages for each reading session",
         "Release and PR workflows now target the supported 0.1.0 platform set and run format plus lint checks in the Tauri job"
       ]
     },
