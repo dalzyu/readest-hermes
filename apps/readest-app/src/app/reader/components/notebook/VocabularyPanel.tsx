@@ -5,6 +5,7 @@ import { useEnv } from '@/context/EnvContext';
 import { useSettingsStore } from '@/store/settingsStore';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
 import type { VocabularyEntry } from '@/services/contextTranslation/types';
+import type { LookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
 import {
   getVocabularyForBook,
   deleteVocabularyEntry,
@@ -13,6 +14,8 @@ import {
   exportAsCSV,
   markVocabularyEntryReviewed,
 } from '@/services/contextTranslation/vocabularyService';
+import { getLookupHistoryForBook } from '@/services/contextTranslation/lookupHistoryService';
+import { eventDispatcher } from '@/utils/event';
 
 interface VocabularyPanelProps {
   bookKey: string;
@@ -23,6 +26,20 @@ function sortVocabularyForReview(entries: VocabularyEntry[]): VocabularyEntry[] 
   return [...entries].sort(
     (a, b) => a.reviewCount - b.reviewCount || a.addedAt - b.addedAt || a.id.localeCompare(b.id),
   );
+}
+
+const RECENT_LOOKUP_LIMIT = 5;
+
+function getRecentLookupPreview(entry: LookupHistoryEntry): string {
+  const resultPreview = Object.keys(entry.result)
+    .sort()
+    .map((key) => entry.result[key]?.trim() ?? '')
+    .find((value) => value.length > 0);
+  const segments = [entry.context.trim(), resultPreview ?? ''].filter(
+    (segment) => segment.length > 0,
+  );
+  const preview = segments.join(' · ');
+  return preview.length > 72 ? `${preview.slice(0, 71).trimEnd()}…` : preview;
 }
 
 const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
@@ -43,6 +60,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [isReviewSaving, setIsReviewSaving] = useState(false);
+  const [recentLookups, setRecentLookups] = useState<LookupHistoryEntry[]>([]);
 
   const loadEntries = useCallback(async () => {
     try {
@@ -76,6 +94,27 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
       active = false;
     };
   }, [bookHash]);
+
+  const loadRecentLookups = useCallback(() => {
+    setRecentLookups(getLookupHistoryForBook(bookHash, RECENT_LOOKUP_LIMIT));
+  }, [bookHash]);
+
+  useEffect(() => {
+    loadRecentLookups();
+  }, [loadRecentLookups]);
+
+  useEffect(() => {
+    const handleLookupHistoryUpdated = (event: CustomEvent) => {
+      const eventBookHash = (event.detail as { bookHash?: string } | undefined)?.bookHash;
+      if (eventBookHash && eventBookHash !== bookHash) return;
+      loadRecentLookups();
+    };
+
+    eventDispatcher.on('lookup-history-updated', handleLookupHistoryUpdated);
+    return () => {
+      eventDispatcher.off('lookup-history-updated', handleLookupHistoryUpdated);
+    };
+  }, [bookHash, loadRecentLookups]);
 
   const renderEntryFields = (entry: VocabularyEntry) => {
     const enabledFields = ctxSettings.outputFields
@@ -192,6 +231,8 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     .sort((a, b) => a.order - b.order);
 
   const currentReviewEntry = reviewQueue[reviewIndex] ?? null;
+  const showRecentLookups =
+    !isReviewing && !isSearching && searchQuery.trim().length === 0 && recentLookups.length > 0;
 
   return (
     <div className='flex h-full flex-col'>
@@ -280,6 +321,30 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
         </div>
       ) : (
         <div className='flex-1 overflow-y-auto px-3 py-2'>
+          {showRecentLookups && (
+            <section className='mb-3'>
+              <div className='text-base-content/50 mb-1 flex items-center justify-between text-[11px] uppercase tracking-wide'>
+                <span>{_('Recent lookups')}</span>
+                <span>{recentLookups.length}</span>
+              </div>
+              <ul className='space-y-1'>
+                {recentLookups.map((entry) => {
+                  const preview = getRecentLookupPreview(entry);
+                  return (
+                    <li
+                      key={entry.id}
+                      className='border-base-300 bg-base-100 rounded-lg border px-3 py-2'
+                    >
+                      <p className='truncate text-sm font-medium'>{entry.term}</p>
+                      {preview && (
+                        <p className='text-base-content/50 mt-0.5 truncate text-xs'>{preview}</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
           {entries.length === 0 && (
             <p className='text-base-content/50 mt-8 text-center text-sm'>
               {isSearching || searchQuery

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import VocabularyPanel from '@/app/reader/components/notebook/VocabularyPanel';
+import { eventDispatcher } from '@/utils/event';
 import type { VocabularyEntry } from '@/services/contextTranslation/types';
 
 const mockGetVocabularyForBook = vi.fn();
@@ -10,7 +11,33 @@ const mockDeleteVocabularyEntry = vi.fn();
 const mockExportAsAnkiTSV = vi.fn();
 const mockExportAsCSV = vi.fn();
 const mockMarkVocabularyEntryReviewed = vi.fn();
+const mockGetLookupHistoryForBook = vi.fn();
 const mockSaveFile = vi.fn();
+
+vi.mock('@/services/contextTranslation/lookupHistoryService', () => ({
+  getLookupHistoryForBook: (...args: unknown[]) => mockGetLookupHistoryForBook(...args),
+}));
+
+const recentHistoryEntries = [
+  {
+    id: 'hist-new',
+    recordedAt: 2_000,
+    bookHash: 'book-hash',
+    term: 'lookup-beta',
+    context: 'context beta',
+    result: { explanation: 'beta summary', translation: 'beta translation' },
+    mode: 'dictionary' as const,
+  },
+  {
+    id: 'hist-old',
+    recordedAt: 1_000,
+    bookHash: 'book-hash',
+    term: 'lookup-alpha',
+    context: 'context alpha',
+    result: { contextualMeaning: 'alpha meaning', translation: 'alpha translation' },
+    mode: 'translation' as const,
+  },
+];
 
 vi.mock('@/hooks/useTranslation', () => ({
   useTranslation: () => (value: string) => value,
@@ -95,6 +122,7 @@ beforeEach(() => {
     ...entry,
     reviewCount: entry.reviewCount + 1,
   }));
+  mockGetLookupHistoryForBook.mockReturnValue(recentHistoryEntries);
 });
 
 afterEach(() => {
@@ -214,5 +242,103 @@ describe('VocabularyPanel review workflow', () => {
     await screen.findByText('solo');
     expect(screen.getByPlaceholderText('Search vocabulary...')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Reveal answer' })).toBeNull();
+  });
+});
+
+describe('VocabularyPanel lookup history surface', () => {
+  test('renders recent lookups newest first with concise previews', async () => {
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    await screen.findByText('Recent lookups');
+
+    expect(screen.getByText('lookup-beta')).toBeTruthy();
+    expect(screen.getByText('lookup-alpha')).toBeTruthy();
+    expect(screen.getByText('context beta · beta summary')).toBeTruthy();
+    expect(screen.getByText('context alpha · alpha meaning')).toBeTruthy();
+
+    expect(screen.getAllByText(/lookup-(beta|alpha)/).map((node) => node.textContent)).toEqual([
+      'lookup-beta',
+      'lookup-alpha',
+    ]);
+  });
+
+  test('renders nothing when there is no lookup history', async () => {
+    mockGetLookupHistoryForBook.mockReturnValueOnce([]);
+
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Recent lookups')).toBeNull();
+    });
+  });
+
+  test('refreshes recent lookups after a history update event for the current book', async () => {
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    await screen.findByText('Recent lookups');
+    expect(screen.getByText('lookup-beta')).toBeTruthy();
+
+    mockGetLookupHistoryForBook.mockReturnValueOnce([
+      {
+        id: 'hist-fresh',
+        recordedAt: 3_000,
+        bookHash: 'book-hash',
+        term: 'lookup-fresh',
+        context: 'context fresh',
+        result: { translation: 'fresh translation' },
+        mode: 'translation' as const,
+      },
+      ...recentHistoryEntries,
+    ]);
+
+    await act(async () => {
+      await eventDispatcher.dispatch('lookup-history-updated', { bookHash: 'book-hash' });
+    });
+
+    await screen.findByText('lookup-fresh');
+    expect(screen.getByText('context fresh · fresh translation')).toBeTruthy();
+  });
+
+  test('hides recent lookups while the search field is focused', async () => {
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    const searchInput = (await screen.findByPlaceholderText(
+      'Search vocabulary...',
+    )) as HTMLInputElement;
+    expect(screen.getByText('Recent lookups')).toBeTruthy();
+
+    fireEvent.focus(searchInput);
+
+    expect(screen.queryByText('Recent lookups')).toBeNull();
+  });
+
+  test('hides recent lookups while filtering with a search query', async () => {
+    mockSearchVocabulary.mockResolvedValueOnce([entries[1]!]);
+
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    await screen.findByText('Recent lookups');
+
+    fireEvent.change(screen.getByPlaceholderText('Search vocabulary...'), {
+      target: { value: 'beta' },
+    });
+
+    await waitFor(() => {
+      expect(mockSearchVocabulary).toHaveBeenCalledWith('beta');
+    });
+
+    expect(screen.queryByText('Recent lookups')).toBeNull();
+    expect(screen.getByText('beta')).toBeTruthy();
+  });
+
+  test('hides recent lookups during review mode', async () => {
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    await screen.findByText('Recent lookups');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review vocabulary' }));
+
+    await screen.findByRole('button', { name: 'Exit review' });
+    expect(screen.queryByText('Recent lookups')).toBeNull();
   });
 });

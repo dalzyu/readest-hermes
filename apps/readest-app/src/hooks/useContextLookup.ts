@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 
-
 import { getAIProvider } from '@/services/ai/providers';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
@@ -25,9 +24,11 @@ import type {
   TranslationResult,
 } from '@/services/contextTranslation/types';
 import { saveVocabularyEntry } from '@/services/contextTranslation/vocabularyService';
+import { saveLookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
 import { detectLookupLanguage } from '@/services/contextTranslation/languagePolicy';
 import type { ValidationDecision } from '@/services/contextTranslation/validator';
 import { useSettingsStore } from '@/store/settingsStore';
+import { eventDispatcher } from '@/utils/event';
 
 export interface UseContextLookupInput {
   mode: 'translation' | 'dictionary';
@@ -83,6 +84,7 @@ export function useContextLookup({
   const [annotations, setAnnotations] = useState<LookupAnnotationSlots | null>(null);
   const [validationDecision, setValidationDecision] = useState<ValidationDecision | null>(null);
   const contextRef = useRef<string>('');
+  const lookupHistoryKeyRef = useRef<string | null>(null);
 
   const requestSnapshot = useMemo(
     () => ({
@@ -97,6 +99,7 @@ export function useContextLookup({
   useEffect(() => {
     if (!selectedText.trim()) return;
 
+    lookupHistoryKeyRef.current = null;
     let cancelled = false;
     const abortController = new AbortController();
     setLoading(true);
@@ -283,6 +286,39 @@ export function useContextLookup({
       abortController.abort();
     };
   }, [selectedText, bookKey, bookHash, requestSnapshot, mode]);
+
+  useEffect(() => {
+    const term = selectedText.trim();
+    if (
+      !term ||
+      !result ||
+      loading ||
+      streaming ||
+      validationDecision !== 'accept' ||
+      !Object.values(result).some((value) => value.trim().length > 0)
+    ) {
+      return;
+    }
+
+    const historyKey = JSON.stringify({
+      bookHash,
+      term,
+      mode,
+      result,
+    });
+
+    if (lookupHistoryKeyRef.current === historyKey) return;
+
+    saveLookupHistoryEntry({
+      bookHash,
+      term,
+      context: contextRef.current,
+      result,
+      mode,
+    });
+    void eventDispatcher.dispatch('lookup-history-updated', { bookHash });
+    lookupHistoryKeyRef.current = historyKey;
+  }, [bookHash, loading, mode, result, selectedText, streaming, validationDecision]);
 
   const saveToVocabulary = useCallback(async () => {
     if (!result) return;

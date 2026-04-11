@@ -9,6 +9,10 @@ vi.mock('@/services/contextTranslation/vocabularyService', () => ({
   saveVocabularyEntry: vi.fn(),
 }));
 
+vi.mock('@/services/contextTranslation/lookupHistoryService', () => ({
+  saveLookupHistoryEntry: vi.fn(),
+}));
+
 vi.mock('@/store/settingsStore', () => ({
   useSettingsStore: vi.fn(() => ({ settings: null })),
 }));
@@ -39,10 +43,19 @@ vi.mock('@/services/contextTranslation/translationService', () => ({
       done: true,
     };
   }),
+  streamLookupWithContext: vi.fn(function* () {
+    yield {
+      fields: { simpleDefinition: 'a trusted friend' },
+      activeFieldId: null,
+      rawText: '<lookup_json>{"simpleDefinition":"a trusted friend"}</lookup_json>',
+      done: true,
+    };
+  }),
 }));
 
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
+import { saveLookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
 import { useContextLookup } from '@/hooks/useContextLookup';
 import type { PopupContextBundle } from '@/services/contextTranslation/types';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
@@ -72,6 +85,7 @@ const defaultProps = {
 };
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.mocked(buildPopupContextBundle).mockResolvedValue(popupContextBundle);
   vi.mocked(runContextLookup).mockResolvedValue({
     fields: { translation: 'close friend' },
@@ -89,18 +103,65 @@ describe('useContextLookup', () => {
     expect(result.current.validationDecision).toBeDefined();
   });
 
-  test('returns the final translation result', async () => {
+  test('returns the final translation result and saves history once', async () => {
     const { result } = renderHook(() => useContextLookup(defaultProps));
+
     await waitFor(() => expect(result.current.result).not.toBeNull());
     expect(result.current.result?.['translation']).toBe('close friend');
+
+    await waitFor(() => expect(saveLookupHistoryEntry).toHaveBeenCalledTimes(1));
+    expect(saveLookupHistoryEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bookHash: 'hash-1',
+        term: '知己',
+        context: 'context text',
+        mode: 'translation',
+        result: { translation: 'close friend' },
+      }),
+    );
   });
 
-  test('translation mode delegates to the shared lookup service', async () => {
-    renderHook(() => useContextLookup(defaultProps));
-    await waitFor(() =>
-      expect(runContextLookup).toHaveBeenCalledWith(
-        expect.objectContaining({ mode: 'translation' }),
-      ),
+  test('records finalized dictionary lookups too', async () => {
+    vi.mocked(runContextLookup).mockResolvedValueOnce({
+      fields: { simpleDefinition: 'a trusted friend' },
+      examples: [],
+      annotations: {},
+      validationDecision: 'accept',
+      detectedLanguage: { language: 'zh', confidence: 0.9, mixed: false },
+    });
+
+    renderHook(() =>
+      useContextLookup({
+        ...defaultProps,
+        mode: 'dictionary',
+      }),
     );
+
+    await waitFor(() => expect(saveLookupHistoryEntry).toHaveBeenCalledTimes(1));
+    expect(saveLookupHistoryEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'dictionary',
+        result: { simpleDefinition: 'a trusted friend' },
+      }),
+    );
+  });
+
+  test('does not record blank selections or incomplete results', async () => {
+    vi.mocked(runContextLookup).mockResolvedValueOnce({
+      fields: {},
+      examples: [],
+      annotations: {},
+      validationDecision: 'accept',
+      detectedLanguage: { language: 'zh', confidence: 0.9, mixed: false },
+    });
+
+    renderHook(() =>
+      useContextLookup({
+        ...defaultProps,
+        selectedText: '   ',
+      }),
+    );
+
+    await waitFor(() => expect(saveLookupHistoryEntry).not.toHaveBeenCalled());
   });
 });
