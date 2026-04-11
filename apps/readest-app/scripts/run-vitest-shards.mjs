@@ -39,5 +39,5 @@ for (let shard = 1; shard <= totalShards; shard += 1) {
 }
 
 for (const file of isolatedFiles) {
-  runVitest(['run', file]);
+  runVitest(['run', '--pool=threads', '--maxWorkers=1', file]);
 }
