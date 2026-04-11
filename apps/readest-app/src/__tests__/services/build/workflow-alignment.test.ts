@@ -57,12 +57,20 @@ describe('workflow alignment', () => {
     expect(prWorkflow).not.toContain('build-web:vinext');
   });
 
+  test('PR tauri job includes format and lint checks before tests', () => {
+    expect(prWorkflow).toContain("- name: run format check");
+    expect(prWorkflow).toContain("working-directory: apps/readest-app");
+    expect(prWorkflow).toContain('pnpm format:check');
+    expect(prWorkflow).toContain("- name: run lint");
+    expect(prWorkflow).toContain('pnpm lint');
+    expect(prWorkflow).toContain('xvfb-run pnpm test:pr:tauri');
+  });
+
+
   test('release workflow matrix matches the normalized local wrapper set', () => {
     expect(releaseLines).toContain('rust_target: x86_64-pc-windows-msvc');
     expect(releaseLines).toContain('rust_target: aarch64-pc-windows-msvc');
     expect(releaseLines).toContain('rust_target: x86_64-unknown-linux-gnu');
-    expect(releaseLines).toContain('rust_target: aarch64-unknown-linux-gnu');
-    expect(releaseLines).toContain('rust_target: arm-unknown-linux-gnueabihf');
     expect(releaseWorkflow).toContain("args: '--target universal-apple-darwin'");
     expect(releaseLines).toContain(
       'rust_target: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android',
@@ -71,10 +79,25 @@ describe('workflow alignment', () => {
     expect(packageJson.scripts['build-win-x64']).toContain('x86_64-pc-windows-msvc');
     expect(packageJson.scripts['build-win-arm64']).toContain('aarch64-pc-windows-msvc');
     expect(packageJson.scripts['build-linux-x64']).toContain('x86_64-unknown-linux-gnu');
-    expect(packageJson.scripts['build-linux-aarch64']).toContain('aarch64-unknown-linux-gnu');
-    expect(packageJson.scripts['build-linux-armhf']).toContain('arm-unknown-linux-gnueabihf');
     expect(packageJson.scripts['build-macos-universal']).toContain('universal-apple-darwin');
   });
+
+  test('release workflow targets only the supported 0.1.0 platforms', () => {
+    expect(releaseWorkflow).toContain("- os: ubuntu-latest");
+    expect(releaseWorkflow).toContain("release: android");
+    expect(releaseWorkflow).toContain("- os: ubuntu-22.04");
+    expect(releaseWorkflow).toContain("release: linux");
+    expect(releaseWorkflow).toContain("rust_target: x86_64-unknown-linux-gnu");
+    expect(releaseWorkflow).toContain("- os: macos-latest");
+    expect(releaseWorkflow).toContain("release: macos");
+    expect(releaseWorkflow).toContain("- os: windows-latest");
+    expect(releaseWorkflow).toContain("rust_target: x86_64-pc-windows-msvc");
+    expect(releaseWorkflow).toContain("rust_target: aarch64-pc-windows-msvc");
+    expect(releaseWorkflow).not.toContain('ubuntu-22.04-arm');
+    expect(releaseWorkflow).not.toContain('arm-unknown-linux-gnueabihf');
+    expect(releaseWorkflow).not.toContain('aarch64-unknown-linux-gnu');
+  });
+
 
   test('desktop-only permissions stay out of the shared capability set', () => {
     expect(defaultCapability.permissions).not.toContain('turso:default');
