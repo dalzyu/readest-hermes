@@ -286,6 +286,7 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   showBatteryPercentage: true,
   use24HourClock: false,
   tapToToggleFooter: false,
+  focusMode: false,
   showMarginsOnScroll: false,
   showPaginationButtons: false,
   progressStyle: 'fraction',

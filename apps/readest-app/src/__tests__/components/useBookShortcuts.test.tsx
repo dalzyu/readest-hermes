@@ -33,14 +33,18 @@ const currentViewSettings = {
   vertical: false,
   rtl: false,
   paragraphMode: { enabled: false },
+  focusMode: false,
 };
+
+
+const setViewSettingsMock = vi.fn();
 
 vi.mock('@/store/readerStore', () => ({
   useReaderStore: () => ({
     getView: () => mockView,
     getViewState: () => ({ ttsEnabled: false }),
     getViewSettings: () => currentViewSettings,
-    setViewSettings: vi.fn(),
+    setViewSettings: setViewSettingsMock,
   }),
 }));
 
@@ -127,6 +131,8 @@ describe('useBookShortcuts', () => {
     currentViewSettings.vertical = false;
     currentViewSettings.rtl = false;
     currentViewSettings.paragraphMode.enabled = false;
+    currentViewSettings.focusMode = false;
+    setViewSettingsMock.mockReset();
     mockView.book.dir = 'ltr';
   });
 
@@ -176,5 +182,15 @@ describe('useBookShortcuts', () => {
     shortcutState.actions?.['onGoNext']?.();
 
     expect(mockView.next).toHaveBeenCalledWith(72);
+  });
+
+  it('toggles focus mode on the active book', () => {
+    render(<Harness />);
+    shortcutState.actions?.['onToggleFocusMode']?.();
+
+    expect(setViewSettingsMock).toHaveBeenCalledWith(
+      'book-1',
+      expect.objectContaining({ focusMode: true }),
+    );
   });
 });

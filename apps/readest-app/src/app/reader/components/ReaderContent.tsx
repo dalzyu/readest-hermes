@@ -221,17 +221,18 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
       )
     );
   }
+  const chromeSuppressed = !!viewSettings.focusMode;
 
   return (
     <div className='reader-content full-height flex'>
-      <SideBar />
+      {!chromeSuppressed && <SideBar />}
       <BooksGrid
         bookKeys={bookKeys}
         onCloseBook={handleCloseBook}
         onGoToLibrary={handleCloseBooksToLibrary}
       />
       {isSettingsDialogOpen && <SettingsDialog bookKey={settingsDialogBookKey} />}
-      <Notebook />
+      {!chromeSuppressed && <Notebook />}
       {showDetailsBook && (
         <BookDetailModal
           isOpen={!!showDetailsBook}

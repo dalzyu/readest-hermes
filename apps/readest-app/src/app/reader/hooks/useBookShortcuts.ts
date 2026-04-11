@@ -186,6 +186,22 @@ const useBookShortcuts = ({ sideBarBookKey, bookKeys }: UseBookShortcutsProps) =
     }
   };
 
+  const toggleFocusMode = (event?: KeyboardEvent | MessageEvent) => {
+    if (!sideBarBookKey) return false;
+
+    const activeViewSettings = getViewSettings(sideBarBookKey);
+    if (!activeViewSettings) return false;
+    if (event instanceof KeyboardEvent && event.key === 'Escape' && !activeViewSettings.focusMode) {
+      return false;
+    }
+
+    setViewSettings(sideBarBookKey, {
+      ...activeViewSettings,
+      focusMode: !activeViewSettings.focusMode,
+    });
+    return true;
+  };
+
   const closeWindow = async () => {
     if (isTauriAppPlatform()) {
       await tauriHandleClose();
@@ -350,6 +366,7 @@ const useBookShortcuts = ({ sideBarBookKey, bookKeys }: UseBookShortcutsProps) =
       onOpenFontLayoutSettings: () => setSettingsDialogOpen(true),
       onShowSearchBar: showSearchBar,
       onToggleFullscreen: toggleFullscreen,
+      onToggleFocusMode: toggleFocusMode,
       onToggleTTS: toggleTTS,
       onTTSPlayPause: ttsPlayPause,
       onTTSGoNextSentence: ttsGoNextSentence,

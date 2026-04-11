@@ -578,6 +578,7 @@ describe('services/constants', () => {
       expect(typeof DEFAULT_VIEW_CONFIG.use24HourClock).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.tapToToggleFooter).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.showMarginsOnScroll).toBe('boolean');
+      expect(typeof DEFAULT_VIEW_CONFIG.focusMode).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.showPaginationButtons).toBe('boolean');
     });
 

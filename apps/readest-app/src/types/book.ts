@@ -221,6 +221,7 @@ export interface ViewConfig {
   showCurrentBatteryStatus: boolean;
   showBatteryPercentage: boolean;
   tapToToggleFooter: boolean;
+  focusMode: boolean;
   showBarsOnScroll: boolean;
   showMarginsOnScroll: boolean;
   showPaginationButtons: boolean;

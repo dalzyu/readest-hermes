@@ -106,8 +106,9 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
         };
         const scrolled = viewSettings.scrolled;
         const showBarsOnScroll = viewSettings.showBarsOnScroll;
-        const showHeader = viewSettings.showHeader && (scrolled ? showBarsOnScroll : true);
-        const showFooter = viewSettings.showFooter && (scrolled ? showBarsOnScroll : true);
+        const chromeVisible = !viewSettings.focusMode;
+        const showHeader = chromeVisible && viewSettings.showHeader && (scrolled ? showBarsOnScroll : true);
+        const showFooter = chromeVisible && viewSettings.showFooter && (scrolled ? showBarsOnScroll : true);
 
         return (
           <div
@@ -119,21 +120,25 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
             )}
           >
             {isBookmarked && !hoveredBookKey && <Ribbon width={`${horizontalGapPercent}%`} />}
-            <HeaderBar
-              bookKey={bookKey}
-              gridInsets={gridInsets}
-              screenInsets={screenInsets}
-              bookTitle={book.title}
-              isTopLeft={index === 0}
-              isHoveredAnim={bookKeys.length > 2}
-              onCloseBook={onCloseBook}
-              onGoToLibrary={onGoToLibrary}
-              onDropdownOpenChange={(isOpen) => setDropdownOpenBook(isOpen ? bookKey : '')}
-            />
-            <PageNavigationButtons
-              bookKey={bookKey}
-              isDropdownOpen={dropdownOpenBook === bookKey}
-            />
+            {chromeVisible && (
+              <>
+                <HeaderBar
+                  bookKey={bookKey}
+                  gridInsets={gridInsets}
+                  screenInsets={screenInsets}
+                  bookTitle={book.title}
+                  isTopLeft={index === 0}
+                  isHoveredAnim={bookKeys.length > 2}
+                  onCloseBook={onCloseBook}
+                  onGoToLibrary={onGoToLibrary}
+                  onDropdownOpenChange={(isOpen) => setDropdownOpenBook(isOpen ? bookKey : '')}
+                />
+                <PageNavigationButtons
+                  bookKey={bookKey}
+                  isDropdownOpen={dropdownOpenBook === bookKey}
+                />
+              </>
+            )}
             <FoliateViewer
               key={viewerKey}
               bookKey={bookKey}
@@ -222,14 +227,16 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
             <SearchResultsNav bookKey={bookKey} gridInsets={gridInsets} />
             <BooknotesNav bookKey={bookKey} gridInsets={gridInsets} toc={bookDoc.toc || []} />
             <FootnotePopup bookKey={bookKey} bookDoc={bookDoc} />
-            <FooterBar
-              bookKey={bookKey}
-              bookFormat={book.format}
-              section={section}
-              pageinfo={pageinfo}
-              isHoveredAnim={false}
-              gridInsets={gridInsets}
-            />
+            {chromeVisible && (
+              <FooterBar
+                bookKey={bookKey}
+                bookFormat={book.format}
+                section={section}
+                pageinfo={pageinfo}
+                isHoveredAnim={false}
+                gridInsets={gridInsets}
+              />
+            )}
           </div>
         );
       })}

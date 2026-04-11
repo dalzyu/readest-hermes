@@ -163,6 +163,11 @@ const DEFAULT_SHORTCUTS = {
     description: _('Toggle Fullscreen'),
     section: 'Window',
   },
+  onToggleFocusMode: {
+    keys: ['z', 'Escape'],
+    description: _('Toggle Focus Mode'),
+    section: 'Window',
+  },
   onCloseWindow: {
     keys: ['ctrl+w', 'cmd+w'],
     description: _('Close Window'),

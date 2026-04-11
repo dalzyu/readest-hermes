@@ -2,8 +2,8 @@ import { Insets } from '@/types/misc';
 import { ViewSettings } from '@/types/book';
 
 export const getViewInsets = (viewSettings: ViewSettings) => {
-  const showHeader = viewSettings.showHeader!;
-  const showFooter = viewSettings.showFooter!;
+  const showHeader = viewSettings.showHeader && !viewSettings.focusMode;
+  const showFooter = viewSettings.showFooter && !viewSettings.focusMode;
   const isVertical = viewSettings.vertical || viewSettings.writingMode.includes('vertical');
   const fullMarginTopPx = viewSettings.marginPx || viewSettings.marginTopPx;
   const compactMarginTopPx = viewSettings.compactMarginPx || viewSettings.compactMarginTopPx;
