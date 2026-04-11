@@ -90,6 +90,7 @@ const AIAssistantChat = ({
     messages: storedMessages,
     addMessage,
     isLoadingHistory,
+    createConversationWithFirstMessage,
   } = useAIChatStore();
 
   // use a ref to keep up-to-date options without triggering re-renders of the runtime
@@ -111,6 +112,11 @@ const AIAssistantChat = ({
       currentPage,
     };
   });
+
+  const handleRecap = useCallback(async () => {
+    const recapPrompt = `Please give me a spoiler-safe recap of "${bookTitle}" by ${authorName} up to page ${currentPage}. Only summarize events and information that have been revealed up to that point. Do not include any content beyond page ${currentPage}.`;
+    await createConversationWithFirstMessage(bookHash, 'Recap so far', recapPrompt);
+  }, [bookHash, bookTitle, authorName, currentPage, createConversationWithFirstMessage]);
 
   // create adapter ONCE and keep it stable
   const adapter = useMemo(() => {
@@ -159,6 +165,7 @@ const AIAssistantChat = ({
       adapter={adapter}
       historyAdapter={historyAdapter}
       onResetIndex={onResetIndex}
+      onRecap={handleRecap}
       isLoadingHistory={isLoadingHistory}
       hasActiveConversation={!!activeConversationId}
     />
@@ -169,12 +176,14 @@ const AIAssistantWithRuntime = ({
   adapter,
   historyAdapter,
   onResetIndex,
+  onRecap,
   isLoadingHistory,
   hasActiveConversation,
 }: {
   adapter: NonNullable<ReturnType<typeof createTauriAdapter>>;
   historyAdapter?: ThreadHistoryAdapter;
   onResetIndex: () => void;
+  onRecap?: () => void;
   isLoadingHistory: boolean;
   hasActiveConversation: boolean;
 }) => {
@@ -188,6 +197,7 @@ const AIAssistantWithRuntime = ({
     <AssistantRuntimeProvider runtime={runtime}>
       <ThreadWrapper
         onResetIndex={onResetIndex}
+        onRecap={onRecap}
         isLoadingHistory={isLoadingHistory}
         hasActiveConversation={hasActiveConversation}
       />
@@ -197,10 +207,12 @@ const AIAssistantWithRuntime = ({
 
 const ThreadWrapper = ({
   onResetIndex,
+  onRecap,
   isLoadingHistory,
   hasActiveConversation,
 }: {
   onResetIndex: () => void;
+  onRecap?: () => void;
   isLoadingHistory: boolean;
   hasActiveConversation: boolean;
 }) => {
@@ -252,6 +264,7 @@ const ThreadWrapper = ({
       sources={sources}
       onClear={handleClear}
       onResetIndex={onResetIndex}
+      onRecap={onRecap}
       isLoadingHistory={isLoadingHistory}
       hasActiveConversation={hasActiveConversation}
     />

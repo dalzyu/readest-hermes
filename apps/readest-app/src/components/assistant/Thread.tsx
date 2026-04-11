@@ -22,6 +22,7 @@ import {
   CopyIcon,
   PencilIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
   SquareIcon,
   Trash2Icon,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ interface ThreadProps {
   sources?: ScoredChunk[];
   onClear?: () => void;
   onResetIndex?: () => void;
+  onRecap?: () => void;
   isLoadingHistory?: boolean;
   hasActiveConversation?: boolean;
 }
@@ -103,6 +105,7 @@ export const Thread: FC<ThreadProps> = ({
   sources = [],
   onClear,
   onResetIndex,
+  onRecap,
   isLoadingHistory = false,
   hasActiveConversation = false,
 }) => {
@@ -171,7 +174,16 @@ export const Thread: FC<ThreadProps> = ({
             <p className='text-base-content/60 mb-4 text-xs'>
               Get answers based on the book content
             </p>
-            <Composer onClear={onClear} onResetIndex={onResetIndex} />
+            {onRecap && (
+              <button
+                type='button'
+                onClick={onRecap}
+                className='text-primary hover:bg-base-200 mb-3 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors'>
+                <RotateCcwIcon className='size-3.5' />
+                Recap so far
+              </button>
+            )}
+            <Composer onClear={onClear} onResetIndex={onResetIndex} onRecap={onRecap} />
           </div>
         </ThreadPrimitive.Empty>
       )}
@@ -207,7 +219,7 @@ export const Thread: FC<ThreadProps> = ({
           <ScrollToBottomButton />
         </div>
 
-        <Composer onClear={onClear} onResetIndex={onResetIndex} />
+        <Composer onClear={onClear} onResetIndex={onResetIndex} onRecap={onRecap} />
       </AssistantIf>
     </ThreadPrimitive.Root>
   );
@@ -216,9 +228,10 @@ export const Thread: FC<ThreadProps> = ({
 interface ComposerProps {
   onClear?: () => void;
   onResetIndex?: () => void;
+  onRecap?: () => void;
 }
 
-const Composer: FC<ComposerProps> = ({ onClear, onResetIndex }) => {
+const Composer: FC<ComposerProps> = ({ onClear, onResetIndex, onRecap }) => {
   const isEmpty = useAssistantState((s) => s.composer.isEmpty);
   const isRunning = useAssistantState((s) => s.thread.isRunning);
 
@@ -250,6 +263,18 @@ const Composer: FC<ComposerProps> = ({ onClear, onResetIndex }) => {
               aria-label='Re-index book'
             >
               <RefreshCwIcon className='size-3.5' />
+            </button>
+          )}
+
+          {onRecap && (
+            <button
+              type='button'
+              onClick={onRecap}
+              className='text-base-content hover:bg-base-300 mb-0.5 flex size-7 shrink-0 items-center justify-center rounded-full transition-colors'
+              title='Recap so far'
+              aria-label='Recap so far'
+            >
+              <RotateCcwIcon className='size-3.5' />
             </button>
           )}
 

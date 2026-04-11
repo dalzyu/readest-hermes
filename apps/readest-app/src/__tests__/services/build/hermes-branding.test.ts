@@ -41,7 +41,7 @@ describe('Hermes branding copy', () => {
     expect(updaterWindow).toContain("Hermes {{newVersion}} is available");
     expect(updaterWindow).toContain('"What\'s New in Hermes"');
     expect(exportMarkdown).toContain('Exported from Hermes');
-    expect(aiTranslatePanel).toContain('DeepL requires a Hermes account. Please log in.');
+expect(aiTranslatePanel).toContain('DeepL requires your own API key.');
     expect(koSyncSettings).toContain('Hermes (');
     expect(commandRegistry).toContain("About Hermes");
     expect(commandRegistry).toContain("Help improve Hermes");
