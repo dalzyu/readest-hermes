@@ -150,7 +150,7 @@ function compressGzip(data: Uint8Array): Promise<Uint8Array> {
 }
 
 /** Get all user dictionary metadata from settings. */
-async function getUserDictionaryMeta(): Promise<UserDictionary[]> {
+export async function getUserDictionaryMeta(): Promise<UserDictionary[]> {
   // Access the settings store directly to read userDictionaryMeta
   // We import lazily to avoid circular deps
   const { useSettingsStore } = await import('@/store/settingsStore');
@@ -158,7 +158,7 @@ async function getUserDictionaryMeta(): Promise<UserDictionary[]> {
 }
 
 /** Persist updated user dictionary metadata to settings. */
-async function saveUserDictionaryMeta(meta: UserDictionary[]): Promise<void> {
+export async function saveUserDictionaryMeta(meta: UserDictionary[]): Promise<void> {
   const { useSettingsStore } = await import('@/store/settingsStore');
   const current = useSettingsStore.getState().settings;
   // Use setSettings to update in-memory state; callers responsible for full save

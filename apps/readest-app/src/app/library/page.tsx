@@ -7,7 +7,6 @@ import { useState, useRef, useEffect, Suspense, useCallback } from 'react';
 import { ReadonlyURLSearchParams, useSearchParams } from 'next/navigation';
 
 import { Book } from '@/types/book';
-import type { BookSeries } from '@/services/contextTranslation/types';
 import { AppService, DeleteAction } from '@/types/system';
 import { navigateToLibrary, navigateToReader } from '@/utils/nav';
 import { formatAuthors, formatTitle, getPrimaryLanguage, listFormater } from '@/utils/book';
@@ -83,75 +82,10 @@ import {
   getAllSeries,
   updateSeriesVolume,
 } from '@/services/contextTranslation/seriesService';
-
-interface ImportSeriesSuggestion {
-  book: Book;
-  series: BookSeries;
-  suggestedVolumeIndex?: number;
-}
-
-const normalizeSuggestionText = (value: string | undefined) =>
-  (value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gi, ' ')
-    .trim();
-
-const extractVolumeNumber = (title: string | undefined): number | undefined => {
-  if (!title) return undefined;
-  const match =
-    title.match(/(?:vol(?:ume)?|book)?\s*(\d+)\s*$/i) || title.match(/\b(\d+)\b(?!.*\b\d+\b)/);
-  if (!match?.[1]) return undefined;
-  const parsed = Number.parseInt(match[1], 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-};
-
-export const buildImportSeriesSuggestions = (
-  importedBooks: Book[],
-  existingSeries: BookSeries[],
-  libraryBooks: Book[],
-): ImportSeriesSuggestion[] =>
-  importedBooks.flatMap<ImportSeriesSuggestion>((book) => {
-    const normalizedTitle = normalizeSuggestionText(book.title);
-    const normalizedAuthor = normalizeSuggestionText(book.author);
-
-    const candidates = existingSeries
-      .filter((series) => !series.volumes.some((volume) => volume.bookHash === book.hash))
-      .map((series) => {
-        const normalizedSeriesName = normalizeSuggestionText(series.name);
-        const seriesBooks = series.volumes
-          .map((volume) => libraryBooks.find((libraryBook) => libraryBook.hash === volume.bookHash))
-          .filter((seriesBook): seriesBook is Book => !!seriesBook);
-        const authorMatches = seriesBooks.some(
-          (seriesBook) => normalizeSuggestionText(seriesBook.author) === normalizedAuthor,
-        );
-        const titleMatches =
-          (!!normalizedSeriesName && normalizedTitle.includes(normalizedSeriesName)) ||
-          seriesBooks.some((seriesBook) => {
-            const existingTitle = normalizeSuggestionText(seriesBook.title);
-            if (!existingTitle) return false;
-            const overlap = existingTitle
-              .split(' ')
-              .filter((token) => token && normalizedTitle.includes(token));
-            return overlap.length >= 2;
-          });
-
-        if (!authorMatches || !titleMatches) {
-          return [];
-        }
-
-        return [
-          {
-            book,
-            series,
-            suggestedVolumeIndex: extractVolumeNumber(book.title),
-          },
-        ];
-      })
-      .flat()
-      .sort((left, right) => (right.suggestedVolumeIndex || 0) - (left.suggestedVolumeIndex || 0));
-
-    return candidates.slice(0, 1);
-  });
+import {
+  buildImportSeriesSuggestions,
+} from '@/utils/seriesSuggestions';
+import type { ImportSeriesSuggestion } from '@/utils/seriesSuggestions';
 
 const LibraryPageWithSearchParams = () => {
   const searchParams = useSearchParams();
