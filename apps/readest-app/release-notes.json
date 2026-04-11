@@ -3,9 +3,12 @@
     "0.1.0": {
       "date": "2026-04-11",
       "notes": [
-        "Hermes 0.1.0 marks the first offline-only release line for the Readest fork",
-        "Version metadata now aligns across the web app, Rust backend, and release notes",
-        "Release packaging and branding cleanup continue in the remaining 0.1.0 slices"
+        "Hermes 0.1.0 is the first offline-only release, with cloud account and premium UI gated off for the forked build",
+        "Branding and metadata are aligned across the app, updater feeds, security policy, release packaging, and locale bundles",
+        "Annotation export now ships bundled Obsidian, Notion, and Study Notes markdown presets while keeping custom templates intact",
+        "Reader focus mode now hides sidebar, notebook, header, footer, and page chrome with keyboard shortcuts for distraction-free reading",
+        "Japanese lookup phonetics now use wanakana-backed romaji generation, improving small-tsu and long-vowel handling",
+        "Release and PR workflows now target the supported 0.1.0 platform set and run format plus lint checks in the Tauri job"
       ]
     },
     "0.0.2": {

@@ -1,18 +1,18 @@
 # Contribution Guidelines
 
-When contributing to `Readest`, whether on GitHub or in other community spaces:
+When contributing to `Hermes`, whether on GitHub or in other community spaces:
 
 - Be respectful, civil, and open-minded.
-- Before opening a new pull request, try searching through the [issue tracker](https://github.com/readest/readest/issues) for known issues or fixes.
+- Before opening a new pull request, try searching through the [issue tracker](https://github.com/dalzyu/readest-hermes/issues) for known issues or fixes.
 - If you want to make code changes based on your personal opinion(s), make sure you open an issue first describing the changes you want to make, and open a pull request only when your suggestions get approved by maintainers.
 
 ## How to Contribute
 
 ### Prerequisites
 
-In order to not waste your time implementing a change that has already been declined, or is generally not needed, start by [opening an issue](https://github.com/readest/readest/issues/new/choose) describing the problem you would like to solve.
+In order to not waste your time implementing a change that has already been declined, or is generally not needed, start by [opening an issue](https://github.com/dalzyu/readest-hermes/issues/new/choose) describing the problem you would like to solve.
 
-For the best experience to build Readest for yourself, use a recent version of Node.js and Rust. Refer to the [Tauri documentation](https://v2.tauri.app/start/prerequisites/) for details on setting up the development environment prerequisites on different platforms.
+For the best experience to build Hermes for yourself, use a recent version of Node.js and Rust. Refer to the [Tauri documentation](https://v2.tauri.app/start/prerequisites/) for details on setting up the development environment prerequisites on different platforms.
 
 Basically you need to install or update the following development tools:
 
@@ -28,13 +28,13 @@ rustup update
 
 ### Getting Started
 
-To get started with Readest, follow these steps to clone and build the project.
+To get started with Hermes, follow these steps to clone and build the project.
 
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/readest/readest.git
-cd readest
+git clone https://github.com/dalzyu/readest-hermes.git
+cd readest-hermes
 git submodule update --init --recursive
 ```
 
@@ -71,11 +71,11 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
-Now you're all setup and can start implementing your changes.
+Now you're all set up and can start implementing your changes.
 
 ### Implement your changes
 
-This project is a monorepo. The code for the `readest-app` is in the `apps/readest-app` directory. Here are some useful scripts for developing the frontend only without compiling Tauri:
+This project is a monorepo. The code for the `readest-app` is in the `apps/readest-app` directory. Hermes is currently shipped as an offline-first fork, so backend-dependent features should remain gated unless the fork adds its own backend support. Here are some useful scripts for developing the frontend only without compiling Tauri:
 
 | Command          | Description                                        |
 | ---------------- | -------------------------------------------------- |
@@ -97,7 +97,7 @@ Check that your code follows the project's style guidelines by running:
 pnpm build
 ```
 
-Please also make a manual, functional test of your changes. When all that's done, it's time to file a pull request to upstream and fill out the title and body appropriately.
+Please also make a manual, functional test of your changes. When all that's done, it's time to open a pull request against the Hermes fork and fill out the title and body appropriately.
 
 ## Credits
 
