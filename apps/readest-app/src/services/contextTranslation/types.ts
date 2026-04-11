@@ -51,7 +51,7 @@ export interface TranslationRequest {
 }
 
 /** Schema version for VocabularyEntry persistence format */
-export const VOCABULARY_SCHEMA_VERSION = 1;
+export const VOCABULARY_SCHEMA_VERSION = 2;
 
 /** A saved example sentence linked to a vocabulary entry */
 export interface VocabularyExample {
@@ -68,6 +68,16 @@ export interface VocabularyEntry {
   result: TranslationResult;
   addedAt: number;
   reviewCount: number;
+  /** SM-2 review scheduling metadata; optional so legacy entries remain readable. */
+  dueAt?: number;
+  /** SM-2 interval in days. */
+  intervalDays?: number;
+  /** SM-2 ease factor. */
+  easeFactor?: number;
+  /** Consecutive successful reviews. */
+  repetition?: number;
+  /** Unix ms timestamp of the last review. */
+  lastReviewedAt?: number;
   /** Lookup mode that produced this entry ('translation' | 'dictionary') */
   mode?: 'translation' | 'dictionary';
   /** Schema version for forward-compatible reads */

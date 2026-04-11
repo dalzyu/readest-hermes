@@ -8,6 +8,7 @@ import { VOCABULARY_SCHEMA_VERSION } from './types';
  * Rules:
  * - Legacy entries without `mode` are assumed to be 'translation'.
  * - Missing `examples` default to [].
+ * - Missing SM-2 fields fall back to the initial scheduling defaults.
  * - Already-upgraded entries are returned with existing field values preserved.
  * - schemaVersion is set to VOCABULARY_SCHEMA_VERSION if absent.
  */
@@ -28,5 +29,10 @@ export function upgradeSavedVocabularyEntry(raw: unknown): VocabularyEntry {
     examples: Array.isArray(entry['examples'])
       ? (entry['examples'] as VocabularyEntry['examples'])
       : [],
+    dueAt: entry['dueAt'] as number | undefined,
+    intervalDays: (entry['intervalDays'] as number | undefined) ?? 0,
+    easeFactor: (entry['easeFactor'] as number | undefined) ?? 2.5,
+    repetition: (entry['repetition'] as number | undefined) ?? 0,
+    lastReviewedAt: entry['lastReviewedAt'] as number | undefined,
   };
 }

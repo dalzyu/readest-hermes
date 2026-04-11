@@ -2,7 +2,11 @@ import clsx from 'clsx';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
-import { readingStatsService, type DailyStats } from '@/services/readingStats/readingStatsService';
+import {
+  readingStatsService,
+  type DailyGoals,
+  type DailyStats,
+} from '@/services/readingStats/readingStatsService';
 
 interface LibraryStatsCardProps {
   className?: string;
@@ -25,29 +29,23 @@ function getUtcDateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function getCurrentStreak(dailyStats: DailyStats[], today = new Date()): number {
-  const dates = new Set(dailyStats.map((stat) => stat.date));
-  const cursor = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
-  );
-  let streak = 0;
-
-  while (dates.has(getUtcDateKey(cursor))) {
-    streak += 1;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-  }
-
-  return streak;
-}
-
 function getTodayStats(dailyStats: DailyStats[], today = new Date()): DailyStats | undefined {
   const todayKey = getUtcDateKey(today);
   return dailyStats.find((stat) => stat.date === todayKey);
 }
 
+function goalPct(current: number, goal: number): number {
+  if (goal <= 0) return 0;
+  return Math.min(100, Math.round((current / goal) * 100));
+}
+
 const LibraryStatsCard: React.FC<LibraryStatsCardProps> = ({ className }) => {
   const _ = useTranslation();
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
+  const [goals, setGoals] = useState<DailyGoals>(() => readingStatsService.getGoals());
+  const [isEditingGoals, setIsEditingGoals] = useState(false);
+  const [editTime, setEditTime] = useState(0);
+  const [editPages, setEditPages] = useState(0);
 
   useEffect(() => {
     setDailyStats(readingStatsService.getDailyStats());
@@ -57,15 +55,35 @@ const LibraryStatsCard: React.FC<LibraryStatsCardProps> = ({ className }) => {
     if (dailyStats.length === 0) return null;
 
     const todayStats = getTodayStats(dailyStats);
-    const currentStreak = getCurrentStreak(dailyStats);
+    const currentStreak = readingStatsService.getCurrentStreak(dailyStats, goals);
+    const todaySeconds = todayStats?.totalSecondsRead ?? 0;
+    const todayPages = todayStats?.totalPagesRead ?? 0;
 
     return {
-      todayRead: formatDuration(todayStats?.totalSecondsRead ?? 0),
-      pagesRead: todayStats?.totalPagesRead ?? 0,
+      todayRead: formatDuration(todaySeconds),
+      pagesRead: todayPages,
       sessions: todayStats?.sessions ?? 0,
       currentStreak,
+      timeGoalPct:
+        goals.timeGoalMinutes > 0 ? goalPct(todaySeconds, goals.timeGoalMinutes * 60) : null,
+      pageGoalPct: goals.pageGoal > 0 ? goalPct(todayPages, goals.pageGoal) : null,
     };
-  }, [dailyStats]);
+  }, [dailyStats, goals]);
+
+  const handleEditGoals = () => {
+    setEditTime(goals.timeGoalMinutes);
+    setEditPages(goals.pageGoal);
+    setIsEditingGoals(true);
+  };
+
+  const handleSaveGoals = () => {
+    const updated = readingStatsService.setGoals({
+      timeGoalMinutes: editTime,
+      pageGoal: editPages,
+    });
+    setGoals(updated);
+    setIsEditingGoals(false);
+  };
 
   if (!summary) return null;
 
@@ -114,6 +132,87 @@ const LibraryStatsCard: React.FC<LibraryStatsCardProps> = ({ className }) => {
           </dd>
         </div>
       </dl>
+
+      {(summary.timeGoalPct !== null || summary.pageGoalPct !== null) && (
+        <div className='mt-3 space-y-2' data-testid='library-stats-goals'>
+          {summary.timeGoalPct !== null && (
+            <div>
+              <div className='mb-1 flex items-center justify-between text-xs'>
+                <span className='text-base-content/60'>{_('Daily time goal')}</span>
+                <span className='text-base-content/60'>{`${summary.timeGoalPct}%`}</span>
+              </div>
+              <progress
+                className='progress progress-primary w-full'
+                value={summary.timeGoalPct}
+                max={100}
+                data-testid='library-stats-time-goal-pct'
+              />
+            </div>
+          )}
+          {summary.pageGoalPct !== null && (
+            <div>
+              <div className='mb-1 flex items-center justify-between text-xs'>
+                <span className='text-base-content/60'>{_('Daily page goal')}</span>
+                <span className='text-base-content/60'>{`${summary.pageGoalPct}%`}</span>
+              </div>
+              <progress
+                className='progress progress-secondary w-full'
+                value={summary.pageGoalPct}
+                max={100}
+                data-testid='library-stats-page-goal-pct'
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {isEditingGoals ? (
+        <div
+          className='mt-3 flex flex-wrap items-end gap-2'
+          data-testid='library-stats-goal-editor'
+        >
+          <label className='flex flex-col gap-1 text-xs'>
+            <span className='text-base-content/60'>{_('Time goal (min/day)')}</span>
+            <input
+              type='number'
+              min={0}
+              max={1440}
+              className='input input-bordered input-xs w-24'
+              value={editTime}
+              onChange={(e) => setEditTime(Math.max(0, Math.floor(Number(e.target.value))))}
+              data-testid='library-stats-edit-time'
+            />
+          </label>
+          <label className='flex flex-col gap-1 text-xs'>
+            <span className='text-base-content/60'>{_('Page goal (pages/day)')}</span>
+            <input
+              type='number'
+              min={0}
+              max={10000}
+              className='input input-bordered input-xs w-24'
+              value={editPages}
+              onChange={(e) => setEditPages(Math.max(0, Math.floor(Number(e.target.value))))}
+              data-testid='library-stats-edit-pages'
+            />
+          </label>
+          <button className='btn btn-primary btn-xs' onClick={handleSaveGoals}>
+            {_('Save')}
+          </button>
+          <button className='btn btn-ghost btn-xs' onClick={() => setIsEditingGoals(false)}>
+            {_('Cancel')}
+          </button>
+        </div>
+      ) : (
+        <div className='mt-3 flex justify-end'>
+          <button
+            className='btn btn-ghost btn-xs text-base-content/40'
+            onClick={handleEditGoals}
+            data-testid='library-stats-edit-goals-btn'
+          >
+            {_('Edit goals')}
+          </button>
+        </div>
+      )}
     </article>
   );
 };

@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { VocabularyEntry } from '@/services/contextTranslation/types';
 
 vi.mock('@/services/ai/storage/aiStore', () => ({
@@ -12,6 +12,7 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
 }));
 
 import { aiStore } from '@/services/ai/storage/aiStore';
+import { VOCABULARY_SCHEMA_VERSION } from '@/services/contextTranslation/types';
 import {
   saveVocabularyEntry,
   getVocabularyForBook,
@@ -19,10 +20,13 @@ import {
   deleteVocabularyEntry,
   searchVocabulary,
   markVocabularyEntryReviewed,
+  sm2Update,
+  getDueVocabularyForBook,
 } from '@/services/contextTranslation/vocabularyService';
-import { VOCABULARY_SCHEMA_VERSION } from '@/services/contextTranslation/types';
 
 const mockStore = vi.mocked(aiStore);
+const DAY_MS = 24 * 60 * 60 * 1000;
+const NOW = 1_700_000_000_000;
 
 const sampleEntry: VocabularyEntry = {
   id: 'abc-123',
@@ -36,6 +40,10 @@ const sampleEntry: VocabularyEntry = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('saveVocabularyEntry', () => {
@@ -67,6 +75,30 @@ describe('saveVocabularyEntry', () => {
     expect(arg.id).toBe('abc-123');
     expect(arg.addedAt).toBe(1700000000000);
   });
+
+  test('persists provided SM-2 fields', async () => {
+    mockStore.saveVocabularyEntry.mockResolvedValueOnce(undefined);
+
+    const scheduledEntry = {
+      ...sampleEntry,
+      dueAt: NOW + DAY_MS,
+      intervalDays: 6,
+      easeFactor: 2.65,
+      repetition: 3,
+      lastReviewedAt: NOW,
+    };
+
+    const saved = await saveVocabularyEntry(scheduledEntry);
+
+    expect(mockStore.saveVocabularyEntry).toHaveBeenCalledOnce();
+    expect(mockStore.saveVocabularyEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...scheduledEntry,
+        schemaVersion: VOCABULARY_SCHEMA_VERSION,
+      }),
+    );
+    expect(saved).toEqual(expect.objectContaining(scheduledEntry));
+  });
 });
 
 describe('getVocabularyForBook', () => {
@@ -77,15 +109,159 @@ describe('getVocabularyForBook', () => {
 
     expect(mockStore.getVocabularyByBook).toHaveBeenCalledWith('book-xyz');
     expect(result).toHaveLength(1);
-    expect(result[0]!.term).toBe('zhiji');
-    expect(result[0]!.mode).toBe('translation');
-    expect(result[0]!.schemaVersion).toBe(VOCABULARY_SCHEMA_VERSION);
+    expect(result[0]!).toMatchObject({
+      term: 'zhiji',
+      mode: 'translation',
+      schemaVersion: VOCABULARY_SCHEMA_VERSION,
+      dueAt: undefined,
+      intervalDays: 0,
+      easeFactor: 2.5,
+      repetition: 0,
+      lastReviewedAt: undefined,
+      examples: [],
+    });
   });
 
   test('returns empty array when book has no entries', async () => {
     mockStore.getVocabularyByBook.mockResolvedValueOnce([]);
     const result = await getVocabularyForBook('unknown-book');
     expect(result).toEqual([]);
+  });
+});
+
+describe('getDueVocabularyForBook', () => {
+  test('returns only due entries ordered by dueAt then addedAt', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW);
+    mockStore.getVocabularyByBook.mockResolvedValueOnce([
+      {
+        ...sampleEntry,
+        id: 'future-entry',
+        dueAt: NOW + DAY_MS,
+        addedAt: 30,
+      },
+      {
+        ...sampleEntry,
+        id: 'past-entry-2',
+        dueAt: NOW - 2 * DAY_MS,
+        addedAt: 20,
+      },
+      {
+        ...sampleEntry,
+        id: 'undated-entry',
+        dueAt: undefined,
+        addedAt: 10,
+      },
+      {
+        ...sampleEntry,
+        id: 'past-entry-1',
+        dueAt: NOW - DAY_MS,
+        addedAt: 15,
+      },
+    ]);
+
+    const result = await getDueVocabularyForBook('book-xyz');
+
+    expect(result.map((entry) => entry.id)).toEqual([
+      'undated-entry',
+      'past-entry-2',
+      'past-entry-1',
+    ]);
+    expect(result.some((entry) => entry.id === 'future-entry')).toBe(false);
+  });
+});
+
+describe('sm2Update', () => {
+  test('advances repetition and interval on a grade 4 pass', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW);
+
+    const updated = sm2Update(
+      {
+        ...sampleEntry,
+        reviewCount: 3,
+        repetition: 2,
+        intervalDays: 6,
+        easeFactor: 2.5,
+        lastReviewedAt: NOW - DAY_MS,
+        dueAt: NOW - DAY_MS,
+      },
+      4,
+    );
+
+    expect(updated.reviewCount).toBe(4);
+    expect(updated.repetition).toBe(3);
+    expect(updated.intervalDays).toBeGreaterThan(6);
+    expect(updated.easeFactor).toBeCloseTo(2.5, 5);
+    expect(updated.lastReviewedAt).toBe(NOW);
+    expect(updated.dueAt).toBe(NOW + updated.intervalDays! * DAY_MS);
+  });
+
+  test('increases ease factor on a grade 5 pass', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW);
+
+    const updated = sm2Update(
+      {
+        ...sampleEntry,
+        reviewCount: 2,
+        repetition: 2,
+        intervalDays: 6,
+        easeFactor: 2.5,
+        lastReviewedAt: NOW - DAY_MS,
+        dueAt: NOW - DAY_MS,
+      },
+      5,
+    );
+
+    expect(updated.easeFactor).toBeGreaterThan(2.5);
+    expect(updated.repetition).toBe(3);
+    expect(updated.intervalDays).toBeGreaterThan(6);
+    expect(updated.dueAt).toBe(NOW + updated.intervalDays! * DAY_MS);
+  });
+
+  test('resets repetition and reduces ease factor on a grade 1 failure', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW);
+
+    const updated = sm2Update(
+      {
+        ...sampleEntry,
+        reviewCount: 7,
+        repetition: 4,
+        intervalDays: 12,
+        easeFactor: 2.4,
+        lastReviewedAt: NOW - DAY_MS,
+        dueAt: NOW - DAY_MS,
+      },
+      1,
+    );
+
+    expect(updated.reviewCount).toBe(8);
+    expect(updated.repetition).toBe(0);
+    expect(updated.intervalDays).toBe(1);
+    expect(updated.easeFactor).toBeCloseTo(1.86, 2); // SM-2: EF decreases on failure
+    expect(updated.lastReviewedAt).toBe(NOW);
+    expect(updated.dueAt).toBe(NOW + DAY_MS);
+  });
+
+  test('clamps the ease factor to the SM-2 minimum after repeated failures', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW);
+
+    let current: VocabularyEntry = {
+      ...sampleEntry,
+      reviewCount: 0,
+      repetition: 3,
+      intervalDays: 10,
+      easeFactor: 1.4,
+      lastReviewedAt: NOW - DAY_MS,
+      dueAt: NOW - DAY_MS,
+    };
+
+    for (let i = 0; i < 4; i += 1) {
+      current = sm2Update(current, 0);
+    }
+
+    expect(current.easeFactor).toBe(1.3);
+    expect(current.repetition).toBe(0);
+    expect(current.intervalDays).toBe(1);
+    expect(current.dueAt).toBe(NOW + DAY_MS);
   });
 });
 
@@ -137,7 +313,8 @@ describe('saveVocabularyEntry with examples', () => {
 });
 
 describe('markVocabularyEntryReviewed', () => {
-  test('increments reviewCount without changing the entry identity or saved data', async () => {
+  test('increments reviewCount and schedules the next review by default', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(NOW);
     mockStore.saveVocabularyEntry.mockResolvedValueOnce(undefined);
 
     const reviewed = await markVocabularyEntryReviewed(sampleEntry);
@@ -147,7 +324,10 @@ describe('markVocabularyEntryReviewed', () => {
       expect.objectContaining({
         ...sampleEntry,
         reviewCount: 1,
-        mode: 'translation',
+        repetition: 1,
+        intervalDays: 1,
+        dueAt: NOW + DAY_MS,
+        lastReviewedAt: NOW,
         schemaVersion: VOCABULARY_SCHEMA_VERSION,
         examples: [],
       }),
@@ -156,7 +336,10 @@ describe('markVocabularyEntryReviewed', () => {
       expect.objectContaining({
         ...sampleEntry,
         reviewCount: 1,
-        mode: 'translation',
+        repetition: 1,
+        intervalDays: 1,
+        dueAt: NOW + DAY_MS,
+        lastReviewedAt: NOW,
         schemaVersion: VOCABULARY_SCHEMA_VERSION,
         examples: [],
       }),

@@ -15,6 +15,11 @@ export async function saveVocabularyEntry(input: NewEntry): Promise<VocabularyEn
     result: input.result as TranslationResult,
     addedAt: input.addedAt ?? Date.now(),
     reviewCount: input.reviewCount ?? 0,
+    dueAt: input.dueAt,
+    intervalDays: input.intervalDays,
+    easeFactor: input.easeFactor,
+    repetition: input.repetition,
+    lastReviewedAt: input.lastReviewedAt,
     mode: input.mode ?? 'translation',
     schemaVersion: input.schemaVersion ?? VOCABULARY_SCHEMA_VERSION,
     sourceLanguage: input.sourceLanguage,
@@ -25,19 +30,71 @@ export async function saveVocabularyEntry(input: NewEntry): Promise<VocabularyEn
   return entry;
 }
 
+/**
+ * SM-2 spaced repetition update. Grade 0-2 = fail, 3-5 = pass.
+ * Returns updated entry with new scheduling fields; does NOT persist.
+ */
+export function sm2Update(entry: VocabularyEntry, grade: 0 | 1 | 2 | 3 | 4 | 5): VocabularyEntry {
+  const EF_MIN = 1.3;
+  const ef = Math.max(
+    EF_MIN,
+    (entry.easeFactor ?? 2.5) + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02)),
+  );
+  const repetition = entry.repetition ?? 0;
+  const now = Date.now();
+
+  if (grade >= 3) {
+    // Correct response
+    let intervalDays: number;
+    if (repetition === 0) intervalDays = 1;
+    else if (repetition === 1) intervalDays = 6;
+    else intervalDays = Math.round((entry.intervalDays ?? 1) * ef);
+
+    return {
+      ...entry,
+      reviewCount: entry.reviewCount + 1,
+      repetition: repetition + 1,
+      intervalDays,
+      easeFactor: ef,
+      lastReviewedAt: now,
+      dueAt: now + intervalDays * 24 * 60 * 60 * 1000,
+      schemaVersion: VOCABULARY_SCHEMA_VERSION,
+    };
+  } else {
+    // Incorrect response — reset repetition, interval 1 day, reduce ease factor
+    return {
+      ...entry,
+      reviewCount: entry.reviewCount + 1,
+      repetition: 0,
+      intervalDays: 1,
+      easeFactor: ef,
+      lastReviewedAt: now,
+      dueAt: now + 24 * 60 * 60 * 1000,
+      schemaVersion: VOCABULARY_SCHEMA_VERSION,
+    };
+  }
+}
+
 export async function markVocabularyEntryReviewed(
   entry: VocabularyEntry,
+  grade: 0 | 1 | 2 | 3 | 4 | 5 = 3,
 ): Promise<VocabularyEntry> {
-  const reviewedEntry: VocabularyEntry = {
-    ...entry,
-    reviewCount: entry.reviewCount + 1,
-  };
-  return saveVocabularyEntry(reviewedEntry);
+  const updated = sm2Update(entry, grade);
+  return saveVocabularyEntry(updated);
 }
 
 export async function getVocabularyForBook(bookHash: string): Promise<VocabularyEntry[]> {
   const entries = await aiStore.getVocabularyByBook(bookHash);
   return entries.map((entry) => upgradeSavedVocabularyEntry(entry));
+}
+
+/** Returns entries for a book whose dueAt is <= now (or undefined = immediately due), ordered by dueAt asc. */
+export async function getDueVocabularyForBook(bookHash: string): Promise<VocabularyEntry[]> {
+  const all = await getVocabularyForBook(bookHash);
+  const now = Date.now();
+  return all
+    .filter((e) => e.dueAt === undefined || e.dueAt <= now)
+    .sort((a, b) => (a.dueAt ?? 0) - (b.dueAt ?? 0) || a.addedAt - b.addedAt);
 }
 
 export async function getAllVocabulary(): Promise<VocabularyEntry[]> {

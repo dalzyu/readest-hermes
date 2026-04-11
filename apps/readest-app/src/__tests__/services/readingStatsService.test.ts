@@ -3,6 +3,7 @@ import {
   ReadingStatsService,
   readingStatsService,
   ReadingSession,
+  type DailyStats,
 } from '../../services/readingStats/readingStatsService';
 
 function createMockLocalStorage() {
@@ -150,6 +151,68 @@ describe('ReadingStatsService', () => {
     });
   });
 
+  describe('goals', () => {
+    test('returns default goals when storage is empty', () => {
+      const service = new ReadingStatsService();
+
+      expect(service.getGoals()).toEqual({ timeGoalMinutes: 30, pageGoal: 20 });
+    });
+
+    test('persists and returns updated goals from setGoals', () => {
+      const service = new ReadingStatsService();
+
+      const updated = service.setGoals({ timeGoalMinutes: 45 });
+
+      expect(updated).toEqual({ timeGoalMinutes: 45, pageGoal: 20 });
+      expect(JSON.parse(mockStorage._getStore()['readest:reading-goals:v1']!)).toEqual(updated);
+      expect(new ReadingStatsService().getGoals()).toEqual(updated);
+    });
+
+    test('clamps negative page goal to 0', () => {
+      const service = new ReadingStatsService();
+
+      const updated = service.setGoals({ pageGoal: -5 });
+
+      expect(updated).toEqual({ timeGoalMinutes: 30, pageGoal: 0 });
+      expect(JSON.parse(mockStorage._getStore()['readest:reading-goals:v1']!)).toEqual(updated);
+    });
+  });
+
+  describe('getCurrentStreak', () => {
+    test('counts only days meeting the time goal threshold', () => {
+      const service = new ReadingStatsService();
+      const dailyStats: DailyStats[] = [
+        { date: '2024-01-20', totalSecondsRead: 1800, totalPagesRead: 0, sessions: 1 },
+        { date: '2024-01-19', totalSecondsRead: 1200, totalPagesRead: 0, sessions: 1 },
+        { date: '2024-01-18', totalSecondsRead: 1800, totalPagesRead: 0, sessions: 1 },
+      ];
+
+      expect(
+        service.getCurrentStreak(
+          dailyStats,
+          { timeGoalMinutes: 30, pageGoal: 0 },
+          new Date('2024-01-20T12:00:00Z'),
+        ),
+      ).toBe(1);
+    });
+
+    test('counts any reading day when both goals are zero', () => {
+      const service = new ReadingStatsService();
+      const dailyStats: DailyStats[] = [
+        { date: '2024-01-20', totalSecondsRead: 60, totalPagesRead: 1, sessions: 1 },
+        { date: '2024-01-19', totalSecondsRead: 120, totalPagesRead: 2, sessions: 1 },
+      ];
+
+      expect(
+        service.getCurrentStreak(
+          dailyStats,
+          { timeGoalMinutes: 0, pageGoal: 0 },
+          new Date('2024-01-20T12:00:00Z'),
+        ),
+      ).toBe(2);
+    });
+  });
+
   describe('getAllSessions', () => {
     test('returns sessions sorted newest first', () => {
       const store = mockStorage._getStore();
@@ -189,8 +252,22 @@ describe('ReadingStatsService', () => {
     test('filters out malformed entries from storage', () => {
       const store = mockStorage._getStore();
       store['readest:reading-sessions:v1'] = JSON.stringify([
-        { bookHash: 'valid', startedAt: 1000, endedAt: 2000, secondsRead: 1000, pageDelta: 10, calendarDate: '2024-01-01' },
-        { bookHash: '', startedAt: 1000, endedAt: 2000, secondsRead: 1000, pageDelta: 10, calendarDate: '2024-01-01' },
+        {
+          bookHash: 'valid',
+          startedAt: 1000,
+          endedAt: 2000,
+          secondsRead: 1000,
+          pageDelta: 10,
+          calendarDate: '2024-01-01',
+        },
+        {
+          bookHash: '',
+          startedAt: 1000,
+          endedAt: 2000,
+          secondsRead: 1000,
+          pageDelta: 10,
+          calendarDate: '2024-01-01',
+        },
       ]);
 
       const service = new ReadingStatsService();
@@ -205,9 +282,30 @@ describe('ReadingStatsService', () => {
     test('returns only sessions for the specified book', () => {
       const store = mockStorage._getStore();
       store['readest:reading-sessions:v1'] = JSON.stringify([
-        { bookHash: 'abc', startedAt: 1000, endedAt: 2000, secondsRead: 1000, pageDelta: 10, calendarDate: '2024-01-01' },
-        { bookHash: 'def', startedAt: 3000, endedAt: 4000, secondsRead: 1000, pageDelta: 20, calendarDate: '2024-01-02' },
-        { bookHash: 'abc', startedAt: 5000, endedAt: 6000, secondsRead: 1000, pageDelta: 15, calendarDate: '2024-01-03' },
+        {
+          bookHash: 'abc',
+          startedAt: 1000,
+          endedAt: 2000,
+          secondsRead: 1000,
+          pageDelta: 10,
+          calendarDate: '2024-01-01',
+        },
+        {
+          bookHash: 'def',
+          startedAt: 3000,
+          endedAt: 4000,
+          secondsRead: 1000,
+          pageDelta: 20,
+          calendarDate: '2024-01-02',
+        },
+        {
+          bookHash: 'abc',
+          startedAt: 5000,
+          endedAt: 6000,
+          secondsRead: 1000,
+          pageDelta: 15,
+          calendarDate: '2024-01-03',
+        },
       ]);
 
       const service = new ReadingStatsService();
@@ -220,7 +318,14 @@ describe('ReadingStatsService', () => {
     test('returns empty array for unknown book', () => {
       const store = mockStorage._getStore();
       store['readest:reading-sessions:v1'] = JSON.stringify([
-        { bookHash: 'abc', startedAt: 1000, endedAt: 2000, secondsRead: 1000, pageDelta: 10, calendarDate: '2024-01-01' },
+        {
+          bookHash: 'abc',
+          startedAt: 1000,
+          endedAt: 2000,
+          secondsRead: 1000,
+          pageDelta: 10,
+          calendarDate: '2024-01-01',
+        },
       ]);
 
       const service = new ReadingStatsService();
@@ -234,9 +339,30 @@ describe('ReadingStatsService', () => {
     test('aggregates sessions by calendarDate', () => {
       const store = mockStorage._getStore();
       store['readest:reading-sessions:v1'] = JSON.stringify([
-        { bookHash: 'a', startedAt: 1000, endedAt: 2000, secondsRead: 1000, pageDelta: 10, calendarDate: '2024-01-15' },
-        { bookHash: 'b', startedAt: 3000, endedAt: 4000, secondsRead: 500, pageDelta: 5, calendarDate: '2024-01-15' },
-        { bookHash: 'c', startedAt: 5000, endedAt: 6000, secondsRead: 1200, pageDelta: 12, calendarDate: '2024-01-20' },
+        {
+          bookHash: 'a',
+          startedAt: 1000,
+          endedAt: 2000,
+          secondsRead: 1000,
+          pageDelta: 10,
+          calendarDate: '2024-01-15',
+        },
+        {
+          bookHash: 'b',
+          startedAt: 3000,
+          endedAt: 4000,
+          secondsRead: 500,
+          pageDelta: 5,
+          calendarDate: '2024-01-15',
+        },
+        {
+          bookHash: 'c',
+          startedAt: 5000,
+          endedAt: 6000,
+          secondsRead: 1200,
+          pageDelta: 12,
+          calendarDate: '2024-01-20',
+        },
       ]);
 
       const service = new ReadingStatsService();
@@ -257,8 +383,22 @@ describe('ReadingStatsService', () => {
     test('does not produce bogus positive totals from negative page deltas', () => {
       const store = mockStorage._getStore();
       store['readest:reading-sessions:v1'] = JSON.stringify([
-        { bookHash: 'a', startedAt: 1000, endedAt: 2000, secondsRead: 1000, pageDelta: -5, calendarDate: '2024-01-15' },
-        { bookHash: 'b', startedAt: 3000, endedAt: 4000, secondsRead: 500, pageDelta: 10, calendarDate: '2024-01-15' },
+        {
+          bookHash: 'a',
+          startedAt: 1000,
+          endedAt: 2000,
+          secondsRead: 1000,
+          pageDelta: -5,
+          calendarDate: '2024-01-15',
+        },
+        {
+          bookHash: 'b',
+          startedAt: 3000,
+          endedAt: 4000,
+          secondsRead: 500,
+          pageDelta: 10,
+          calendarDate: '2024-01-15',
+        },
       ]);
 
       const service = new ReadingStatsService();
@@ -278,8 +418,22 @@ describe('ReadingStatsService', () => {
     test('returns stats sorted newest date first', () => {
       const store = mockStorage._getStore();
       store['readest:reading-sessions:v1'] = JSON.stringify([
-        { bookHash: 'a', startedAt: 1000, endedAt: 2000, secondsRead: 1000, pageDelta: 10, calendarDate: '2024-01-10' },
-        { bookHash: 'b', startedAt: 3000, endedAt: 4000, secondsRead: 500, pageDelta: 5, calendarDate: '2024-01-20' },
+        {
+          bookHash: 'a',
+          startedAt: 1000,
+          endedAt: 2000,
+          secondsRead: 1000,
+          pageDelta: 10,
+          calendarDate: '2024-01-10',
+        },
+        {
+          bookHash: 'b',
+          startedAt: 3000,
+          endedAt: 4000,
+          secondsRead: 500,
+          pageDelta: 5,
+          calendarDate: '2024-01-20',
+        },
       ]);
 
       const service = new ReadingStatsService();
@@ -294,7 +448,14 @@ describe('ReadingStatsService', () => {
     test('removes all sessions from storage', () => {
       const store = mockStorage._getStore();
       store['readest:reading-sessions:v1'] = JSON.stringify([
-        { bookHash: 'a', startedAt: 1000, endedAt: 2000, secondsRead: 1000, pageDelta: 10, calendarDate: '2024-01-15' },
+        {
+          bookHash: 'a',
+          startedAt: 1000,
+          endedAt: 2000,
+          secondsRead: 1000,
+          pageDelta: 10,
+          calendarDate: '2024-01-15',
+        },
       ]);
 
       const service = new ReadingStatsService();

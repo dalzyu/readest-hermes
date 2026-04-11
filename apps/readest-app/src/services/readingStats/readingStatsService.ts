@@ -1,4 +1,14 @@
 const STORAGE_KEY = 'readest:reading-sessions:v1';
+const GOALS_KEY = 'readest:reading-goals:v1';
+
+export interface DailyGoals {
+  /** Daily reading time goal in minutes (0 = no goal) */
+  timeGoalMinutes: number;
+  /** Daily page reading goal (0 = no goal) */
+  pageGoal: number;
+}
+
+const DEFAULT_GOALS: DailyGoals = { timeGoalMinutes: 30, pageGoal: 20 };
 
 export interface ReadingSession {
   bookHash: string;
@@ -98,12 +108,17 @@ export class ReadingStatsService {
   }
 
   /** Returns aggregated stats grouped by calendar date, newest first. */
-  getDailyStats(): DailyStats[] {
+  getDailyStats(goals?: DailyGoals): DailyStats[] {
+    void goals;
     const sessions = loadSessions();
     const byDate = new Map<string, { secondsRead: number; pageDelta: number; count: number }>();
 
     for (const session of sessions) {
-      const existing = byDate.get(session.calendarDate) ?? { secondsRead: 0, pageDelta: 0, count: 0 };
+      const existing = byDate.get(session.calendarDate) ?? {
+        secondsRead: 0,
+        pageDelta: 0,
+        count: 0,
+      };
       byDate.set(session.calendarDate, {
         secondsRead: existing.secondsRead + session.secondsRead,
         pageDelta: existing.pageDelta + session.pageDelta,
@@ -119,6 +134,77 @@ export class ReadingStatsService {
         sessions: stats.count,
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  getGoals(): DailyGoals {
+    if (typeof localStorage === 'undefined') return { ...DEFAULT_GOALS };
+
+    try {
+      const raw = localStorage.getItem(GOALS_KEY);
+      if (!raw) return { ...DEFAULT_GOALS };
+
+      const parsed = JSON.parse(raw) as Partial<DailyGoals>;
+      return {
+        timeGoalMinutes:
+          typeof parsed.timeGoalMinutes === 'number' && parsed.timeGoalMinutes >= 0
+            ? parsed.timeGoalMinutes
+            : DEFAULT_GOALS.timeGoalMinutes,
+        pageGoal:
+          typeof parsed.pageGoal === 'number' && parsed.pageGoal >= 0
+            ? parsed.pageGoal
+            : DEFAULT_GOALS.pageGoal,
+      };
+    } catch {
+      return { ...DEFAULT_GOALS };
+    }
+  }
+
+  setGoals(goals: Partial<DailyGoals>): DailyGoals {
+    const current = this.getGoals();
+    const updated: DailyGoals = {
+      timeGoalMinutes:
+        goals.timeGoalMinutes !== undefined
+          ? Math.max(0, Math.floor(goals.timeGoalMinutes))
+          : current.timeGoalMinutes,
+      pageGoal:
+        goals.pageGoal !== undefined ? Math.max(0, Math.floor(goals.pageGoal)) : current.pageGoal,
+    };
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(GOALS_KEY, JSON.stringify(updated));
+    }
+
+    return updated;
+  }
+
+  /** Returns current streak: consecutive days meeting the goal threshold. */
+  getCurrentStreak(dailyStats: DailyStats[], goals?: DailyGoals, today = new Date()): number {
+    const g = goals ?? { timeGoalMinutes: 0, pageGoal: 0 };
+    const hasGoal = g.timeGoalMinutes > 0 || g.pageGoal > 0;
+
+    function dayMeetsGoal(stat: DailyStats): boolean {
+      if (!hasGoal) return true;
+
+      const meetsTime =
+        g.timeGoalMinutes > 0 ? stat.totalSecondsRead >= g.timeGoalMinutes * 60 : false;
+      const meetsPages = g.pageGoal > 0 ? stat.totalPagesRead >= g.pageGoal : false;
+
+      return meetsTime || meetsPages;
+    }
+
+    const qualifyingDates = new Set(dailyStats.filter(dayMeetsGoal).map((stat) => stat.date));
+    const cursor = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
+    );
+    let streak = 0;
+    const getKey = (date: Date) => date.toISOString().slice(0, 10);
+
+    while (qualifyingDates.has(getKey(cursor))) {
+      streak += 1;
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+    }
+
+    return streak;
   }
 
   /** Clears all stored sessions. */

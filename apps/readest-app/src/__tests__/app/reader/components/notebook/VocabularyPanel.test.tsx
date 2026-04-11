@@ -6,6 +6,7 @@ import { eventDispatcher } from '@/utils/event';
 import type { VocabularyEntry } from '@/services/contextTranslation/types';
 
 const mockGetVocabularyForBook = vi.fn();
+const mockGetDueVocabularyForBook = vi.fn();
 const mockSearchVocabulary = vi.fn();
 const mockDeleteVocabularyEntry = vi.fn();
 const mockExportAsAnkiTSV = vi.fn();
@@ -64,6 +65,7 @@ vi.mock('@/store/settingsStore', () => ({
 
 vi.mock('@/services/contextTranslation/vocabularyService', () => ({
   getVocabularyForBook: (...args: unknown[]) => mockGetVocabularyForBook(...args),
+  getDueVocabularyForBook: (...args: unknown[]) => mockGetDueVocabularyForBook(...args),
   deleteVocabularyEntry: (...args: unknown[]) => mockDeleteVocabularyEntry(...args),
   searchVocabulary: (...args: unknown[]) => mockSearchVocabulary(...args),
   exportAsAnkiTSV: (...args: unknown[]) => mockExportAsAnkiTSV(...args),
@@ -114,6 +116,7 @@ const singleEntry: VocabularyEntry = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetVocabularyForBook.mockResolvedValue(entries);
+  mockGetDueVocabularyForBook.mockResolvedValue(entries);
   mockSearchVocabulary.mockResolvedValue([]);
   mockDeleteVocabularyEntry.mockResolvedValue(undefined);
   mockExportAsAnkiTSV.mockReturnValue('anki');
@@ -130,17 +133,15 @@ afterEach(() => {
 });
 
 describe('VocabularyPanel review workflow', () => {
-  test('starts review from the least-reviewed oldest entry, reveals the answer, and advances without reshuffling the session', async () => {
+  test('starts review from the least-reviewed oldest entry, reveals the answer, and advances on Good', async () => {
     render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Review vocabulary' })).toBeTruthy();
-    });
+    await screen.findByRole('button', { name: 'Review (3)' });
 
     expect(screen.getByPlaceholderText('Search vocabulary...')).toBeTruthy();
     expect(screen.getByTitle('Export as Anki TSV')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Review vocabulary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review (3)' }));
 
     await screen.findByRole('button', { name: 'Exit review' });
 
@@ -154,10 +155,29 @@ describe('VocabularyPanel review workflow', () => {
     expect(screen.getByText('alpha answer')).toBeTruthy();
     expect(screen.getByText('alpha meaning')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mark reviewed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Good' }));
 
     await waitFor(() => {
-      expect(mockMarkVocabularyEntryReviewed).toHaveBeenCalledWith(entries[0]);
+      expect(mockMarkVocabularyEntryReviewed).toHaveBeenCalledWith(entries[0], 4);
+    });
+
+    await screen.findByText('beta');
+    expect(screen.queryByText('alpha')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Reveal answer' })).toBeTruthy();
+  });
+
+  test('clicking Again also advances the review session', async () => {
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    await screen.findByRole('button', { name: 'Review (3)' });
+    fireEvent.click(screen.getByRole('button', { name: 'Review (3)' }));
+    await screen.findByRole('button', { name: 'Exit review' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal answer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Again' }));
+
+    await waitFor(() => {
+      expect(mockMarkVocabularyEntryReviewed).toHaveBeenCalledWith(entries[0], 1);
     });
 
     await screen.findByText('beta');
@@ -180,7 +200,7 @@ describe('VocabularyPanel review workflow', () => {
 
     expect(screen.getByText('No entries match your search')).toBeTruthy();
 
-    const reviewButton = screen.getByRole('button', { name: 'Review vocabulary' });
+    const reviewButton = screen.getByRole('button', { name: 'Review (3)' });
     expect(reviewButton).toBeTruthy();
     expect(reviewButton.hasAttribute('disabled')).toBe(false);
 
@@ -188,6 +208,15 @@ describe('VocabularyPanel review workflow', () => {
 
     await screen.findByRole('button', { name: 'Exit review' });
     expect(screen.getByText('alpha')).toBeTruthy();
+  });
+
+  test('disables the review button when no entries are due', async () => {
+    mockGetDueVocabularyForBook.mockResolvedValueOnce([]);
+
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    const reviewButton = await screen.findByRole('button', { name: 'Review vocabulary' });
+    expect(reviewButton.hasAttribute('disabled')).toBe(true);
   });
 
   test('disables exiting review while a review save is pending', async () => {
@@ -201,14 +230,12 @@ describe('VocabularyPanel review workflow', () => {
 
     render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Review vocabulary' })).toBeTruthy();
-    });
+    await screen.findByRole('button', { name: 'Review (3)' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Review vocabulary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review (3)' }));
     await screen.findByRole('button', { name: 'Exit review' });
     fireEvent.click(screen.getByRole('button', { name: 'Reveal answer' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Mark reviewed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Good' }));
 
     const exitButton = screen.getByRole('button', { name: 'Exit review' });
     expect(exitButton.hasAttribute('disabled')).toBe(true);
@@ -217,26 +244,25 @@ describe('VocabularyPanel review workflow', () => {
     const firstEntry = entries[0]!;
     resolveReview({ ...firstEntry, reviewCount: firstEntry.reviewCount + 1 });
     await waitFor(() => {
-      expect(mockMarkVocabularyEntryReviewed).toHaveBeenCalledWith(firstEntry);
+      expect(mockMarkVocabularyEntryReviewed).toHaveBeenCalledWith(firstEntry, 4);
     });
   });
 
-  test('ends a single-entry review session cleanly after marking reviewed', async () => {
+  test('ends a single-entry review session cleanly after marking Good', async () => {
     mockGetVocabularyForBook.mockResolvedValue([singleEntry]);
+    mockGetDueVocabularyForBook.mockResolvedValue([singleEntry]);
 
     render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Review vocabulary' })).toBeTruthy();
-    });
+    await screen.findByRole('button', { name: 'Review (1)' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Review vocabulary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review (1)' }));
     await screen.findByRole('button', { name: 'Exit review' });
     fireEvent.click(screen.getByRole('button', { name: 'Reveal answer' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Mark reviewed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Good' }));
 
     await waitFor(() => {
-      expect(mockMarkVocabularyEntryReviewed).toHaveBeenCalledWith(singleEntry);
+      expect(mockMarkVocabularyEntryReviewed).toHaveBeenCalledWith(singleEntry, 4);
     });
 
     await screen.findByText('solo');
@@ -336,7 +362,7 @@ describe('VocabularyPanel lookup history surface', () => {
 
     await screen.findByText('Recent lookups');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Review vocabulary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review (3)' }));
 
     await screen.findByRole('button', { name: 'Exit review' });
     expect(screen.queryByText('Recent lookups')).toBeNull();

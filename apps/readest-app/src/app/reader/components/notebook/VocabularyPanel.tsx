@@ -8,6 +8,7 @@ import type { VocabularyEntry } from '@/services/contextTranslation/types';
 import type { LookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
 import {
   getVocabularyForBook,
+  getDueVocabularyForBook,
   deleteVocabularyEntry,
   searchVocabulary,
   exportAsAnkiTSV,
@@ -20,12 +21,6 @@ import { eventDispatcher } from '@/utils/event';
 interface VocabularyPanelProps {
   bookKey: string;
   bookHash: string;
-}
-
-function sortVocabularyForReview(entries: VocabularyEntry[]): VocabularyEntry[] {
-  return [...entries].sort(
-    (a, b) => a.reviewCount - b.reviewCount || a.addedAt - b.addedAt || a.id.localeCompare(b.id),
-  );
 }
 
 const RECENT_LOOKUP_LIMIT = 5;
@@ -51,7 +46,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     settings?.globalReadSettings?.contextTranslation ?? DEFAULT_CONTEXT_TRANSLATION_SETTINGS;
 
   const [entries, setEntries] = useState<VocabularyEntry[]>([]);
-  const [allEntriesCount, setAllEntriesCount] = useState(0);
+  const [dueCount, setDueCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -66,29 +61,46 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     try {
       const data = await getVocabularyForBook(bookHash);
       setEntries(data);
-      setAllEntriesCount(data.length);
       return data;
     } catch {
       setEntries([]);
-      setAllEntriesCount(0);
       return [] as VocabularyEntry[];
+    }
+  }, [bookHash]);
+
+  const loadDueCount = useCallback(async () => {
+    try {
+      const due = await getDueVocabularyForBook(bookHash);
+      setDueCount(due.length);
+      return due.length;
+    } catch {
+      setDueCount(0);
+      return 0;
     }
   }, [bookHash]);
 
   useEffect(() => {
     let active = true;
 
-    getVocabularyForBook(bookHash)
-      .then((data) => {
+    (async () => {
+      try {
+        const data = await getVocabularyForBook(bookHash);
         if (!active) return;
         setEntries(data);
-        setAllEntriesCount(data.length);
-      })
-      .catch(() => {
+      } catch {
         if (!active) return;
         setEntries([]);
-        setAllEntriesCount(0);
-      });
+      }
+
+      try {
+        const due = await getDueVocabularyForBook(bookHash);
+        if (!active) return;
+        setDueCount(due.length);
+      } catch {
+        if (!active) return;
+        setDueCount(0);
+      }
+    })();
 
     return () => {
       active = false;
@@ -142,11 +154,11 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     setIsAnswerRevealed(false);
     setIsReviewSaving(false);
     await loadEntries();
-  }, [loadEntries]);
+    await loadDueCount();
+  }, [loadEntries, loadDueCount]);
 
   const startReview = useCallback(async () => {
-    const data = await loadEntries();
-    const queue = sortVocabularyForReview(data);
+    const queue = await getDueVocabularyForBook(bookHash);
     if (queue.length === 0) return;
 
     setSearchQuery('');
@@ -156,13 +168,14 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     setReviewIndex(0);
     setIsAnswerRevealed(false);
     setIsReviewing(true);
-  }, [loadEntries]);
+  }, [bookHash]);
 
   const handleSearch = async (q: string) => {
     setSearchQuery(q);
     if (isReviewing) return;
     if (!q.trim()) {
       await loadEntries();
+      await loadDueCount();
       return;
     }
     const results = await searchVocabulary(q);
@@ -172,7 +185,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
   const handleDelete = async (id: string) => {
     await deleteVocabularyEntry(id);
     setEntries((prev: VocabularyEntry[]) => prev.filter((e) => e.id !== id));
-    setAllEntriesCount((prev) => Math.max(0, prev - 1));
+    await loadDueCount();
   };
 
   const handleExport = async (format: 'anki' | 'csv') => {
@@ -202,16 +215,36 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     await finishReviewSession();
   }, [finishReviewSession]);
 
-  const handleMarkReviewed = useCallback(async () => {
+  const handlePass = useCallback(async () => {
     const currentEntry = reviewQueue[reviewIndex];
     if (!currentEntry || isReviewSaving) return;
 
     setIsReviewSaving(true);
     try {
-      const reviewedEntry = await markVocabularyEntryReviewed(currentEntry);
-      setEntries((prev) =>
-        prev.map((entry) => (entry.id === reviewedEntry.id ? reviewedEntry : entry)),
-      );
+      const updated = await markVocabularyEntryReviewed(currentEntry, 4);
+      setEntries((prev) => prev.map((entry) => (entry.id === updated.id ? updated : entry)));
+
+      const nextIndex = reviewIndex + 1;
+      if (nextIndex >= reviewQueue.length) {
+        await finishReviewSession();
+        return;
+      }
+
+      setReviewIndex(nextIndex);
+      setIsAnswerRevealed(false);
+    } finally {
+      setIsReviewSaving(false);
+    }
+  }, [finishReviewSession, isReviewSaving, reviewIndex, reviewQueue]);
+
+  const handleFail = useCallback(async () => {
+    const currentEntry = reviewQueue[reviewIndex];
+    if (!currentEntry || isReviewSaving) return;
+
+    setIsReviewSaving(true);
+    try {
+      const updated = await markVocabularyEntryReviewed(currentEntry, 1);
+      setEntries((prev) => prev.map((entry) => (entry.id === updated.id ? updated : entry)));
 
       const nextIndex = reviewIndex + 1;
       if (nextIndex >= reviewQueue.length) {
@@ -231,6 +264,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     .sort((a, b) => a.order - b.order);
 
   const currentReviewEntry = reviewQueue[reviewIndex] ?? null;
+  const reviewButtonLabel = dueCount > 0 ? `${_('Review')} (${dueCount})` : _('Review vocabulary');
   const showRecentLookups =
     !isReviewing && !isSearching && searchQuery.trim().length === 0 && recentLookups.length > 0;
 
@@ -266,11 +300,11 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
         ) : (
           <button
             className='btn btn-ghost btn-xs'
-            title={_('Review vocabulary')}
-            disabled={allEntriesCount === 0}
+            title={reviewButtonLabel}
+            disabled={dueCount === 0}
             onClick={() => void startReview()}
           >
-            {_('Review vocabulary')}
+            {reviewButtonLabel}
           </button>
         )}
         <button
@@ -301,22 +335,34 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
               <div className='mt-4'>{renderEntryFields(currentReviewEntry)}</div>
             ) : (
               <p className='text-base-content/50 mt-4 text-sm'>
-                {_('Reveal the answer when you are ready, then mark the entry reviewed.')}
+                {_('Reveal the answer when you are ready, then choose Again or Good.')}
               </p>
             )}
           </div>
 
           <div className='flex items-center gap-2'>
-            <button className='btn btn-secondary btn-sm' onClick={handleRevealAnswer}>
-              {_('Reveal answer')}
-            </button>
-            <button
-              className='btn btn-primary btn-sm'
-              disabled={!isAnswerRevealed || isReviewSaving}
-              onClick={() => void handleMarkReviewed()}
-            >
-              {_('Mark reviewed')}
-            </button>
+            {!isAnswerRevealed ? (
+              <button className='btn btn-secondary btn-sm' onClick={handleRevealAnswer}>
+                {_('Reveal answer')}
+              </button>
+            ) : (
+              <>
+                <button
+                  className='btn btn-error btn-sm'
+                  disabled={isReviewSaving}
+                  onClick={() => void handleFail()}
+                >
+                  {_('Again')}
+                </button>
+                <button
+                  className='btn btn-success btn-sm'
+                  disabled={isReviewSaving}
+                  onClick={() => void handlePass()}
+                >
+                  {_('Good')}
+                </button>
+              </>
+            )}
           </div>
         </div>
       ) : (

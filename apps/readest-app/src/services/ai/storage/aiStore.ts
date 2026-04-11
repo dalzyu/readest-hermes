@@ -6,7 +6,7 @@ import { aiLogger } from '../logger';
 const lunr = require('lunr') as typeof import('lunr');
 
 const DB_NAME = 'readest-ai';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const CHUNKS_STORE = 'chunks';
 const META_STORE = 'bookMeta';
 const BM25_STORE = 'bm25Indices';
@@ -175,6 +175,15 @@ class AIStore {
         // v5: user dictionary store
         if (!db.objectStoreNames.contains(DICTIONARY_STORE)) {
           db.createObjectStore(DICTIONARY_STORE, { keyPath: 'id' });
+        }
+
+        // v6: dueAt index on vocabulary for SM-2 review queue
+        if (db.objectStoreNames.contains(VOCAB_STORE)) {
+          const tx = (event.target as IDBOpenDBRequest).transaction!;
+          const vocabStore = tx.objectStore(VOCAB_STORE);
+          if (!vocabStore.indexNames.contains('dueAt')) {
+            vocabStore.createIndex('dueAt', 'dueAt', { unique: false });
+          }
         }
       };
     });
