@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Hermes",
   "mainBinaryName": "hermes",
-      "identifier": "com.hermes.readest",
+  "identifier": "com.hermes.readest",
 
   "version": "../package.json",
   "build": {

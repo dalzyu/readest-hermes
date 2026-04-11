@@ -82,9 +82,7 @@ import {
   getAllSeries,
   updateSeriesVolume,
 } from '@/services/contextTranslation/seriesService';
-import {
-  buildImportSeriesSuggestions,
-} from '@/utils/seriesSuggestions';
+import { buildImportSeriesSuggestions } from '@/utils/seriesSuggestions';
 import type { ImportSeriesSuggestion } from '@/utils/seriesSuggestions';
 
 const LibraryPageWithSearchParams = () => {

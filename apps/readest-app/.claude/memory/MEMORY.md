@@ -1,6 +1,7 @@
 # Readest Project Memory
 
 ## Key Reference Documents
+
 - [Bug Fixing Patterns](bug-patterns.md) - Common bug categories, root causes, and fix strategies
 - [CSS & Style Fixes](css-style-fixes.md) - EPUB CSS override patterns and the style.ts pipeline
 - [TTS Fixes](tts-fixes.md) - Text-to-Speech architecture and bug patterns
@@ -9,6 +10,7 @@
 - [Annotator & Reader Fixes](annotator-reader-fixes.md) - Highlight, selection, accessibility bugs
 
 ## Critical Files (Most Bug-Prone)
+
 - `src/utils/style.ts` - Central EPUB CSS transformation hub (14+ bug fixes)
 - `packages/foliate-js/paginator.js` - Page layout, image sizing, backgrounds
 - `src/services/tts/TTSController.ts` - TTS state machine, section tracking
@@ -17,9 +19,11 @@
 - `src/app/reader/components/annotator/Annotator.tsx` - Annotation lifecycle
 
 ## Feature Notes
+
 - [D-pad Navigation](dpad-navigation.md) — Android TV remote / keyboard arrow navigation design, key files, and pitfalls
 
 ## Architecture Notes
+
 - foliate-js is a git submodule at `packages/foliate-js/`
 - Multiview paginator: loads adjacent sections in background, multiple View/Overlayer instances per book
 - Style overrides: `getLayoutStyles()` (always), `getColorStyles()` (when overriding color)
@@ -29,6 +33,7 @@
 - Dropdown menus use `DropdownContext` (not blur-based) for screen reader compat
 
 ## Workflow
+
 - [Test file filter](feedback_test_file_filter.md) — use `pnpm test <path>` without `--` to run a single file
 - [Always rebase before PR](feedback_pr_rebase.md) — rebase onto origin/main before creating PRs
 - [New branch per PR](feedback_pr_new_branch.md) — always create a fresh branch from main for each new PR/issue

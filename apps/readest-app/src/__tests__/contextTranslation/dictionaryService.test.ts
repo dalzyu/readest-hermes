@@ -22,17 +22,18 @@ const records = new Map<string, unknown>();
 
 // --- Mocks ---
 vi.mock('@/store/settingsStore', () => ({
-  useSettingsStore: Object.assign(
-    () => ({}),
-    {
-      getState: () => ({
-        settings: { get userDictionaryMeta() { return settingsRef.current; } },
-        setSettings: setSettingsSpy,
-      }),
-      set: vi.fn(),
-      subscribe: () => () => {},
-    },
-  ),
+  useSettingsStore: Object.assign(() => ({}), {
+    getState: () => ({
+      settings: {
+        get userDictionaryMeta() {
+          return settingsRef.current;
+        },
+      },
+      setSettings: setSettingsSpy,
+    }),
+    set: vi.fn(),
+    subscribe: () => () => {},
+  }),
 }));
 
 vi.mock('@/services/ai/storage/aiStore', () => ({
@@ -60,7 +61,9 @@ vi.mock('@/services/contextTranslation/dictionaryParser', () => {
   return {
     extractFromZip: vi.fn(async () => ({
       ifo: encoder.encode('bookname=Dummy\nwordcount=2\nsametypesequence=m\n'),
-      idx: encoder.encode('hello\x00\x00\x00\x00\x00\x00\x00\x05world\x00\x00\x00\x00\x00\x00\x00\x0a'),
+      idx: encoder.encode(
+        'hello\x00\x00\x00\x00\x00\x00\x00\x05world\x00\x00\x00\x00\x00\x00\x00\x0a',
+      ),
       dict: encoder.encode('definition for hello\x00definition for world'),
     })),
     parseStarDict: vi.fn(() => [
@@ -219,9 +222,8 @@ describe('importUserDictionary', () => {
       parseIfo: vi.fn(() => ({ name: 'Empty', wordcount: 0 })),
     }));
     vi.resetModules();
-    const { importUserDictionary: reimport } = await import(
-      '@/services/contextTranslation/dictionaryService'
-    );
+    const { importUserDictionary: reimport } =
+      await import('@/services/contextTranslation/dictionaryService');
 
     await expect(
       reimport(fakeZipBuffer(), {
@@ -237,7 +239,9 @@ describe('importUserDictionary', () => {
       return {
         extractFromZip: vi.fn(async () => ({
           ifo: encoder.encode('bookname=Dummy\nwordcount=2\nsametypesequence=m\n'),
-          idx: encoder.encode('hello\x00\x00\x00\x00\x00\x00\x00\x05world\x00\x00\x00\x00\x00\x00\x00\x0a'),
+          idx: encoder.encode(
+            'hello\x00\x00\x00\x00\x00\x00\x00\x05world\x00\x00\x00\x00\x00\x00\x00\x0a',
+          ),
           dict: encoder.encode('definition for hello\x00definition for world'),
         })),
         parseStarDict: vi.fn(() => [
@@ -253,7 +257,10 @@ describe('importUserDictionary', () => {
             if (eqIndex === -1) continue;
             parsed[line.slice(0, eqIndex)] = line.slice(eqIndex + 1);
           }
-          return { name: parsed['bookname'] ?? '', wordcount: parseInt(parsed['wordcount'] ?? '0', 10) };
+          return {
+            name: parsed['bookname'] ?? '',
+            wordcount: parseInt(parsed['wordcount'] ?? '0', 10),
+          };
         }),
       };
     });
@@ -357,11 +364,7 @@ describe('findMatches', () => {
         makeEntry('hypersonic', 'faster than sound'),
       ];
       const result = findMatches(entries, 'hyper');
-      expect(result.map((e) => e.headword)).toEqual([
-        'hyperbole',
-        'hyperbolic',
-        'hypersonic',
-      ]);
+      expect(result.map((e) => e.headword)).toEqual(['hyperbole', 'hyperbolic', 'hypersonic']);
     });
 
     test('skipped when text.length > 40', () => {

@@ -25,11 +25,7 @@ import { callLLM } from './llmClient';
 import { normalizeLookupResponse } from './normalizer';
 import { validateLookupResult } from './validator';
 import { lookupDefinitions } from './dictionaryService';
-import {
-  DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
-  getContextDictionaryOutputFields,
-} from './defaults';
-
+import { DEFAULT_CONTEXT_DICTIONARY_SETTINGS, getContextDictionaryOutputFields } from './defaults';
 
 export interface ContextLookupRequest {
   mode: ContextLookupMode;
@@ -117,7 +113,6 @@ function resolveEffectiveOutputFields(request: ContextLookupRequest): Translatio
   return request.outputFields;
 }
 
-
 export function buildContextLookupTelemetryPayload(input: {
   mode: ContextLookupMode;
   selectedText: string;
@@ -203,7 +198,6 @@ export async function runContextLookup(
     sourceLanguage,
     outputFields: effectiveOutputFields,
     dictionarySettings: request.dictionarySettings,
-
   });
 
   const runAttempt = async (

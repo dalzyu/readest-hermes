@@ -152,7 +152,10 @@ const renderPopup = (userColors: UserHighlightColor[] = []) => {
           buttons={toolButtons}
           notes={[]}
           position={{ dir: 'up', point: { x: POPUP_X, y: POPUP_Y } }}
-          trianglePosition={{ dir: 'up', point: { x: POPUP_X + POPUP_W / 2, y: POPUP_Y + POPUP_H } }}
+          trianglePosition={{
+            dir: 'up',
+            point: { x: POPUP_X + POPUP_W / 2, y: POPUP_Y + POPUP_H },
+          }}
           highlightOptionsVisible
           selectedStyle='highlight'
           selectedColor='yellow'

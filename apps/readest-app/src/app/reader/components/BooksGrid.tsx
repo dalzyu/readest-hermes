@@ -107,8 +107,10 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
         const scrolled = viewSettings.scrolled;
         const showBarsOnScroll = viewSettings.showBarsOnScroll;
         const chromeVisible = !viewSettings.focusMode;
-        const showHeader = chromeVisible && viewSettings.showHeader && (scrolled ? showBarsOnScroll : true);
-        const showFooter = chromeVisible && viewSettings.showFooter && (scrolled ? showBarsOnScroll : true);
+        const showHeader =
+          chromeVisible && viewSettings.showHeader && (scrolled ? showBarsOnScroll : true);
+        const showFooter =
+          chromeVisible && viewSettings.showFooter && (scrolled ? showBarsOnScroll : true);
 
         return (
           <div

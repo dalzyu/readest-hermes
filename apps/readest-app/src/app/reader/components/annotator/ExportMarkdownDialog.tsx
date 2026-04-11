@@ -50,7 +50,9 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
   });
 
   const selectedPresetId = useMemo(() => {
-    const preset = NOTE_EXPORT_PRESETS.find((item) => item.template === exportConfig.customTemplate);
+    const preset = NOTE_EXPORT_PRESETS.find(
+      (item) => item.template === exportConfig.customTemplate,
+    );
     return preset?.id ?? '';
   }, [exportConfig.customTemplate]);
 

@@ -36,7 +36,6 @@ const currentViewSettings = {
   focusMode: false,
 };
 
-
 const setViewSettingsMock = vi.fn();
 
 vi.mock('@/store/readerStore', () => ({

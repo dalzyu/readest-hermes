@@ -7,7 +7,10 @@ import type { BookSeries } from '@/services/contextTranslation/types';
  * lowercase a-z and 0-9 remain.
  */
 export function normalizeSuggestionText(value: string | undefined): string {
-  return (value || '').toLowerCase().replace(/[^a-z0-9]+/gi, ' ').trim();
+  return (value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .trim();
 }
 
 /**
@@ -17,8 +20,7 @@ export function normalizeSuggestionText(value: string | undefined): string {
 export function extractVolumeNumber(title: string | undefined): number | undefined {
   if (!title) return undefined;
   const match =
-    title.match(/(?:vol(?:ume)?|book)?\s*(\d+)\s*$/i) ||
-    title.match(/\b(\d+)\b(?!.*\b\d+\b)/);
+    title.match(/(?:vol(?:ume)?|book)?\s*(\d+)\s*$/i) || title.match(/\b(\d+)\b(?!.*\b\d+\b)/);
   if (!match?.[1]) return undefined;
   const parsed = Number.parseInt(match[1], 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;

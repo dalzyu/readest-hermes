@@ -59,7 +59,10 @@ vi.mock('@/context/EnvContext', () => ({
 vi.mock('@/context/AuthContext', () => ({ useAuth: () => ({ token: null, user: null }) }));
 
 vi.mock('@/store/themeStore', () => ({
-  useThemeStore: () => ({ safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 }, isRoundedWindow: false }),
+  useThemeStore: () => ({
+    safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
+    isRoundedWindow: false,
+  }),
 }));
 
 vi.mock('@/store/settingsStore', () => ({
@@ -80,13 +83,17 @@ vi.mock('@/store/settingsStore', () => ({
 }));
 
 vi.mock('@/store/bookDataStore', () => ({ useBookDataStore: () => ({ clearBookData: vi.fn() }) }));
-vi.mock('@/store/transferStore', () => ({ useTransferStore: () => ({ isTransferQueueOpen: false }) }));
+vi.mock('@/store/transferStore', () => ({
+  useTransferStore: () => ({ isTransferQueueOpen: false }),
+}));
 
 vi.mock('@/store/libraryStore', () => {
   const updateBooks = vi.fn(async (_envConfig: unknown, books: Book[]) => {
     libraryState = [...libraryState, ...books];
   });
-  const setLibrary = vi.fn((books: Book[]) => { libraryState = books; });
+  const setLibrary = vi.fn((books: Book[]) => {
+    libraryState = books;
+  });
   const useLibraryStore = () => ({
     library: libraryState,
     isSyncing: false,
@@ -133,7 +140,9 @@ vi.mock('@/components/metadata', () => ({ BookDetailModal: () => null }));
 vi.mock('@/components/UpdaterWindow', () => ({ UpdaterWindow: () => null }));
 vi.mock('@/app/library/components/OPDSDialog', () => ({ CatalogDialog: () => null }));
 vi.mock('@/app/library/components/MigrateDataWindow', () => ({ MigrateDataWindow: () => null }));
-vi.mock('@/app/library/hooks/useDragDropImport', () => ({ useDragDropImport: () => ({ isDragging: false }) }));
+vi.mock('@/app/library/hooks/useDragDropImport', () => ({
+  useDragDropImport: () => ({ isDragging: false }),
+}));
 vi.mock('@/hooks/useTransferQueue', () => ({ useTransferQueue: vi.fn() }));
 vi.mock('@/hooks/useAppRouter', () => ({ useAppRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/components/Toast', () => ({ Toast: () => null }));
@@ -152,11 +161,14 @@ vi.mock('@/components/ModalPortal', () => ({
 }));
 vi.mock('@/app/library/components/TransferQueuePanel', () => ({ default: () => null }));
 vi.mock('overlayscrollbars-react', () => ({
-  OverlayScrollbarsComponent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  OverlayScrollbarsComponent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 vi.mock('@/services/contextTranslation/seriesService', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/services/contextTranslation/seriesService')>();
+  const actual =
+    await importOriginal<typeof import('@/services/contextTranslation/seriesService')>();
   return {
     __esModule: true,
     ...actual,
@@ -249,7 +261,9 @@ describe('buildImportSeriesSuggestions — non-ASCII titles and authors', () => 
   test('Arabic author name — non-ASCII characters stripped, no author match', () => {
     const importedBook = makeBook({ title: 'Cosmos 2', author: 'كارل ساغان' });
     const series: BookSeries[] = [makeSeries('Cosmos', 'Carl Sagan', ['existing-1'])];
-    const library: Book[] = [makeBook({ hash: 'existing-1', title: 'Cosmos 1', author: 'Carl Sagan' })];
+    const library: Book[] = [
+      makeBook({ hash: 'existing-1', title: 'Cosmos 1', author: 'Carl Sagan' }),
+    ];
 
     const suggestions = buildImportSeriesSuggestions([importedBook], series, library);
     expect(suggestions).toHaveLength(0);

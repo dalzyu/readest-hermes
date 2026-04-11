@@ -158,7 +158,6 @@ jobs:
         working-directory: apps/readest-app
         run: pnpm lint
 
-
       - name: run tauri tests
         working-directory: apps/readest-app
         run: xvfb-run pnpm test:pr:tauri

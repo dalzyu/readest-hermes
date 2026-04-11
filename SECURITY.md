@@ -8,11 +8,11 @@ Hermes is a cross-platform e-reader (macOS, Windows, Linux, Android, iOS, Web) b
 
 ### Assets
 
-| Asset                          | Description                                                                          |
-| ------------------------------ | ------------------------------------------------------------------------------------ |
-| Ebook files                    | User-uploaded EPUB, MOBI, PDF, and other formats stored locally            |
-| Reading progress & annotations | Highlights, bookmarks, and notes stored on device                         |
-| External API keys              | Translation service credentials (DeepL, Yandex) configured by users       |
+| Asset                          | Description                                                         |
+| ------------------------------ | ------------------------------------------------------------------- |
+| Ebook files                    | User-uploaded EPUB, MOBI, PDF, and other formats stored locally     |
+| Reading progress & annotations | Highlights, bookmarks, and notes stored on device                   |
+| External API keys              | Translation service credentials (DeepL, Yandex) configured by users |
 
 ### Threat Actors
 
@@ -68,8 +68,8 @@ Hermes does not currently maintain separate release channels. Security updates a
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x  | :white_check_mark: |
-| < 0.1  | :x:                |
+| 0.1.x   | :white_check_mark: |
+| < 0.1   | :x:                |
 
 ## Reporting a Vulnerability
 

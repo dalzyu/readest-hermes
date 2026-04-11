@@ -178,7 +178,8 @@ export const Thread: FC<ThreadProps> = ({
               <button
                 type='button'
                 onClick={onRecap}
-                className='text-primary hover:bg-base-200 mb-3 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors'>
+                className='text-primary hover:bg-base-200 mb-3 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors'
+              >
                 <RotateCcwIcon className='size-3.5' />
                 Recap so far
               </button>

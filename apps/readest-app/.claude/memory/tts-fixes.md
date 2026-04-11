@@ -3,13 +3,16 @@
 ## Architecture
 
 ### Key Components
+
 - `TTSController` (`src/services/tts/TTSController.ts`) - Core state machine
 - `EdgeTTSClient` (`src/services/tts/EdgeTTSClient.ts`) - Edge TTS provider
 - `useTTSControl` hook (`src/app/reader/hooks/useTTSControl.ts`) - React integration
 - `useTTSMediaSession` hook (`src/app/reader/hooks/useTTSMediaSession.ts`) - Media controls
 
 ### Section-Aware TTS Model
+
 TTS tracks its own section independently from the view via `#ttsSectionIndex`:
+
 - `#initTTSForSection()` - Creates TTS document for a section without changing the view
 - `#initTTSForNextSection()` / `#initTTSForPrevSection()` - Navigate TTS across sections
 - `#getHighlighter()` - Only returns highlighter if view section matches TTS section
@@ -17,6 +20,7 @@ TTS tracks its own section independently from the view via `#ttsSectionIndex`:
 - Highlights use CFI strings (not raw Range objects) for cross-section compatibility
 
 ### State Management Pitfalls
+
 1. **`#ttsSectionIndex` must match view section for highlights to work**
    - If `-1`, all highlight calls are suppressed
    - `shutdown()` sets it to `-1` but must also null out `this.view.tts`
@@ -31,14 +35,14 @@ TTS tracks its own section independently from the view via `#ttsSectionIndex`:
 
 ## Fix History
 
-| Issue | Problem | Root Cause | Fix |
-|-------|---------|------------|-----|
-| #3100 | TTS scrolls too far | TTS coupled to view section | Added `#ttsSectionIndex`, "Back to TTS Location" button |
-| #3198 | TTS doesn't follow to next section | No `onSectionChange` callback | Added section change notification, extracted hooks |
-| #3244 | Paused TTS advances | Safety timeout fires after pause | Removed `ontimeupdate` timeout mechanism |
-| #3291 | TTS fails without lang attribute | Invalid SSML from missing lang | Set lang/xml:lang on html element from `ttsLang` |
-| #3292 | Can't restart TTS from annotation | `ttsOnRef` blocks re-entry | Removed the guard ref entirely |
-| #3400 | TTS highlight stops after restart | `view.tts` not nulled on shutdown | Added `this.view.tts = null` in `shutdown()` |
+| Issue | Problem                            | Root Cause                        | Fix                                                     |
+| ----- | ---------------------------------- | --------------------------------- | ------------------------------------------------------- |
+| #3100 | TTS scrolls too far                | TTS coupled to view section       | Added `#ttsSectionIndex`, "Back to TTS Location" button |
+| #3198 | TTS doesn't follow to next section | No `onSectionChange` callback     | Added section change notification, extracted hooks      |
+| #3244 | Paused TTS advances                | Safety timeout fires after pause  | Removed `ontimeupdate` timeout mechanism                |
+| #3291 | TTS fails without lang attribute   | Invalid SSML from missing lang    | Set lang/xml:lang on html element from `ttsLang`        |
+| #3292 | Can't restart TTS from annotation  | `ttsOnRef` blocks re-entry        | Removed the guard ref entirely                          |
+| #3400 | TTS highlight stops after restart  | `view.tts` not nulled on shutdown | Added `this.view.tts = null` in `shutdown()`            |
 
 ## Debugging TTS Issues
 
