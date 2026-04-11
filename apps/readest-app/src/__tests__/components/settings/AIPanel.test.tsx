@@ -6,7 +6,7 @@ import AIPanel from '@/components/settings/AIPanel';
 import AITranslatePanel from '@/components/settings/AITranslatePanel';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 
-const saveSettingsMock = vi.fn();
+const saveSettingsMock = vi.fn().mockResolvedValue(undefined);
 const setSettingsMock = vi.fn();
 
 // vi.hoisted runs before vi.mock factories — use it to create stable object references

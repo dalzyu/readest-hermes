@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
+
+
 import { getAIProvider } from '@/services/ai/providers';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
@@ -89,8 +91,7 @@ export function useContextLookup({
       dictionarySettings,
       aiSettings: appSettings?.aiSettings ?? DEFAULT_AI_SETTINGS,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bookHash, selectedText],
+    [bookHash, selectedText, currentPage, settings, dictionarySettings, appSettings?.aiSettings],
   );
 
   useEffect(() => {

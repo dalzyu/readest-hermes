@@ -18,12 +18,18 @@ import {
   formatTranslationResult,
   parseStructuredExamples,
 } from './exampleFormatter';
+
 import { buildLookupPrompt } from './promptBuilder';
 import { buildRepairPrompt } from './repairPromptBuilder';
 import { callLLM } from './llmClient';
 import { normalizeLookupResponse } from './normalizer';
 import { validateLookupResult } from './validator';
 import { lookupDefinitions } from './dictionaryService';
+import {
+  DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+  getContextDictionaryOutputFields,
+} from './defaults';
+
 
 export interface ContextLookupRequest {
   mode: ContextLookupMode;
@@ -97,6 +103,21 @@ function resolvePrimaryField(outputFields: TranslationOutputField[]): string {
   return outputFields.find((field) => field.enabled)?.id ?? 'translation';
 }
 
+/**
+ * Returns the output fields to use for a lookup request, based on the mode.
+ * In dictionary mode, this overrides the request's outputFields with the
+ * dictionary-mode field definitions so the prompt and validation are consistent.
+ */
+function resolveEffectiveOutputFields(request: ContextLookupRequest): TranslationOutputField[] {
+  if (request.mode === 'dictionary') {
+    return getContextDictionaryOutputFields(
+      request.dictionarySettings ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+    );
+  }
+  return request.outputFields;
+}
+
+
 export function buildContextLookupTelemetryPayload(input: {
   mode: ContextLookupMode;
   selectedText: string;
@@ -165,8 +186,9 @@ export async function runContextLookup(
     ...request.popupContext,
     dictionaryEntries,
   };
+  const effectiveOutputFields = resolveEffectiveOutputFields(request);
 
-  const primaryField = resolvePrimaryField(request.outputFields);
+  const primaryField = resolvePrimaryField(effectiveOutputFields);
   const plugins = resolveLookupPlugins({
     sourceLanguage,
     targetLanguage: request.targetLanguage,
@@ -179,8 +201,9 @@ export async function runContextLookup(
     popupContext: popupContextWithDictionary,
     targetLanguage: request.targetLanguage,
     sourceLanguage,
-    outputFields: request.outputFields,
+    outputFields: effectiveOutputFields,
     dictionarySettings: request.dictionarySettings,
+
   });
 
   const runAttempt = async (
@@ -199,7 +222,7 @@ export async function runContextLookup(
             selectedText: request.selectedText,
             sourceLanguage,
             targetLanguage: request.targetLanguage,
-            outputFields: request.outputFields,
+            outputFields: effectiveOutputFields,
             pageContext: request.popupContext.localPastContext,
           })
         : normalized;
@@ -224,7 +247,7 @@ export async function runContextLookup(
   if (attempt.validation.decision === 'degrade' && CONTEXT_LOOKUP_ROLLOUT.repairOnDegrade) {
     repairCount = 1;
 
-    const orderedFieldIds = request.outputFields
+    const orderedFieldIds = effectiveOutputFields
       .filter((f) => f.enabled)
       .sort((a, b) => a.order - b.order)
       .map((f) => f.id)

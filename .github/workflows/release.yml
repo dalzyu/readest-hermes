@@ -266,13 +266,13 @@ jobs:
           pnpm tauri android init
           pnpm tauri icon ../../data/icons/readest-book.png
           git checkout .
-          pnpm tauri android build --debug
+          pnpm tauri android build --release
 
       - name: upload Android apk artifact (fork only)
         if: matrix.config.release == 'android' && github.repository != 'readest/readest'
         uses: actions/upload-artifact@v4
         with:
-          name: android-debug-apks
+          name: android-release-apks
           path: apps/readest-app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
 
@@ -442,8 +442,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_BUNDLER_NEW_APPIMAGE_FORMAT: 'true'
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}

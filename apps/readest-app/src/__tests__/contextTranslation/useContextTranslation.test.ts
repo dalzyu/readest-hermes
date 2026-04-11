@@ -227,7 +227,7 @@ describe('useContextTranslation', () => {
     expect(secondCall.selectedText).toBe('朋友');
   });
 
-  test('does not restart translation when currentPage changes for the same popup request', async () => {
+  test('restarts translation when currentPage changes for the same popup request', async () => {
     const { result, rerender } = renderHook(
       (props: typeof defaultProps) => useContextTranslation(props),
       { initialProps: defaultProps },
@@ -240,7 +240,7 @@ describe('useContextTranslation', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(vi.mocked(runContextLookup)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(runContextLookup)).toHaveBeenCalledTimes(2);
   });
 
   test('does not translate when selectedText is empty', async () => {

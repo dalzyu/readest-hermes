@@ -14,7 +14,7 @@ interface SettingsState {
   fontPanelView: FontPanelView;
   activeSettingsItemId: string | null;
   setSettings: (settings: SystemSettings) => void;
-  saveSettings: (envConfig: EnvConfigType, settings: SystemSettings) => void;
+  saveSettings: (envConfig: EnvConfigType, settings: SystemSettings) => Promise<void>;
   setSettingsDialogBookKey: (bookKey: string) => void;
   setSettingsDialogOpen: (open: boolean) => void;
   setSettingsGlobal: (global: boolean) => void;

@@ -107,7 +107,7 @@ const AITranslatePanel: React.FC = () => {
         },
       };
       setSettings(newSettings);
-      saveSettings(envConfig, newSettings);
+      saveSettings(envConfig, newSettings).catch(console.error);
     },
     [envConfig, setSettings, saveSettings],
   );
@@ -126,7 +126,7 @@ const AITranslatePanel: React.FC = () => {
         },
       };
       setSettings(newSettings);
-      saveSettings(envConfig, newSettings);
+      saveSettings(envConfig, newSettings).catch(console.error);
     },
     [envConfig, setSettings, saveSettings],
   );
@@ -163,13 +163,25 @@ const AITranslatePanel: React.FC = () => {
     initBundledDictionaries().catch(() => {
       setDictionaryUnavailableBanner(true);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sync userDictionaries from settings
   useEffect(() => {
     setUserDictionaries(settings?.userDictionaryMeta ?? []);
   }, [settings?.userDictionaryMeta]);
+
+  const persistUserDictionaryMeta = useCallback(
+    async (meta: UserDictionary[]) => {
+      const currentSettings = settingsRef.current;
+      if (!currentSettings) return;
+      const newSettings = { ...currentSettings, userDictionaryMeta: meta };
+      settingsRef.current = newSettings;
+      setSettings(newSettings);
+      await saveSettings(envConfig, newSettings);
+      setUserDictionaries(meta);
+    },
+    [envConfig, saveSettings, setSettings],
+  );
 
   // Language code to display name helper
   const getLanguageName = (code: string): string => {
@@ -210,13 +222,12 @@ const AITranslatePanel: React.FC = () => {
     setImportError(null);
     try {
       const targetLang = importTargetLang || importSourceLang;
-      await importUserDictionary(selectedZipFile, {
+      const importedMeta = await importUserDictionary(selectedZipFile, {
         name: importPreview.name,
         language: importSourceLang,
         targetLanguage: targetLang,
       });
-      // Refresh user dictionaries list
-      setUserDictionaries(useSettingsStore.getState().settings.userDictionaryMeta ?? []);
+      await persistUserDictionaryMeta([...userDictionaries, importedMeta]);
       setShowModal(false);
       setImportPreview(null);
       setSelectedZipFile(null);
@@ -230,7 +241,7 @@ const AITranslatePanel: React.FC = () => {
   const handleDeleteDictionary = async (id: string) => {
     try {
       await deleteUserDictionary(id);
-      setUserDictionaries((prev) => prev.filter((d) => d.id !== id));
+      await persistUserDictionaryMeta(userDictionaries.filter((d) => d.id !== id));
     } catch (err) {
       console.error('Failed to delete dictionary:', err);
     }
@@ -262,7 +273,7 @@ const AITranslatePanel: React.FC = () => {
       );
       const newSettings = { ...currentSettings, userDictionaryMeta: updated };
       setSettings(newSettings);
-      saveSettings(envConfig, newSettings);
+      saveSettings(envConfig, newSettings).catch(console.error);
       setUserDictionaries(updated);
     },
     [userDictionaries, envConfig, setSettings, saveSettings],
