@@ -9,9 +9,8 @@
  * `justify-between`, unwanted `flex-1` on the color strip).
  */
 import React from 'react';
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
-import { page } from 'vitest/browser';
 import type { UserHighlightColor } from '@/types/book';
 import { EnvProvider } from '@/context/EnvContext';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -90,11 +89,6 @@ const toolButtons = annotationToolButtons.map(({ label, Icon }) => ({
   onClick: vi.fn(),
 }));
 
-// Browser-mode matcher types are unavailable to tsgo; cast once here.
-const expectElement = (locator: unknown) =>
-  // @ts-expect-error -- expect.element() exists in vitest browser mode
-  expect.element(locator) as { toMatchScreenshot: (name: string) => Promise<void> };
-
 /**
  * Fixed-size wrapper that contains both the popup and the absolutely
  * positioned highlight-options row above it, matching the real app
@@ -169,11 +163,36 @@ const renderPopup = (userColors: UserHighlightColor[] = []) => {
   );
 };
 
-// ── Lifecycle ───────────────────────────────────────────────────────────
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-beforeAll(async () => {
-  await page.viewport(800, 600);
-});
+const getLayoutMetrics = async (userColors: UserHighlightColor[] = []) => {
+  const { container } = renderPopup(userColors);
+  await nextFrame();
+
+  const options = container.querySelector('.highlight-options') as HTMLElement | null;
+  if (!options) {
+    throw new Error('Expected .highlight-options element to be rendered');
+  }
+
+  const [styleButtons, colorStrip] = Array.from(options.children) as HTMLElement[];
+  if (!styleButtons || !colorStrip) {
+    throw new Error('Expected highlight options to render style and color groups');
+  }
+
+  const styleRect = styleButtons.getBoundingClientRect();
+  const colorRect = colorStrip.getBoundingClientRect();
+
+  return {
+    options,
+    colorStrip,
+    gap: colorRect.left - styleRect.right,
+    colorStripWidth: colorRect.width,
+    colorStripClientWidth: colorStrip.clientWidth,
+    colorStripScrollWidth: colorStrip.scrollWidth,
+  };
+};
+
+// ── Lifecycle ───────────────────────────────────────────────────────────
 
 beforeEach(() => {
   // Reset store state before each test.
@@ -186,31 +205,46 @@ afterEach(() => {
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
-describe('AnnotationPopup layout screenshot', () => {
-  it('default 5 colors — compact color strip, large gap', async () => {
-    const { container } = renderPopup();
-    const wrapper = container.firstElementChild as HTMLElement;
-    await expectElement(page.elementLocator(wrapper)).toMatchScreenshot(
-      'annotation-popup-5-colors',
+describe('AnnotationPopup layout', () => {
+  it('default 5 colors keeps a wide gap without overflow', async () => {
+    const metrics = await getLayoutMetrics();
+
+    expect(metrics.options.className).toContain('justify-between');
+    expect(metrics.colorStrip.className).toContain('min-w-0');
+    expect(metrics.colorStrip.className).not.toContain('flex-1');
+    expect(metrics.gap).toBeGreaterThan(40);
+    expect(metrics.colorStripScrollWidth).toBeLessThanOrEqual(
+      metrics.colorStripClientWidth + 1,
     );
   });
 
-  it('5+5 user colors — color strip grows, gap shrinks', async () => {
-    const { container } = renderPopup([
+  it('adding 5 user colors expands the strip and shrinks the gap', async () => {
+    const defaultMetrics = await getLayoutMetrics();
+    cleanup();
+
+    const expandedMetrics = await getLayoutMetrics([
       { hex: '#f97316' },
       { hex: '#06b6d4' },
       { hex: '#ec4899' },
       { hex: '#14b8a6' },
       { hex: '#f43f5e' },
     ]);
-    const wrapper = container.firstElementChild as HTMLElement;
-    await expectElement(page.elementLocator(wrapper)).toMatchScreenshot(
-      'annotation-popup-10-colors',
-    );
+
+    expect(expandedMetrics.colorStripWidth).toBeGreaterThan(defaultMetrics.colorStripWidth + 20);
+    expect(expandedMetrics.gap).toBeLessThan(defaultMetrics.gap - 20);
   });
 
-  it('5+10 user colors — color strip at max, overflow scrolls', async () => {
-    const { container } = renderPopup([
+  it('adding 10 user colors caps the strip width and enables overflow scrolling', async () => {
+    const expandedMetrics = await getLayoutMetrics([
+      { hex: '#f97316' },
+      { hex: '#06b6d4' },
+      { hex: '#ec4899' },
+      { hex: '#14b8a6' },
+      { hex: '#f43f5e' },
+    ]);
+    cleanup();
+
+    const overflowMetrics = await getLayoutMetrics([
       { hex: '#f97316' },
       { hex: '#06b6d4' },
       { hex: '#ec4899' },
@@ -222,9 +256,12 @@ describe('AnnotationPopup layout screenshot', () => {
       { hex: '#e11d48' },
       { hex: '#6366f1' },
     ]);
-    const wrapper = container.firstElementChild as HTMLElement;
-    await expectElement(page.elementLocator(wrapper)).toMatchScreenshot(
-      'annotation-popup-15-colors',
+
+    expect(Math.abs(overflowMetrics.colorStripWidth - expandedMetrics.colorStripWidth)).toBeLessThanOrEqual(
+      2,
+    );
+    expect(overflowMetrics.colorStripScrollWidth).toBeGreaterThan(
+      overflowMetrics.colorStripClientWidth + 20,
     );
   });
 });

@@ -14,7 +14,7 @@ import type {
   PopupContextBundle,
   PopupRetrievalHints,
   RetrievalStatus,
-} from '@/services/contextTranslation/defaults';
+} from '@/services/contextTranslation/types';
 
 const popupContextBundle: PopupContextBundle = {
   localPastContext: 'context text',
