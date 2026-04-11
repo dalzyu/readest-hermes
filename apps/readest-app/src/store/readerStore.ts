@@ -211,8 +211,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             book.metadata.seriesIndex ?? parseFloat(series.position || '0');
         }
       }
-      // TODO: uncomment this when we can ensure metaHash is correctly generated for all books
-      // book.metaHash = book.metaHash ?? getMetadataHash(bookDoc.metadata);
       book.metaHash = getMetadataHash(bookDoc.metadata);
 
       const isFixedLayout =

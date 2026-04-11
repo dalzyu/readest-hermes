@@ -54,7 +54,7 @@ const useShortcuts = (actions: KeyActionHandlers, dependencies: React.Dependency
     shiftKey: boolean,
     event: KeyboardEvent | MessageEvent,
   ) => {
-    // FIXME: This is a temporary fix to disable Back button navigation
+    // Known limitation for 0.1.0: keep Backspace from triggering browser back navigation outside editable fields.
     if (key === 'backspace') return true;
     for (const [actionName, actionHandler] of Object.entries(actions)) {
       const shortcutKey = actionName as keyof ShortcutConfig;

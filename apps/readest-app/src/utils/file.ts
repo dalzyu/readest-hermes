@@ -336,7 +336,6 @@ export class RemoteFile extends File implements ClosableFile {
   }
 
   async open() {
-    // FIXME: currently HEAD request in asset protocol is not supported on Android
     if (getOSPlatform() === 'android') {
       return this._open_with_range();
     } else {
