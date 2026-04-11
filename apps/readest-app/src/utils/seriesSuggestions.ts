@@ -52,7 +52,7 @@ export function buildImportSeriesSuggestions(
 
     const candidates = existingSeries
       .filter((series) => !series.volumes.some((v) => v.bookHash === book.hash))
-      .map((series) => {
+      .flatMap((series) => {
         const normSeriesName = normalizeSuggestionText(series.name);
         const seriesBooks = series.volumes
           .map((v) => libraryBooks.find((lb) => lb.hash === v.bookHash))
@@ -83,7 +83,6 @@ export function buildImportSeriesSuggestions(
           },
         ];
       })
-      .flat()
       .sort((a, b) => (b.suggestedVolumeIndex || 0) - (a.suggestedVolumeIndex || 0));
 
     return candidates.slice(0, 1);

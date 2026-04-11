@@ -89,9 +89,11 @@ describe('workflow alignment', () => {
       "if: matrix.config.release != 'android' && github.repository != 'readest/readest'",
     );
     expect(releaseWorkflow).toContain('name: upload Android apks to GitHub release (fork only)');
-    expect(releaseWorkflow).toContain('upload_name="Hermes_${version}_${flavor}"');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: testing literal shell variables in workflow content
+    expect(releaseWorkflow).toContain('upload_name="Hermes_' + '${version}' + '_' + '${flavor}"');
     expect(releaseWorkflow).toContain('name: upload desktop bundles to GitHub release (fork only)');
-    expect(releaseWorkflow).toContain('case "${{ matrix.config.release }}" in');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: testing literal workflow expression in shell content
+    expect(releaseWorkflow).toContain('case "' + '${{ matrix.config.release }}' + '" in');
     expect(releaseWorkflow).toContain("-path '*/release/bundle/appimage/*.AppImage'");
     expect(releaseWorkflow).toContain("-path '*/release/bundle/deb/*.deb'");
     expect(releaseWorkflow).toContain("-path '*/release/bundle/dmg/*.dmg'");
@@ -126,7 +128,8 @@ describe('workflow alignment', () => {
   test('Hermes release metadata stays decoupled from upstream versioning', () => {
     expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(releaseWorkflow).toContain('name: Release Hermes');
-    expect(releaseWorkflow).toContain('name: `Hermes ${process.env.PACKAGE_VERSION}`');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: testing literal JS template expression embedded in workflow YAML
+    expect(releaseWorkflow).toContain('name: `Hermes ' + '${process.env.PACKAGE_VERSION}' + '`');
     expect(releaseWorkflow).toContain("make_latest: 'true'");
     expect(tauriConfig.productName).toBe('Hermes');
     expect(tauriConfig.mainBinaryName).toBe('hermes');
