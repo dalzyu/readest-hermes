@@ -8,22 +8,34 @@
  * Guards against the layout regression from PR #3741 (missing
  * `justify-between`, unwanted `flex-1` on the color strip).
  */
-
 import React from 'react';
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { page } from 'vitest/browser';
 import type { UserHighlightColor } from '@/types/book';
+import { EnvProvider } from '@/context/EnvContext';
+import { useSettingsStore } from '@/store/settingsStore';
+import { DEFAULT_SYSTEM_SETTINGS } from '@/services/constants';
 
 // ── Tailwind / DaisyUI styles ───────────────────────────────────────────
 import '@/styles/globals.css';
 
-// ── Per-test state read by mocks ────────────────────────────────────────
-let mockUserColors: UserHighlightColor[] = [];
-
 // ── Mocks (must be before component imports) ────────────────────────────
 
+// Environment service mock — EnvProvider reads `env.getAppService()`.
+vi.mock('@/services/environment', async () => {
+  const actual = await vi.importActual('@/services/environment');
+  return {
+    ...actual,
+    default: {
+      getAppService: vi.fn().mockResolvedValue({ isMobile: false }),
+    },
+  };
+});
+
+// EnvContext mock so useEnv() is safe to call outside the real provider.
 vi.mock('@/context/EnvContext', () => ({
+  EnvProvider: ({ children }: { children: React.ReactNode }) => children,
   useEnv: () => ({ envConfig: {}, appService: null }),
 }));
 
@@ -33,30 +45,6 @@ vi.mock('@/store/themeStore', () => ({
 
 vi.mock('@/hooks/useTranslation', () => ({
   useTranslation: () => (s: string) => s,
-}));
-
-vi.mock('@/store/settingsStore', () => ({
-  useSettingsStore: () => ({
-    settings: {
-      globalReadSettings: {
-        highlightStyle: 'highlight' as const,
-        highlightStyles: {
-          highlight: 'yellow',
-          underline: 'red',
-          squiggly: 'blue',
-        },
-        customHighlightColors: {} as Record<string, string>,
-        get userHighlightColors() {
-          return mockUserColors;
-        },
-        defaultHighlightLabels: {},
-      },
-      globalViewSettings: {
-        isEink: false,
-        isColorEink: false,
-      },
-    },
-  }),
 }));
 
 vi.mock('@/hooks/useResponsiveSize', () => ({
@@ -127,26 +115,54 @@ const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 const renderPopup = (userColors: UserHighlightColor[] = []) => {
-  mockUserColors = userColors;
+  // Use real Zustand store setState — no mock needed for useSettingsStore.
+  // Mirrors the state shape that the original useSettingsStore mock returned:
+  //   customHighlightColors = {} (empty, so default color names render as-is)
+  //   highlightStyles.underline = 'red' (explicit override)
+  (useSettingsStore.setState as (s: object) => void)({
+    settings: {
+      ...DEFAULT_SYSTEM_SETTINGS,
+      globalReadSettings: {
+        ...DEFAULT_SYSTEM_SETTINGS.globalReadSettings,
+        highlightStyle: 'highlight',
+        highlightStyles: {
+          highlight: 'yellow',
+          underline: 'red',
+          squiggly: 'blue',
+        },
+        customHighlightColors: {} as Record<string, string>,
+        userHighlightColors: userColors,
+        defaultHighlightLabels: {},
+      },
+      globalViewSettings: {
+        ...DEFAULT_SYSTEM_SETTINGS.globalViewSettings,
+        isEink: false,
+        isColorEink: false,
+      },
+    },
+  });
+
   return render(
-    <Wrapper>
-      <AnnotationPopup
-        bookKey='test'
-        dir='ltr'
-        isVertical={false}
-        buttons={toolButtons}
-        notes={[]}
-        position={{ dir: 'up', point: { x: POPUP_X, y: POPUP_Y } }}
-        trianglePosition={{ dir: 'up', point: { x: POPUP_X + POPUP_W / 2, y: POPUP_Y + POPUP_H } }}
-        highlightOptionsVisible
-        selectedStyle='highlight'
-        selectedColor='yellow'
-        popupWidth={POPUP_W}
-        popupHeight={POPUP_H}
-        onHighlight={vi.fn()}
-        onDismiss={vi.fn()}
-      />
-    </Wrapper>,
+    <EnvProvider>
+      <Wrapper>
+        <AnnotationPopup
+          bookKey='test'
+          dir='ltr'
+          isVertical={false}
+          buttons={toolButtons}
+          notes={[]}
+          position={{ dir: 'up', point: { x: POPUP_X, y: POPUP_Y } }}
+          trianglePosition={{ dir: 'up', point: { x: POPUP_X + POPUP_W / 2, y: POPUP_Y + POPUP_H } }}
+          highlightOptionsVisible
+          selectedStyle='highlight'
+          selectedColor='yellow'
+          popupWidth={POPUP_W}
+          popupHeight={POPUP_H}
+          onHighlight={vi.fn()}
+          onDismiss={vi.fn()}
+        />
+      </Wrapper>
+    </EnvProvider>,
   );
 };
 
@@ -157,7 +173,8 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  mockUserColors = [];
+  // Reset store state before each test.
+  (useSettingsStore.setState as (s: object) => void)({ settings: DEFAULT_SYSTEM_SETTINGS });
 });
 
 afterEach(() => {
