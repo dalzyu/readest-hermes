@@ -21,7 +21,7 @@
     "test:coverage": "dotenv -e .env -e .env.test.local -- vitest run --coverage",
     "test:browser": "dotenv -e .env -e .env.test.local -- vitest run --config vitest.browser.config.mts",
     "test:tauri": "bash scripts/test-tauri.sh",
-    "test:pr:web:unit": "dotenv -e .env -e .env.test.local -- vitest run --shard=1/4 && dotenv -e .env -e .env.test.local -- vitest run --shard=2/4 && dotenv -e .env -e .env.test.local -- vitest run --shard=3/4 && dotenv -e .env -e .env.test.local -- vitest run --shard=4/4",
+    "test:pr:web:unit": "node scripts/run-vitest-shards.mjs 8",
     "test:pr:web": "corepack pnpm test:pr:web:unit && corepack pnpm test:browser",
     "test:pr:tauri": "bash scripts/test-tauri.sh",
     "test:all": "corepack pnpm test -- --watch=false && corepack pnpm test:browser && bash scripts/test-tauri.sh",
