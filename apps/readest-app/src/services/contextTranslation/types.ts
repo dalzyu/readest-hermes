@@ -112,6 +112,13 @@ export interface PopupRetrievalHints {
   missingSeriesAssignment: boolean;
 }
 
+/** A dictionary result for immediate display in the popup (no LLM required). */
+export interface DictionaryDisplayEntry {
+  headword: string;
+  definition: string;
+  source: string; // e.g., "CC-CEDICT", "JMdict", user dictionary name
+}
+
 export interface PopupContextBundle {
   localPastContext: string;
   localFutureBuffer: string;
@@ -120,6 +127,8 @@ export interface PopupContextBundle {
   retrievalStatus: RetrievalStatus;
   retrievalHints: PopupRetrievalHints;
   dictionaryEntries: string[];
+  /** Structured dictionary results for immediate popup display */
+  dictionaryResults?: DictionaryDisplayEntry[];
 }
 
 /** Settings for the source-language dictionary lookup feature */
@@ -147,12 +156,20 @@ export interface ContextTranslationSettings {
   disabledBundledDicts?: string[];
   /** Translation source to use when looking up selected text. Defaults to 'ai'. */
   source?: 'ai' | 'dictionary' | 'azure' | 'deepl' | 'google' | 'yandex';
+  /**
+   * Field strategy:
+   * - 'single' (default) = one LLM call with all fields in a single prompt
+   * - 'multi' = per-field prompts with parallel LLM calls
+   */
+  fieldStrategy?: 'single' | 'multi';
 }
 
 /** A single entry from a StarDict dictionary. */
 export interface DictionaryEntry {
   headword: string;
   definition: string;
+  /** Source dictionary name for display attribution. */
+  source?: string;
 }
 
 /** A dictionary installed in the app. */

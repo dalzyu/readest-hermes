@@ -2,6 +2,8 @@ import { gzip } from 'fflate';
 import { aiStore } from '@/services/ai/storage/aiStore';
 import type { DictionaryEntry, UserDictionary } from './types';
 import { extractFromZip, parseStarDict } from './dictionaryParser';
+import { parseDictionary, detectFormat } from './parsers/formatRouter';
+import { getDictionaryForm, isTokenizerReady } from './plugins/jpTokenizer';
 
 const DICTIONARY_STORE = 'dictionaryData';
 
@@ -213,14 +215,18 @@ export async function previewDictionaryZip(
   zipFile: File | Uint8Array,
 ): Promise<{ name: string; wordcount: number }> {
   const buffer = zipFile instanceof File ? new Uint8Array(await zipFile.arrayBuffer()) : zipFile;
+  const filename = zipFile instanceof File ? zipFile.name : 'dictionary.zip';
+  const format = detectFormat(filename, buffer);
 
-  const { ifo } = await extractFromZip(buffer);
-  const ifoResult = (await import('./dictionaryParser')).parseIfo(ifo);
+  if (format === 'stardict') {
+    const { ifo } = await extractFromZip(buffer);
+    const ifoResult = (await import('./dictionaryParser')).parseIfo(ifo);
+    return { name: ifoResult.name, wordcount: ifoResult.wordcount };
+  }
 
-  return {
-    name: ifoResult.name,
-    wordcount: ifoResult.wordcount,
-  };
+  // For non-StarDict formats, do a full parse to get the count
+  const { entries, name } = await parseDictionary(filename, buffer);
+  return { name, wordcount: entries.length };
 }
 
 /**
@@ -236,16 +242,9 @@ export async function importUserDictionary(
   meta: { name: string; language: string; targetLanguage: string },
 ): Promise<UserDictionary> {
   const buffer = zipFile instanceof File ? new Uint8Array(await zipFile.arrayBuffer()) : zipFile;
+  const filename = zipFile instanceof File ? zipFile.name : 'dictionary.zip';
 
-  // Phase 1
-  const { ifo, idx, dict } = await extractFromZip(buffer);
-  const ifoResult = (await import('./dictionaryParser')).parseIfo(ifo);
-  if (ifoResult.wordcount === 0) {
-    throw new Error('Dictionary has 0 entries');
-  }
-
-  // Phase 2
-  const entries = parseStarDict({ ifo, idx, dict });
+  const { entries } = await parseDictionary(filename, buffer);
   if (entries.length === 0) {
     throw new Error('Dictionary has 0 entries');
   }
@@ -399,6 +398,11 @@ export async function lookupDefinitions(
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
 
+  // For Japanese, deconjugate to dictionary form and search both surface + base form
+  const isJapanese = sourceLang === 'ja';
+  const baseForm = isJapanese && isTokenizerReady() ? getDictionaryForm(text) : null;
+  const searchTerms = baseForm && baseForm !== text ? [text, baseForm] : [text];
+
   const MAX_RESULTS = 3;
 
   const allBundled: UserDictionary[] = BUNDLED_DICTIONARIES.map((b) => ({
@@ -452,14 +456,20 @@ export async function lookupDefinitions(
     if (results.length >= MAX_RESULTS) break;
 
     const entries = await loadDictionaryEntries(rankedEntry.dictionaryId);
-    const matches = findMatches(entries, text);
+
+    // Try each search term (surface form first, then base form if different)
+    let matches: DictionaryEntry[] = [];
+    for (const term of searchTerms) {
+      matches = findMatches(entries, term);
+      if (matches.length > 0) break;
+    }
 
     // Take up to 1 from this dictionary
     for (const match of matches) {
       if (results.length >= MAX_RESULTS) break;
       if (seenHeadwords.has(match.headword)) continue;
       seenHeadwords.add(match.headword);
-      results.push(match);
+      results.push({ ...match, source: rankedEntry.dictionaryId });
     }
   }
 

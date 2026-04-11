@@ -157,6 +157,24 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
         <p className='text-sm italic text-gray-400'>{_('Looking up...')}</p>
       )}
       {error && <p className='text-sm text-red-400'>{error}</p>}
+      {popupContext?.dictionaryResults && popupContext.dictionaryResults.length > 0 && (
+        <details className='mb-2'>
+          <summary className='cursor-pointer text-xs font-medium uppercase tracking-wide text-gray-400'>
+            {_('Dictionary')}
+          </summary>
+          <div className='mt-1 space-y-1 pl-2'>
+            {popupContext.dictionaryResults.map((entry, i) => (
+              <div key={i} className='text-sm'>
+                <span className='not-eink:text-white/95 font-medium'>{entry.headword}</span>
+                <span className='not-eink:text-white/70 ml-1'>{entry.definition}</span>
+                {entry.source && (
+                  <span className='ml-1 text-xs text-gray-500'>({entry.source})</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
       {!error && (hasDisplayedResult || !loading) && (
         <>
           {simpleDefinition !== null ? (

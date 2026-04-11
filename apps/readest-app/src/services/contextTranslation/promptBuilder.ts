@@ -213,3 +213,47 @@ export function buildLookupPrompt(request: LookupPromptRequest): {
     userPrompt,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Per-field prompt builder (for fieldStrategy === 'multi')
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a focused system+user prompt for a single output field.
+ * The LLM response is expected to be raw text — no XML wrapping.
+ */
+export function buildPerFieldPrompt(
+  field: { id: string; promptInstruction: string },
+  request: TranslationRequest,
+): { systemPrompt: string; userPrompt: string } {
+  const targetLang = languageName(request.targetLanguage);
+  const sourceLangHint = request.sourceLanguage
+    ? ` The source language is ${languageName(request.sourceLanguage)}.`
+    : '';
+
+  const examplesLayout =
+    field.id === 'examples'
+      ? isChineseSource(request)
+        ? '\nFormat each numbered example as:\n1. 中文句子\nEnglish: ...\nDo not include pinyin.'
+        : isChineseTarget(request)
+          ? '\nFormat each numbered example as:\n1. English sentence\nChinese: 中文句子\nDo not include pinyin.'
+          : ''
+      : '';
+
+  const referenceDictNote =
+    request.popupContext.dictionaryEntries.length > 0
+      ? '\nIf a <reference_dictionary> block is present, use it as an authoritative reference.'
+      : '';
+
+  const systemPrompt = `You are a literary translation assistant.${sourceLangHint}
+
+Task: ${field.promptInstruction}
+
+Respond entirely in ${targetLang}. Output ONLY the requested content — no preamble, no XML tags, no labels.${examplesLayout}${referenceDictNote}`;
+
+  const userPrompt = `<selected_text>${request.selectedText}</selected_text>
+
+${buildContextSections(request)}`;
+
+  return { systemPrompt, userPrompt };
+}

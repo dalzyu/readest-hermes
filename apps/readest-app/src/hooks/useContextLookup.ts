@@ -11,6 +11,7 @@ import type { TranslationSource } from '@/services/contextTranslation/simpleLook
 import {
   streamTranslationWithContext,
   streamLookupWithContext,
+  streamPerFieldTranslation,
 } from '@/services/contextTranslation/translationService';
 import { lookupDefinitions } from '@/services/contextTranslation/dictionaryService';
 import type { ContextLookupMode } from '@/services/contextTranslation/modes';
@@ -121,7 +122,7 @@ export function useContextLookup({
         const detectedLanguage = detectLookupLanguage(selectedText);
 
         // Launch bundle building (with prefetch check) and dictionary lookup in parallel
-        const [bundle, dictionaryEntries] = await Promise.all([
+        const [bundle, rawDictEntries] = await Promise.all([
           consumePrefetch(bookHash, requestSnapshot.currentPage, selectedText).then(
             (prefetched) =>
               prefetched ??
@@ -139,13 +140,19 @@ export function useContextLookup({
             detectedLanguage.language,
             requestSnapshot.settings.targetLanguage,
             requestSnapshot.settings.disabledBundledDicts ?? [],
-          )
-            .then((entries) => entries.map((e) => `${e.headword}: ${e.definition}`))
-            .catch(() => [] as string[]),
+          ).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>),
         ]);
+
+        // Build string entries for LLM prompt + structured results for display
+        const dictionaryEntries = rawDictEntries.map((e) => `${e.headword}: ${e.definition}`);
 
         // Inject pre-resolved dictionary entries into the bundle
         bundle.dictionaryEntries = dictionaryEntries;
+        bundle.dictionaryResults = rawDictEntries.map((e) => ({
+          headword: e.headword,
+          definition: e.definition,
+          source: e.source ?? '',
+        }));
         contextRef.current = bundle.localPastContext;
 
         if (cancelled) return;
@@ -194,11 +201,13 @@ export function useContextLookup({
           let finalRawText = '';
           let finalFields: TranslationResult = {};
 
-          for await (const chunk of streamTranslationWithContext(
-            translationRequest,
-            model,
-            abortController.signal,
-          )) {
+          // Choose streamer based on fieldStrategy
+          const useMultiField = requestSnapshot.settings.fieldStrategy === 'multi';
+          const streamer = useMultiField
+            ? streamPerFieldTranslation(translationRequest, model, abortController.signal)
+            : streamTranslationWithContext(translationRequest, model, abortController.signal);
+
+          for await (const chunk of streamer) {
             if (cancelled) return;
             finalRawText = chunk.rawText;
             finalFields = chunk.fields;

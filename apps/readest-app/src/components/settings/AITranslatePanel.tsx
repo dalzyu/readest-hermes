@@ -62,6 +62,9 @@ const AITranslatePanel: React.FC = () => {
   );
   const [ctxOutputFields, setCtxOutputFields] = useState(ctxTransSettings.outputFields);
   const [ctxSource, setCtxSource] = useState<TranslationSource>(ctxTransSettings.source ?? 'ai');
+  const [ctxFieldStrategy, setCtxFieldStrategy] = useState<'single' | 'multi'>(
+    ctxTransSettings.fieldStrategy ?? 'single',
+  );
 
   const [ctxDictEnabled, setCtxDictEnabled] = useState(ctxDictSettings.enabled);
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
@@ -290,7 +293,7 @@ const AITranslatePanel: React.FC = () => {
       <input
         ref={fileInputRef}
         type='file'
-        accept='.zip'
+        accept='.zip,.dsl,.dsl.dz,.mdx'
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />
@@ -485,6 +488,27 @@ const AITranslatePanel: React.FC = () => {
             {/* Output Fields */}
             <div className={clsx(!ctxEnabled && 'pointer-events-none select-none opacity-50')}>
               <div className='px-4 py-2 text-sm font-medium'>{_('Output Fields')}</div>
+              <div className='border-base-200 border-t px-4 py-2'>
+                <div className='config-item !px-0'>
+                  <span className='text-sm'>{_('Parallel per-field mode')}</span>
+                  <input
+                    type='checkbox'
+                    className='toggle toggle-sm'
+                    checked={ctxFieldStrategy === 'multi'}
+                    disabled={!ctxEnabled || !isAiSource}
+                    onChange={() => {
+                      const next = ctxFieldStrategy === 'multi' ? 'single' : 'multi';
+                      setCtxFieldStrategy(next);
+                      saveCtxTransSetting({ fieldStrategy: next });
+                    }}
+                  />
+                </div>
+                {ctxFieldStrategy === 'multi' && (
+                  <p className='text-warning mt-1 text-xs'>
+                    {_('Parallel mode uses one API call per field — costs 3-4× more per lookup.')}
+                  </p>
+                )}
+              </div>
               {ctxOutputFields
                 .slice()
                 .sort((a, b) => a.order - b.order)

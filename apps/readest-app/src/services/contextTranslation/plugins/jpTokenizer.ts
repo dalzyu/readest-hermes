@@ -79,6 +79,31 @@ export function getReadingRomaji(text: string): string {
     .join('');
 }
 
+/**
+ * Deconjugate Japanese text to its dictionary form using kuromoji's `basic_form`.
+ *
+ * For single-token conjugated verbs/adjectives (e.g. 食べた → 食べる, 美しかった → 美しい),
+ * returns the dictionary form. For multi-token phrases or when the tokenizer is not ready,
+ * returns the original text unchanged.
+ */
+export function getDictionaryForm(text: string): string {
+  if (!tokenizer) return text;
+  const tokens = tokenizer.tokenize(text);
+  if (tokens.length === 0) return text;
+
+  // For single-token selections, use the basic_form directly
+  if (tokens.length === 1) {
+    const t = tokens[0]!;
+    return t.basic_form && t.basic_form !== '*' ? t.basic_form : t.surface_form;
+  }
+
+  // For multi-token: return basic_form of each content token joined together
+  // This handles compound verbs like 食べていた → 食べている (approximately)
+  return tokens
+    .map((t) => (t.basic_form && t.basic_form !== '*' ? t.basic_form : t.surface_form))
+    .join('');
+}
+
 // ---------------------------------------------------------------------------
 // Test helpers — allow tests to inject / reset a mock tokenizer
 // ---------------------------------------------------------------------------

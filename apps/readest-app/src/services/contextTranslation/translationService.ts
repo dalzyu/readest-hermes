@@ -7,7 +7,7 @@ import type {
 } from './types';
 import type { ContextLookupMode } from './modes';
 import { formatTranslationResult } from './exampleFormatter';
-import { buildTranslationPrompt, buildLookupPrompt } from './promptBuilder';
+import { buildTranslationPrompt, buildLookupPrompt, buildPerFieldPrompt } from './promptBuilder';
 import { parseStreamingTranslationResponse, parseTranslationResponse, StreamingParser } from './responseParser';
 import { normalizeLookupResponse } from './normalizer';
 import { callLLM, streamLLM } from './llmClient';
@@ -108,6 +108,69 @@ export async function* streamLookupWithContext(
     fields: normalizeLookupResponse(rawText, request.mode),
     activeFieldId: null,
     rawText,
+    done: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Per-field parallel streaming (fieldStrategy === 'multi')
+// ---------------------------------------------------------------------------
+
+/**
+ * Streams N independent LLM calls in parallel — one per enabled output field.
+ * Each field result is yielded as it arrives, identified by `activeFieldId`.
+ * The final yield has `done: true` and the merged results.
+ */
+export async function* streamPerFieldTranslation(
+  request: TranslationRequest,
+  model: LanguageModel,
+  abortSignal?: AbortSignal,
+): AsyncGenerator<TranslationStreamResult> {
+  const enabledFields = request.outputFields
+    .filter((f) => f.enabled)
+    .sort((a, b) => a.order - b.order);
+
+  // Shared mutable state — each field updates its slot
+  const merged: TranslationResult = {};
+  let latestActiveFieldId: string | null = null;
+
+  // Launch one stream per field
+  const fieldStreams = enabledFields.map(async (field) => {
+    const { systemPrompt, userPrompt } = buildPerFieldPrompt(field, request);
+    let fieldText = '';
+
+    for await (const chunk of streamLLM(systemPrompt, userPrompt, model, abortSignal)) {
+      fieldText += chunk;
+      merged[field.id] = fieldText.trim();
+      latestActiveFieldId = field.id;
+    }
+
+    // Mark field done with final trim
+    merged[field.id] = fieldText.trim();
+  });
+
+  // Poll merged results while any stream is still running
+  const allDone = Promise.all(fieldStreams);
+  let settled = false;
+  allDone.then(() => { settled = true; }).catch(() => { settled = true; });
+
+  while (!settled) {
+    // Yield current snapshot
+    yield {
+      fields: formatTranslationResult({ ...merged }, request),
+      activeFieldId: latestActiveFieldId,
+      rawText: '', // individual raw texts not meaningful in multi mode
+      done: false,
+    };
+    // Brief pause to batch updates instead of busy-looping
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  // Yield final merged result
+  yield {
+    fields: formatTranslationResult({ ...merged }, request),
+    activeFieldId: null,
+    rawText: '',
     done: true,
   };
 }
