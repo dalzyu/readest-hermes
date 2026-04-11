@@ -572,7 +572,11 @@ describe('TTSController', () => {
 
   describe('forward and backward', () => {
     test('forward stops at the end of the book after repeated empty sections', async () => {
-      mockView.book.sections = Array.from({ length: 10 }, () => ({
+      mockView.book.sections = Array.from({ length: 10 }, (_, index) => ({
+        id: `section-${index}`,
+        cfi: `cfi-${index}`,
+        size: 1,
+        linear: 'yes',
         createDocument: vi.fn().mockResolvedValue({} as Document),
       }));
       mockView.tts = {

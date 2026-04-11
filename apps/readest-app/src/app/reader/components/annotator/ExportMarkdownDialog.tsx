@@ -6,6 +6,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useReaderStore } from '@/store/readerStore';
 import { BookNote, BooknoteGroup, NoteExportConfig } from '@/types/book';
 import { DEFAULT_NOTE_EXPORT_CONFIG } from '@/services/constants';
+import { DEFAULT_NOTE_EXPORT_TEMPLATE, NOTE_EXPORT_PRESETS } from '@/utils/noteExportTemplates';
 import { saveViewSettings } from '@/helpers/settings';
 import { renderNoteTemplate, formatBlockQuote } from '@/utils/note';
 import Dialog from '@/components/Dialog';
@@ -35,40 +36,7 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
   const { envConfig } = useEnv();
   const { getViewSettings } = useReaderStore();
   const viewSettings = getViewSettings(bookKey);
-
-  const defaultTemplate = `## {{ title }}
-**${_('Author')}**: {{ author }}
-
-**${_('Exported from Hermes')}**: {{ exportDate | date('%Y-%m-%d') }}
-
----
-
-### ${_('Highlights & Annotations')}
-
-{% for chapter in chapters %}
-#### {{ chapter.title }}
-{% for annotation in chapter.annotations %}
-{% if annotation.color == 'yellow' %}
-- {{ annotation.text }}
-{% elif annotation.color == 'red' %}
-- ❗ {{ annotation.text }}
-{% elif annotation.color == 'green' %}
-- ✅ {{ annotation.text }}
-{% elif annotation.color == 'blue' %}
-- 💡 {{ annotation.text }}
-{% elif annotation.color == 'violet' %}
-- ✨ {{ annotation.text }}
-{% else %}
-- {{ annotation.text }}
-{% endif %}
-{% if annotation.note %}
-**${_('Note:')}** {{ annotation.note }}
-{% endif %}
-*${_('Page:')} {{ annotation.page }} · ${_('Time:')} {{ annotation.timestamp | date('%Y-%m-%d %H:%M') }}*
-{% endfor %}
-
----
-{% endfor %}`;
+  const defaultTemplate = DEFAULT_NOTE_EXPORT_TEMPLATE;
 
   const [exportConfig, setExportConfig] = useState<NoteExportConfig>(() => {
     const noteExportConfig = viewSettings?.noteExportConfig || DEFAULT_NOTE_EXPORT_CONFIG;
@@ -80,6 +48,22 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
     }
     return noteExportConfig;
   });
+
+  const selectedPresetId = useMemo(() => {
+    const preset = NOTE_EXPORT_PRESETS.find((item) => item.template === exportConfig.customTemplate);
+    return preset?.id ?? '';
+  }, [exportConfig.customTemplate]);
+
+  const handlePresetChange = (presetId: string) => {
+    const preset = NOTE_EXPORT_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+
+    setExportConfig({
+      ...exportConfig,
+      useCustomTemplate: true,
+      customTemplate: preset.template,
+    });
+  };
 
   const [showSource, setShowSource] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -383,6 +367,20 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
               {exportConfig.useCustomTemplate && (
                 <>
                   <div className='space-y-2'>
+                    <div className='space-y-2'>
+                      <label className='text-sm font-medium'>{_('Template Preset')}</label>
+                      <select
+                        className='select select-bordered select-sm w-full'
+                        value={selectedPresetId}
+                        onChange={(e) => handlePresetChange(e.target.value)}
+                      >
+                        <option value=''>{_('Custom')}</option>
+                        <option value='obsidian'>{_('Obsidian Markdown')}</option>
+                        <option value='notion'>{_('Notion Markdown')}</option>
+                        <option value='study-notes'>{_('Study Notes')}</option>
+                      </select>
+                    </div>
+
                     <div className='flex items-center justify-between'>
                       <label className='text-sm font-medium'>{_('Export Template')}</label>
                       <button
