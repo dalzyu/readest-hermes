@@ -15,17 +15,18 @@ const { stableSettings } = vi.hoisted(() => {
   const stableSettings = {
     aiSettings: {
       enabled: false,
-      provider: 'ollama',
-      ollamaBaseUrl: 'http://127.0.0.1:11434',
-      ollamaModel: 'llama3.2',
-      ollamaEmbeddingModel: 'nomic-embed-text',
-      aiGatewayModel: 'google/gemini-2.5-flash-lite',
-      aiGatewayEmbeddingModel: 'openai/text-embedding-3-small',
-      openAICompatibleApiStyle: 'chat-completions',
-      openAICompatibleBaseUrl: 'http://127.0.0.1:8080',
-      openAICompatibleModel: '',
-      openAICompatibleEmbeddingBaseUrl: 'http://127.0.0.1:8081',
-      openAICompatibleEmbeddingModel: '',
+      providers: [
+        {
+          id: 'ollama-default',
+          name: 'Ollama (Local)',
+          providerType: 'ollama',
+          baseUrl: 'http://127.0.0.1:11434',
+          model: 'llama3.2',
+          embeddingModel: 'nomic-embed-text',
+        },
+      ],
+      activeProviderId: 'ollama-default',
+      modelAssignments: {},
       spoilerProtection: true,
       maxContextChunks: 10,
       indexingMode: 'on-demand',
@@ -107,6 +108,10 @@ vi.mock('@/context/EnvContext', () => ({
 }));
 
 vi.mock('@/services/ai/providers', () => ({
+  createProviderFromConfig: () => ({
+    healthCheck: vi.fn().mockResolvedValue(true),
+    isAvailable: vi.fn().mockResolvedValue(true),
+  }),
   getAIProvider: () => ({
     healthCheck: vi.fn().mockResolvedValue(true),
     isAvailable: vi.fn().mockResolvedValue(true),
@@ -210,12 +215,12 @@ describe('AIPanel', () => {
     expect(screen.getByText('Use prior-volume memory')).toBeTruthy();
   });
 
-  test('renders openai-compatible provider option', () => {
+  test('renders provider list with configured providers', () => {
     render(<AIPanel />);
 
-    expect(screen.getAllByText('OpenAI-Compatible').length).toBeGreaterThan(0);
-    expect(screen.queryByText('llama.cpp (Local)')).toBeNull();
-    expect(screen.queryByText('vLLM (Local)')).toBeNull();
+    expect(screen.getByText('Providers')).toBeTruthy();
+    // The default Ollama provider should be listed
+    expect(screen.getAllByText('Ollama (Local)').length).toBeGreaterThan(0);
   });
 
   test('uses the full shared translator language list for context translation targets', () => {

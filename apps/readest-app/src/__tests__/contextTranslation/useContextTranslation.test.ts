@@ -18,6 +18,10 @@ vi.mock('@/store/settingsStore', () => ({
 }));
 vi.mock('@/services/ai/providers', () => ({
   getAIProvider: () => ({ getModel: () => 'mock-model' }),
+  getProviderForTask: () => ({
+    provider: { getModel: () => 'mock-model' },
+    inferenceParams: {},
+  }),
 }));
 vi.mock('@/services/contextTranslation/contextLookupService', () => ({
   runContextLookup: vi.fn(),

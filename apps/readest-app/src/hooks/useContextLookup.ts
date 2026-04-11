@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 
-import { getAIProvider } from '@/services/ai/providers';
+import { getProviderForTask } from '@/services/ai/providers';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
 import { runSimpleLookup } from '@/services/contextTranslation/simpleLookup';
@@ -155,7 +155,9 @@ export function useContextLookup({
           return;
         }
 
-        const model = getAIProvider(requestSnapshot.aiSettings).getModel();
+        const taskType = mode === 'translation' ? 'translation' as const : 'dictionary' as const;
+        const { provider, inferenceParams } = getProviderForTask(requestSnapshot.aiSettings, taskType);
+        const model = provider.getModel(inferenceParams);
 
         if (mode === 'translation') {
           // Streaming path for translation mode — real-time UI updates + post-stream repair/enrichment

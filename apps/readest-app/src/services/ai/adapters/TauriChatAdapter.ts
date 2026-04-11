@@ -1,6 +1,6 @@
 import { streamText } from 'ai';
 import type { ChatModelAdapter, ChatModelRunResult } from '@assistant-ui/react';
-import { getAIProvider } from '../providers';
+import { getProviderForTask } from '../providers';
 import { hybridSearch, isBookIndexed } from '../ragService';
 import { aiLogger } from '../logger';
 import { buildSystemPrompt } from '../prompts';
@@ -48,14 +48,18 @@ async function* streamViaApiRoute(
   settings: AISettings,
   abortSignal?: AbortSignal,
 ): AsyncGenerator<string> {
+  // Find the active AI Gateway provider config to get apiKey and model
+  const gatewayConfig = settings.providers.find(
+    (p) => p.id === settings.activeProviderId && p.providerType === 'ai-gateway',
+  );
   const response = await fetch('/api/ai/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       messages,
       system: systemPrompt,
-      apiKey: settings.aiGatewayApiKey,
-      model: settings.aiGatewayModel || 'google/gemini-2.5-flash-lite',
+      apiKey: gatewayConfig?.apiKey ?? '',
+      model: gatewayConfig?.model || 'google/gemini-2.5-flash-lite',
     }),
     signal: abortSignal,
   });
@@ -80,7 +84,7 @@ export function createTauriAdapter(getOptions: () => TauriAdapterOptions): ChatM
     async *run({ messages, abortSignal }): AsyncGenerator<ChatModelRunResult> {
       const options = getOptions();
       const { settings, bookHash, bookTitle, authorName, currentPage } = options;
-      const provider = getAIProvider(settings);
+      const { provider, inferenceParams } = getProviderForTask(settings, 'chat');
       let chunks: ScoredChunk[] = [];
 
       const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
@@ -123,7 +127,7 @@ export function createTauriAdapter(getOptions: () => TauriAdapterOptions): ChatM
       }));
 
       try {
-        const useApiRoute = typeof window !== 'undefined' && settings.provider === 'ai-gateway';
+        const useApiRoute = typeof window !== 'undefined' && settings.providers.some(p => p.id === settings.activeProviderId && p.providerType === 'ai-gateway');
 
         let text = '';
 
@@ -139,7 +143,7 @@ export function createTauriAdapter(getOptions: () => TauriAdapterOptions): ChatM
           }
         } else {
           const result = streamText({
-            model: provider.getModel(),
+            model: provider.getModel(inferenceParams),
             system: systemPrompt,
             messages: aiMessages,
             abortSignal,

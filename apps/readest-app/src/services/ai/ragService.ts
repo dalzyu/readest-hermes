@@ -2,7 +2,7 @@ import { embed, embedMany } from 'ai';
 import { aiStore } from './storage/aiStore';
 import { chunkSection, extractTextFromDocument } from './utils/chunker';
 import { withRetryAndTimeout, AI_TIMEOUTS, AI_RETRY_CONFIGS } from './utils/retry';
-import { getAIProvider } from './providers';
+import { getProviderForTask } from './providers';
 import { aiLogger } from './logger';
 import type { AISettings, TextChunk, ScoredChunk, EmbeddingProgress, BookIndexMeta } from './types';
 import type { PageSearchBounds } from './storage/aiStore';
@@ -87,7 +87,7 @@ export async function indexBook(
   }
 
   aiLogger.rag.indexStart(bookHash, title);
-  const provider = getAIProvider(settings);
+  const { provider } = getProviderForTask(settings, 'embedding');
   const sections = bookDoc.sections || [];
   const toc = bookDoc.toc || [];
 
@@ -145,10 +145,9 @@ export async function indexBook(
     }
 
     onProgress?.({ current: 0, total: allChunks.length, phase: 'embedding' });
-    const embeddingModelName =
-      settings.provider === 'ollama'
-        ? settings.ollamaEmbeddingModel
-        : settings.aiGatewayEmbeddingModel || 'text-embedding-3-small';
+    // Resolve the embedding model name for logging from the active provider config
+    const activeConfig = settings.providers.find((p) => p.id === settings.activeProviderId);
+    const embeddingModelName = activeConfig?.embeddingModel || 'unknown';
     aiLogger.embedding.start(embeddingModelName, allChunks.length);
 
     const embeddingModel = provider.getEmbeddingModel();
@@ -240,7 +239,7 @@ export async function boundedHybridSearch(
 ): Promise<ScoredChunk[]> {
   const normalizedBounds = typeof bounds === 'number' ? { maxPage: bounds } : bounds;
   aiLogger.search.query(query, normalizedBounds?.maxPage);
-  const provider = getAIProvider(settings);
+  const { provider } = getProviderForTask(settings, 'embedding');
   let queryEmbedding: number[] | null = null;
 
   try {

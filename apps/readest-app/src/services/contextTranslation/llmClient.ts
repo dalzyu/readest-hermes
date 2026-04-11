@@ -1,24 +1,23 @@
 import { generateText, streamText } from 'ai';
 import type { LanguageModel } from 'ai';
+import type { InferenceParams } from '@/services/ai/types';
 
-/**
- * Thin wrapper around the `ai` SDK for making single-turn LLM calls.
- * Accepts a pre-built system prompt and user prompt.
- *
- * In production, pass the `model` obtained from the AI provider settings.
- * In tests, this entire function is mocked.
- */
 export async function callLLM(
   systemPrompt: string,
   userPrompt: string,
   model: LanguageModel,
   abortSignal?: AbortSignal,
+  params?: InferenceParams,
 ): Promise<string> {
   const { text } = await generateText({
     model,
     system: systemPrompt,
     prompt: userPrompt,
     abortSignal,
+    ...(params?.temperature != null && { temperature: params.temperature }),
+    ...(params?.maxTokens != null && { maxTokens: params.maxTokens }),
+    ...(params?.topP != null && { topP: params.topP }),
+    ...(params?.frequencyPenalty != null && { frequencyPenalty: params.frequencyPenalty }),
   });
   return text;
 }
@@ -28,12 +27,17 @@ export async function* streamLLM(
   userPrompt: string,
   model: LanguageModel,
   abortSignal?: AbortSignal,
+  params?: InferenceParams,
 ): AsyncGenerator<string> {
   const result = streamText({
     model,
     system: systemPrompt,
     prompt: userPrompt,
     abortSignal,
+    ...(params?.temperature != null && { temperature: params.temperature }),
+    ...(params?.maxTokens != null && { maxTokens: params.maxTokens }),
+    ...(params?.topP != null && { topP: params.topP }),
+    ...(params?.frequencyPenalty != null && { frequencyPenalty: params.frequencyPenalty }),
   });
 
   for await (const chunk of result.textStream) {

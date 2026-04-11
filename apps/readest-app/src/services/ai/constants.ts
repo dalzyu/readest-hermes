@@ -1,4 +1,4 @@
-import type { AISettings } from './types';
+import type { AISettings, ProviderConfig } from './types';
 
 // cheapest popular models as of 2025
 export const GATEWAY_MODELS = {
@@ -19,22 +19,43 @@ export const MODEL_PRICING: Record<string, { input: string; output: string }> = 
   [GATEWAY_MODELS.QWEN_3_235B]: { input: '0.07', output: '0.46' },
 };
 
+/** Built-in provider preset for Ollama. */
+export const DEFAULT_OLLAMA_CONFIG: ProviderConfig = {
+  id: 'ollama-default',
+  name: 'Ollama (Local)',
+  providerType: 'ollama',
+  baseUrl: 'http://127.0.0.1:11434',
+  model: 'llama3.2',
+  embeddingModel: 'nomic-embed-text',
+};
+
+/** Built-in provider preset for OpenAI-compatible local server. */
+export const DEFAULT_OPENAI_COMPATIBLE_CONFIG: ProviderConfig = {
+  id: 'openai-compat-default',
+  name: 'OpenAI-Compatible (Local)',
+  providerType: 'openai-compatible',
+  baseUrl: 'http://127.0.0.1:8080',
+  model: '',
+  apiStyle: 'chat-completions',
+  embeddingBaseUrl: 'http://127.0.0.1:8081',
+  embeddingModel: '',
+};
+
+/** Built-in provider preset for AI Gateway (Cloud). */
+export const DEFAULT_AI_GATEWAY_CONFIG: ProviderConfig = {
+  id: 'ai-gateway-default',
+  name: 'AI Gateway (Cloud)',
+  providerType: 'ai-gateway',
+  baseUrl: '',
+  model: GATEWAY_MODELS.GEMINI_FLASH_LITE,
+  embeddingModel: 'openai/text-embedding-3-small',
+};
+
 export const DEFAULT_AI_SETTINGS: AISettings = {
   enabled: false,
-  provider: 'ollama',
-
-  ollamaBaseUrl: 'http://127.0.0.1:11434',
-  ollamaModel: 'llama3.2',
-  ollamaEmbeddingModel: 'nomic-embed-text',
-
-  aiGatewayModel: 'google/gemini-2.5-flash-lite',
-  aiGatewayEmbeddingModel: 'openai/text-embedding-3-small',
-
-  openAICompatibleApiStyle: 'chat-completions',
-  openAICompatibleBaseUrl: 'http://127.0.0.1:8080',
-  openAICompatibleModel: '',
-  openAICompatibleEmbeddingBaseUrl: 'http://127.0.0.1:8081',
-  openAICompatibleEmbeddingModel: '',
+  providers: [DEFAULT_OLLAMA_CONFIG],
+  activeProviderId: 'ollama-default',
+  modelAssignments: {},
 
   spoilerProtection: true,
   maxContextChunks: 10,

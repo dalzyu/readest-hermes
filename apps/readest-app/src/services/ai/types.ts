@@ -1,40 +1,107 @@
 import type { LanguageModel, EmbeddingModel } from 'ai';
 
-export type AIProviderName = 'ollama' | 'ai-gateway' | 'openai-compatible';
+// ---------------------------------------------------------------------------
+// Provider type taxonomy
+// ---------------------------------------------------------------------------
+
+/** All supported provider types. */
+export type AIProviderType =
+  | 'ollama'
+  | 'openai'
+  | 'openai-compatible'
+  | 'anthropic'
+  | 'google'
+  | 'openrouter'
+  | 'deepseek'
+  | 'mistral'
+  | 'groq'
+  | 'xai'
+  | 'cohere'
+  | 'fireworks'
+  | 'togetherai'
+  | 'ai-gateway';
+
+/** @deprecated Use AIProviderType. Kept for migration convenience. */
+export type AIProviderName = AIProviderType;
+
 export type AIProviderApiStyle = 'chat-completions' | 'responses';
 
-export interface AIProvider {
-  id: AIProviderName;
+// ---------------------------------------------------------------------------
+// Inference parameters
+// ---------------------------------------------------------------------------
+
+export interface InferenceParams {
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+}
+
+/** Per-task default overrides. */
+export const TASK_INFERENCE_DEFAULTS: Record<AITaskType, InferenceParams> = {
+  translation: { temperature: 0.3, maxTokens: 1024 },
+  dictionary: { temperature: 0.3, maxTokens: 1024 },
+  chat: { temperature: 0.7, maxTokens: 2048 },
+  embedding: {},
+};
+
+// ---------------------------------------------------------------------------
+// Provider configuration (one entry per user-configured provider)
+// ---------------------------------------------------------------------------
+
+export interface ProviderConfig {
+  id: string;
   name: string;
+  providerType: AIProviderType;
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+  embeddingBaseUrl?: string;
+  embeddingModel?: string;
+  embeddingApiKey?: string;
+  apiStyle?: AIProviderApiStyle;
+  inferenceParams?: InferenceParams;
+}
+
+// ---------------------------------------------------------------------------
+// Task routing
+// ---------------------------------------------------------------------------
+
+export type AITaskType = 'translation' | 'dictionary' | 'chat' | 'embedding';
+
+export interface ModelAssignments {
+  translation?: string; // provider config id
+  dictionary?: string;
+  chat?: string;
+  embedding?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Provider interface (runtime)
+// ---------------------------------------------------------------------------
+
+export interface AIProvider {
+  id: string;
+  name: string;
+  providerType: AIProviderType;
   requiresAuth: boolean;
 
-  getModel(): LanguageModel;
+  getModel(params?: InferenceParams): LanguageModel;
   getEmbeddingModel(): EmbeddingModel;
 
   isAvailable(): Promise<boolean>;
   healthCheck(): Promise<boolean>;
 }
 
+// ---------------------------------------------------------------------------
+// Top-level AI settings (persisted in SystemSettings.aiSettings)
+// ---------------------------------------------------------------------------
+
 export interface AISettings {
   enabled: boolean;
-  provider: AIProviderName;
-
-  ollamaBaseUrl: string;
-  ollamaModel: string;
-  ollamaEmbeddingModel: string;
-
-  aiGatewayApiKey?: string;
-  aiGatewayModel?: string;
-  aiGatewayCustomModel?: string;
-  aiGatewayEmbeddingModel?: string;
-
-  openAICompatibleApiStyle: AIProviderApiStyle;
-  openAICompatibleBaseUrl: string;
-  openAICompatibleModel: string;
-  openAICompatibleApiKey?: string;
-  openAICompatibleEmbeddingBaseUrl: string;
-  openAICompatibleEmbeddingModel: string;
-  openAICompatibleEmbeddingApiKey?: string;
+  providers: ProviderConfig[];
+  activeProviderId: string;
+  modelAssignments: ModelAssignments;
 
   spoilerProtection: boolean;
   maxContextChunks: number;

@@ -38,27 +38,25 @@ import { OllamaProvider } from '@/services/ai/providers/OllamaProvider';
 import { AIGatewayProvider } from '@/services/ai/providers/AIGatewayProvider';
 import { OpenAICompatibleProvider } from '@/services/ai/providers/OpenAICompatibleProvider';
 import { getAIProvider } from '@/services/ai/providers';
-import type { AISettings } from '@/services/ai/types';
-import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
+import type { AISettings, ProviderConfig } from '@/services/ai/types';
+import { DEFAULT_AI_SETTINGS, DEFAULT_OLLAMA_CONFIG } from '@/services/ai/constants';
 
 describe('OllamaProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  test('should create provider with default settings', () => {
-    const settings: AISettings = { ...DEFAULT_AI_SETTINGS, enabled: true };
-    const provider = new OllamaProvider(settings);
+  test('should create provider with default config', () => {
+    const provider = new OllamaProvider(DEFAULT_OLLAMA_CONFIG);
 
-    expect(provider.id).toBe('ollama');
+    expect(provider.id).toBe('ollama-default');
     expect(provider.name).toBe('Ollama (Local)');
     expect(provider.requiresAuth).toBe(false);
   });
 
   test('isAvailable should return true when Ollama responds', async () => {
     mockFetch.mockResolvedValueOnce({ ok: true });
-    const settings: AISettings = { ...DEFAULT_AI_SETTINGS, enabled: true };
-    const provider = new OllamaProvider(settings);
+    const provider = new OllamaProvider(DEFAULT_OLLAMA_CONFIG);
 
     const result = await provider.isAvailable();
     expect(result).toBe(true);
@@ -67,24 +65,30 @@ describe('OllamaProvider', () => {
 
 describe('AIGatewayProvider', () => {
   test('should throw if no API key', () => {
-    const settings: AISettings = { ...DEFAULT_AI_SETTINGS, enabled: true, provider: 'ai-gateway' };
+    const config: ProviderConfig = {
+      id: 'gw-test',
+      name: 'AI Gateway',
+      providerType: 'ai-gateway',
+      baseUrl: '',
+      model: 'openai/gpt-5.2',
+    };
 
-    expect(() => new AIGatewayProvider(settings)).toThrow('AI Gateway API key required');
+    expect(() => new AIGatewayProvider(config)).toThrow('AI Gateway API key required');
   });
 });
 
 describe('OpenAICompatibleProvider', () => {
-  const baseSettings: AISettings = {
-    ...DEFAULT_AI_SETTINGS,
-    enabled: true,
-    provider: 'openai-compatible',
-    openAICompatibleApiStyle: 'chat-completions',
-    openAICompatibleBaseUrl: 'http://127.0.0.1:8080',
-    openAICompatibleModel: 'gemma-3-4b',
-    openAICompatibleApiKey: 'text-key',
-    openAICompatibleEmbeddingBaseUrl: 'http://127.0.0.1:8081',
-    openAICompatibleEmbeddingModel: 'embeddinggemma',
-    openAICompatibleEmbeddingApiKey: 'embed-key',
+  const baseConfig: ProviderConfig = {
+    id: 'oc-test',
+    name: 'OpenAI-Compatible',
+    providerType: 'openai-compatible',
+    baseUrl: 'http://127.0.0.1:8080',
+    model: 'gemma-3-4b',
+    apiKey: 'text-key',
+    apiStyle: 'chat-completions',
+    embeddingBaseUrl: 'http://127.0.0.1:8081',
+    embeddingModel: 'embeddinggemma',
+    embeddingApiKey: 'embed-key',
   };
 
   beforeEach(() => {
@@ -92,18 +96,18 @@ describe('OpenAICompatibleProvider', () => {
   });
 
   test('uses chat completions when api style is chat-completions', () => {
-    const provider = OpenAICompatibleProvider.fromSettings(baseSettings);
+    const provider = new OpenAICompatibleProvider(baseConfig);
 
-    expect(provider.id).toBe('openai-compatible');
+    expect(provider.id).toBe('oc-test');
     expect(provider.getModel()).toBe('chat-model');
     expect(mockChatModel).toHaveBeenCalledWith('gemma-3-4b');
     expect(mockResponsesModel).not.toHaveBeenCalled();
   });
 
   test('uses responses when api style is responses', () => {
-    const provider = OpenAICompatibleProvider.fromSettings({
-      ...baseSettings,
-      openAICompatibleApiStyle: 'responses',
+    const provider = new OpenAICompatibleProvider({
+      ...baseConfig,
+      apiStyle: 'responses',
     });
 
     expect(provider.getModel()).toBe('responses-model');
@@ -112,7 +116,7 @@ describe('OpenAICompatibleProvider', () => {
   });
 
   test('uses separate embedding client settings', () => {
-    const provider = OpenAICompatibleProvider.fromSettings(baseSettings);
+    const provider = new OpenAICompatibleProvider(baseConfig);
 
     expect(provider.getEmbeddingModel()).toBe('embedding-model');
     expect(mockEmbeddingModel).toHaveBeenCalledWith('embeddinggemma');
@@ -134,37 +138,53 @@ describe('OpenAICompatibleProvider', () => {
 });
 
 describe('getAIProvider', () => {
-  test('should return OllamaProvider for ollama', () => {
-    const settings: AISettings = { ...DEFAULT_AI_SETTINGS, enabled: true, provider: 'ollama' };
+  test('should return OllamaProvider for ollama settings', () => {
+    const settings: AISettings = { ...DEFAULT_AI_SETTINGS, enabled: true };
     const provider = getAIProvider(settings);
 
-    expect(provider.id).toBe('ollama');
+    expect(provider.id).toBe('ollama-default');
   });
 
-  test('should return AIGatewayProvider for ai-gateway', () => {
+  test('should return AIGatewayProvider for ai-gateway settings', () => {
     const settings: AISettings = {
       ...DEFAULT_AI_SETTINGS,
       enabled: true,
-      provider: 'ai-gateway',
-      aiGatewayApiKey: 'test-key',
+      providers: [
+        {
+          id: 'gw-1',
+          name: 'AI Gateway',
+          providerType: 'ai-gateway',
+          baseUrl: '',
+          model: 'openai/gpt-5.2',
+          apiKey: 'test-key',
+        },
+      ],
+      activeProviderId: 'gw-1',
     };
     const provider = getAIProvider(settings);
 
-    expect(provider.id).toBe('ai-gateway');
+    expect(provider.id).toBe('gw-1');
   });
 
-  test('should return OpenAICompatibleProvider for openai-compatible', () => {
+  test('should return OpenAICompatibleProvider for openai-compatible settings', () => {
     const settings: AISettings = {
       ...DEFAULT_AI_SETTINGS,
       enabled: true,
-      provider: 'openai-compatible',
-      openAICompatibleBaseUrl: 'http://127.0.0.1:8080',
-      openAICompatibleModel: 'gemma-3-4b',
-      openAICompatibleEmbeddingBaseUrl: 'http://127.0.0.1:8081',
-      openAICompatibleEmbeddingModel: 'embeddinggemma',
+      providers: [
+        {
+          id: 'oc-1',
+          name: 'OpenAI-Compatible',
+          providerType: 'openai-compatible',
+          baseUrl: 'http://127.0.0.1:8080',
+          model: 'gemma-3-4b',
+          embeddingBaseUrl: 'http://127.0.0.1:8081',
+          embeddingModel: 'embeddinggemma',
+        },
+      ],
+      activeProviderId: 'oc-1',
     };
     const provider = getAIProvider(settings);
 
-    expect(provider.id).toBe('openai-compatible');
+    expect(provider.id).toBe('oc-1');
   });
 });

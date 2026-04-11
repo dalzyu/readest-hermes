@@ -38,7 +38,7 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
 }));
 
 vi.mock('@/services/ai/providers', () => ({
-  getAIProvider: mockGetAIProvider,
+  getProviderForTask: mockGetAIProvider,
 }));
 
 vi.mock('@/services/ai/logger', () => ({
@@ -105,7 +105,10 @@ describe('ragService', () => {
     mockSaveBM25Index.mockResolvedValue(undefined);
     mockSaveMeta.mockResolvedValue(undefined);
     mockGetAIProvider.mockReturnValue({
-      getEmbeddingModel: () => ({ modelId: 'test-embedding-model' }),
+      provider: {
+        getEmbeddingModel: () => ({ modelId: 'test-embedding-model' }),
+      },
+      inferenceParams: {},
     });
     mockEmbed.mockResolvedValue({ embedding: [0.1, 0.2] });
     mockEmbedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
@@ -118,9 +121,17 @@ describe('ragService', () => {
     const settings: AISettings = {
       ...DEFAULT_AI_SETTINGS,
       enabled: true,
-      provider: 'openai-compatible',
-      openAICompatibleModel: 'test-llm',
-      openAICompatibleEmbeddingModel: 'embeddinggemma',
+      providers: [
+        {
+          id: 'oc-test',
+          name: 'OpenAI-Compatible',
+          providerType: 'openai-compatible',
+          baseUrl: 'http://127.0.0.1:8080',
+          model: 'test-llm',
+          embeddingModel: 'embeddinggemma',
+        },
+      ],
+      activeProviderId: 'oc-test',
     };
     const bookDoc = {
       metadata: { title: 'Large Book', author: 'Tester' },
