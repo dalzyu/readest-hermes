@@ -44,6 +44,8 @@ jobs:
 
   build_web_app:
     runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: '--max-old-space-size=8192'
     steps:
       - uses: actions/checkout@v6
         with:
