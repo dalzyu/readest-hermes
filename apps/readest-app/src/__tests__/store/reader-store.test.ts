@@ -52,6 +52,13 @@ vi.mock('@/libs/document', () => ({
   DocumentLoader: vi.fn(),
 }));
 
+const mockReadingStatsRecordSession = vi.fn();
+vi.mock('@/services/readingStats/readingStatsService', () => ({
+  readingStatsService: {
+    recordSession: (...args: unknown[]) => mockReadingStatsRecordSession(...args),
+  },
+}));
+
 import { useReaderStore } from '@/store/readerStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 
@@ -76,6 +83,8 @@ function seedViewState(key: string, overrides: Record<string, unknown> = {}) {
         syncing: false,
         gridInsets: null,
         viewSettings: null,
+        sessionStartedAt: null,
+        sessionStartPage: null,
         ...overrides,
       },
     },
@@ -90,6 +99,8 @@ describe('readerStore', () => {
       hoveredBookKey: null,
     });
     useBookDataStore.setState({ booksData: {} });
+    mockReadingStatsRecordSession.mockReset();
+    mockReadingStatsRecordSession.mockReturnValue(true);
   });
 
   describe('initial state', () => {
@@ -309,6 +320,56 @@ describe('readerStore', () => {
 
       useReaderStore.getState().setViewInited('book-1', false);
       expect(useReaderStore.getState().viewStates['book-1']!.inited).toBe(false);
+    });
+  });
+
+  describe('reading session tracking', () => {
+    test('setViewInited starts a session timestamp and start page', () => {
+      seedViewState('book-1', { progress: { pageinfo: { current: 12 } } });
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-11T20:00:00Z'));
+
+      useReaderStore.getState().setViewInited('book-1', true);
+      const state = useReaderStore.getState().viewStates['book-1']!;
+
+      expect(state.inited).toBe(true);
+      expect(state.sessionStartedAt).toBe(new Date('2026-04-11T20:00:00Z').getTime());
+      expect(state.sessionStartPage).toBe(12);
+      vi.useRealTimers();
+    });
+
+    test('recordSession persists completed session and clears tracking state', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-11T20:30:00Z'));
+      seedViewState('book-1', {
+        inited: true,
+        sessionStartedAt: new Date('2026-04-11T20:00:00Z').getTime(),
+        sessionStartPage: 10,
+        progress: { pageinfo: { current: 18 } },
+      });
+
+      const recorded = useReaderStore.getState().recordSession('book-1');
+
+      expect(recorded).toBe(true);
+      expect(mockReadingStatsRecordSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bookHash: 'book',
+          secondsRead: 1800,
+          pageDelta: 8,
+        }),
+      );
+      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartedAt).toBeNull();
+      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartPage).toBeNull();
+      vi.useRealTimers();
+    });
+
+    test('recordSession skips uninited views', () => {
+      seedViewState('book-1', { inited: false });
+
+      const recorded = useReaderStore.getState().recordSession('book-1');
+
+      expect(recorded).toBe(false);
+      expect(mockReadingStatsRecordSession).not.toHaveBeenCalled();
     });
   });
 });

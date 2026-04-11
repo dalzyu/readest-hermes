@@ -10,7 +10,7 @@ checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
 name = "Readest"
-version = "0.2.2"
+version = "0.1.0"
 dependencies = [
  "block",
  "cocoa",
@@ -7191,7 +7191,6 @@ dependencies = [
  "tauri-codegen",
  "tauri-utils 2.8.3",
  "tauri-winres",
- "toml 0.9.12+spec-1.1.0",
  "walkdir",
 ]
 

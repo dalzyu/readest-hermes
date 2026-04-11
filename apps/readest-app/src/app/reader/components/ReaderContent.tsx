@@ -43,7 +43,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
   const { saveSettings } = useSettingsStore();
   const { getConfig, getBookData, saveConfig } = useBookDataStore();
   const { getView, setBookKeys, getViewSettings } = useReaderStore();
-  const { initViewState, getViewState, clearViewState } = useReaderStore();
+  const { initViewState, getViewState, clearViewState, recordSession } = useReaderStore();
   const { isSettingsDialogOpen, settingsDialogBookKey } = useSettingsStore();
   const [showDetailsBook, setShowDetailsBook] = useState<Book | null>(null);
   const isInitiating = useRef(false);
@@ -152,6 +152,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
       console.info('Error closing book', bookKey);
     }
     eventDispatcher.dispatch('tts-stop', { bookKey });
+    recordSession(bookKey);
     await saveBookConfig(bookKey);
     clearViewState(bookKey);
   };

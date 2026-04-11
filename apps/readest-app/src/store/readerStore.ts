@@ -21,6 +21,7 @@ import { useSettingsStore } from './settingsStore';
 import { BookData, useBookDataStore } from './bookDataStore';
 import { useLibraryStore } from './libraryStore';
 import { uniqueId } from '@/utils/misc';
+import { readingStatsService } from '@/services/readingStats/readingStatsService';
 
 interface ViewState {
   /* Unique key for each book view */
@@ -41,6 +42,9 @@ interface ViewState {
     view settings for primary view are saved to book config which is persisted to config file
     omitting settings that are not changed from global settings */
   viewSettings: ViewSettings | null;
+  /* Session tracking for reading stats */
+  sessionStartedAt: number | null;
+  sessionStartPage: number | null;
 }
 
 interface ReaderStore {
@@ -83,6 +87,7 @@ interface ReaderStore {
   setGridInsets: (key: string, insets: Insets | null) => void;
   setViewInited: (key: string, inited: boolean) => void;
   recreateViewer: (envConfig: EnvConfigType, key: string) => void;
+  recordSession: (key: string) => boolean;
 }
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
@@ -141,6 +146,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           syncing: false,
           gridInsets: null,
           viewSettings: null,
+          sessionStartedAt: null,
+          sessionStartPage: null,
         },
       },
     }));
@@ -242,6 +249,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             syncing: false,
             gridInsets: null,
             viewSettings: { ...globalViewSettings, ...configViewSettings },
+            sessionStartedAt: null,
+            sessionStartPage: null,
           },
         },
       }));
@@ -265,6 +274,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             syncing: false,
             gridInsets: null,
             viewSettings: null,
+            sessionStartedAt: null,
+            sessionStartPage: null,
           },
         },
       }));
@@ -450,15 +461,25 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     })),
 
   setViewInited: (key: string, inited: boolean) =>
-    set((state) => ({
-      viewStates: {
-        ...state.viewStates,
-        [key]: {
-          ...state.viewStates[key]!,
-          inited,
+    set((state) => {
+      const viewState = state.viewStates[key];
+      if (!viewState) return state;
+
+      const nextSessionStartedAt = inited ? Date.now() : null;
+      const nextSessionStartPage = inited ? (viewState.progress?.pageinfo?.current ?? 0) : null;
+
+      return {
+        viewStates: {
+          ...state.viewStates,
+          [key]: {
+            ...viewState,
+            inited,
+            sessionStartedAt: nextSessionStartedAt,
+            sessionStartPage: nextSessionStartPage,
+          },
         },
-      },
-    })),
+      };
+    }),
 
   recreateViewer: (envConfig: EnvConfigType, key: string) => {
     const id = key.split('-')[0]!;
@@ -475,5 +496,42 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           },
         }));
       });
+  },
+
+  recordSession: (key: string) => {
+    const viewState = get().viewStates[key];
+    if (!viewState?.inited || !viewState.sessionStartedAt) return false;
+
+    const progress = viewState.progress?.pageinfo;
+    const currentPage = progress?.current ?? viewState.sessionStartPage ?? 0;
+    const sessionStartPage = viewState.sessionStartPage ?? currentPage;
+    const endedAt = Date.now();
+    const startedAt = viewState.sessionStartedAt;
+    const secondsRead = Math.floor((endedAt - startedAt) / 1000);
+    const pageDelta = Math.max(0, currentPage - sessionStartPage);
+    const bookHash = key.split('-')[0] || '';
+
+    const recorded = readingStatsService.recordSession({
+      bookHash,
+      startedAt,
+      endedAt,
+      secondsRead,
+      pageDelta,
+    });
+
+    if (recorded) {
+      set((state) => ({
+        viewStates: {
+          ...state.viewStates,
+          [key]: {
+            ...state.viewStates[key]!,
+            sessionStartedAt: null,
+            sessionStartPage: null,
+          },
+        },
+      }));
+    }
+
+    return recorded;
   },
 }));
