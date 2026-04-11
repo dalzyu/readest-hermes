@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { CLOUD_ENABLED } from '@/services/constants';
 import { QuotaType, UserPlan } from '@/types/quota';
 import { getStoragePlanData, getTranslationPlanData, getUserProfilePlan } from '@/utils/access';
 import { useTranslation } from './useTranslation';
@@ -11,7 +12,7 @@ export const useQuotaStats = (briefName = false) => {
   const [userProfilePlan, setUserProfilePlan] = useState<UserPlan | undefined>(undefined);
 
   useEffect(() => {
-    if (!user || !token) return;
+    if (!CLOUD_ENABLED || !user || !token) return;
 
     const storagPlan = getStoragePlanData(token);
     const inGB = storagPlan.quota > 1e9;

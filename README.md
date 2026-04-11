@@ -1,22 +1,22 @@
 <p align="center">
-  <a href="https://github.com/readest/readest" align="center">Refer to this for more info about the base Readest Project<br></a>
+  <a href="https://github.com/dalzyu/readest-hermes/releases/latest" align="center">Hermes releases and project info<br></a>
   <a href="#support">Support</a> •
   <a href="#license">License</a>
 </p>
 
 ## Contributors
 
-Readest is open-source, and contributions are welcome! Feel free to open issues, suggest features, or submit pull requests. Please **review our [contributing guidelines](CONTRIBUTING.md) before you start**. We also welcome you to join our [Discord][link-discord] community for either support or contributing guidance.
+Hermes is open-source, and contributions are welcome! Feel free to open issues, suggest features, or submit pull requests. Please **review our [contributing guidelines](CONTRIBUTING.md) before you start**. We also welcome you to join our [Discord][link-discord] community for either support or contributing guidance.
 
-<a href="https://github.com/readest/readest/graphs/contributors">
+<a href="https://github.com/dalzyu/readest-hermes/graphs/contributors">
   <p align="left">
-    <img width="500" src="https://contrib.rocks/image?repo=readest/readest" alt="A table of avatars from the project's contributors" />
+    <img width="500" src="https://contrib.rocks/image?repo=dalzyu/readest-hermes" alt="A table of avatars from the project's contributors" />
   </p>
 </a>
 
 ## Support
 
-If Readest has been useful to you, consider supporting its development. You can [become a sponsor on GitHub](https://github.com/sponsors/readest), [donate via Stripe](https://donate.stripe.com/4gMcN5aZdcE52kW3TFgjC01), or [donate with crypto](https://donate.readest.com). Your contribution helps us squash bugs faster, improve performance, and keep building great features.
+If Hermes has been useful to you, consider supporting its development. You can [become a sponsor on GitHub](https://github.com/sponsors/readest), [donate via Stripe](https://donate.stripe.com/4gMcN5aZdcE52kW3TFgjC01), or [donate with crypto](https://donate.readest.com). Your contribution helps us squash bugs faster, improve performance, and keep building great features.
 
 ### Sponsors
 
@@ -71,7 +71,7 @@ We would also like to thank the [Web Chinese Fonts Plan](https://chinese-font.ne
 [link-website]: https://readest.com?utm_source=github&utm_medium=referral&utm_campaign=readme
 [link-flathub]: https://flathub.org/en/apps/com.bilingify.readest
 [link-web-readest]: https://web.readest.com
-[link-gh-releases]: https://github.com/readest/readest/releases
+[link-gh-releases]: https://github.com/dalzyu/readest-hermes/releases
 [link-gh-commits]: https://github.com/readest/readest/commits/main
 [link-gh-pulse]: https://github.com/readest/readest/pulse
 [link-gh-wiki]: https://github.com/readest/readest/wiki
@@ -80,6 +80,6 @@ We would also like to thank the [Web Chinese Fonts Plan](https://chinese-font.ne
 [link-koreader]: https://github.com/koreader/koreader
 [link-hellogithub]: https://hellogithub.com/repository/8a5b6ade2aee461a8bd94e59200682a7
 [link-deepwiki]: https://deepwiki.com/readest/readest
-[link-locales]: https://github.com/readest/readest/tree/main/apps/readest-app/public/locales
+[link-locales]: https://github.com/dalzyu/readest-hermes/tree/main/apps/readest-app/public/locales
 [link-kosync-wiki]: https://github.com/readest/readest/wiki/Sync-with-Koreader-devices
 [link-reddit]: https://reddit.com/r/readest/

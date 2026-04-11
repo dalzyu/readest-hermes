@@ -4,17 +4,15 @@
 
 ### Overview
 
-Readest is a cross-platform e-reader (macOS, Windows, Linux, Android, iOS, Web) built on Next.js and Tauri. It processes user-supplied ebook files, syncs data to the cloud, integrates with external services (OPDS catalogs, KOReader, DeepL, Yandex), and handles user authentication.
+Hermes is a cross-platform e-reader (macOS, Windows, Linux, Android, iOS, Web) built on Next.js and Tauri. It processes user-supplied ebook files and integrates with external services (OPDS catalogs, KOReader, DeepL, Yandex).
 
 ### Assets
 
 | Asset                          | Description                                                                          |
 | ------------------------------ | ------------------------------------------------------------------------------------ |
-| Ebook files                    | User-uploaded EPUB, MOBI, PDF, and other formats stored locally and in cloud storage |
-| Reading progress & annotations | Highlights, bookmarks, and notes synced across devices                               |
-| User credentials               | Authentication tokens and session data for cloud sync                                |
-| User preferences & settings    | Reading preferences, custom fonts, theme configurations                              |
-| External API keys              | Translation service credentials (DeepL, Yandex) configured by users                  |
+| Ebook files                    | User-uploaded EPUB, MOBI, PDF, and other formats stored locally            |
+| Reading progress & annotations | Highlights, bookmarks, and notes stored on device                         |
+| External API keys              | Translation service credentials (DeepL, Yandex) configured by users       |
 
 ### Threat Actors
 
@@ -33,10 +31,10 @@ Readest is a cross-platform e-reader (macOS, Windows, Linux, Android, iOS, Web) 
 - **Risk:** Malformed EPUB/MOBI/PDF files could trigger parser bugs, path traversal, or script injection via embedded HTML/JS.
 - **Mitigations:** Ebook content is rendered in a sandboxed iframe. External script execution is blocked. File parsing is isolated from the main process.
 
-#### 2. Cloud Sync & Authentication
+#### 2. External Services & Authentication
 
-- **Risk:** Credential theft, session hijacking, or unauthorized access to another user's library data.
-- **Mitigations:** All sync traffic uses HTTPS/TLS. Authentication tokens are stored securely (OS keychain/secure storage). Server-side authorization ensures users can only access their own data.
+- **Risk:** Misuse of API keys or session tokens for external services could expose user data or allow unauthorized requests.
+- **Mitigations:** External requests use HTTPS/TLS. Credentials are stored securely (OS keychain/secure storage). Users explicitly configure the providers they want to use.
 
 #### 3. OPDS / External Catalog Integration
 
@@ -60,18 +58,18 @@ Readest is a cross-platform e-reader (macOS, Windows, Linux, Android, iOS, Web) 
 
 ### Out of Scope
 
-- Vulnerabilities in user's operating system or browser outside of Readest's control
+- Vulnerabilities in user's operating system or browser outside of Hermes's control
 - Physical access attacks to a user's device
 - Issues in third-party services (DeepL, Yandex, Calibre) themselves
 
 ## Supported Versions
 
-Readest does not currently maintain separate release channels. Security updates are provided only for the latest release series.
+Hermes does not currently maintain separate release channels. Security updates are provided only for the latest release series.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.10.x  | :white_check_mark: |
-| < 0.10  | :x:                |
+| 0.1.x  | :white_check_mark: |
+| < 0.1  | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -80,7 +78,7 @@ issue or discussion for security-sensitive reports.
 
 Use GitHub's private vulnerability reporting for this repository:
 
-<https://github.com/readest/readest/security/advisories/new>
+<https://github.com/dalzyu/readest-hermes/security/advisories/new>
 
 When submitting a report, include:
 

@@ -532,7 +532,7 @@ const AITranslatePanel: React.FC = () => {
                         </div>
                         {deeplNeedsLogin && (
                           <p className='text-warning mt-1 text-xs'>
-                            {_('DeepL requires a Hermes account. Please log in.')}
+                            {_('DeepL requires your own API key.')}
                           </p>
                         )}
                       </div>

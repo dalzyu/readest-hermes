@@ -8,7 +8,7 @@ import { MdCloudSync, MdSync, MdSyncProblem } from 'react-icons/md';
 
 import { invoke, PermissionState } from '@tauri-apps/api/core';
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
-import { DOWNLOAD_READEST_URL } from '@/services/constants';
+import { CLOUD_ENABLED, DOWNLOAD_READEST_URL } from '@/services/constants';
 import { setBackupDialogVisible } from '@/app/library/components/BackupWindow';
 import { useAuth } from '@/context/AuthContext';
 import { useEnv } from '@/context/EnvContext';
@@ -285,73 +285,76 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
       )}
       onCancel={() => setIsDropdownOpen?.(false)}
     >
-      {user ? (
-        <MenuItem
-          label={
-            userDisplayName
-              ? _('Logged in as {{userDisplayName}}', { userDisplayName })
-              : _('Logged in')
-          }
-          labelClass='!max-w-40'
-          aria-label={_('View account details and quota')}
-          Icon={
-            avatarUrl ? (
-              <UserAvatar url={avatarUrl} size={iconSize} DefaultIcon={PiUserCircleCheck} />
-            ) : (
-              PiUserCircleCheck
-            )
-          }
-        >
-          <ul className='ms-0 flex flex-col ps-0 before:hidden'>
-            <MenuItem
-              label={_('Cloud File Transfers')}
-              Icon={MdCloudSync}
-              description={
-                hasActiveTransfers
-                  ? _('{{activeCount}} active, {{pendingCount}} pending', {
-                      activeCount: stats.active,
-                      pendingCount: stats.pending,
-                    })
-                  : stats.failed > 0
-                    ? _('{{failedCount}} failed', { failedCount: stats.failed })
-                    : ''
-              }
-              onClick={openTransferQueue}
-            />
-            <MenuItem
-              label={
-                settings.lastSyncedAtBooks
-                  ? _('Synced at {{time}}', {
-                      time: formatLocaleDateTime(settings.lastSyncedAtBooks),
-                    })
-                  : _('Never synced')
-              }
-              Icon={user ? MdSync : MdSyncProblem}
-              labelClass='ps-2 pe-1 !mx-0'
-              iconClassName={user && isSyncing ? 'animate-reverse-spin' : ''}
-              onClick={onPullLibrary.bind(null, true, true)}
-            />
-            <button
-              onClick={handleUserProfile}
-              className='hover:bg-base-300 w-full rounded-md'
-              style={{
-                paddingInlineStart: `${iconSize}px`,
-              }}
-            >
-              <Quota quotas={quotas} labelClassName='h-10 pl-3 pr-2' />
-            </button>
-            <MenuItem label={_('Account')} onClick={handleUserProfile} />
-          </ul>
-        </MenuItem>
-      ) : (
-        <MenuItem label={_('Sign In')} Icon={PiUserCircle} onClick={handleUserLogin}></MenuItem>
-      )}
+      {CLOUD_ENABLED &&
+        (user ? (
+          <MenuItem
+            label={
+              userDisplayName
+                ? _('Logged in as {{userDisplayName}}', { userDisplayName })
+                : _('Logged in')
+            }
+            labelClass='!max-w-40'
+            aria-label={_('View account details and quota')}
+            Icon={
+              avatarUrl ? (
+                <UserAvatar url={avatarUrl} size={iconSize} DefaultIcon={PiUserCircleCheck} />
+              ) : (
+                PiUserCircleCheck
+              )
+            }
+          >
+            <ul className='ms-0 flex flex-col ps-0 before:hidden'>
+              <MenuItem
+                label={_('Cloud File Transfers')}
+                Icon={MdCloudSync}
+                description={
+                  hasActiveTransfers
+                    ? _('{{activeCount}} active, {{pendingCount}} pending', {
+                        activeCount: stats.active,
+                        pendingCount: stats.pending,
+                      })
+                    : stats.failed > 0
+                      ? _('{{failedCount}} failed', { failedCount: stats.failed })
+                      : ''
+                }
+                onClick={openTransferQueue}
+              />
+              <MenuItem
+                label={
+                  settings.lastSyncedAtBooks
+                    ? _('Synced at {{time}}', {
+                        time: formatLocaleDateTime(settings.lastSyncedAtBooks),
+                      })
+                    : _('Never synced')
+                }
+                Icon={user ? MdSync : MdSyncProblem}
+                labelClass='ps-2 pe-1 !mx-0'
+                iconClassName={user && isSyncing ? 'animate-reverse-spin' : ''}
+                onClick={onPullLibrary.bind(null, true, true)}
+              />
+              <button
+                onClick={handleUserProfile}
+                className='hover:bg-base-300 w-full rounded-md'
+                style={{
+                  paddingInlineStart: `${iconSize}px`,
+                }}
+              >
+                <Quota quotas={quotas} labelClassName='h-10 pl-3 pr-2' />
+              </button>
+              <MenuItem label={_('Account')} onClick={handleUserProfile} />
+            </ul>
+          </MenuItem>
+        ) : (
+          <MenuItem label={_('Sign In')} Icon={PiUserCircle} onClick={handleUserLogin}></MenuItem>
+        ))}
 
-      <MenuItem
-        label={_('Auto Upload Books to Cloud')}
-        toggled={isAutoUpload}
-        onClick={toggleAutoUploadBooks}
-      />
+      {CLOUD_ENABLED && (
+        <MenuItem
+          label={_('Auto Upload Books to Cloud')}
+          toggled={isAutoUpload}
+          onClick={toggleAutoUploadBooks}
+        />
+      )}
 
       {isTauriAppPlatform() && !appService?.isMobile && (
         <MenuItem
@@ -437,7 +440,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         </ul>
       </MenuItem>
       <hr aria-hidden='true' className='border-base-200 my-1' />
-      {user && userProfilePlan === 'free' && (
+      {CLOUD_ENABLED && user && userProfilePlan === 'free' && (
         <MenuItem label={_('Upgrade to Hermes Premium')} onClick={handleUpgrade} />
       )}
       {isWebAppPlatform() && (

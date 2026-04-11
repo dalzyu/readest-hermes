@@ -1,5 +1,13 @@
 {
   "releases": {
+    "0.1.0": {
+      "date": "2026-04-11",
+      "notes": [
+        "Hermes 0.1.0 marks the first offline-only release line for the Readest fork",
+        "Version metadata now aligns across the web app, Rust backend, and release notes",
+        "Release packaging and branding cleanup continue in the remaining 0.1.0 slices"
+      ]
+    },
     "0.0.2": {
       "date": "2026-04-11",
       "notes": [
