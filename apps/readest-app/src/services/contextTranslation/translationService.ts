@@ -13,6 +13,40 @@ import { normalizeLookupResponse } from './normalizer';
 import { callLLM, streamLLM } from './llmClient';
 import { getContextDictionaryOutputFields, DEFAULT_CONTEXT_DICTIONARY_SETTINGS } from './defaults';
 
+function hasUsablePrimaryField(
+  parsed: TranslationResult,
+  request: TranslationRequest,
+): boolean {
+  const primary = request.outputFields.find((field) => field.enabled)?.id ?? 'translation';
+  return Boolean(parsed[primary]?.trim());
+}
+
+function completionRatio(parsed: TranslationResult, request: TranslationRequest): number {
+  const enabledCount = request.outputFields.filter((field) => field.enabled).length;
+  if (enabledCount === 0) return 1;
+  const completed = request.outputFields.filter(
+    (field) => field.enabled && Boolean(parsed[field.id]?.trim()),
+  ).length;
+  return completed / enabledCount;
+}
+
+function buildTranslationRepairPrompt(
+  originalSystemPrompt: string,
+  originalUserPrompt: string,
+  fieldIds: string[],
+): { systemPrompt: string; userPrompt: string } {
+  const template = fieldIds.map((id) => `<${id}>...</${id}>`).join('\n');
+  return {
+    systemPrompt: `${originalSystemPrompt}
+
+The previous answer did not follow the required XML shape.
+Rewrite the answer now with ONLY these tags and in this exact order:
+${template}
+Do not include reasoning, markdown, or any extra text.`,
+    userPrompt: `Retry the same request exactly and return only valid XML tags in the required order.\n\nOriginal request:\n${originalUserPrompt}`,
+  };
+}
+
 /**
  * Orchestrates context-aware translation:
  * 1. Builds system + user prompts from the request
@@ -26,7 +60,26 @@ export async function translateWithContext(
 ): Promise<TranslationResult> {
   const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
   const response = await callLLM(systemPrompt, userPrompt, model!, abortSignal);
-  return formatTranslationResult(parseTranslationResponse(response, request.outputFields), request);
+  let parsed = parseTranslationResponse(response, request.outputFields);
+
+  // Weak models frequently drift outside required tags; retry once with a strict repair prompt.
+  if (!hasUsablePrimaryField(parsed, request) || completionRatio(parsed, request) < 0.5) {
+    const repair = buildTranslationRepairPrompt(
+      systemPrompt,
+      userPrompt,
+      request.outputFields
+        .filter((field) => field.enabled)
+        .sort((a, b) => a.order - b.order)
+        .map((field) => field.id),
+    );
+    const repairedResponse = await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal);
+    const repairedParsed = parseTranslationResponse(repairedResponse, request.outputFields);
+    if (hasUsablePrimaryField(repairedParsed, request)) {
+      parsed = repairedParsed;
+    }
+  }
+
+  return formatTranslationResult(parsed, request);
 }
 
 export async function* streamTranslationWithContext(

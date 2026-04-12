@@ -62,6 +62,9 @@ export function buildTranslationPrompt(request: TranslationRequest): {
     ? ` The source language is ${languageName(request.sourceLanguage)}.`
     : '';
   const orderedFieldIds = enabledFields.map((field) => field.id).join(', ');
+  const responseTemplate = enabledFields
+    .map((field) => `<${field.id}>...</${field.id}>`)
+    .join('\n');
 
   const fieldInstructions = enabledFields
     .map(
@@ -119,7 +122,10 @@ You MUST respond entirely in ${targetLang} — every word in every field must be
 ${fieldInstructions}
 
 Emit fields in this exact order: ${orderedFieldIds}.
-Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.${examplesLayoutInstruction}${referenceDictionaryInstruction}${pairHints}`;
+Respond with ONLY the tagged fields. Do not add any preamble, reasoning, markdown, or extra commentary outside the tags.
+Never leave a requested field empty. If context is limited, provide the shortest safe answer rather than an empty tag.
+Use this exact output shape:
+${responseTemplate}${examplesLayoutInstruction}${referenceDictionaryInstruction}${pairHints}`;
 
   const userPrompt = `<selected_text>${request.selectedText}</selected_text>
 

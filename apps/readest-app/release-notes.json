@@ -1,5 +1,15 @@
 {
   "releases": {
+    "0.2.1": {
+      "date": "2026-04-12",
+      "notes": [
+        "Context translation prompting now enforces strict XML output templates and non-empty field responses to improve small-model reliability",
+        "Translation runtime now includes automatic repair retries when model output is malformed or missing required fields",
+        "Prompt evaluation harness now performs iterative rescue passes (strict retry + per-field fallback) and reports a usability score per fixture",
+        "Added a large handwritten-style multilingual fixture corpus with 1,500 cases (30 language pairs x 50 examples) for robust weak-model evaluation",
+        "Added automated iterative multi-model evaluation tooling with explicit model unload/load lifecycle handling for constrained hardware setups"
+      ]
+    },
     "0.2.0": {
       "date": "2026-04-11",
       "notes": [

@@ -9,7 +9,7 @@
  *   npx tsx apps/readest-app/scripts/run-prompt-eval.ts [--provider <id>] [--fixture <file>]
  */
 import type { TranslationOutputField } from './types';
-import { buildTranslationPrompt } from './promptBuilder';
+import { buildPerFieldPrompt, buildTranslationPrompt } from './promptBuilder';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +34,7 @@ export interface PromptTestResult {
   rawResponse: string;
   timestamp: number;
   scores?: Record<string, number>;
+  attemptCount?: number;
 }
 
 export interface PromptEvalReport {
@@ -60,11 +61,86 @@ const EVAL_OUTPUT_FIELDS: TranslationOutputField[] = [
   { id: 'examples', label: 'Examples', enabled: true, order: 3, promptInstruction: 'Provide 2-3 example sentences using the selected text.' },
 ];
 
+function parseTaggedFields(text: string, fields: TranslationOutputField[]): Record<string, string> {
+  const parsed: Record<string, string> = {};
+  for (const field of fields) {
+    const regex = new RegExp(`<${field.id}>([\\s\\S]*?)</${field.id}>`, 'i');
+    const match = regex.exec(text);
+    if (match?.[1]) {
+      parsed[field.id] = match[1].trim();
+    }
+  }
+  return parsed;
+}
+
+function completionRatio(fields: Record<string, string>, schema: TranslationOutputField[]): number {
+  const enabled = schema.filter((field) => field.enabled);
+  if (enabled.length === 0) return 1;
+  const present = enabled.filter((field) => Boolean(fields[field.id]?.trim())).length;
+  return present / enabled.length;
+}
+
+function buildRepairPrompts(
+  originalSystemPrompt: string,
+  originalUserPrompt: string,
+  fieldSchema: TranslationOutputField[],
+): { systemPrompt: string; userPrompt: string } {
+  const template = fieldSchema
+    .filter((field) => field.enabled)
+    .sort((a, b) => a.order - b.order)
+    .map((field) => `<${field.id}>...</${field.id}>`)
+    .join('\n');
+
+  return {
+    systemPrompt: `${originalSystemPrompt}\n\nThe previous answer was malformed or incomplete. Retry now with strict XML only:\n${template}\nNo markdown. No reasoning. No extra text.`,
+    userPrompt: `Retry the original request and return only the requested tags in the required order.\n\nOriginal request:\n${originalUserPrompt}`,
+  };
+}
+
+function scoreResult(
+  fixture: PromptTestFixture,
+  fields: Record<string, string>,
+  rawResponse: string,
+): Record<string, number> {
+  const scores: Record<string, number> = {};
+
+  const hasTranslation = Boolean(fields['translation']?.trim());
+  scores['translationPresent'] = hasTranslation ? 1 : 0;
+  scores['xmlCoverage'] = completionRatio(fields, EVAL_OUTPUT_FIELDS);
+  scores['noReasoningLeak'] = /<(translation|contextualMeaning|phonetic|examples)>/i.test(rawResponse)
+    ? 1
+    : 0;
+
+  if (fixture.expectedFields) {
+    for (const [key, expected] of Object.entries(fixture.expectedFields)) {
+      const actual = fields[key] ?? '';
+      scores[`expected_${key}`] = actual.toLowerCase().includes(expected.toLowerCase()) ? 1 : 0;
+    }
+  }
+
+  // Composite usability: prioritize non-empty translation and XML structure compliance.
+  const expectedScores = Object.entries(scores)
+    .filter(([key]) => key.startsWith('expected_'))
+    .map(([, value]) => value);
+  const expectedMean =
+    expectedScores.length > 0
+      ? expectedScores.reduce((sum, value) => sum + value, 0) / expectedScores.length
+      : 1;
+  const usability = scores['translationPresent'] * 0.45 + scores['xmlCoverage'] * 0.35 + expectedMean * 0.2;
+  scores['usability'] = Number(usability.toFixed(3));
+
+  return scores;
+}
+
 // ─── Runner ───────────────────────────────────────────────────────────────────
 
 export async function runPromptEval(
   fixtures: PromptTestFixture[],
-  callModel: (systemPrompt: string, userPrompt: string) => Promise<{
+  callModel: (
+    systemPrompt: string,
+    userPrompt: string,
+    label?: string,
+  ) => Promise<{
     text: string;
     promptTokens?: number;
     completionTokens?: number;
@@ -99,39 +175,72 @@ export async function runPromptEval(
 
     const t0 = performance.now();
     try {
-      const response = await callModel(systemPrompt, userPrompt);
+      let attemptCount = 1;
+      let response = await callModel(systemPrompt, userPrompt, 'initial');
+      let parsedFields = parseTaggedFields(response.text, EVAL_OUTPUT_FIELDS);
+
+      if (!parsedFields['translation'] || completionRatio(parsedFields, EVAL_OUTPUT_FIELDS) < 0.5) {
+        attemptCount += 1;
+        const repair = buildRepairPrompts(systemPrompt, userPrompt, EVAL_OUTPUT_FIELDS);
+        response = await callModel(repair.systemPrompt, repair.userPrompt, 'repair');
+        parsedFields = parseTaggedFields(response.text, EVAL_OUTPUT_FIELDS);
+      }
+
+      if (!parsedFields['translation']) {
+        attemptCount += 1;
+        // Final rescue: call per-field prompts and stitch a minimal usable record.
+        const stitched: Record<string, string> = {};
+        for (const field of EVAL_OUTPUT_FIELDS.filter((f) => f.enabled)) {
+          const perField = buildPerFieldPrompt(field, {
+            selectedText: fixture.sourceText,
+            popupContext: {
+              localPastContext: fixture.bookContext ?? '',
+              localFutureBuffer: '',
+              sameBookChunks: [],
+              priorVolumeChunks: [],
+              dictionaryEntries: [],
+              retrievalStatus: 'local-only',
+              retrievalHints: {
+                currentVolumeIndexed: false,
+                missingLocalIndex: false,
+                missingPriorVolumes: [],
+                missingSeriesAssignment: false,
+              },
+            },
+            sourceLanguage: fixture.sourceLanguage,
+            targetLanguage: fixture.targetLanguage,
+            outputFields: EVAL_OUTPUT_FIELDS,
+          });
+          const fieldOnly = await callModel(perField.systemPrompt, perField.userPrompt, `field:${field.id}`);
+          stitched[field.id] = fieldOnly.text.trim();
+        }
+
+        const stitchedRaw = EVAL_OUTPUT_FIELDS.filter((f) => f.enabled)
+          .map((f) => `<${f.id}>${stitched[f.id] ?? ''}</${f.id}>`)
+          .join('\n');
+        response = {
+          text: stitchedRaw,
+          promptTokens: response.promptTokens,
+          completionTokens: response.completionTokens,
+        };
+        parsedFields = stitched;
+      }
+
       const latencyMs = Math.round(performance.now() - t0);
-
-      // Parse XML-tagged fields from response
-      const fields: Record<string, string> = {};
-      for (const field of EVAL_OUTPUT_FIELDS) {
-        const regex = new RegExp(`<${field.id}>([\\s\\S]*?)</${field.id}>`, 'i');
-        const match = regex.exec(response.text);
-        if (match?.[1]) {
-          fields[field.id] = match[1].trim();
-        }
-      }
-
-      // Simple exact-match scoring against expected fields
-      const scores: Record<string, number> = {};
-      if (fixture.expectedFields) {
-        for (const [key, expected] of Object.entries(fixture.expectedFields)) {
-          const actual = fields[key] ?? '';
-          scores[key] = actual.toLowerCase().includes(expected.toLowerCase()) ? 1 : 0;
-        }
-      }
+      const scores = scoreResult(fixture, parsedFields, response.text);
 
       results.push({
         fixtureId: fixture.id,
         model: meta.model,
         provider: meta.provider,
-        fields,
+        fields: parsedFields,
         latencyMs,
         promptTokens: response.promptTokens,
         completionTokens: response.completionTokens,
         rawResponse: response.text,
         timestamp: Date.now(),
-        scores: Object.keys(scores).length > 0 ? scores : undefined,
+        scores,
+        attemptCount,
       });
     } catch (err) {
       results.push({
