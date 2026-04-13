@@ -611,7 +611,12 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           currentPage: progress.page,
           selectedText: selection.text,
           settings: ctxSettings,
-          aiSettings: settings.aiSettings ?? { enabled: false, providers: [], activeProviderId: '', modelAssignments: {} },
+          aiSettings: settings.aiSettings ?? {
+            enabled: false,
+            providers: [],
+            activeProviderId: '',
+            modelAssignments: {},
+          },
         });
       }
     }

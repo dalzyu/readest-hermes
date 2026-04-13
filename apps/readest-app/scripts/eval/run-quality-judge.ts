@@ -66,7 +66,8 @@ const REQUEST_TIMEOUT_MS = 90_000;
 const RETRY_DELAYS_MS = [1_000, 3_000, 7_000];
 
 function isRetryableRequestError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   return (
     message.includes('fetch failed') ||
     message.includes('proxy error') ||
@@ -203,7 +204,11 @@ function parseJudgeResponse(
     const contextPreservation = Number(parsed.context_preservation);
     const rationale = String(parsed.rationale ?? '');
 
-    if ([accuracy, fluency, contextPreservation].some((value) => Number.isNaN(value) || value < 1 || value > 5)) {
+    if (
+      [accuracy, fluency, contextPreservation].some(
+        (value) => Number.isNaN(value) || value < 1 || value > 5,
+      )
+    ) {
       return null;
     }
 
@@ -305,8 +310,12 @@ async function main() {
   const endpoint = String(values.endpoint ?? 'http://127.0.0.1:8081').replace(/\/$/, '');
   const inputPath = resolve(String(values.input));
   const judgeModelId = String(values['judge-model'] ?? JUDGE_MODEL_ID);
-  const outputPath = resolve(String(values.output ?? `scripts/eval/quality-scores-${Date.now()}.json`));
-  const fixturePath = resolve(String(values['fixture-file'] ?? 'scripts/eval/mini-weak-clusters-fixtures.json'));
+  const outputPath = resolve(
+    String(values.output ?? `scripts/eval/quality-scores-${Date.now()}.json`),
+  );
+  const fixturePath = resolve(
+    String(values['fixture-file'] ?? 'scripts/eval/mini-weak-clusters-fixtures.json'),
+  );
   const useCheckpoint = Boolean(values.checkpoint);
   const concurrency = Math.max(1, Number(values.concurrency ?? '1'));
 
@@ -344,14 +353,20 @@ async function main() {
     console.log(`Judging: ${translationModel} (${report.results.length} results)`);
     console.log(`${'='.repeat(60)}`);
 
-    const checkpointPath = outputPath.replace(/\.json$/, `.checkpoint-${translationModel.replace(/[/\\:]/g, '_')}.json`);
+    const checkpointPath = outputPath.replace(
+      /\.json$/,
+      `.checkpoint-${translationModel.replace(/[/\\:]/g, '_')}.json`,
+    );
     const scores: JudgeScore[] = [];
     let completedSet = new Set<string>();
 
     if (useCheckpoint && existsSync(checkpointPath)) {
       try {
         const checkpoint = JSON.parse(readFileSync(checkpointPath, 'utf8')) as JudgeCheckpoint;
-        if (checkpoint.translationModel === translationModel && checkpoint.judgeModel === judgeModelId) {
+        if (
+          checkpoint.translationModel === translationModel &&
+          checkpoint.judgeModel === judgeModelId
+        ) {
           completedSet = new Set(checkpoint.completedFixtureIds);
           scores.push(...checkpoint.scores);
           console.log(`Resumed: ${completedSet.size} already judged`);
@@ -397,9 +412,13 @@ async function main() {
     allScores[translationModel] = scores;
 
     const validScores = scores.filter((score) => score.accuracy > 0);
-    const avgAccuracy = validScores.reduce((sum, score) => sum + score.accuracy, 0) / Math.max(validScores.length, 1);
-    const avgFluency = validScores.reduce((sum, score) => sum + score.fluency, 0) / Math.max(validScores.length, 1);
-    const avgContext = validScores.reduce((sum, score) => sum + score.contextPreservation, 0) / Math.max(validScores.length, 1);
+    const avgAccuracy =
+      validScores.reduce((sum, score) => sum + score.accuracy, 0) / Math.max(validScores.length, 1);
+    const avgFluency =
+      validScores.reduce((sum, score) => sum + score.fluency, 0) / Math.max(validScores.length, 1);
+    const avgContext =
+      validScores.reduce((sum, score) => sum + score.contextPreservation, 0) /
+      Math.max(validScores.length, 1);
     console.log(
       `Avg accuracy: ${avgAccuracy.toFixed(2)}, fluency: ${avgFluency.toFixed(2)}, context: ${avgContext.toFixed(2)}`,
     );
@@ -429,4 +448,3 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-

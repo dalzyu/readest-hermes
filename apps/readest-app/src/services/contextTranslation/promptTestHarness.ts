@@ -120,15 +120,17 @@ function scoreResult(
 ): Record<string, number> {
   const scores: Record<string, number> = {};
 
-  const hasTranslation = Boolean(fields["translation"]?.trim());
-  scores["translationPresent"] = hasTranslation ? 1 : 0;
-  scores["xmlCoverage"] = completionRatio(fields, EVAL_OUTPUT_FIELDS);
-  scores["noReasoningLeak"] = /<(translation|contextualMeaning|phonetic|examples)>/i.test(rawResponse)
+  const hasTranslation = Boolean(fields['translation']?.trim());
+  scores['translationPresent'] = hasTranslation ? 1 : 0;
+  scores['xmlCoverage'] = completionRatio(fields, EVAL_OUTPUT_FIELDS);
+  scores['noReasoningLeak'] = /<(translation|contextualMeaning|phonetic|examples)>/i.test(
+    rawResponse,
+  )
     ? 1
     : 0;
 
-  const translationLen = (fields["translation"] ?? '').length;
-  scores["translationConcise"] = translationLen <= 60 ? 1 : translationLen <= 120 ? 0.5 : 0;
+  const translationLen = (fields['translation'] ?? '').length;
+  scores['translationConcise'] = translationLen <= 60 ? 1 : translationLen <= 120 ? 0.5 : 0;
 
   if (fixture.expectedFields) {
     for (const [key, expected] of Object.entries(fixture.expectedFields)) {
@@ -145,11 +147,11 @@ function scoreResult(
       ? expectedScores.reduce((sum, value) => sum + value, 0) / expectedScores.length
       : 1;
   const usability =
-    scores["translationPresent"] * 0.4 +
-    scores["xmlCoverage"] * 0.3 +
-    scores["translationConcise"] * 0.15 +
+    scores['translationPresent'] * 0.4 +
+    scores['xmlCoverage'] * 0.3 +
+    scores['translationConcise'] * 0.15 +
     expectedMean * 0.15;
-  scores["usability"] = Number(usability.toFixed(3));
+  scores['usability'] = Number(usability.toFixed(3));
 
   return scores;
 }
@@ -230,7 +232,11 @@ export async function runPromptEval(
             targetLanguage: fixture.targetLanguage,
             outputFields: EVAL_OUTPUT_FIELDS,
           });
-          const fieldOnly = await callModel(perField.systemPrompt, perField.userPrompt, `field:${field.id}`);
+          const fieldOnly = await callModel(
+            perField.systemPrompt,
+            perField.userPrompt,
+            `field:${field.id}`,
+          );
           stitched[field.id] = fieldOnly.text.trim();
         }
 

@@ -17,7 +17,9 @@ const EXPLICIT_BASE_PAIRS = [
   'it->hi',
 ] as const;
 
-export function getFixturePair(fixture: Pick<PromptTestFixture, 'sourceLanguage' | 'targetLanguage'>): string {
+export function getFixturePair(
+  fixture: Pick<PromptTestFixture, 'sourceLanguage' | 'targetLanguage'>,
+): string {
   return `${fixture.sourceLanguage}->${fixture.targetLanguage}`;
 }
 
@@ -70,7 +72,10 @@ export function selectTranslationModels(
   };
 }
 
-export function sampleFixturesByPair(fixtures: PromptTestFixture[], perPair: number): PromptTestFixture[] {
+export function sampleFixturesByPair(
+  fixtures: PromptTestFixture[],
+  perPair: number,
+): PromptTestFixture[] {
   const byPair = new Map<string, PromptTestFixture[]>();
 
   for (const fixture of fixtures) {

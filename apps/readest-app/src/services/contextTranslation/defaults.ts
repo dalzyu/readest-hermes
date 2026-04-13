@@ -59,7 +59,8 @@ export function resolveContextTranslationHarnessSettings(
     ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
     ...harness,
     contaminationMarkers:
-      harness?.contaminationMarkers ?? DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.contaminationMarkers,
+      harness?.contaminationMarkers ??
+      DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.contaminationMarkers,
     reasoningMarkers:
       harness?.reasoningMarkers ?? DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.reasoningMarkers,
   };

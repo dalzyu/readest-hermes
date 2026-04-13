@@ -158,7 +158,9 @@ describe('buildTranslationPrompt', () => {
     expect(systemPrompt).toContain('Use this exact output shape:');
     const exactIndex = systemPrompt.indexOf('English lacks grammatical aspect and case');
     const sourceWildcardIndex = systemPrompt.indexOf('English source text often hides idioms');
-    const targetWildcardIndex = systemPrompt.indexOf('Russian should use a natural literary phrase');
+    const targetWildcardIndex = systemPrompt.indexOf(
+      'Russian should use a natural literary phrase',
+    );
     expect(exactIndex).toBeGreaterThan(-1);
     expect(sourceWildcardIndex).toBeGreaterThan(exactIndex);
     expect(targetWildcardIndex).toBeGreaterThan(sourceWildcardIndex);
@@ -191,7 +193,9 @@ describe('buildTranslationPrompt', () => {
 
     expect(systemPrompt).toContain('1-3 words maximum');
     expect(systemPrompt).toContain('Do NOT include explanations');
-    expect(systemPrompt).toContain('Every sentence must be written entirely in the target language');
+    expect(systemPrompt).toContain(
+      'Every sentence must be written entirely in the target language',
+    );
     expect(systemPrompt).toContain('Do NOT use the source word in examples');
   });
 
@@ -289,4 +293,3 @@ describe('buildPerFieldPrompt', () => {
     expect(systemPrompt).toContain('steps');
   });
 });
-

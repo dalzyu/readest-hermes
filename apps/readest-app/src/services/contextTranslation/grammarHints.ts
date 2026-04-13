@@ -104,7 +104,11 @@ function buildConjugationExplanation(token: IpadicToken): string | undefined {
   if (!token.basic_form || token.basic_form === '*' || token.basic_form === token.surface_form) {
     return undefined;
   }
-  if (!token.conjugated_form || token.conjugated_form === '*' || token.conjugated_form === '鍩烘湰褰?') {
+  if (
+    !token.conjugated_form ||
+    token.conjugated_form === '*' ||
+    token.conjugated_form === '鍩烘湰褰?'
+  ) {
     return undefined;
   }
 
@@ -115,7 +119,7 @@ function buildConjugationExplanation(token: IpadicToken): string | undefined {
   const posLabel = POS_LABELS[token.pos] ?? token.pos;
   const typeName =
     token.conjugated_type && token.conjugated_type !== '*'
-      ? CONJUGATED_TYPE_LABELS[token.conjugated_type] ?? token.conjugated_type
+      ? (CONJUGATED_TYPE_LABELS[token.conjugated_type] ?? token.conjugated_type)
       : '';
 
   let explanation = `${formName} of ${token.basic_form}`;
@@ -163,14 +167,11 @@ export function getJapaneseGrammarHint(text: string): GrammarHint | null {
 
   // For single-token: give full POS breakdown
   // For multi-token: give POS of the head token (last content word)
-  const contentTokens = tokens.filter(
-    (t) => t.pos !== '瑷樺彿' && t.pos !== 'BOS/EOS',
-  );
+  const contentTokens = tokens.filter((t) => t.pos !== '瑷樺彿' && t.pos !== 'BOS/EOS');
   if (contentTokens.length === 0) return null;
 
-  const target = contentTokens.length === 1
-    ? contentTokens[0]!
-    : contentTokens[contentTokens.length - 1]!;
+  const target =
+    contentTokens.length === 1 ? contentTokens[0]! : contentTokens[contentTokens.length - 1]!;
 
   const parts: string[] = [];
 

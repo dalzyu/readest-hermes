@@ -10,7 +10,10 @@ function buildMarkerRegex(
   options: { prefixOnly?: boolean } = {},
 ): RegExp | null {
   if (markers.length === 0) return null;
-  const body = markers.map((marker) => escapeRegexLiteral(marker.trim())).filter(Boolean).join('|');
+  const body = markers
+    .map((marker) => escapeRegexLiteral(marker.trim()))
+    .filter(Boolean)
+    .join('|');
   if (!body) return null;
   return options.prefixOnly ? new RegExp(`^\\s*(?:${body})`, 'i') : new RegExp(body, 'i');
 }
@@ -90,14 +93,10 @@ export function sanitizeFieldContent(
   if (!value) return '';
   if (!harness.sanitizeOutput) return normalizeWhitespace(value);
 
-  const channelTail =
-    harness.extractChannelTail
-      ? extractChannelTail(value)
-      : null;
-  const nested =
-    harness.extractNestedTags
-      ? extractNestedFieldValue(fieldId, channelTail ?? value)
-      : null;
+  const channelTail = harness.extractChannelTail ? extractChannelTail(value) : null;
+  const nested = harness.extractNestedTags
+    ? extractNestedFieldValue(fieldId, channelTail ?? value)
+    : null;
   const normalized = normalizeWhitespace(
     (nested ?? channelTail ?? value)
       .replace(/^<translation>/i, '')
@@ -115,9 +114,7 @@ export function sanitizeFieldContent(
     const looksSuspicious =
       (harness.stripReasoning && Boolean(metaPrefixRegex?.test(normalized))) ||
       Boolean(contaminationRegex?.test(normalized)) ||
-      /Contextual Meaning|<translation>|<contextualMeaning>/i.test(
-        normalized,
-      ) ||
+      /Contextual Meaning|<translation>|<contextualMeaning>/i.test(normalized) ||
       normalized.includes('\n');
 
     if (!looksSuspicious) {

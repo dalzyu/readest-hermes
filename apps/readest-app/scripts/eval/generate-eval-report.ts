@@ -62,7 +62,9 @@ interface LanguageBreakdown {
 }
 
 function getModelTier(modelId: string): string {
-  return [/0\.8B/i, /E2B/i, /[_-]1B/i, /[_-]2B/i].some((pattern) => pattern.test(modelId)) ? 'weak' : 'strong';
+  return [/0\.8B/i, /E2B/i, /[_-]1B/i, /[_-]2B/i].some((pattern) => pattern.test(modelId))
+    ? 'weak'
+    : 'strong';
 }
 
 function avg(values: number[]): number {
@@ -79,7 +81,10 @@ function compositeScore(accuracy: number, fluency: number, contextPreservation: 
 function buildLanguageBreakdown(
   entries: { language: string; accuracy: number; fluency: number; context: number }[],
 ): LanguageBreakdown[] {
-  const byLanguage = new Map<string, { accuracy: number[]; fluency: number[]; context: number[] }>();
+  const byLanguage = new Map<
+    string,
+    { accuracy: number[]; fluency: number[]; context: number[] }
+  >();
 
   for (const entry of entries) {
     if (!byLanguage.has(entry.language)) {
@@ -120,7 +125,9 @@ async function main() {
   });
 
   if (!values['eval-results']) {
-    console.error('Usage: --eval-results <file.json> [--quality-scores <file.json>] [--output <prefix>]');
+    console.error(
+      'Usage: --eval-results <file.json> [--quality-scores <file.json>] [--output <prefix>]',
+    );
     process.exit(1);
   }
 
@@ -128,7 +135,12 @@ async function main() {
   const reports: Record<string, EvalReport> = evalData.reports ?? {};
 
   let qualityData: Record<string, JudgeScore[]> = {};
-  let qualityMeta: { judgeModel: string | null; qualityTimestamp: number | null; qualityFixturePath: string | null; qualityInputPath: string | null } = {
+  let qualityMeta: {
+    judgeModel: string | null;
+    qualityTimestamp: number | null;
+    qualityFixturePath: string | null;
+    qualityInputPath: string | null;
+  } = {
     judgeModel: null,
     qualityTimestamp: null,
     qualityFixturePath: null,
@@ -165,7 +177,9 @@ async function main() {
       avgLatencyMs: Math.round(avg(report.results.map((result) => result.latencyMs))),
       avgAccuracy: Number(avg(judgeScores.map((score) => score.accuracy)).toFixed(2)),
       avgFluency: Number(avg(judgeScores.map((score) => score.fluency)).toFixed(2)),
-      avgContextPreservation: Number(avg(judgeScores.map((score) => score.contextPreservation)).toFixed(2)),
+      avgContextPreservation: Number(
+        avg(judgeScores.map((score) => score.contextPreservation)).toFixed(2),
+      ),
       compositeQuality: Number(
         compositeScore(
           avg(judgeScores.map((score) => score.accuracy)),
@@ -184,7 +198,10 @@ async function main() {
 
   for (const [model, report] of Object.entries(reports)) {
     const judgeMap = new Map((qualityData[model] ?? []).map((score) => [score.fixtureId, score]));
-    const pairData = new Map<string, { accuracy: number[]; fluency: number[]; context: number[]; count: number }>();
+    const pairData = new Map<
+      string,
+      { accuracy: number[]; fluency: number[]; context: number[]; count: number }
+    >();
 
     for (const result of report.results) {
       const parts = result.fixtureId.split('-');
@@ -240,13 +257,15 @@ async function main() {
         return [];
       }
 
-      return [{
-        sourceLanguage: parts[0] ?? '',
-        targetLanguage: parts[1] ?? '',
-        accuracy: score.accuracy,
-        fluency: score.fluency,
-        context: score.contextPreservation,
-      }];
+      return [
+        {
+          sourceLanguage: parts[0] ?? '',
+          targetLanguage: parts[1] ?? '',
+          accuracy: score.accuracy,
+          fluency: score.fluency,
+          context: score.contextPreservation,
+        },
+      ];
     });
 
     sourceLanguageBreakdowns[model] = buildLanguageBreakdown(
@@ -284,17 +303,25 @@ async function main() {
   lines.push(`- Fixture pair count: ${String(evalData.fixturePairCount ?? 'unknown')}`);
   lines.push(`- Active translation models: ${(evalData.models ?? []).join(', ') || 'none'}`);
   lines.push(`- Excluded endpoint models: ${(evalData.excludedModels ?? []).join(', ') || 'none'}`);
-  lines.push(`- Missing requested models: ${(evalData.missingRequestedModels ?? []).join(', ') || 'none'}`);
+  lines.push(
+    `- Missing requested models: ${(evalData.missingRequestedModels ?? []).join(', ') || 'none'}`,
+  );
   if (qualityMeta.judgeModel) {
     lines.push(`- Judge model: ${String(qualityMeta.judgeModel)}`);
   }
   lines.push('');
   lines.push('## Model Rankings');
   lines.push('');
-  lines.push('| Rank | Model | Tier | Usable% | Avg Usability | Avg Accuracy | Avg Fluency | Avg Context | Composite | Avg Latency |');
-  lines.push('|------|-------|------|---------|---------------|-------------|-------------|-------------|-----------|-------------|');
+  lines.push(
+    '| Rank | Model | Tier | Usable% | Avg Usability | Avg Accuracy | Avg Fluency | Avg Context | Composite | Avg Latency |',
+  );
+  lines.push(
+    '|------|-------|------|---------|---------------|-------------|-------------|-------------|-----------|-------------|',
+  );
   modelSummaries.forEach((summary, index) => {
-    lines.push(`| ${index + 1} | ${summary.model} | ${summary.tier} | ${(summary.usableRate * 100).toFixed(1)}% | ${summary.avgUsability} | ${summary.avgAccuracy} | ${summary.avgFluency} | ${summary.avgContextPreservation} | **${summary.compositeQuality}** | ${summary.avgLatencyMs}ms |`);
+    lines.push(
+      `| ${index + 1} | ${summary.model} | ${summary.tier} | ${(summary.usableRate * 100).toFixed(1)}% | ${summary.avgUsability} | ${summary.avgAccuracy} | ${summary.avgFluency} | ${summary.avgContextPreservation} | **${summary.compositeQuality}** | ${summary.avgLatencyMs}ms |`,
+    );
   });
   lines.push('');
 
@@ -313,7 +340,9 @@ async function main() {
       lines.push('| Source | Count | Accuracy | Fluency | Context | Composite |');
       lines.push('|--------|-------|----------|---------|---------|-----------|');
       sourceLanguages.forEach((language) => {
-        lines.push(`| ${language.language} | ${language.count} | ${language.avgAccuracy} | ${language.avgFluency} | ${language.avgContextPreservation} | ${language.compositeQuality} |`);
+        lines.push(
+          `| ${language.language} | ${language.count} | ${language.avgAccuracy} | ${language.avgFluency} | ${language.avgContextPreservation} | ${language.compositeQuality} |`,
+        );
       });
       lines.push('');
     }
@@ -324,7 +353,9 @@ async function main() {
       lines.push('| Target | Count | Accuracy | Fluency | Context | Composite |');
       lines.push('|--------|-------|----------|---------|---------|-----------|');
       targetLanguages.forEach((language) => {
-        lines.push(`| ${language.language} | ${language.count} | ${language.avgAccuracy} | ${language.avgFluency} | ${language.avgContextPreservation} | ${language.compositeQuality} |`);
+        lines.push(
+          `| ${language.language} | ${language.count} | ${language.avgAccuracy} | ${language.avgFluency} | ${language.avgContextPreservation} | ${language.compositeQuality} |`,
+        );
       });
       lines.push('');
     }
@@ -333,7 +364,9 @@ async function main() {
     lines.push('| Pair | Count | Accuracy | Fluency | Context | Composite |');
     lines.push('|------|-------|----------|---------|---------|-----------|');
     pairs.slice(0, 5).forEach((pair) => {
-      lines.push(`| ${pair.pair} | ${pair.count} | ${pair.avgAccuracy} | ${pair.avgFluency} | ${pair.avgContextPreservation} | ${pair.compositeQuality} |`);
+      lines.push(
+        `| ${pair.pair} | ${pair.count} | ${pair.avgAccuracy} | ${pair.avgFluency} | ${pair.avgContextPreservation} | ${pair.compositeQuality} |`,
+      );
     });
     lines.push('');
 
@@ -341,7 +374,9 @@ async function main() {
     lines.push('| Pair | Count | Accuracy | Fluency | Context | Composite |');
     lines.push('|------|-------|----------|---------|---------|-----------|');
     pairs.slice(-5).forEach((pair) => {
-      lines.push(`| ${pair.pair} | ${pair.count} | ${pair.avgAccuracy} | ${pair.avgFluency} | ${pair.avgContextPreservation} | ${pair.compositeQuality} |`);
+      lines.push(
+        `| ${pair.pair} | ${pair.count} | ${pair.avgAccuracy} | ${pair.avgFluency} | ${pair.avgContextPreservation} | ${pair.compositeQuality} |`,
+      );
     });
     lines.push('');
   }
@@ -349,7 +384,9 @@ async function main() {
   writeFileSync(`${outputPrefix}.md`, lines.join('\n'), 'utf8');
   console.log(`Wrote: ${outputPrefix}.md`);
 
-  const csvLines = ['model,tier,totalFixtures,usableRate,avgUsability,avgAttempts,avgLatencyMs,avgAccuracy,avgFluency,avgContextPreservation,compositeQuality'];
+  const csvLines = [
+    'model,tier,totalFixtures,usableRate,avgUsability,avgAttempts,avgLatencyMs,avgAccuracy,avgFluency,avgContextPreservation,compositeQuality',
+  ];
   for (const summary of modelSummaries) {
     csvLines.push(
       `${summary.model},${summary.tier},${summary.totalFixtures},${summary.usableRate},${summary.avgUsability},${summary.avgAttempts},${summary.avgLatencyMs},${summary.avgAccuracy},${summary.avgFluency},${summary.avgContextPreservation},${summary.compositeQuality}`,
@@ -386,4 +423,3 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-

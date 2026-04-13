@@ -31,10 +31,9 @@ export function initJapaneseTokenizer(): Promise<Tokenizer> {
   if (initPromise) return initPromise;
   initPromise = new Promise<Tokenizer>((resolve, reject) => {
     // Dynamic import avoids pulling kuromoji into SSR bundles
-    import('kuromoji').then((kuromoji) => {
-      kuromoji
-        .builder({ dicPath: getDicPath() })
-        .build((err: Error | null, tok: Tokenizer) => {
+    import('kuromoji')
+      .then((kuromoji) => {
+        kuromoji.builder({ dicPath: getDicPath() }).build((err: Error | null, tok: Tokenizer) => {
           if (err) {
             console.error('[jpTokenizer] Failed to load dictionary:', err);
             initPromise = null; // allow retry
@@ -44,11 +43,12 @@ export function initJapaneseTokenizer(): Promise<Tokenizer> {
             resolve(tok);
           }
         });
-    }).catch((e) => {
-      console.error('[jpTokenizer] Failed to import kuromoji:', e);
-      initPromise = null;
-      reject(e);
-    });
+      })
+      .catch((e) => {
+        console.error('[jpTokenizer] Failed to import kuromoji:', e);
+        initPromise = null;
+        reject(e);
+      });
   });
   return initPromise;
 }

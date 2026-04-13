@@ -19,7 +19,7 @@ describe('runPromptEval', () => {
       async (systemPrompt, userPrompt, label) => {
         prompts.push({ systemPrompt, userPrompt, label });
         return {
-          text: '<translation>§à§ä§é§å§Ø§Õ§Ö§ß§ß§Ñ§ñ</translation>\n<contextualMeaning>§¹§å§Ó§ã§ä§Ó§å§ð§ë§Ñ§ñ §Ô§Ý§å§Ò§à§Ü§å§ð §Ó§ß§å§ä§â§Ö§ß§ß§ð§ð §à§ä§Õ§Ñ§Ý§Ö§ß§ß§à§ã§ä§î.</contextualMeaning>\n<examples>§°§ß§Ñ §Ó§à§ê§Ý§Ñ §Ó §Õ§à§Þ §à§ä§é§å§Ø§Õ§Ö§ß§ß§à§Û. §¦§Ô§à §Ô§à§Ý§à§ã §Ù§Ó§å§é§Ñ§Ý §à§ä§é§å§Ø§Õ§Ö§ß§ß§à §Ú §ã§å§ç§à.</examples>',
+          text: '<translation>ï¿½ï¿½ï¿½ï¿½ï¿½Ø§Õ§Ö§ß§ß§Ñ§ï¿½</translation>\n<contextualMeaning>ï¿½ï¿½ï¿½ï¿½Ó§ï¿½ï¿½Ó§ï¿½ï¿½ï¿½Ñ§ï¿½ ï¿½Ô§Ý§ï¿½Ò§ï¿½Ü§ï¿½ï¿½ ï¿½Ó§ß§ï¿½ï¿½ï¿½Ö§ß§ß§ï¿½ï¿½ ï¿½ï¿½ï¿½Õ§Ñ§Ý§Ö§ß§ß§ï¿½ï¿½ï¿½ï¿½.</contextualMeaning>\n<examples>ï¿½ï¿½ï¿½ß§ï¿½ ï¿½Ó§ï¿½ï¿½Ý§ï¿½ ï¿½ï¿½ ï¿½Õ§ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø§Õ§Ö§ß§ß§ï¿½ï¿½. ï¿½ï¿½ï¿½Ô§ï¿½ ï¿½Ô§ï¿½Ý§ï¿½ï¿½ ï¿½Ù§Ó§ï¿½ï¿½Ñ§ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø§Õ§Ö§ß§ß§ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½.</examples>',
         };
       },
       { model: 'test-model', provider: 'test-provider' },

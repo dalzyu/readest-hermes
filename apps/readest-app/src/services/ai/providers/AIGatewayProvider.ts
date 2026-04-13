@@ -23,10 +23,7 @@ export class AIGatewayProvider implements AIProvider {
       throw new Error('AI Gateway API key required');
     }
     this.gateway = createGateway({ apiKey: config.apiKey });
-    aiLogger.provider.init(
-      config.id,
-      config.model || GATEWAY_MODELS.GEMINI_FLASH_LITE,
-    );
+    aiLogger.provider.init(config.id, config.model || GATEWAY_MODELS.GEMINI_FLASH_LITE);
   }
 
   getModel(_params?: InferenceParams): LanguageModel {

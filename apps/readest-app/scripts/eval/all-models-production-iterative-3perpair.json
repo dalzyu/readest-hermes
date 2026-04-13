@@ -54,10 +54,7 @@
   ],
   "requestedModels": null,
   "flow": "production",
-  "excludedModels": [
-    "gemma-4-26B-A4B-it-MXFP4_MOE",
-    "ggml-org/embeddinggemma-300M-GGUF:Q8_0"
-  ],
+  "excludedModels": ["gemma-4-26B-A4B-it-MXFP4_MOE", "ggml-org/embeddinggemma-300M-GGUF:Q8_0"],
   "missingRequestedModels": [],
   "models": [
     "Qwen3.5-0.8B-UD-Q6_K_XL",

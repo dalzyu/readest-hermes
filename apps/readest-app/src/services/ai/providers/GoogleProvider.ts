@@ -43,8 +43,7 @@ export class GoogleProvider implements AIProvider {
   async healthCheck(): Promise<boolean> {
     if (!this.config.apiKey) return false;
     try {
-      const baseUrl =
-        this.config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta';
+      const baseUrl = this.config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta';
       const response = await fetch(
         `${baseUrl}/models/${this.config.model}?key=${this.config.apiKey}`,
         { signal: AbortSignal.timeout(AI_TIMEOUTS.HEALTH_CHECK) },

@@ -7,7 +7,10 @@ import {
   CONTEXT_TRANSLATION_HARNESS_PRESETS,
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
 } from '@/services/contextTranslation/defaults';
-import { buildPerFieldPrompt, buildTranslationPrompt } from '@/services/contextTranslation/promptBuilder';
+import {
+  buildPerFieldPrompt,
+  buildTranslationPrompt,
+} from '@/services/contextTranslation/promptBuilder';
 import { parseTranslationResponse } from '@/services/contextTranslation/responseParser';
 import {
   sanitizeFieldContent,
@@ -104,7 +107,9 @@ function completionRatio(parsed: Record<string, string>, fields: TranslationOutp
 async function requestJson(url: string, init: RequestInit): Promise<unknown> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`${init.method ?? 'GET'} ${url} failed (${response.status}) :: ${await response.text()}`);
+    throw new Error(
+      `${init.method ?? 'GET'} ${url} failed (${response.status}) :: ${await response.text()}`,
+    );
   }
   return response.json();
 }
@@ -232,7 +237,9 @@ async function runFixture(
 
   if (shouldRepair) {
     attempts += 1;
-    const template = request.outputFields.map((field) => `<${field.id}>...</${field.id}>`).join('\n');
+    const template = request.outputFields
+      .map((field) => `<${field.id}>...</${field.id}>`)
+      .join('\n');
     rawResponse = await callOpenAICompat(
       baseUrl,
       model,
@@ -270,10 +277,7 @@ ${userPrompt}`,
       rawSegments.push(fieldResponse);
       let sanitized = sanitizeFieldContent(field.id, fieldResponse, harness);
 
-      if (
-        responseLooksContaminated(fieldResponse, harness) ||
-        !sanitized.trim()
-      ) {
+      if (responseLooksContaminated(fieldResponse, harness) || !sanitized.trim()) {
         attempts += 1;
         fieldResponse = await callOpenAICompat(
           baseUrl,

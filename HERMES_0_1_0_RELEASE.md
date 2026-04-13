@@ -1,9 +1,11 @@
 # Hermes 0.1.0 Release Plan
 
 ## Goal
+
 Ship Hermes 0.1.0 — the first minor release signaling a feature-complete, polished fork of Readest. Targets: Windows (x64/arm64), macOS (universal), Linux (x64), Android (APK, no Play Store). **Offline-only** — no cloud backend for this release. Full branding cleanup, existing TODO/FIXME polish, test hardening, CI pipeline fixes, and an ambitious offline feature slate: spaced-repetition vocabulary review, lookup history, Japanese furigana, reading session stats, streaks/goals, AI chapter recap, focus mode, and PKM export templates.
 
 ## Current State
+
 - **Version**: Frontend `0.0.2`, Rust crate `0.2.2` (mismatch)
 - **Branch**: `codex`, 13 commits ahead of `origin/main`
 - **Submodules**: `packages/qcms` registered but uninitialized (prefix `-` in `git submodule status`)
@@ -19,12 +21,14 @@ Ship Hermes 0.1.0 — the first minor release signaling a feature-complete, poli
 ## Phase 1: Version & Metadata Alignment
 
 ### 1.1 Unify version numbers
+
 - **File**: `apps/readest-app/package.json` — bump `version` from `0.0.2` to `0.1.0`
 - **File**: `apps/readest-app/src-tauri/Cargo.toml` — change `version` from `0.2.2` to `0.1.0`
   - Tauri reads the JS version via `../package.json` reference in `tauri.conf.json`, but the Cargo.toml version should match for consistency
 - **File**: `apps/readest-app/release-notes.json` — add `0.1.0` entry with release notes
 
 ### 1.2 Rust crate metadata
+
 - **File**: `apps/readest-app/src-tauri/Cargo.toml`
   - `name = "Readest"` → `name = "Hermes"` (or keep as internal crate name if it would break Tauri integration — verify `cargo clippy -p Readest` in CI)
   - `description` → update to Hermes description
@@ -32,6 +36,7 @@ Ship Hermes 0.1.0 — the first minor release signaling a feature-complete, poli
   - **Verification**: Check if renaming the crate breaks `cargo clippy -p Readest` in `pull-request.yml`, the `readestlib` lib name, or any Tauri plugin references. If it does, leave `name` alone and only update `description`/`repository`.
 
 ### 1.3 Submodule: qcms
+
 - `packages/qcms` is registered in `.gitmodules` but never initialized. Determine if it's used. If not, remove from `.gitmodules` and clean up. If used, initialize it.
 - **Check**: `grep -r "qcms" apps/ packages/ Cargo.toml Cargo.lock` to see if anything references it.
 
@@ -40,6 +45,7 @@ Ship Hermes 0.1.0 — the first minor release signaling a feature-complete, poli
 ## Phase 2: Full Branding Cleanup
 
 ### 2.1 Constants & user-agent
+
 - **File**: `apps/readest-app/src/services/constants.ts`
   - `DOWNLOAD_READEST_URL` (line 709): Point to `https://github.com/dalzyu/readest-hermes/releases/latest` instead of `readest.com`
   - `READEST_OPDS_USER_AGENT` (line 723): `'Readest/1.0 (OPDS Browser)'` → `'Hermes/0.1 (OPDS Browser)'`
@@ -47,22 +53,24 @@ Ship Hermes 0.1.0 — the first minor release signaling a feature-complete, poli
   - Variable names like `READEST_*` stay as internal identifiers (not user-facing).
 
 ### 2.6 Disable cloud-dependent UI (offline-only mode)
+
 Since Hermes 0.1.0 has no cloud backend, the following UI elements must be hidden or disabled:
 
-| UI Element | File | Action |
-|---|---|---|
-| "Sign In" menu item | `src/app/library/components/SettingsMenu.tsx` | Hide when no backend configured |
-| "Upgrade to Hermes Premium" menu item | `src/app/library/components/SettingsMenu.tsx` | Hide when no backend configured |
-| Cloud sync status/button | `src/app/library/components/SettingsMenu.tsx` | Hide sync indicators |
-| "Account" menu item | `src/app/library/components/SettingsMenu.tsx` | Hide when no user |
-| "DeepL requires a Hermes account" message | `src/components/settings/AITranslatePanel.tsx` | Change to "DeepL requires your own API key" or similar |
-| Sync settings panels (KOReader, Readwise, Hardcover) | `src/components/settings/` | Keep visible but document that sync requires self-hosted backend (Docker) |
+| UI Element                                           | File                                           | Action                                                                    |
+| ---------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------- |
+| "Sign In" menu item                                  | `src/app/library/components/SettingsMenu.tsx`  | Hide when no backend configured                                           |
+| "Upgrade to Hermes Premium" menu item                | `src/app/library/components/SettingsMenu.tsx`  | Hide when no backend configured                                           |
+| Cloud sync status/button                             | `src/app/library/components/SettingsMenu.tsx`  | Hide sync indicators                                                      |
+| "Account" menu item                                  | `src/app/library/components/SettingsMenu.tsx`  | Hide when no user                                                         |
+| "DeepL requires a Hermes account" message            | `src/components/settings/AITranslatePanel.tsx` | Change to "DeepL requires your own API key" or similar                    |
+| Sync settings panels (KOReader, Readwise, Hardcover) | `src/components/settings/`                     | Keep visible but document that sync requires self-hosted backend (Docker) |
 
 **Implementation approach**: Add a feature flag constant (e.g. `CLOUD_ENABLED = false`) in `constants.ts`. Gate cloud UI on this flag. This is clean, reversible, and makes re-enabling trivial when a backend is available.
 
 **Key constraint**: OPDS catalog browsing, local AI (Ollama), local TTS, and all offline reading features must remain fully functional. Only cloud-dependent features (sync, accounts, premium) are affected.
 
 ### 2.2 Translation keys — stale cleanup
+
 - **32 locale files** in `apps/readest-app/public/locales/*/translation.json` contain orphaned keys:
   - `"About Readest"`, `"Download Readest"`, `"Upgrade to Readest Premium"`, `"support@readest.com"`, etc.
 - These keys are no longer referenced in code (the code now uses `"About Hermes"`, etc.), but they clutter the files.
@@ -70,6 +78,7 @@ Since Hermes 0.1.0 has no cloud backend, the following UI elements must be hidde
 - **Verification**: Run `pnpm i18n:extract` to regenerate keys from source, then diff against current translation files to confirm no active key references "Readest".
 
 ### 2.3 SECURITY.md
+
 - **File**: `SECURITY.md`
   - Line 7: "Readest is a cross-platform e-reader" → "Hermes is a cross-platform e-reader"
   - Line 63: "outside of Readest's control" → "outside of Hermes's control"
@@ -79,11 +88,13 @@ Since Hermes 0.1.0 has no cloud backend, the following UI elements must be hidde
   - Keep upstream attribution where appropriate.
 
 ### 2.4 data/metainfo/appdata.xml
+
 - **File**: `data/metainfo/appdata.xml`
   - Screenshot URLs referencing `readest/readest` repo → update to `dalzyu/readest-hermes` or remove if screenshots aren't published yet
   - Help/donation URLs pointing to `readest.io` — keep as upstream attribution? Or update?
 
 ### 2.5 README.md
+
 - Currently describes upstream Readest. Needs Hermes-specific introduction or at minimum a prominent "This is the Hermes fork" section.
 - Update any download/install links to point to Hermes releases.
 
@@ -95,25 +106,26 @@ Priority: Fix items that affect user experience. Skip platform-specific items fo
 
 ### 3.1 Actionable FIXMEs (in scope)
 
-| # | File | Issue | Action |
-|---|---|---|---|
-| 1 | `src/hooks/useShortcuts.ts:57` | Temporary fix disabling Back button navigation | Investigate and implement proper fix or document as known limitation |
-| 2 | `src/hooks/useTheme.ts:91` | iPhone landscape system UI workaround | Out of scope (iOS) — leave as-is |
-| 3 | `src/hooks/useOpenWithBooks.ts:110` | iOS plugin listener freeze | Out of scope (iOS) — leave as-is |
-| 4 | `src/app/reader/hooks/useTextSelector.ts:71` | iOS selection tools dismissal hack | Out of scope (iOS) — leave as-is |
-| 5 | `src/app/reader/hooks/useTextSelector.ts:223-224` | Cross-page text selection workaround + TODO | Document as known limitation for 0.1.0 |
-| 6 | `src/services/tts/TTSController.ts:62` | Native TTS not implemented for PC | Document as known limitation |
-| 7 | `src/services/tts/TTSController.ts:327` | End-of-book TTS handling | Fix: detect end-of-book and stop TTS gracefully |
-| 8 | `src/services/bookService.ts` | 0.9.64 filename-not-updated bug | Investigate if still relevant — the version is old |
-| 9 | `src/utils/file.ts:339` | Android HEAD request not supported | In scope (Android APK target) — investigate fix |
-| 10 | `src/store/readerStore.ts:214` | metaHash verification blocked | Investigate blocker status |
-| 11 | `src/services/nativeAppService.ts` | NativeFile switch pending bug fix | Investigate current status |
-| 12 | `src/services/commandRegistry.ts:652` | Reader-specific actions not in command registry | Nice-to-have: add TTS, bookmark commands |
-| 13 | `src/utils/storage.ts:4` | Storage type exposed to client | Low priority — type-level cleanup |
-| 14 | `pages/api/deepl/translate.ts:188` | Server-side translation processing should move to client | Low priority — works as-is |
-| 15 | `pages/api/sync.ts:121` | Hotfix for initial race condition | Investigate if still needed |
+| #   | File                                              | Issue                                                    | Action                                                               |
+| --- | ------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------- |
+| 1   | `src/hooks/useShortcuts.ts:57`                    | Temporary fix disabling Back button navigation           | Investigate and implement proper fix or document as known limitation |
+| 2   | `src/hooks/useTheme.ts:91`                        | iPhone landscape system UI workaround                    | Out of scope (iOS) — leave as-is                                     |
+| 3   | `src/hooks/useOpenWithBooks.ts:110`               | iOS plugin listener freeze                               | Out of scope (iOS) — leave as-is                                     |
+| 4   | `src/app/reader/hooks/useTextSelector.ts:71`      | iOS selection tools dismissal hack                       | Out of scope (iOS) — leave as-is                                     |
+| 5   | `src/app/reader/hooks/useTextSelector.ts:223-224` | Cross-page text selection workaround + TODO              | Document as known limitation for 0.1.0                               |
+| 6   | `src/services/tts/TTSController.ts:62`            | Native TTS not implemented for PC                        | Document as known limitation                                         |
+| 7   | `src/services/tts/TTSController.ts:327`           | End-of-book TTS handling                                 | Fix: detect end-of-book and stop TTS gracefully                      |
+| 8   | `src/services/bookService.ts`                     | 0.9.64 filename-not-updated bug                          | Investigate if still relevant — the version is old                   |
+| 9   | `src/utils/file.ts:339`                           | Android HEAD request not supported                       | In scope (Android APK target) — investigate fix                      |
+| 10  | `src/store/readerStore.ts:214`                    | metaHash verification blocked                            | Investigate blocker status                                           |
+| 11  | `src/services/nativeAppService.ts`                | NativeFile switch pending bug fix                        | Investigate current status                                           |
+| 12  | `src/services/commandRegistry.ts:652`             | Reader-specific actions not in command registry          | Nice-to-have: add TTS, bookmark commands                             |
+| 13  | `src/utils/storage.ts:4`                          | Storage type exposed to client                           | Low priority — type-level cleanup                                    |
+| 14  | `pages/api/deepl/translate.ts:188`                | Server-side translation processing should move to client | Low priority — works as-is                                           |
+| 15  | `pages/api/sync.ts:121`                           | Hotfix for initial race condition                        | Investigate if still needed                                          |
 
 ### 3.2 Priority fixes for 0.1.0
+
 Focus on items **1, 7, 8, 9, 10, 11, 15** — these affect desktop and Android users.
 
 ### 3.3 New Feature Slate for 0.1.0
@@ -187,19 +199,23 @@ Focus on items **1, 7, 8, 9, 10, 11, 15** — these affect desktop and Android u
 ## Phase 4: Test Hardening
 
 ### 4.1 Update existing branding tests
+
 - **File**: `src/__tests__/services/build/hermes-branding.test.ts`
   - Extend to verify OPDS user-agent, SECURITY.md, and translation file cleanup
   - Add assertion that no `translation.json` file contains `"About Readest"` or `"Upgrade to Readest Premium"` keys
 
 ### 4.2 Update workflow alignment tests
+
 - **File**: `src/__tests__/services/build/workflow-alignment.test.ts`
   - Update version expectations to `0.1.0`
   - Add assertion for Cargo.toml version alignment
 
 ### 4.3 Version alignment test
+
 - Add test that verifies `package.json` version, `Cargo.toml` version, and `release-notes.json` all have the same version entry.
 
 ### 4.4 Run existing test suite
+
 - `pnpm test -- --watch=false` — all unit tests must pass
 - `pnpm test:browser` — all browser tests must pass
 - `pnpm lint` — zero warnings/errors
@@ -211,12 +227,14 @@ Focus on items **1, 7, 8, 9, 10, 11, 15** — these affect desktop and Android u
 ## Phase 5: CI/CD Pipeline Fixes
 
 ### 5.1 Release workflow — remove non-target platforms
+
 - **File**: `.github/workflows/release.yml`
   - Remove or disable `ubuntu-22.04-arm` matrix entries (aarch64 and armhf Linux) — these require self-hosted runners not available
   - Keep: Android (ubuntu-latest), Linux x64 (ubuntu-22.04), macOS (macos-latest), Windows x64 + arm64 (windows-latest)
   - **Result**: 5 matrix entries instead of 7
 
 ### 5.2 Release workflow — verify fork path
+
 - The workflow gates on `github.repository == 'readest/readest'` for signing. Verify the else-branch (fork path) correctly:
   - Builds unsigned APK for Android
   - Builds unsigned NSIS for Windows
@@ -225,10 +243,12 @@ Focus on items **1, 7, 8, 9, 10, 11, 15** — these affect desktop and Android u
   - Uploads all artifacts to GitHub Release
 
 ### 5.3 PR workflow — add format/lint to Tauri job
+
 - **File**: `.github/workflows/pull-request.yml`
   - The `build_tauri_app` job only runs tests. Add `pnpm format:check` and `pnpm lint` to match the web job coverage.
 
 ### 5.4 Verify release-notes.json parsing
+
 - The release workflow parses `release-notes.json` to generate the release body. Verify the 0.1.0 entry is correctly formatted and the parser handles it.
 
 ---
@@ -236,15 +256,18 @@ Focus on items **1, 7, 8, 9, 10, 11, 15** — these affect desktop and Android u
 ## Phase 6: Documentation Updates
 
 ### 6.1 Release notes
+
 - **File**: `apps/readest-app/release-notes.json`
   - Add `0.1.0` entry summarizing all changes since 0.0.1 (branding, popup refactor, translation cleanup, bug fixes, version alignment)
 
 ### 6.2 README.md
+
 - Add Hermes-specific header/description
 - Update installation instructions to reference Hermes GitHub releases
 - Keep upstream attribution section
 
 ### 6.3 CONTRIBUTING.md
+
 - Review for any Hermes-specific changes needed (repo URL, setup instructions)
 
 ---
@@ -252,10 +275,12 @@ Focus on items **1, 7, 8, 9, 10, 11, 15** — these affect desktop and Android u
 ## Phase 7: Release Preparation
 
 ### 7.1 Final version bump
+
 - All version numbers set to `0.1.0` (Phase 1)
 - Release notes populated (Phase 6)
 
 ### 7.2 Pre-release checklist
+
 - [ ] All tests pass (`pnpm test -- --watch=false && pnpm test:browser`)
 - [ ] Lint clean (`pnpm lint`)
 - [ ] Format clean (`pnpm format:check`)
@@ -269,11 +294,13 @@ Focus on items **1, 7, 8, 9, 10, 11, 15** — these affect desktop and Android u
 - [ ] Full feature slate complete; if not, delay 0.1.0 instead of cutting scope silently
 
 ### 7.3 Merge strategy
+
 - Squash-merge `codex` → `main` or create a PR from `codex` → `main`
 - Tag `v0.1.0` on main
 - Push tag to trigger release workflow
 
 ### 7.4 Clean up stale branches
+
 - Delete `backup/*` branches (already merged into `codex`)
 - Delete `feat` branch (tracks `origin/main`, unused)
 
@@ -327,42 +354,42 @@ Recommended rhythm for the implementation session: change → run the narrowest 
 
 ## Key Files to Modify
 
-| File | Phase | Changes |
-|------|-------|---------|
-| `apps/readest-app/package.json` | 1, 3 | Version bump to 0.1.0; likely add `wanakana` if chosen for jaPlugin |
-| `apps/readest-app/src-tauri/Cargo.toml` | 1, 2 | Version + metadata |
-| `apps/readest-app/src/services/constants.ts` | 2, 3 | User-agent, URLs, CLOUD_ENABLED flag, feature defaults if needed |
-| `apps/readest-app/src/app/library/components/SettingsMenu.tsx` | 2 | Gate cloud UI on CLOUD_ENABLED |
-| `apps/readest-app/src/components/settings/AITranslatePanel.tsx` | 2 | Fix DeepL account message |
-| `apps/readest-app/src/services/contextTranslation/types.ts` | 3 | Extend `VocabularyEntry` and related lookup/history types |
-| `apps/readest-app/src/services/contextTranslation/vocabularyService.ts` | 3 | SM-2 scheduling helpers, review queue queries, history helpers, export support |
-| `apps/readest-app/src/services/ai/storage/aiStore.ts` | 3 | DB version bump, `dueAt` index, lookup history store/indexes |
-| `apps/readest-app/src/store/notebookStore.ts` | 3 | Add `review` tab state |
-| `apps/readest-app/src/app/reader/components/notebook/Notebook.tsx` | 3 | Render review queue and updated vocabulary/history UI |
-| `apps/readest-app/src/app/reader/components/notebook/VocabularyPanel.tsx` | 3 | Saved/history views, export affordances |
-| `apps/readest-app/src/services/contextTranslation/plugins/jaPlugin.ts` | 3 | Replace kana-only stub with proper phonetic enrichment |
-| `apps/readest-app/src/services/contextTranslation/plugins/types.ts` | 3 | Adjust plugin typing if furigana/readings need richer annotations |
-| `apps/readest-app/src/app/reader/components/notebook/AIAssistant.tsx` | 3 | Add `Recap so far` entry point |
-| `apps/readest-app/src/services/ai/prompts.ts` | 3 | Add recap-oriented system prompt variant if needed |
-| `apps/readest-app/src/store/readerStore.ts` | 3 | Reader lifecycle hooks for session tracking and focus mode state |
-| `apps/readest-app/src/types/book.ts` | 3 | Extend persisted types only if book-level analytics metadata is required |
-| `apps/readest-app/src/app/library/components/` | 3 | Add compact stats/streaks/goals UI to library view |
-| `apps/readest-app/src/app/reader/components/HeaderBar.tsx` | 3 | Respect focus mode chrome hiding |
-| `apps/readest-app/src/app/reader/components/footerbar/FooterBar.tsx` | 3 | Respect focus mode chrome hiding |
-| `apps/readest-app/src/app/reader/components/sidebar/SideBar.tsx` | 3 | Respect focus mode chrome hiding |
-| `apps/readest-app/src/hooks/useShortcuts.ts` | 3 | Add focus mode shortcut and preserve escape hatch |
-| `apps/readest-app/src/app/reader/components/annotator/ExportMarkdownDialog.tsx` | 3 | Add preset export templates |
-| `apps/readest-app/src/utils/note.ts` | 3 | Keep preset/template rendering coherent |
-| `apps/readest-app/public/locales/*/translation.json` (×32) | 2 | Remove stale keys |
-| `apps/readest-app/release-notes.json` | 1, 6 | Add 0.1.0 entry |
-| `SECURITY.md` | 2 | Rebrand to Hermes |
-| `data/metainfo/appdata.xml` | 2 | Update URLs |
-| `README.md` | 6 | Add Hermes description |
-| `.github/workflows/release.yml` | 5 | Remove ARM Linux targets |
-| `.github/workflows/pull-request.yml` | 5 | Add lint to Tauri job |
-| `src/__tests__/services/build/hermes-branding.test.ts` | 4 | Extend assertions |
-| `src/__tests__/services/build/workflow-alignment.test.ts` | 4 | Version assertions |
-| Feature-specific test files under `src/__tests__/` | 4 | Add behavioral coverage for SRS, history, recap, focus mode, stats, templates |
+| File                                                                            | Phase | Changes                                                                        |
+| ------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------ |
+| `apps/readest-app/package.json`                                                 | 1, 3  | Version bump to 0.1.0; likely add `wanakana` if chosen for jaPlugin            |
+| `apps/readest-app/src-tauri/Cargo.toml`                                         | 1, 2  | Version + metadata                                                             |
+| `apps/readest-app/src/services/constants.ts`                                    | 2, 3  | User-agent, URLs, CLOUD_ENABLED flag, feature defaults if needed               |
+| `apps/readest-app/src/app/library/components/SettingsMenu.tsx`                  | 2     | Gate cloud UI on CLOUD_ENABLED                                                 |
+| `apps/readest-app/src/components/settings/AITranslatePanel.tsx`                 | 2     | Fix DeepL account message                                                      |
+| `apps/readest-app/src/services/contextTranslation/types.ts`                     | 3     | Extend `VocabularyEntry` and related lookup/history types                      |
+| `apps/readest-app/src/services/contextTranslation/vocabularyService.ts`         | 3     | SM-2 scheduling helpers, review queue queries, history helpers, export support |
+| `apps/readest-app/src/services/ai/storage/aiStore.ts`                           | 3     | DB version bump, `dueAt` index, lookup history store/indexes                   |
+| `apps/readest-app/src/store/notebookStore.ts`                                   | 3     | Add `review` tab state                                                         |
+| `apps/readest-app/src/app/reader/components/notebook/Notebook.tsx`              | 3     | Render review queue and updated vocabulary/history UI                          |
+| `apps/readest-app/src/app/reader/components/notebook/VocabularyPanel.tsx`       | 3     | Saved/history views, export affordances                                        |
+| `apps/readest-app/src/services/contextTranslation/plugins/jaPlugin.ts`          | 3     | Replace kana-only stub with proper phonetic enrichment                         |
+| `apps/readest-app/src/services/contextTranslation/plugins/types.ts`             | 3     | Adjust plugin typing if furigana/readings need richer annotations              |
+| `apps/readest-app/src/app/reader/components/notebook/AIAssistant.tsx`           | 3     | Add `Recap so far` entry point                                                 |
+| `apps/readest-app/src/services/ai/prompts.ts`                                   | 3     | Add recap-oriented system prompt variant if needed                             |
+| `apps/readest-app/src/store/readerStore.ts`                                     | 3     | Reader lifecycle hooks for session tracking and focus mode state               |
+| `apps/readest-app/src/types/book.ts`                                            | 3     | Extend persisted types only if book-level analytics metadata is required       |
+| `apps/readest-app/src/app/library/components/`                                  | 3     | Add compact stats/streaks/goals UI to library view                             |
+| `apps/readest-app/src/app/reader/components/HeaderBar.tsx`                      | 3     | Respect focus mode chrome hiding                                               |
+| `apps/readest-app/src/app/reader/components/footerbar/FooterBar.tsx`            | 3     | Respect focus mode chrome hiding                                               |
+| `apps/readest-app/src/app/reader/components/sidebar/SideBar.tsx`                | 3     | Respect focus mode chrome hiding                                               |
+| `apps/readest-app/src/hooks/useShortcuts.ts`                                    | 3     | Add focus mode shortcut and preserve escape hatch                              |
+| `apps/readest-app/src/app/reader/components/annotator/ExportMarkdownDialog.tsx` | 3     | Add preset export templates                                                    |
+| `apps/readest-app/src/utils/note.ts`                                            | 3     | Keep preset/template rendering coherent                                        |
+| `apps/readest-app/public/locales/*/translation.json` (×32)                      | 2     | Remove stale keys                                                              |
+| `apps/readest-app/release-notes.json`                                           | 1, 6  | Add 0.1.0 entry                                                                |
+| `SECURITY.md`                                                                   | 2     | Rebrand to Hermes                                                              |
+| `data/metainfo/appdata.xml`                                                     | 2     | Update URLs                                                                    |
+| `README.md`                                                                     | 6     | Add Hermes description                                                         |
+| `.github/workflows/release.yml`                                                 | 5     | Remove ARM Linux targets                                                       |
+| `.github/workflows/pull-request.yml`                                            | 5     | Add lint to Tauri job                                                          |
+| `src/__tests__/services/build/hermes-branding.test.ts`                          | 4     | Extend assertions                                                              |
+| `src/__tests__/services/build/workflow-alignment.test.ts`                       | 4     | Version assertions                                                             |
+| Feature-specific test files under `src/__tests__/`                              | 4     | Add behavioral coverage for SRS, history, recap, focus mode, stats, templates  |
 
 ## Open Questions (to resolve during execution)
 
@@ -375,6 +402,7 @@ Recommended rhythm for the implementation session: change → run the narrowest 
 ## Verification
 
 After all phases complete:
+
 ```bash
 # Existing suites
 pnpm test -- --watch=false

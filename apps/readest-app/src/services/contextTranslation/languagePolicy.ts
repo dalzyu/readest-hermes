@@ -30,10 +30,7 @@ export function resolvePluginLanguage(locale: string): string[] {
  * strong prior for short or ambiguous text where statistical detection
  * is unreliable.
  */
-export function detectLookupLanguage(
-  text: string,
-  bookLanguage?: string,
-): DetectedLanguageInfo {
+export function detectLookupLanguage(text: string, bookLanguage?: string): DetectedLanguageInfo {
   const hasCJK = isCJKStr(text);
   const hasLatin = /[a-zA-Z]{2,}/.test(text);
   const mixed = hasCJK && hasLatin;

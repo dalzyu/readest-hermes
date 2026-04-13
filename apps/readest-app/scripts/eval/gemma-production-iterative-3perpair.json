@@ -52,20 +52,11 @@
     "gemma-4-E4B-it-Q4_K_M",
     "ggml-org/embeddinggemma-300M-GGUF:Q8_0"
   ],
-  "requestedModels": [
-    "gemma-4-E2B-it-Q4_K_M",
-    "gemma-4-E4B-it-Q4_K_M"
-  ],
+  "requestedModels": ["gemma-4-E2B-it-Q4_K_M", "gemma-4-E4B-it-Q4_K_M"],
   "flow": "production",
-  "excludedModels": [
-    "gemma-4-26B-A4B-it-MXFP4_MOE",
-    "ggml-org/embeddinggemma-300M-GGUF:Q8_0"
-  ],
+  "excludedModels": ["gemma-4-26B-A4B-it-MXFP4_MOE", "ggml-org/embeddinggemma-300M-GGUF:Q8_0"],
   "missingRequestedModels": [],
-  "models": [
-    "gemma-4-E2B-it-Q4_K_M",
-    "gemma-4-E4B-it-Q4_K_M"
-  ],
+  "models": ["gemma-4-E2B-it-Q4_K_M", "gemma-4-E4B-it-Q4_K_M"],
   "summaries": {
     "gemma-4-E2B-it-Q4_K_M": {
       "total": 108,

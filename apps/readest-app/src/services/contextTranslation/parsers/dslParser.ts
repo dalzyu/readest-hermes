@@ -62,16 +62,18 @@ export function parseDSL(content: string): DictionaryEntry[] {
  * Strip DSL markup tags, leaving plain text.
  */
 function stripDSLMarkup(text: string): string {
-  return text
-    // Remove tag pairs like [b]...[/b], [i]...[/i], [c]...[/c], etc.
-    .replace(/\[(\/?)(?:b|i|u|c|sup|sub|ex|com|trn|!trs|\*|m\d?|s|url|ref|p)\b[^\]]*\]/g, '')
-    // Remove media references [s]file.wav[/s]
-    .replace(/\[s\][^\[]*\[\/s\]/g, '')
-    // Remove remaining bracket tags that may not be covered above
-    .replace(/\[[^\]]{1,20}\]/g, '')
-    // Clean up excessive whitespace
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return (
+    text
+      // Remove tag pairs like [b]...[/b], [i]...[/i], [c]...[/c], etc.
+      .replace(/\[(\/?)(?:b|i|u|c|sup|sub|ex|com|trn|!trs|\*|m\d?|s|url|ref|p)\b[^\]]*\]/g, '')
+      // Remove media references [s]file.wav[/s]
+      .replace(/\[s\][^\[]*\[\/s\]/g, '')
+      // Remove remaining bracket tags that may not be covered above
+      .replace(/\[[^\]]{1,20}\]/g, '')
+      // Clean up excessive whitespace
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  );
 }
 
 /**
@@ -80,7 +82,7 @@ function stripDSLMarkup(text: string): string {
  */
 export function isDSLFile(buffer: Uint8Array): boolean {
   // UTF-16LE BOM: 0xFF 0xFE
-  if (buffer[0] === 0xFF && buffer[1] === 0xFE) return true;
+  if (buffer[0] === 0xff && buffer[1] === 0xfe) return true;
 
   // Try decoding first 200 bytes as UTF-8 and check for DSL header
   try {
@@ -97,11 +99,11 @@ export function isDSLFile(buffer: Uint8Array): boolean {
  */
 export function decodeDSLBuffer(buffer: Uint8Array): string {
   // UTF-16LE BOM
-  if (buffer[0] === 0xFF && buffer[1] === 0xFE) {
+  if (buffer[0] === 0xff && buffer[1] === 0xfe) {
     return new TextDecoder('utf-16le').decode(buffer);
   }
   // UTF-8 BOM
-  if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+  if (buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
     return new TextDecoder('utf-8').decode(buffer.slice(3));
   }
   return new TextDecoder('utf-8').decode(buffer);

@@ -255,7 +255,9 @@ describe('translateWithContext', () => {
       )
       .mockResolvedValueOnce('Thinking Process:\n1. Analyze the Request.\najeno')
       .mockResolvedValueOnce('ajeno')
-      .mockResolvedValueOnce('The user wants me to explain the nuance.\nEl lugar se siente ajeno a la memoria de la protagonista.')
+      .mockResolvedValueOnce(
+        'The user wants me to explain the nuance.\nEl lugar se siente ajeno a la memoria de la protagonista.',
+      )
       .mockResolvedValueOnce('El lugar se siente ajeno a la memoria de la protagonista.')
       .mockResolvedValueOnce('La casa le parecia ajena a todo recuerdo.');
 

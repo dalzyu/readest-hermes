@@ -1,14 +1,10 @@
 import { performance } from 'node:perf_hooks';
-import {
-  DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
-} from '../../src/services/contextTranslation/defaults';
+import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '../../src/services/contextTranslation/defaults';
 import {
   buildPerFieldPrompt,
   buildTranslationPrompt,
 } from '../../src/services/contextTranslation/promptBuilder';
-import {
-  parseTranslationResponse,
-} from '../../src/services/contextTranslation/responseParser';
+import { parseTranslationResponse } from '../../src/services/contextTranslation/responseParser';
 import {
   sanitizeFieldContent,
   sanitizeTranslationResult,
@@ -38,10 +34,13 @@ export function responseLooksContaminated(response: string): boolean {
 }
 
 export function parsedFieldsLookContaminated(fields: Record<string, string>): boolean {
-  return Object.values(fields).some((value) =>
-    responseLooksContaminated(value) ||
-    /^\s*\*/m.test(value) ||
-    /Selected word:|Source Text:|Contextual Setup:|Narrative:|Original field request/i.test(value),
+  return Object.values(fields).some(
+    (value) =>
+      responseLooksContaminated(value) ||
+      /^\s*\*/m.test(value) ||
+      /Selected word:|Source Text:|Contextual Setup:|Narrative:|Original field request/i.test(
+        value,
+      ),
   );
 }
 
@@ -59,8 +58,7 @@ Rewrite the answer now with ONLY these tags and in this exact order:
 ${template}
 Do not include reasoning, markdown, or any extra text.
 Do not write phrases like "Thinking Process", "The user wants me", "Analyze the Request", steps, plans, or self-referential analysis inside any tag.`,
-    userPrompt:
-      `Retry the same request exactly and return only valid XML tags in the required order.\n\nOriginal request:\n${originalUserPrompt}`,
+    userPrompt: `Retry the same request exactly and return only valid XML tags in the required order.\n\nOriginal request:\n${originalUserPrompt}`,
   };
 }
 
@@ -154,7 +152,11 @@ export async function runProductionPromptEval(
       );
       let contaminated = responseLooksContaminated(initial.text);
 
-      if (contaminated || !hasUsablePrimaryField(parsedFields) || completionRatio(parsedFields) < 0.5) {
+      if (
+        contaminated ||
+        !hasUsablePrimaryField(parsedFields) ||
+        completionRatio(parsedFields) < 0.5
+      ) {
         attemptCount += 1;
         const repair = buildTranslationRepairPrompt(
           systemPrompt,
@@ -176,7 +178,11 @@ export async function runProductionPromptEval(
         const stitched: Record<string, string> = {};
         for (const field of request.outputFields.filter((item) => item.enabled)) {
           const perField = buildPerFieldPrompt(field, request);
-          let fieldResponse = await callModel(perField.systemPrompt, perField.userPrompt, `field:${field.id}`);
+          let fieldResponse = await callModel(
+            perField.systemPrompt,
+            perField.userPrompt,
+            `field:${field.id}`,
+          );
           rawSegments.push(fieldResponse.text);
           attemptCount += 1;
 

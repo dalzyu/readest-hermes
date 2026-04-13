@@ -132,9 +132,7 @@ export function useContextLookup({
       try {
         // Optionally expand selection to word boundaries
         const autoExpand = requestSnapshot.settings.autoExpandSelection !== false;
-        const lookupText = autoExpand
-          ? expandToWordBoundary(selectedText, '')
-          : selectedText;
+        const lookupText = autoExpand ? expandToWordBoundary(selectedText, '') : selectedText;
         if (lookupText !== selectedText) {
           setExpandedText(lookupText);
         }
@@ -203,11 +201,15 @@ export function useContextLookup({
           return;
         }
 
-        const taskType = mode === 'translation' ? 'translation' as const : 'dictionary' as const;
+        const taskType =
+          mode === 'translation' ? ('translation' as const) : ('dictionary' as const);
         let provider: ReturnType<typeof getProviderForTask>['provider'];
         let inferenceParams: ReturnType<typeof getProviderForTask>['inferenceParams'];
         try {
-          ({ provider, inferenceParams } = getProviderForTask(requestSnapshot.aiSettings, taskType));
+          ({ provider, inferenceParams } = getProviderForTask(
+            requestSnapshot.aiSettings,
+            taskType,
+          ));
         } catch {
           // No AI provider configured — fall back to dictionary-only results
           if (cancelled) return;

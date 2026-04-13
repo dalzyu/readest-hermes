@@ -111,10 +111,7 @@ const PAIR_HINTS: Record<PairKey, LanguagePairHint> = {
  * Look up prompt hints for a language pair.
  * Returns hints in order of specificity: exact pair -> source wildcard -> target wildcard.
  */
-export function getLanguagePairHints(
-  sourceLanguage: string,
-  targetLanguage: string,
-): string {
+export function getLanguagePairHints(sourceLanguage: string, targetLanguage: string): string {
   const hints: string[] = [];
 
   const exactKey = `${sourceLanguage}->${targetLanguage}` as PairKey;

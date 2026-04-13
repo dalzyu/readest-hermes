@@ -242,7 +242,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
       {chromeSuppressed && (
         <button
           onClick={exitFocusMode}
-          className='fixed left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-base-300/70 px-3 py-1 text-xs text-base-content/60 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100'
+          className='bg-base-300/70 text-base-content/60 fixed left-1/2 top-2 z-50 -translate-x-1/2 rounded-full px-3 py-1 text-xs opacity-0 transition-opacity hover:opacity-100 focus:opacity-100'
           title={_('Exit focus mode (Esc)')}
         >
           {_('Exit focus mode')}

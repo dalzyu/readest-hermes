@@ -105,8 +105,7 @@ function emptyConfig(providerType: AIProviderType): ProviderConfig {
           : '',
     model: providerType === 'ollama' ? 'llama3.2' : '',
     embeddingModel: providerType === 'ollama' ? 'nomic-embed-text' : undefined,
-    embeddingBaseUrl:
-      providerType === 'openai-compatible' ? 'http://127.0.0.1:8081' : undefined,
+    embeddingBaseUrl: providerType === 'openai-compatible' ? 'http://127.0.0.1:8081' : undefined,
     apiStyle: HAS_API_STYLE.has(providerType) ? 'chat-completions' : undefined,
   };
 }
@@ -375,7 +374,9 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
         {!HAS_EMBEDDING.has(config.providerType) && (
           <div className='config-item'>
             <span className='text-warning text-xs'>
-              {_('This provider does not support embeddings. RAG requires a separate embedding provider.')}
+              {_(
+                'This provider does not support embeddings. RAG requires a separate embedding provider.',
+              )}
             </span>
           </div>
         )}
@@ -588,7 +589,7 @@ const AIPanel: React.FC = () => {
                       onChange={() => setActiveProviderId(p.id)}
                     />
                     <div>
-                      <div className='font-medium text-sm'>{p.name}</div>
+                      <div className='text-sm font-medium'>{p.name}</div>
                       <div className='text-base-content/50 text-xs'>
                         {PROVIDER_TYPE_LABELS[p.providerType] ?? p.providerType} &middot;{' '}
                         {p.model || _('No model')}

@@ -4,9 +4,7 @@
   "fixturePath": "C:\\repos\\context aware translate\\readest\\.worktrees\\context-translation-harness-loop\\apps\\readest-app\\src\\services\\contextTranslation\\fixtures\\handwrittenLong30x50Fixtures.json",
   "sampledFixtureCount": 300,
   "sampledPerPair": 10,
-  "models": [
-    "Qwen3.5-0.8B-UD-Q6_K_XL"
-  ],
+  "models": ["Qwen3.5-0.8B-UD-Q6_K_XL"],
   "summaries": {
     "Qwen3.5-0.8B-UD-Q6_K_XL": {
       "total": 300,

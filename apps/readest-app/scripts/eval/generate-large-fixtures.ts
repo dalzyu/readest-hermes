@@ -47,268 +47,1468 @@ const PAIRS: Pair[] = [
 ];
 
 const EN_SEEDS: Seed[] = [
-  { selectedText: 'resilience', context: 'I wrote this on the back of a grocery receipt while waiting for the rain to stop. Even after the roof leaked again and the landlord ignored my messages, Mara kept saying that resilience is a quiet habit, not a heroic speech. By midnight, we had moved every book to dry shelves and laughed at the absurdity of bailing water with a teapot.' },
-  { selectedText: 'hesitation', context: 'In my notebook from the train station, I underlined the word hesitation three times. I almost called my brother to cancel the trip, but the old couple beside me shared oranges and stories until my fear softened. When the train finally arrived, I stepped in with shaking hands and a strangely peaceful mind.' },
-  { selectedText: 'fragile', context: 'This entry was scribbled after I wrapped grandmother\'s teacups in newspaper. They looked fragile, but she insisted they survived two wars and one flood. Carrying the box down narrow stairs, I realized she was really talking about herself and about all of us pretending not to be tired.' },
-  { selectedText: 'murmur', context: 'I wrote by candlelight because the power failed again. From the hallway came a murmur of neighbors trading candles, batteries, and rumors about when the lights would return. The whole building sounded like a small village deciding, in whispers, how to endure one more inconvenient night.' },
-  { selectedText: 'restless', context: 'At 2 a.m. I could not sleep, so I folded laundry and listened to buses grinding past the window. The city felt restless, as if every apartment held someone quietly rehearsing a difficult conversation. I brewed weak tea and promised myself to answer the email I have avoided for a week.' },
-  { selectedText: 'linger', context: 'After the meeting ended, everyone rushed out except me and Hana. The smell of burnt coffee would not leave the room; it seemed to linger like all the things we never said about the budget cuts. We stacked chairs in silence and understood each other anyway.' },
-  { selectedText: 'resolve', context: 'I wrote this on page 43 with a pen that keeps blotting. The doctor said recovery will be slow, but my resolve hardened when I watched my daughter tie her own shoes for the first time since winter. Progress is boring and repetitive, yet somehow more beautiful than dramatic change.' },
-  { selectedText: 'awkward', context: 'Tonight\'s dinner with my cousin was awkward in the best way. We spent ten years pretending our argument never happened, then suddenly laughed over burnt dumplings and apologized between bites. The silence afterward was gentle, not cold, and that felt like a miracle.' },
-  { selectedText: 'drift', context: 'The lecture was excellent, but my mind began to drift when the professor mentioned retirement. I imagined my father finally planting tomatoes instead of spreadsheets, and I forgot to take notes for five full minutes. Maybe distraction is sometimes a form of longing.' },
-  { selectedText: 'stubborn', context: 'I am writing this with paint still on my fingers. The window frame looked hopeless, but my stubborn neighbor insisted we could repair it without replacing the whole thing. Four hours later, the frame is still crooked, but it opens again and lets in spring air.' },
-  { selectedText: 'faint', context: 'On the bus home I heard a faint melody from someone\'s headphones. It reminded me of the song mother hummed while slicing pears in autumn. By the time I reached my stop, I had decided to call her before making excuses about being too busy.' },
-  { selectedText: 'relief', context: 'I left the office with a folder of rejected drafts and expected to feel embarrassed. Instead, relief arrived the moment I crossed the bridge and felt cold wind on my face. Failing quickly is painful, but it also frees tomorrow from yesterday\'s pretense.' },
-  { selectedText: 'hesitant', context: 'I stood outside the studio door, hesitant and annoyed at myself. Inside, people were singing scales badly and laughing anyway, which made me brave enough to enter. Imperfect music was somehow kinder than my private perfectionism.' },
-  { selectedText: 'grateful', context: 'This note is for the woman in seat 12C who gave me her umbrella and disappeared before I could thank her properly. The storm was brutal, and my shoes were ruined, but I reached the interview dry enough to look prepared. Tonight I feel intensely grateful to a stranger I may never meet again.' },
-  { selectedText: 'distant', context: 'My sister sounded distant on the phone, answering in short sentences as if each word cost money. Later she texted a photo of hospital corridors and a sleeping child, and the distance made sense. Sometimes people are not cold; they are simply carrying too much.' },
-  { selectedText: 'steady', context: 'When the printer jammed for the fourth time, everyone panicked except Mei. Her voice stayed steady while she dismantled the tray with a butter knife and impossible patience. Leadership is often just calm attention when everyone else is escalating.' },
-  { selectedText: 'regret', context: 'I keep rewriting this line because regret has too many angles. I regret not attending the funeral, but I also regret pretending I was fine afterward. Tomorrow I will visit the cemetery with fresh lilies and no rehearsed speech.' },
-  { selectedText: 'curious', context: 'The new intern asked curious questions that made the team uncomfortable, mostly because we had no good answers. Why do we keep this useless report, and who actually reads it? By lunch we deleted three rituals and gained two hours of real work.' },
-  { selectedText: 'quietly', context: 'The announcement happened quietly, without a speech or dramatic email. One line in the weekly memo said the night shift would be reduced, and the whole warehouse changed overnight. Quiet decisions can carry the loudest consequences.' },
-  { selectedText: 'patient', context: 'I wrote this after helping Leo assemble a desk from confusing instructions. He was patient even when I inserted three screws in the wrong place and blamed the diagram. We finished at sunset, and the desk wobbles slightly, but our friendship feels sturdier.' },
-  { selectedText: 'melancholy', context: 'Rain tapped the balcony rail while I sorted old photographs into unlabeled envelopes. A mild melancholy settled in, not dramatic sadness, just the ache of seeing versions of ourselves we can no longer visit. I made tea and decided nostalgia should come with kindness, not judgment.' },
-  { selectedText: 'urgent', context: 'The message looked urgent, all caps and exclamation marks, but it was about a form due next month. I nearly skipped lunch to handle it immediately before realizing panic had been outsourced to typography. I ate soup, then solved it in twelve calm minutes.' },
-  { selectedText: 'hesitate', context: 'Do not hesitate, my mentor wrote in the margin of my proposal, then circled it twice. I laughed because I had spent three weeks polishing introductions and avoiding one necessary phone call. I made the call today; it lasted four minutes and solved the central problem.' },
-  { selectedText: 'tender', context: 'Grandfather\'s handwriting has become shaky, but his notes are still tender and precise. He wrote a recipe for lentil stew and added, in tiny letters, \"salt only after tasting.\" Even his instructions feel like care rather than control.' },
-  { selectedText: 'echo', context: 'The empty gym produced an echo that made every shoe squeak sound dramatic. We practiced the same drill for an hour until our timing finally matched, and the echo turned from chaos into rhythm. Repetition can be humiliating, then suddenly beautiful.' },
-  { selectedText: 'hesitancy', context: 'There was a hint of hesitancy in the committee\'s response, though they kept smiling for the camera. Their budget objections were polite but unmistakable, so we revised the plan before anyone could call it impossible. Diplomacy is often disagreement in formal clothing.' },
-  { selectedText: 'humble', context: 'The award ceremony was absurdly grand for a small neighborhood project. Priya gave a humble speech, thanked volunteers by name, and returned to stacking folding chairs before dessert. Real credibility appears when applause ends.' },
-  { selectedText: 'uncertain', context: 'I felt uncertain walking into the mediation room, but both parties looked more tired than angry. After two hours of plain language and fewer legal terms, they found a compromise nobody loved and everybody could accept. Peace is usually practical, not poetic.' },
-  { selectedText: 'persist', context: 'The software bug was ridiculous and appeared only on Tuesdays after updates. We would patch one symptom and another would persist, like weeds after rain. By evening we fixed the root cause and celebrated with vending-machine chocolate.' },
-  { selectedText: 'brittle', context: 'My voice sounded brittle during the call, too sharp for a conversation that deserved empathy. I apologized, restarted, and listened long enough to hear the fear beneath the complaints. Tone can injure before meaning arrives.' },
-  { selectedText: 'calm', context: 'I keep this page to remember that calm can be learned. During the outage, Ana listed priorities, delegated clearly, and refused to match anyone\'s panic. The system came back online at dawn, and nobody forgot who kept the room functional.' },
-  { selectedText: 'vivid', context: 'The dream was so vivid that I wrote it down before brushing my teeth. In it, our old apartment had sunlight in every room and none of the mold we fought for years. Memory edits reality, but the feeling still convinced me to repaint the hallway.' },
-  { selectedText: 'hesitant smile', context: 'She gave a hesitant smile when I mentioned returning to school at thirty-nine. Then she admitted she had postponed the same decision for a decade. We filled out our applications together at the kitchen table, correcting each other\'s typos.' },
-  { selectedText: 'gentle', context: 'The nurse used a gentle tone when explaining the new medication schedule. My father, who usually resists instructions, nodded and repeated each step in his own words. Respect often succeeds where authority fails.' },
-  { selectedText: 'friction', context: 'Team meetings had constant friction because nobody owned final decisions. We changed one rule: the meeting organizer must summarize and decide before leaving the room. The next week felt strangely lighter, as if someone had oiled a locked hinge.' },
-  { selectedText: 'clarity', context: 'I sought clarity by making a list of fears and a separate list of facts. The fear list was long and dramatic; the facts list fit on half a page. Decisions become manageable when imagination stops impersonating evidence.' },
-  { selectedText: 'quiet triumph', context: 'Today was a quiet triumph: no ceremony, no social media post, just one successful prototype after six failed versions. We ate convenience-store sandwiches on the workshop floor and stared at the moving gears like proud children. Not every victory needs an audience.' },
-  { selectedText: 'hesitate no longer', context: 'My own note to self said hesitate no longer, so I finally sent the manuscript to the editor. Ten minutes later I wanted to withdraw it, but the file was already delivered. Courage sometimes looks exactly like impatience with your own fear.' },
-  { selectedText: 'compassion', context: 'When the cashier made a counting mistake, the customer behind me showed rare compassion and helped quietly instead of complaining. The line moved slower, but everyone relaxed. Small mercies can alter the temperature of a whole room.' },
-  { selectedText: 'restraint', context: 'I practiced restraint during the debate by taking notes instead of interrupting. By the time I spoke, my argument was shorter and stronger, and nobody could accuse me of reacting emotionally. Discipline is often invisible labor before public moments.' },
-  { selectedText: 'weathered', context: 'His jacket looked weathered, the elbows nearly transparent from years of use. Yet he carried himself with such dignity that nobody noticed until he joked about sewing patches with dental floss. Style is less about cost than about posture.' },
-  { selectedText: 'improvise', context: 'The keynote projector died minutes before the event, so we had to improvise with printed diagrams and a whiteboard. The audience asked better questions than usual because they were following ideas instead of slides. Failure removed the performance and revealed the point.' },
-  { selectedText: 'unfold', context: 'I watched the conflict unfold in slow motion over three emails and one misplaced joke. By the fourth message, people were defending principles that had nothing to do with the original issue. We resolved it with a ten-minute phone call that should have happened first.' },
-  { selectedText: 'unspoken', context: 'There was an unspoken agreement at dinner not to mention the inheritance dispute. We discussed weather, recipes, and train schedules while tension sat between the plates. Sometimes silence protects peace; sometimes it only postpones the bill.' },
-  { selectedText: 'reconcile', context: 'After months of stubborn distance, we met to reconcile in a noisy bakery at seven in the morning. The background clatter made honesty easier because no sentence felt theatrical. By the second coffee, blame had turned into practical plans.' },
-  { selectedText: 'inclined', context: 'I am inclined to overthink every ordinary decision, from buying lightbulbs to choosing project names. This week I tried a new rule: decide in ten minutes unless the decision is irreversible. My stress level dropped before lunch.' },
-  { selectedText: 'sincere', context: 'Her apology was sincere, specific, and free of excuses, which is rarer than people admit. She named the harm, offered repair, and accepted that trust would take time. Accountability can be painful and still deeply relieving.' },
-  { selectedText: 'withstand', context: 'We designed the shelter to withstand winter winds, but nobody predicted how hard loneliness would hit the volunteers. We added shared dinners and rotating check-ins, and attendance improved immediately. Structures need social support as much as steel bolts.' },
-  { selectedText: 'hesitant peace', context: 'By evening, the office reached a hesitant peace: no one fully satisfied, everyone too tired to continue fighting. We wrote down unresolved items and agreed to revisit them with fresh data tomorrow. Temporary peace is still peace.' },
-  { selectedText: 'renewal', context: 'I began this page to mark renewal, not reinvention. The apartment is still small, my salary is still modest, and my worries still show up at dawn, but the curtains are open and the plants are alive. Progress can be ordinary and still profound.' },
+  {
+    selectedText: 'resilience',
+    context:
+      'I wrote this on the back of a grocery receipt while waiting for the rain to stop. Even after the roof leaked again and the landlord ignored my messages, Mara kept saying that resilience is a quiet habit, not a heroic speech. By midnight, we had moved every book to dry shelves and laughed at the absurdity of bailing water with a teapot.',
+  },
+  {
+    selectedText: 'hesitation',
+    context:
+      'In my notebook from the train station, I underlined the word hesitation three times. I almost called my brother to cancel the trip, but the old couple beside me shared oranges and stories until my fear softened. When the train finally arrived, I stepped in with shaking hands and a strangely peaceful mind.',
+  },
+  {
+    selectedText: 'fragile',
+    context:
+      "This entry was scribbled after I wrapped grandmother's teacups in newspaper. They looked fragile, but she insisted they survived two wars and one flood. Carrying the box down narrow stairs, I realized she was really talking about herself and about all of us pretending not to be tired.",
+  },
+  {
+    selectedText: 'murmur',
+    context:
+      'I wrote by candlelight because the power failed again. From the hallway came a murmur of neighbors trading candles, batteries, and rumors about when the lights would return. The whole building sounded like a small village deciding, in whispers, how to endure one more inconvenient night.',
+  },
+  {
+    selectedText: 'restless',
+    context:
+      'At 2 a.m. I could not sleep, so I folded laundry and listened to buses grinding past the window. The city felt restless, as if every apartment held someone quietly rehearsing a difficult conversation. I brewed weak tea and promised myself to answer the email I have avoided for a week.',
+  },
+  {
+    selectedText: 'linger',
+    context:
+      'After the meeting ended, everyone rushed out except me and Hana. The smell of burnt coffee would not leave the room; it seemed to linger like all the things we never said about the budget cuts. We stacked chairs in silence and understood each other anyway.',
+  },
+  {
+    selectedText: 'resolve',
+    context:
+      'I wrote this on page 43 with a pen that keeps blotting. The doctor said recovery will be slow, but my resolve hardened when I watched my daughter tie her own shoes for the first time since winter. Progress is boring and repetitive, yet somehow more beautiful than dramatic change.',
+  },
+  {
+    selectedText: 'awkward',
+    context:
+      "Tonight's dinner with my cousin was awkward in the best way. We spent ten years pretending our argument never happened, then suddenly laughed over burnt dumplings and apologized between bites. The silence afterward was gentle, not cold, and that felt like a miracle.",
+  },
+  {
+    selectedText: 'drift',
+    context:
+      'The lecture was excellent, but my mind began to drift when the professor mentioned retirement. I imagined my father finally planting tomatoes instead of spreadsheets, and I forgot to take notes for five full minutes. Maybe distraction is sometimes a form of longing.',
+  },
+  {
+    selectedText: 'stubborn',
+    context:
+      'I am writing this with paint still on my fingers. The window frame looked hopeless, but my stubborn neighbor insisted we could repair it without replacing the whole thing. Four hours later, the frame is still crooked, but it opens again and lets in spring air.',
+  },
+  {
+    selectedText: 'faint',
+    context:
+      "On the bus home I heard a faint melody from someone's headphones. It reminded me of the song mother hummed while slicing pears in autumn. By the time I reached my stop, I had decided to call her before making excuses about being too busy.",
+  },
+  {
+    selectedText: 'relief',
+    context:
+      "I left the office with a folder of rejected drafts and expected to feel embarrassed. Instead, relief arrived the moment I crossed the bridge and felt cold wind on my face. Failing quickly is painful, but it also frees tomorrow from yesterday's pretense.",
+  },
+  {
+    selectedText: 'hesitant',
+    context:
+      'I stood outside the studio door, hesitant and annoyed at myself. Inside, people were singing scales badly and laughing anyway, which made me brave enough to enter. Imperfect music was somehow kinder than my private perfectionism.',
+  },
+  {
+    selectedText: 'grateful',
+    context:
+      'This note is for the woman in seat 12C who gave me her umbrella and disappeared before I could thank her properly. The storm was brutal, and my shoes were ruined, but I reached the interview dry enough to look prepared. Tonight I feel intensely grateful to a stranger I may never meet again.',
+  },
+  {
+    selectedText: 'distant',
+    context:
+      'My sister sounded distant on the phone, answering in short sentences as if each word cost money. Later she texted a photo of hospital corridors and a sleeping child, and the distance made sense. Sometimes people are not cold; they are simply carrying too much.',
+  },
+  {
+    selectedText: 'steady',
+    context:
+      'When the printer jammed for the fourth time, everyone panicked except Mei. Her voice stayed steady while she dismantled the tray with a butter knife and impossible patience. Leadership is often just calm attention when everyone else is escalating.',
+  },
+  {
+    selectedText: 'regret',
+    context:
+      'I keep rewriting this line because regret has too many angles. I regret not attending the funeral, but I also regret pretending I was fine afterward. Tomorrow I will visit the cemetery with fresh lilies and no rehearsed speech.',
+  },
+  {
+    selectedText: 'curious',
+    context:
+      'The new intern asked curious questions that made the team uncomfortable, mostly because we had no good answers. Why do we keep this useless report, and who actually reads it? By lunch we deleted three rituals and gained two hours of real work.',
+  },
+  {
+    selectedText: 'quietly',
+    context:
+      'The announcement happened quietly, without a speech or dramatic email. One line in the weekly memo said the night shift would be reduced, and the whole warehouse changed overnight. Quiet decisions can carry the loudest consequences.',
+  },
+  {
+    selectedText: 'patient',
+    context:
+      'I wrote this after helping Leo assemble a desk from confusing instructions. He was patient even when I inserted three screws in the wrong place and blamed the diagram. We finished at sunset, and the desk wobbles slightly, but our friendship feels sturdier.',
+  },
+  {
+    selectedText: 'melancholy',
+    context:
+      'Rain tapped the balcony rail while I sorted old photographs into unlabeled envelopes. A mild melancholy settled in, not dramatic sadness, just the ache of seeing versions of ourselves we can no longer visit. I made tea and decided nostalgia should come with kindness, not judgment.',
+  },
+  {
+    selectedText: 'urgent',
+    context:
+      'The message looked urgent, all caps and exclamation marks, but it was about a form due next month. I nearly skipped lunch to handle it immediately before realizing panic had been outsourced to typography. I ate soup, then solved it in twelve calm minutes.',
+  },
+  {
+    selectedText: 'hesitate',
+    context:
+      'Do not hesitate, my mentor wrote in the margin of my proposal, then circled it twice. I laughed because I had spent three weeks polishing introductions and avoiding one necessary phone call. I made the call today; it lasted four minutes and solved the central problem.',
+  },
+  {
+    selectedText: 'tender',
+    context:
+      'Grandfather\'s handwriting has become shaky, but his notes are still tender and precise. He wrote a recipe for lentil stew and added, in tiny letters, \"salt only after tasting.\" Even his instructions feel like care rather than control.',
+  },
+  {
+    selectedText: 'echo',
+    context:
+      'The empty gym produced an echo that made every shoe squeak sound dramatic. We practiced the same drill for an hour until our timing finally matched, and the echo turned from chaos into rhythm. Repetition can be humiliating, then suddenly beautiful.',
+  },
+  {
+    selectedText: 'hesitancy',
+    context:
+      "There was a hint of hesitancy in the committee's response, though they kept smiling for the camera. Their budget objections were polite but unmistakable, so we revised the plan before anyone could call it impossible. Diplomacy is often disagreement in formal clothing.",
+  },
+  {
+    selectedText: 'humble',
+    context:
+      'The award ceremony was absurdly grand for a small neighborhood project. Priya gave a humble speech, thanked volunteers by name, and returned to stacking folding chairs before dessert. Real credibility appears when applause ends.',
+  },
+  {
+    selectedText: 'uncertain',
+    context:
+      'I felt uncertain walking into the mediation room, but both parties looked more tired than angry. After two hours of plain language and fewer legal terms, they found a compromise nobody loved and everybody could accept. Peace is usually practical, not poetic.',
+  },
+  {
+    selectedText: 'persist',
+    context:
+      'The software bug was ridiculous and appeared only on Tuesdays after updates. We would patch one symptom and another would persist, like weeds after rain. By evening we fixed the root cause and celebrated with vending-machine chocolate.',
+  },
+  {
+    selectedText: 'brittle',
+    context:
+      'My voice sounded brittle during the call, too sharp for a conversation that deserved empathy. I apologized, restarted, and listened long enough to hear the fear beneath the complaints. Tone can injure before meaning arrives.',
+  },
+  {
+    selectedText: 'calm',
+    context:
+      "I keep this page to remember that calm can be learned. During the outage, Ana listed priorities, delegated clearly, and refused to match anyone's panic. The system came back online at dawn, and nobody forgot who kept the room functional.",
+  },
+  {
+    selectedText: 'vivid',
+    context:
+      'The dream was so vivid that I wrote it down before brushing my teeth. In it, our old apartment had sunlight in every room and none of the mold we fought for years. Memory edits reality, but the feeling still convinced me to repaint the hallway.',
+  },
+  {
+    selectedText: 'hesitant smile',
+    context:
+      "She gave a hesitant smile when I mentioned returning to school at thirty-nine. Then she admitted she had postponed the same decision for a decade. We filled out our applications together at the kitchen table, correcting each other's typos.",
+  },
+  {
+    selectedText: 'gentle',
+    context:
+      'The nurse used a gentle tone when explaining the new medication schedule. My father, who usually resists instructions, nodded and repeated each step in his own words. Respect often succeeds where authority fails.',
+  },
+  {
+    selectedText: 'friction',
+    context:
+      'Team meetings had constant friction because nobody owned final decisions. We changed one rule: the meeting organizer must summarize and decide before leaving the room. The next week felt strangely lighter, as if someone had oiled a locked hinge.',
+  },
+  {
+    selectedText: 'clarity',
+    context:
+      'I sought clarity by making a list of fears and a separate list of facts. The fear list was long and dramatic; the facts list fit on half a page. Decisions become manageable when imagination stops impersonating evidence.',
+  },
+  {
+    selectedText: 'quiet triumph',
+    context:
+      'Today was a quiet triumph: no ceremony, no social media post, just one successful prototype after six failed versions. We ate convenience-store sandwiches on the workshop floor and stared at the moving gears like proud children. Not every victory needs an audience.',
+  },
+  {
+    selectedText: 'hesitate no longer',
+    context:
+      'My own note to self said hesitate no longer, so I finally sent the manuscript to the editor. Ten minutes later I wanted to withdraw it, but the file was already delivered. Courage sometimes looks exactly like impatience with your own fear.',
+  },
+  {
+    selectedText: 'compassion',
+    context:
+      'When the cashier made a counting mistake, the customer behind me showed rare compassion and helped quietly instead of complaining. The line moved slower, but everyone relaxed. Small mercies can alter the temperature of a whole room.',
+  },
+  {
+    selectedText: 'restraint',
+    context:
+      'I practiced restraint during the debate by taking notes instead of interrupting. By the time I spoke, my argument was shorter and stronger, and nobody could accuse me of reacting emotionally. Discipline is often invisible labor before public moments.',
+  },
+  {
+    selectedText: 'weathered',
+    context:
+      'His jacket looked weathered, the elbows nearly transparent from years of use. Yet he carried himself with such dignity that nobody noticed until he joked about sewing patches with dental floss. Style is less about cost than about posture.',
+  },
+  {
+    selectedText: 'improvise',
+    context:
+      'The keynote projector died minutes before the event, so we had to improvise with printed diagrams and a whiteboard. The audience asked better questions than usual because they were following ideas instead of slides. Failure removed the performance and revealed the point.',
+  },
+  {
+    selectedText: 'unfold',
+    context:
+      'I watched the conflict unfold in slow motion over three emails and one misplaced joke. By the fourth message, people were defending principles that had nothing to do with the original issue. We resolved it with a ten-minute phone call that should have happened first.',
+  },
+  {
+    selectedText: 'unspoken',
+    context:
+      'There was an unspoken agreement at dinner not to mention the inheritance dispute. We discussed weather, recipes, and train schedules while tension sat between the plates. Sometimes silence protects peace; sometimes it only postpones the bill.',
+  },
+  {
+    selectedText: 'reconcile',
+    context:
+      'After months of stubborn distance, we met to reconcile in a noisy bakery at seven in the morning. The background clatter made honesty easier because no sentence felt theatrical. By the second coffee, blame had turned into practical plans.',
+  },
+  {
+    selectedText: 'inclined',
+    context:
+      'I am inclined to overthink every ordinary decision, from buying lightbulbs to choosing project names. This week I tried a new rule: decide in ten minutes unless the decision is irreversible. My stress level dropped before lunch.',
+  },
+  {
+    selectedText: 'sincere',
+    context:
+      'Her apology was sincere, specific, and free of excuses, which is rarer than people admit. She named the harm, offered repair, and accepted that trust would take time. Accountability can be painful and still deeply relieving.',
+  },
+  {
+    selectedText: 'withstand',
+    context:
+      'We designed the shelter to withstand winter winds, but nobody predicted how hard loneliness would hit the volunteers. We added shared dinners and rotating check-ins, and attendance improved immediately. Structures need social support as much as steel bolts.',
+  },
+  {
+    selectedText: 'hesitant peace',
+    context:
+      'By evening, the office reached a hesitant peace: no one fully satisfied, everyone too tired to continue fighting. We wrote down unresolved items and agreed to revisit them with fresh data tomorrow. Temporary peace is still peace.',
+  },
+  {
+    selectedText: 'renewal',
+    context:
+      'I began this page to mark renewal, not reinvention. The apartment is still small, my salary is still modest, and my worries still show up at dawn, but the curtains are open and the plants are alive. Progress can be ordinary and still profound.',
+  },
 ];
 
 const ES_SEEDS: Seed[] = [
-  { selectedText: 'embarazada', expectedEn: 'pregnant', context: 'Anote esto en el margen de una carta familiar: mi hermana esta embarazada y lleva semanas escogiendo nombres imposibles. En casa hablamos bajito para no despertar al bebe de mi prima, pero la emocion se nota en cada taza de te que dejamos enfriar.' },
-  { selectedText: 'añorar', expectedEn: 'to miss', context: 'Escribi en el cuaderno del trabajo que empece a añorar el olor del pan de mi barrio cuando salgo tarde de la oficina. La ciudad nueva me trata bien, pero hay noches en que el acento ajeno pesa como una mochila mojada.' },
-  { selectedText: 'desvelo', expectedEn: 'sleeplessness', context: 'Este desvelo no viene solo por cafe, sino por la lista de pendientes que me mira desde la mesa. A las tres de la madrugada ordene facturas, regue las plantas y prometi apagar el telefono antes de dormir.' },
-  { selectedText: 'templanza', expectedEn: 'self-control', context: 'Mi abuelo repetia que la templanza vale mas que el talento cuando los problemas se apilan. Hoy lo entendi durante la reunion, cuando todos levantaban la voz y una sola persona siguio haciendo preguntas utiles.' },
-  { selectedText: 'apuro', expectedEn: 'rush', context: 'Sali con apuro y olvide las llaves, asi que tuve que esperar en la escalera con las bolsas del mercado. Una vecina me invito cafe y terminamos hablando de como el cansancio nos vuelve torpes y tambien mas humanos.' },
-  { selectedText: 'cariño', expectedEn: 'affection', context: 'En esta nota quiero dejar constancia del cariño discreto de mi tia, que siempre pregunta si comi antes de opinar sobre cualquier otra cosa. Su forma de cuidar no hace ruido, pero sostiene la casa entera.' },
-  { selectedText: 'sobrio', expectedEn: 'restrained', context: 'Necesitaba un tono sobrio para el informe, porque los datos eran delicados y no querian drama. Borre adjetivos grandilocuentes y, por primera vez en semanas, el texto quedo claro y util.' },
-  { selectedText: 'desahogo', expectedEn: 'venting', context: 'Este parrafo fue un desahogo despues de una llamada dificil con recursos humanos. Escribi todo de golpe, luego respire, y mas tarde converti la rabia en tres propuestas concretas.' },
-  { selectedText: 'tramo', expectedEn: 'stretch', context: 'El ultimo tramo del viaje fue en autobus viejo y con lluvia, pero nadie se quejo. Una senora compartio mandarinas y terminamos riendo como si nos conocieramos de toda la vida.' },
-  { selectedText: 'desvelo amable', expectedEn: 'kind wakefulness', context: 'Anoche tuve un desvelo amable: no habia ansiedad, solo ideas pendientes para el taller del sabado. Escribi esquemas en servilletas y al amanecer ya tenia claro el primer ejercicio.' },
-  { selectedText: 'prudencia', expectedEn: 'prudence', context: 'La prudencia no siempre luce valiente, pero hoy evito un desastre en la oficina. Antes de enviar el contrato, revisamos una clausula y encontramos un error que nos habria costado meses.' },
-  { selectedText: 'cansancio', expectedEn: 'fatigue', context: 'Este cansancio no es solo fisico; viene de sostener conversaciones incompletas durante semanas. Aun asi, regue las macetas del balcon y senti que el dia podia salvarse.' },
-  { selectedText: 'remendar', expectedEn: 'to mend', context: 'Decidimos remendar la cortina en vez de comprar otra, y el arreglo quedo torcido pero digno. Mi madre dice que reparar juntos enseña mas que estrenar solo.' },
-  { selectedText: 'desorden', expectedEn: 'mess', context: 'El desorden del escritorio parecia un mapa de mis prioridades contradictorias. Tire papeles viejos, guarde cartas importantes y encontre una foto que me devolvio calma.' },
-  { selectedText: 'alivio', expectedEn: 'relief', context: 'Senti un alivio enorme cuando el medico dijo que los analisis salieron bien. Volvi caminando bajo llovizna, sin paraguas y sin prisa, disfrutando cada semaforo en rojo.' },
-  { selectedText: 'contratiempo', expectedEn: 'setback', context: 'El contratiempo con la impresora nos hizo perder media manana, pero tambien obligo al equipo a simplificar el material. Al final, la presentacion quedo mas limpia y mas honesta.' },
-  { selectedText: 'consuelo', expectedEn: 'comfort', context: 'En dias de incertidumbre, el consuelo llega de formas pequenas: una sopa caliente, un mensaje corto, la risa de alguien en la cocina. Nada resuelve todo, pero todo ayuda un poco.' },
-  { selectedText: 'aprender', expectedEn: 'to learn', context: 'Estoy intentando aprender sin convertir cada error en una sentencia personal. Hoy me equivoque en publico y nadie se rio; al contrario, varias personas agradecieron la claridad.' },
-  { selectedText: 'torpeza', expectedEn: 'clumsiness', context: 'Mi torpeza con las herramientas ya es parte del ritual de los domingos. Aprieto tornillos al reves, mi primo se burla con cariño, y al final siempre logramos colgar el estante.' },
-  { selectedText: 'temor', expectedEn: 'fear', context: 'El temor aparecio justo antes de entrar a la entrevista, cuando vi mi reflejo en la puerta de vidrio. Respire profundo, recorde mis notas y me sente sin fingir perfeccion.' },
-  { selectedText: 'sostener', expectedEn: 'to sustain', context: 'No se trata solo de iniciar proyectos; lo dificil es sostenerlos cuando desaparece la novedad. Esta semana seguimos, despacio pero firmes, y eso ya cuenta como victoria.' },
-  { selectedText: 'despedida', expectedEn: 'farewell', context: 'La despedida en la estacion fue breve porque nadie queria llorar en publico. Aun asi, cuando el tren salio, senti que una etapa completa se cerraba con un click silencioso.' },
-  { selectedText: 'sereno', expectedEn: 'serene', context: 'Su tono sereno durante la discusion cambio el rumbo de la reunion. En vez de atacar, pidio ejemplos concretos y nos obligo a pensar antes de responder.' },
-  { selectedText: 'insistir', expectedEn: 'to insist', context: 'Tuve que insistir tres veces para que revisaran el presupuesto con calma. Cuando por fin lo hicieron, descubrieron un error de calculo que nadie habia querido mirar.' },
-  { selectedText: 'vacilar', expectedEn: 'to hesitate', context: 'Iba a vacilar otra vez, pero mi amiga me tomo del brazo y me empujo hacia la puerta del aula. Diez minutos despues ya estaba participando como si llevara anos alli.' },
-  { selectedText: 'rencor', expectedEn: 'resentment', context: 'El rencor parecia pequeno al principio, una frase mal dicha y nada mas. Con los meses crecio en silencio, hasta que una conversacion honesta lo desarmo casi por completo.' },
-  { selectedText: 'brusco', expectedEn: 'abrupt', context: 'Su respuesta fue brusca, pero luego explico que no habia dormido por cuidar a su padre. Entender el contexto no borra el golpe, pero evita fabricar enemigos imaginarios.' },
-  { selectedText: 'amparo', expectedEn: 'support', context: 'Encontramos amparo en el centro comunitario cuando perdimos temporalmente la vivienda. Nos dieron mantas, informacion legal y, sobre todo, un trato que no nos reducia a una estadistica.' },
-  { selectedText: 'desgaste', expectedEn: 'wear', context: 'El desgaste emocional de estas semanas se nota en detalles minimos: olvidar nombres, perder llaves, releer el mismo correo tres veces. Aun asi, seguimos presentandonos cada manana.' },
-  { selectedText: 'acompañar', expectedEn: 'to accompany', context: 'Fui a acompañar a mi vecino al hospital y terminamos hablando de futbol para espantar el miedo. A veces la mejor ayuda es estar presente sin intentar resolverlo todo.' },
-  { selectedText: 'equilibrio', expectedEn: 'balance', context: 'Busco equilibrio entre trabajo y descanso, pero la balanza siempre se inclina cuando hay entregas urgentes. Esta semana puse limites simples y por fin cene antes de las diez.' },
-  { selectedText: 'modesto', expectedEn: 'modest', context: 'El resultado fue modesto, apenas una mejora pequena en la aplicacion, pero redujo quejas de usuarios mayores. Lo celebramos porque el impacto real no siempre viene en titulares.' },
-  { selectedText: 'traspié', expectedEn: 'stumble', context: 'Este traspié en el proyecto no nos define, aunque dolio ver semanas de trabajo descartadas. Reorganizamos tareas y rescatamos lo que si funcionaba, sin culpas teatrales.' },
-  { selectedText: 'constancia', expectedEn: 'consistency', context: 'La constancia de mi hermana me impresiona mas que cualquier discurso motivacional. Estudia cada noche veinte minutos y ya conversa en otro idioma con una calma envidiable.' },
-  { selectedText: 'reencuentro', expectedEn: 'reunion', context: 'El reencuentro con mis compañeros del colegio fue torpe al principio y luego muy divertido. Nos dimos cuenta de que la memoria embellece todo, pero la risa sigue siendo autentica.' },
-  { selectedText: 'desahucio', expectedEn: 'eviction', context: 'La amenaza de desahucio nos cayo como piedra en el pecho. Organizamos documentos, hablamos con abogados del barrio y, por primera vez, senti que pedir ayuda era una forma de dignidad.' },
-  { selectedText: 'abrigar', expectedEn: 'to shelter', context: 'Abrigar no es solo dar una manta; tambien es escuchar sin prisa y sin juicio. Esta idea la aprendi en el refugio, donde cada gesto pequeno cambia la noche de alguien.' },
-  { selectedText: 'desconcertado', expectedEn: 'bewildered', context: 'Me quede desconcertado cuando cancelaron la reunion cinco minutos antes de empezar. Aproveche el hueco para ordenar notas y salio una propuesta mejor que la original.' },
-  { selectedText: 'afinar', expectedEn: 'to refine', context: 'Nos falta afinar el discurso para que suene humano y no robotico. Quitamos tecnicismos innecesarios y dejamos ejemplos concretos de la vida real.' },
-  { selectedText: 'resguardo', expectedEn: 'shelter', context: 'Durante la tormenta buscamos resguardo bajo el techo de la parada vieja. Compartimos paraguas rotos, chistes malos y una paciencia inesperada.' },
-  { selectedText: 'frágil', expectedEn: 'fragile', context: 'La confianza era fragil despues de tantos malentendidos, pero no estaba rota. Empezamos por acuerdos minimos y celebramos cada semana sin recaidas.' },
-  { selectedText: 'sincero', expectedEn: 'sincere', context: 'Su mensaje fue sincero porque no intentaba ganar la discusion, solo reparar el dano. Admitio errores concretos y pregunto como podia enmendar, sin dramatismo.' },
-  { selectedText: 'despedirse', expectedEn: 'to say goodbye', context: 'Aprender a despedirse tambien es parte de crecer, aunque nadie te lo ensena. Ayer cerramos el taller con abrazos breves y promesas realistas, no eternas.' },
-  { selectedText: 'aplazar', expectedEn: 'to postpone', context: 'Decidimos aplazar el evento porque el equipo estaba exhausto y la calidad iba a sufrir. Fue una decision impopular, pero necesaria para no quemarnos del todo.' },
-  { selectedText: 'recomponer', expectedEn: 'to rebuild', context: 'Tardo meses recomponer la rutina despues de la mudanza, pero hoy por fin desayune sin mirar el reloj. Los cambios grandes se acomodan en gestos diminutos.' },
-  { selectedText: 'tenaz', expectedEn: 'tenacious', context: 'La forma tenaz en que Lucia persigue soluciones inspira al equipo incluso cuando no hay presupuesto. No confunde optimismo con ingenuidad; trabaja con datos y paciencia.' },
-  { selectedText: 'agotador', expectedEn: 'exhausting', context: 'El proceso fue agotador, con formularios repetidos y ventanillas cerradas. Aun asi, avanzamos una etapa y volvimos a casa con una mezcla rara de cansancio y orgullo.' },
-  { selectedText: 'desplazado', expectedEn: 'displaced', context: 'Mi vecino se siente desplazado desde que cerraron el mercado de toda la vida. No es solo economia; es perder un punto de encuentro donde todos se conocian por nombre.' },
-  { selectedText: 'serenidad', expectedEn: 'serenity', context: 'Hoy encontre serenidad barriendo el patio despues de la lluvia. El olor a tierra mojada me recordo que no todo problema exige respuesta inmediata.' },
-  { selectedText: 'renovar', expectedEn: 'to renew', context: 'Quiero renovar esta etapa sin fingir que todo empieza de cero. Conservo lo aprendido, suelto lo que pesa y avanzo con expectativas mas honestas.' },
+  {
+    selectedText: 'embarazada',
+    expectedEn: 'pregnant',
+    context:
+      'Anote esto en el margen de una carta familiar: mi hermana esta embarazada y lleva semanas escogiendo nombres imposibles. En casa hablamos bajito para no despertar al bebe de mi prima, pero la emocion se nota en cada taza de te que dejamos enfriar.',
+  },
+  {
+    selectedText: 'añorar',
+    expectedEn: 'to miss',
+    context:
+      'Escribi en el cuaderno del trabajo que empece a añorar el olor del pan de mi barrio cuando salgo tarde de la oficina. La ciudad nueva me trata bien, pero hay noches en que el acento ajeno pesa como una mochila mojada.',
+  },
+  {
+    selectedText: 'desvelo',
+    expectedEn: 'sleeplessness',
+    context:
+      'Este desvelo no viene solo por cafe, sino por la lista de pendientes que me mira desde la mesa. A las tres de la madrugada ordene facturas, regue las plantas y prometi apagar el telefono antes de dormir.',
+  },
+  {
+    selectedText: 'templanza',
+    expectedEn: 'self-control',
+    context:
+      'Mi abuelo repetia que la templanza vale mas que el talento cuando los problemas se apilan. Hoy lo entendi durante la reunion, cuando todos levantaban la voz y una sola persona siguio haciendo preguntas utiles.',
+  },
+  {
+    selectedText: 'apuro',
+    expectedEn: 'rush',
+    context:
+      'Sali con apuro y olvide las llaves, asi que tuve que esperar en la escalera con las bolsas del mercado. Una vecina me invito cafe y terminamos hablando de como el cansancio nos vuelve torpes y tambien mas humanos.',
+  },
+  {
+    selectedText: 'cariño',
+    expectedEn: 'affection',
+    context:
+      'En esta nota quiero dejar constancia del cariño discreto de mi tia, que siempre pregunta si comi antes de opinar sobre cualquier otra cosa. Su forma de cuidar no hace ruido, pero sostiene la casa entera.',
+  },
+  {
+    selectedText: 'sobrio',
+    expectedEn: 'restrained',
+    context:
+      'Necesitaba un tono sobrio para el informe, porque los datos eran delicados y no querian drama. Borre adjetivos grandilocuentes y, por primera vez en semanas, el texto quedo claro y util.',
+  },
+  {
+    selectedText: 'desahogo',
+    expectedEn: 'venting',
+    context:
+      'Este parrafo fue un desahogo despues de una llamada dificil con recursos humanos. Escribi todo de golpe, luego respire, y mas tarde converti la rabia en tres propuestas concretas.',
+  },
+  {
+    selectedText: 'tramo',
+    expectedEn: 'stretch',
+    context:
+      'El ultimo tramo del viaje fue en autobus viejo y con lluvia, pero nadie se quejo. Una senora compartio mandarinas y terminamos riendo como si nos conocieramos de toda la vida.',
+  },
+  {
+    selectedText: 'desvelo amable',
+    expectedEn: 'kind wakefulness',
+    context:
+      'Anoche tuve un desvelo amable: no habia ansiedad, solo ideas pendientes para el taller del sabado. Escribi esquemas en servilletas y al amanecer ya tenia claro el primer ejercicio.',
+  },
+  {
+    selectedText: 'prudencia',
+    expectedEn: 'prudence',
+    context:
+      'La prudencia no siempre luce valiente, pero hoy evito un desastre en la oficina. Antes de enviar el contrato, revisamos una clausula y encontramos un error que nos habria costado meses.',
+  },
+  {
+    selectedText: 'cansancio',
+    expectedEn: 'fatigue',
+    context:
+      'Este cansancio no es solo fisico; viene de sostener conversaciones incompletas durante semanas. Aun asi, regue las macetas del balcon y senti que el dia podia salvarse.',
+  },
+  {
+    selectedText: 'remendar',
+    expectedEn: 'to mend',
+    context:
+      'Decidimos remendar la cortina en vez de comprar otra, y el arreglo quedo torcido pero digno. Mi madre dice que reparar juntos enseña mas que estrenar solo.',
+  },
+  {
+    selectedText: 'desorden',
+    expectedEn: 'mess',
+    context:
+      'El desorden del escritorio parecia un mapa de mis prioridades contradictorias. Tire papeles viejos, guarde cartas importantes y encontre una foto que me devolvio calma.',
+  },
+  {
+    selectedText: 'alivio',
+    expectedEn: 'relief',
+    context:
+      'Senti un alivio enorme cuando el medico dijo que los analisis salieron bien. Volvi caminando bajo llovizna, sin paraguas y sin prisa, disfrutando cada semaforo en rojo.',
+  },
+  {
+    selectedText: 'contratiempo',
+    expectedEn: 'setback',
+    context:
+      'El contratiempo con la impresora nos hizo perder media manana, pero tambien obligo al equipo a simplificar el material. Al final, la presentacion quedo mas limpia y mas honesta.',
+  },
+  {
+    selectedText: 'consuelo',
+    expectedEn: 'comfort',
+    context:
+      'En dias de incertidumbre, el consuelo llega de formas pequenas: una sopa caliente, un mensaje corto, la risa de alguien en la cocina. Nada resuelve todo, pero todo ayuda un poco.',
+  },
+  {
+    selectedText: 'aprender',
+    expectedEn: 'to learn',
+    context:
+      'Estoy intentando aprender sin convertir cada error en una sentencia personal. Hoy me equivoque en publico y nadie se rio; al contrario, varias personas agradecieron la claridad.',
+  },
+  {
+    selectedText: 'torpeza',
+    expectedEn: 'clumsiness',
+    context:
+      'Mi torpeza con las herramientas ya es parte del ritual de los domingos. Aprieto tornillos al reves, mi primo se burla con cariño, y al final siempre logramos colgar el estante.',
+  },
+  {
+    selectedText: 'temor',
+    expectedEn: 'fear',
+    context:
+      'El temor aparecio justo antes de entrar a la entrevista, cuando vi mi reflejo en la puerta de vidrio. Respire profundo, recorde mis notas y me sente sin fingir perfeccion.',
+  },
+  {
+    selectedText: 'sostener',
+    expectedEn: 'to sustain',
+    context:
+      'No se trata solo de iniciar proyectos; lo dificil es sostenerlos cuando desaparece la novedad. Esta semana seguimos, despacio pero firmes, y eso ya cuenta como victoria.',
+  },
+  {
+    selectedText: 'despedida',
+    expectedEn: 'farewell',
+    context:
+      'La despedida en la estacion fue breve porque nadie queria llorar en publico. Aun asi, cuando el tren salio, senti que una etapa completa se cerraba con un click silencioso.',
+  },
+  {
+    selectedText: 'sereno',
+    expectedEn: 'serene',
+    context:
+      'Su tono sereno durante la discusion cambio el rumbo de la reunion. En vez de atacar, pidio ejemplos concretos y nos obligo a pensar antes de responder.',
+  },
+  {
+    selectedText: 'insistir',
+    expectedEn: 'to insist',
+    context:
+      'Tuve que insistir tres veces para que revisaran el presupuesto con calma. Cuando por fin lo hicieron, descubrieron un error de calculo que nadie habia querido mirar.',
+  },
+  {
+    selectedText: 'vacilar',
+    expectedEn: 'to hesitate',
+    context:
+      'Iba a vacilar otra vez, pero mi amiga me tomo del brazo y me empujo hacia la puerta del aula. Diez minutos despues ya estaba participando como si llevara anos alli.',
+  },
+  {
+    selectedText: 'rencor',
+    expectedEn: 'resentment',
+    context:
+      'El rencor parecia pequeno al principio, una frase mal dicha y nada mas. Con los meses crecio en silencio, hasta que una conversacion honesta lo desarmo casi por completo.',
+  },
+  {
+    selectedText: 'brusco',
+    expectedEn: 'abrupt',
+    context:
+      'Su respuesta fue brusca, pero luego explico que no habia dormido por cuidar a su padre. Entender el contexto no borra el golpe, pero evita fabricar enemigos imaginarios.',
+  },
+  {
+    selectedText: 'amparo',
+    expectedEn: 'support',
+    context:
+      'Encontramos amparo en el centro comunitario cuando perdimos temporalmente la vivienda. Nos dieron mantas, informacion legal y, sobre todo, un trato que no nos reducia a una estadistica.',
+  },
+  {
+    selectedText: 'desgaste',
+    expectedEn: 'wear',
+    context:
+      'El desgaste emocional de estas semanas se nota en detalles minimos: olvidar nombres, perder llaves, releer el mismo correo tres veces. Aun asi, seguimos presentandonos cada manana.',
+  },
+  {
+    selectedText: 'acompañar',
+    expectedEn: 'to accompany',
+    context:
+      'Fui a acompañar a mi vecino al hospital y terminamos hablando de futbol para espantar el miedo. A veces la mejor ayuda es estar presente sin intentar resolverlo todo.',
+  },
+  {
+    selectedText: 'equilibrio',
+    expectedEn: 'balance',
+    context:
+      'Busco equilibrio entre trabajo y descanso, pero la balanza siempre se inclina cuando hay entregas urgentes. Esta semana puse limites simples y por fin cene antes de las diez.',
+  },
+  {
+    selectedText: 'modesto',
+    expectedEn: 'modest',
+    context:
+      'El resultado fue modesto, apenas una mejora pequena en la aplicacion, pero redujo quejas de usuarios mayores. Lo celebramos porque el impacto real no siempre viene en titulares.',
+  },
+  {
+    selectedText: 'traspié',
+    expectedEn: 'stumble',
+    context:
+      'Este traspié en el proyecto no nos define, aunque dolio ver semanas de trabajo descartadas. Reorganizamos tareas y rescatamos lo que si funcionaba, sin culpas teatrales.',
+  },
+  {
+    selectedText: 'constancia',
+    expectedEn: 'consistency',
+    context:
+      'La constancia de mi hermana me impresiona mas que cualquier discurso motivacional. Estudia cada noche veinte minutos y ya conversa en otro idioma con una calma envidiable.',
+  },
+  {
+    selectedText: 'reencuentro',
+    expectedEn: 'reunion',
+    context:
+      'El reencuentro con mis compañeros del colegio fue torpe al principio y luego muy divertido. Nos dimos cuenta de que la memoria embellece todo, pero la risa sigue siendo autentica.',
+  },
+  {
+    selectedText: 'desahucio',
+    expectedEn: 'eviction',
+    context:
+      'La amenaza de desahucio nos cayo como piedra en el pecho. Organizamos documentos, hablamos con abogados del barrio y, por primera vez, senti que pedir ayuda era una forma de dignidad.',
+  },
+  {
+    selectedText: 'abrigar',
+    expectedEn: 'to shelter',
+    context:
+      'Abrigar no es solo dar una manta; tambien es escuchar sin prisa y sin juicio. Esta idea la aprendi en el refugio, donde cada gesto pequeno cambia la noche de alguien.',
+  },
+  {
+    selectedText: 'desconcertado',
+    expectedEn: 'bewildered',
+    context:
+      'Me quede desconcertado cuando cancelaron la reunion cinco minutos antes de empezar. Aproveche el hueco para ordenar notas y salio una propuesta mejor que la original.',
+  },
+  {
+    selectedText: 'afinar',
+    expectedEn: 'to refine',
+    context:
+      'Nos falta afinar el discurso para que suene humano y no robotico. Quitamos tecnicismos innecesarios y dejamos ejemplos concretos de la vida real.',
+  },
+  {
+    selectedText: 'resguardo',
+    expectedEn: 'shelter',
+    context:
+      'Durante la tormenta buscamos resguardo bajo el techo de la parada vieja. Compartimos paraguas rotos, chistes malos y una paciencia inesperada.',
+  },
+  {
+    selectedText: 'frágil',
+    expectedEn: 'fragile',
+    context:
+      'La confianza era fragil despues de tantos malentendidos, pero no estaba rota. Empezamos por acuerdos minimos y celebramos cada semana sin recaidas.',
+  },
+  {
+    selectedText: 'sincero',
+    expectedEn: 'sincere',
+    context:
+      'Su mensaje fue sincero porque no intentaba ganar la discusion, solo reparar el dano. Admitio errores concretos y pregunto como podia enmendar, sin dramatismo.',
+  },
+  {
+    selectedText: 'despedirse',
+    expectedEn: 'to say goodbye',
+    context:
+      'Aprender a despedirse tambien es parte de crecer, aunque nadie te lo ensena. Ayer cerramos el taller con abrazos breves y promesas realistas, no eternas.',
+  },
+  {
+    selectedText: 'aplazar',
+    expectedEn: 'to postpone',
+    context:
+      'Decidimos aplazar el evento porque el equipo estaba exhausto y la calidad iba a sufrir. Fue una decision impopular, pero necesaria para no quemarnos del todo.',
+  },
+  {
+    selectedText: 'recomponer',
+    expectedEn: 'to rebuild',
+    context:
+      'Tardo meses recomponer la rutina despues de la mudanza, pero hoy por fin desayune sin mirar el reloj. Los cambios grandes se acomodan en gestos diminutos.',
+  },
+  {
+    selectedText: 'tenaz',
+    expectedEn: 'tenacious',
+    context:
+      'La forma tenaz en que Lucia persigue soluciones inspira al equipo incluso cuando no hay presupuesto. No confunde optimismo con ingenuidad; trabaja con datos y paciencia.',
+  },
+  {
+    selectedText: 'agotador',
+    expectedEn: 'exhausting',
+    context:
+      'El proceso fue agotador, con formularios repetidos y ventanillas cerradas. Aun asi, avanzamos una etapa y volvimos a casa con una mezcla rara de cansancio y orgullo.',
+  },
+  {
+    selectedText: 'desplazado',
+    expectedEn: 'displaced',
+    context:
+      'Mi vecino se siente desplazado desde que cerraron el mercado de toda la vida. No es solo economia; es perder un punto de encuentro donde todos se conocian por nombre.',
+  },
+  {
+    selectedText: 'serenidad',
+    expectedEn: 'serenity',
+    context:
+      'Hoy encontre serenidad barriendo el patio despues de la lluvia. El olor a tierra mojada me recordo que no todo problema exige respuesta inmediata.',
+  },
+  {
+    selectedText: 'renovar',
+    expectedEn: 'to renew',
+    context:
+      'Quiero renovar esta etapa sin fingir que todo empieza de cero. Conservo lo aprendido, suelto lo que pesa y avanzo con expectativas mas honestas.',
+  },
 ];
 
 const FR_SEEDS: Seed[] = [
-  { selectedText: 'dépayssement', expectedEn: 'disorientation', context: 'J\'ai ecrit ces lignes dans un carnet froisse au cafe de la gare. Ce depayssement est arrive d\'un coup: nouvelle ville, nouvelle equipe, et pourtant les memes doutes que partout. Le serveur m\'a reconnu au troisieme jour, et cette petite habitude a rendu la semaine moins etrangere.' },
-  { selectedText: 'élan', expectedEn: 'momentum', context: 'Notre projet manquait d\'elan depuis des mois, puis une idee simple a remis tout le monde en mouvement. Rien de spectaculaire, juste une decision claire et un calendrier realiste. Le soir, nous sommes partis tard mais avec le sentiment d\'avoir retrouve une direction.' },
-  { selectedText: 'retenue', expectedEn: 'restraint', context: 'Sa retenue pendant la discussion a evite une escalade inutile. Au lieu de repondre a chaud, elle a pose deux questions precises et tout le ton de la reunion a change. La maturite se voit souvent dans ce qu\'on choisit de ne pas dire.' },
-  { selectedText: 'souplesse', expectedEn: 'flexibility', context: 'Il faut de la souplesse quand les plans tombent a l\'eau au dernier moment. Le train etait annule, nous avons improvise un covoiturage, et l\'atelier a commence avec vingt minutes de retard. Personne n\'a dramatise, et c\'etait deja une victoire.' },
-  { selectedText: 'frisson', expectedEn: 'shiver', context: 'Un frisson m\'a traverse en relisant cette vieille lettre de mon pere. L\'encre est presque effacee, mais la phrase sur la patience reste nette comme hier. J\'ai replie la feuille avec une gratitude tranquille.' },
-  { selectedText: 'hésiter', expectedEn: 'to hesitate', context: 'J\'allais encore hesiter avant de proposer mon idee, puis j\'ai vu que toute l\'equipe attendait simplement une piste concrete. J\'ai parle, c\'etait imparfait, mais suffisant pour lancer la suite. Le courage ressemble parfois a une phrase dite trop vite.' },
-  { selectedText: 'fatigue', expectedEn: 'fatigue', context: 'La fatigue de cette semaine se lit dans nos oublis et nos phrases inachevees. Pourtant, a chaque fin de journee, quelqu\'un pense a preparer du the pour les autres. Cette attention ordinaire maintient l\'equilibre.' },
-  { selectedText: 'apaiser', expectedEn: 'to soothe', context: 'Il a su apaiser la tension en resumant les points d\'accord avant de parler des desaccords. Ce n\'etait pas une formule magique, juste une methode sobre et respectueuse. Le debat est redevenu travail plutot que combat.' },
-  { selectedText: 'pudeur', expectedEn: 'reserve', context: 'Sa pudeur lui fait eviter les grandes declarations, mais ses gestes racontent tout. Elle arrive plus tot pour preparer la salle et reste plus tard pour nettoyer sans rien demander. Certains engagements n\'ont pas besoin d\'annonce.' },
-  { selectedText: 'accalmie', expectedEn: 'lull', context: 'Apres des semaines agitees, une accalmie inattendue a traverse l\'equipe. Nous en avons profite pour corriger des details negliges depuis longtemps. Le calme, meme bref, peut reparer beaucoup.' },
-  { selectedText: 'tenace', expectedEn: 'tenacious', context: 'Son optimisme tenace ne nie pas les obstacles; il les rend abordables. Quand un dossier bloque, elle decoupe le probleme en etapes minimes. En fin de journee, ce qui paraissait impossible devient simplement long.' },
-  { selectedText: 'flou', expectedEn: 'blurred', context: 'Le compte rendu restait flou tant que nous utilisions des mots trop generaux. Des qu\'on a ajoute des exemples concrets, tout le monde a compris les priorites. La precision est une forme de respect.' },
-  { selectedText: 'rassurer', expectedEn: 'to reassure', context: 'Il a fallu rassurer les nouveaux arrivants sans minimiser les difficultes. Nous avons partage les erreurs frequentes et les ressources utiles, puis laisse du temps pour les questions. L\'accueil, c\'est aussi avouer ce qu\'on ne sait pas encore.' },
-  { selectedText: 'ajourner', expectedEn: 'to postpone', context: 'Nous avons prefere ajourner la decision plutot que voter dans la confusion. Cette prudence a evite une erreur couteuse et permis de revenir avec de meilleures donnees. Attendre n\'est pas toujours fuir.' },
-  { selectedText: 'souvenir', expectedEn: 'memory', context: 'Ce souvenir de vacances est plus net que des semaines entieres de bureau. Une route de campagne, une boulangerie ouverte a l\'aube, et le rire de ma soeur dans la voiture. La memoire choisit ses preuves.' },
-  { selectedText: 'serein', expectedEn: 'serene', context: 'Son regard est reste serein pendant toute la crise serveur. Pendant que certains criaient, il listait les priorites sur un tableau et distribuait les taches avec calme. Le professionnalisme peut etre discret et decisif.' },
-  { selectedText: 'bousculer', expectedEn: 'to disrupt', context: 'La reorganisation va bousculer nos habitudes, c\'est evident. Mais garder des routines inefficaces juste par confort serait pire. Nous avons decide de tester pendant un mois avant de juger.' },
-  { selectedText: 'tâtonner', expectedEn: 'to grope', context: 'Au debut, nous avancions en tatonnant, sans plan parfaitement etabli. Chaque erreur nous donnait pourtant une information utile pour la suite. L\'apprentissage reel est rarement lineaire.' },
-  { selectedText: 'atténuer', expectedEn: 'to soften', context: 'Un simple changement de formulation peut attenuer un conflit inutile. Nous avons remplace les accusations par des observations factuelles, et la conversation est devenue productive. Les mots peuvent ouvrir ou fermer une porte.' },
-  { selectedText: 'solide', expectedEn: 'solid', context: 'Leur amitie est solide parce qu\'elle a traverse des periodes de silence sans se rompre. Ils reprennent la discussion la ou elle s\'etait arretee, sans theatre. Cette confiance est rare et precieuse.' },
-  { selectedText: 'fragile', expectedEn: 'fragile', context: 'L\'equilibre du projet reste fragile tant que deux personnes portent tout. Nous avons commence a documenter les procedures pour partager la charge. La durabilite commence souvent par l\'ecriture.' },
-  { selectedText: 'honnête', expectedEn: 'honest', context: 'Son retour etait honnete et precis: utile, parfois rude, jamais humiliant. J\'ai d\'abord grimace, puis j\'ai corrige le texte en deux heures. Une critique juste fait gagner du temps.' },
-  { selectedText: 'ralentir', expectedEn: 'to slow down', context: 'Il fallait ralentir avant de commettre une erreur irreparable. Nous avons pris une pause de vingt minutes, puis relu chaque etape calmement. Aller moins vite a parfois evite des semaines de correction.' },
-  { selectedText: 'fissure', expectedEn: 'crack', context: 'Une fissure est apparue dans le mur et, avec elle, toutes nos discussions reportees sur les travaux. Le devis etait sale, mais ignorer le probleme couterait plus cher. L\'entretien est une forme de prevision.' },
-  { selectedText: 'soutien', expectedEn: 'support', context: 'Le soutien du quartier nous a surpris apres l\'incendie du local associatif. En deux jours, nous avions des tables, des couvertures et des volontaires. La solidarite concrete a plus de poids que les slogans.' },
-  { selectedText: 'élucider', expectedEn: 'to clarify', context: 'Nous devons elucider ce bug avant la mise en production. Les symptomes changent selon l\'heure et le navigateur, ce qui brouille les pistes. En isolant les variables, on avance enfin.' },
-  { selectedText: 'retenir', expectedEn: 'to hold back', context: 'J\'ai du me retenir de repondre impulsivement a ce message agressif. Le lendemain, avec une tete plus claire, j\'ai ecrit une reponse ferme mais utile. La nuit peut sauver une conversation.' },
-  { selectedText: 'évident', expectedEn: 'obvious', context: 'Ce qui paraissait evident hier ne tenait plus avec les nouvelles donnees. Nous avons revise l\'hypothese sans dramatiser et continue le test. Changer d\'avis n\'est pas perdre la face.' },
-  { selectedText: 'apprendre', expectedEn: 'to learn', context: 'Apprendre a dire non poliment m\'a pris des annees. Maintenant, je protege des plages de concentration et j\'evite les reunions sans objectif clair. Ma fatigue a diminue sans nuire a l\'equipe.' },
-  { selectedText: 'écouter', expectedEn: 'to listen', context: 'Ecouter vraiment demande plus d\'effort que repondre vite. Pendant l\'entretien, j\'ai laisse des silences et la personne a formule elle-meme la solution. Le conseil le plus utile est parfois une question.' },
-  { selectedText: 'retrouver', expectedEn: 'to rediscover', context: 'J\'ai retrouve dans un carton mes anciens cahiers de croquis. Les dessins etaient maladroits, mais l\'envie etait intacte. J\'ai reserve une heure dimanche pour recommencer.' },
-  { selectedText: 'ajuster', expectedEn: 'to adjust', context: 'Nous devons ajuster le planning apres la panne materielle de ce matin. Plutot que prolonger la journee, nous avons coupe les taches secondaires. Le resultat sera moins ambitieux mais plus fiable.' },
-  { selectedText: 'réconcilier', expectedEn: 'to reconcile', context: 'Ils ont choisi un petit cafe pour se reconcilier loin des regards. La conversation etait maladroite, parfois lente, mais sincere. A la fin, ils avaient un plan concret pour repartir.' },
-  { selectedText: 'modeste', expectedEn: 'modest', context: 'Le gain est modeste, seulement quelques secondes par operation, mais sur un mois cela change tout. Les ameliorations invisibles soutiennent les grandes annonces.' },
-  { selectedText: 'troubler', expectedEn: 'to unsettle', context: 'La nouvelle m\'a trouble plus que je ne veux l\'admettre. J\'ai marche longtemps avant de rentrer et d\'en parler calmement. Prendre du recul n\'est pas ignorer le reel.' },
-  { selectedText: 'persister', expectedEn: 'to persist', context: 'Nous avons corrige trois fois la meme erreur; elle semble persister comme une ombre dans le code. Finalement, le probleme venait d\'un parametre oublie dans un ancien script. La patience a paye.' },
-  { selectedText: 'répit', expectedEn: 'respite', context: 'Ce week-end a ete un repit bienvenu apres des mois de tension. Rien d\'extraordinaire, juste dormir tard et cuisiner lentement. Le corps se souvient vite de ce qui lui manque.' },
-  { selectedText: 'préserver', expectedEn: 'to preserve', context: 'Nous voulons preserver l\'esprit du projet tout en changeant son architecture. C\'est un equilibre delicat entre memoire et adaptation. La documentation nous aide a ne pas trahir l\'intention initiale.' },
-  { selectedText: 'chancelant', expectedEn: 'unsteady', context: 'Le tabouret chancelant du bureau devait etre repare depuis des semaines. Ce matin, il a enfin cede sous un carton de dossiers, heureusement sans blessure. Nous avons appris a ne plus repousser les petites urgences.' },
-  { selectedText: 'décaler', expectedEn: 'to shift', context: 'Il faut decaler l\'atelier a mardi parce que la salle est indisponible. Ce contretemps complique tout, mais il evite de travailler dans la precipitation. Mieux vaut un retard net qu\'un resultat bancal.' },
-  { selectedText: 'accueillir', expectedEn: 'to welcome', context: 'Accueillir les nouveaux ne se limite pas a un discours de bienvenue. Il faut expliquer les habitudes implicites et autoriser les questions simples. Sinon, chacun improvise dans son coin.' },
-  { selectedText: 'souci', expectedEn: 'worry', context: 'Mon principal souci en ce moment n\'est pas la charge de travail, mais la qualite des decisions prises trop vite. Nous avons donc impose une relecture croisee avant validation finale.' },
-  { selectedText: 'constance', expectedEn: 'consistency', context: 'La constance de son effort impressionne tout le monde, meme sans resultat spectaculaire immediat. Chaque jour, il corrige une partie du systeme et documente proprement. Le progres durable a ce rythme.' },
-  { selectedText: 'insister', expectedEn: 'to insist', context: 'J\'ai du insister pour que l\'on teste aussi le parcours mobile, pas seulement desktop. Le bug principal n\'apparaissait que sur petit ecran. Sans cette verification, nous aurions livre un produit casse.' },
-  { selectedText: 'soulagement', expectedEn: 'relief', context: 'Quel soulagement de voir enfin la file d\'attente diminuer au service administratif. Les agents ont simplifie les formulaires et ouvert un guichet d\'orientation. Parfois, l\'amelioration vient d\'une organisation plus humaine.' },
-  { selectedText: 'reprendre', expectedEn: 'to resume', context: 'Apres une semaine malade, reprendre le rythme a ete plus dur que prevu. J\'ai commence par les taches courtes pour retrouver confiance. En deux jours, la sensation de retard avait deja baisse.' },
-  { selectedText: 'clarifier', expectedEn: 'to clarify', context: 'Nous devons clarifier les responsabilites avant le prochain sprint. Tant que tout le monde est "un peu" responsable, personne ne l\'est vraiment. Une ligne claire evite les frustrations diffuses.' },
-  { selectedText: 'attendre', expectedEn: 'to wait', context: 'Attendre la bonne information est parfois plus efficace que produire vite une mauvaise conclusion. Cette discipline est contre-intuitive, surtout sous pression. Pourtant elle evite des corrections couteuses.' },
-  { selectedText: 'renouveau', expectedEn: 'renewal', context: 'Ce printemps ressemble a un renouveau modeste: quelques habitudes meilleures et moins de promesses grandioses. Je prefere les changements tenables aux declarations brillantes de janvier.' },
-  { selectedText: 'partager', expectedEn: 'to share', context: 'Nous avons appris a partager les responsabilites plutot que d\'attendre un heros de service. Depuis, les absences ne paralysent plus l\'equipe et la qualite reste stable. Le collectif devient solide quand la connaissance circule.' },
+  {
+    selectedText: 'dépayssement',
+    expectedEn: 'disorientation',
+    context:
+      "J'ai ecrit ces lignes dans un carnet froisse au cafe de la gare. Ce depayssement est arrive d'un coup: nouvelle ville, nouvelle equipe, et pourtant les memes doutes que partout. Le serveur m'a reconnu au troisieme jour, et cette petite habitude a rendu la semaine moins etrangere.",
+  },
+  {
+    selectedText: 'élan',
+    expectedEn: 'momentum',
+    context:
+      "Notre projet manquait d'elan depuis des mois, puis une idee simple a remis tout le monde en mouvement. Rien de spectaculaire, juste une decision claire et un calendrier realiste. Le soir, nous sommes partis tard mais avec le sentiment d'avoir retrouve une direction.",
+  },
+  {
+    selectedText: 'retenue',
+    expectedEn: 'restraint',
+    context:
+      "Sa retenue pendant la discussion a evite une escalade inutile. Au lieu de repondre a chaud, elle a pose deux questions precises et tout le ton de la reunion a change. La maturite se voit souvent dans ce qu'on choisit de ne pas dire.",
+  },
+  {
+    selectedText: 'souplesse',
+    expectedEn: 'flexibility',
+    context:
+      "Il faut de la souplesse quand les plans tombent a l'eau au dernier moment. Le train etait annule, nous avons improvise un covoiturage, et l'atelier a commence avec vingt minutes de retard. Personne n'a dramatise, et c'etait deja une victoire.",
+  },
+  {
+    selectedText: 'frisson',
+    expectedEn: 'shiver',
+    context:
+      "Un frisson m'a traverse en relisant cette vieille lettre de mon pere. L'encre est presque effacee, mais la phrase sur la patience reste nette comme hier. J'ai replie la feuille avec une gratitude tranquille.",
+  },
+  {
+    selectedText: 'hésiter',
+    expectedEn: 'to hesitate',
+    context:
+      "J'allais encore hesiter avant de proposer mon idee, puis j'ai vu que toute l'equipe attendait simplement une piste concrete. J'ai parle, c'etait imparfait, mais suffisant pour lancer la suite. Le courage ressemble parfois a une phrase dite trop vite.",
+  },
+  {
+    selectedText: 'fatigue',
+    expectedEn: 'fatigue',
+    context:
+      "La fatigue de cette semaine se lit dans nos oublis et nos phrases inachevees. Pourtant, a chaque fin de journee, quelqu'un pense a preparer du the pour les autres. Cette attention ordinaire maintient l'equilibre.",
+  },
+  {
+    selectedText: 'apaiser',
+    expectedEn: 'to soothe',
+    context:
+      "Il a su apaiser la tension en resumant les points d'accord avant de parler des desaccords. Ce n'etait pas une formule magique, juste une methode sobre et respectueuse. Le debat est redevenu travail plutot que combat.",
+  },
+  {
+    selectedText: 'pudeur',
+    expectedEn: 'reserve',
+    context:
+      "Sa pudeur lui fait eviter les grandes declarations, mais ses gestes racontent tout. Elle arrive plus tot pour preparer la salle et reste plus tard pour nettoyer sans rien demander. Certains engagements n'ont pas besoin d'annonce.",
+  },
+  {
+    selectedText: 'accalmie',
+    expectedEn: 'lull',
+    context:
+      "Apres des semaines agitees, une accalmie inattendue a traverse l'equipe. Nous en avons profite pour corriger des details negliges depuis longtemps. Le calme, meme bref, peut reparer beaucoup.",
+  },
+  {
+    selectedText: 'tenace',
+    expectedEn: 'tenacious',
+    context:
+      'Son optimisme tenace ne nie pas les obstacles; il les rend abordables. Quand un dossier bloque, elle decoupe le probleme en etapes minimes. En fin de journee, ce qui paraissait impossible devient simplement long.',
+  },
+  {
+    selectedText: 'flou',
+    expectedEn: 'blurred',
+    context:
+      "Le compte rendu restait flou tant que nous utilisions des mots trop generaux. Des qu'on a ajoute des exemples concrets, tout le monde a compris les priorites. La precision est une forme de respect.",
+  },
+  {
+    selectedText: 'rassurer',
+    expectedEn: 'to reassure',
+    context:
+      "Il a fallu rassurer les nouveaux arrivants sans minimiser les difficultes. Nous avons partage les erreurs frequentes et les ressources utiles, puis laisse du temps pour les questions. L'accueil, c'est aussi avouer ce qu'on ne sait pas encore.",
+  },
+  {
+    selectedText: 'ajourner',
+    expectedEn: 'to postpone',
+    context:
+      "Nous avons prefere ajourner la decision plutot que voter dans la confusion. Cette prudence a evite une erreur couteuse et permis de revenir avec de meilleures donnees. Attendre n'est pas toujours fuir.",
+  },
+  {
+    selectedText: 'souvenir',
+    expectedEn: 'memory',
+    context:
+      "Ce souvenir de vacances est plus net que des semaines entieres de bureau. Une route de campagne, une boulangerie ouverte a l'aube, et le rire de ma soeur dans la voiture. La memoire choisit ses preuves.",
+  },
+  {
+    selectedText: 'serein',
+    expectedEn: 'serene',
+    context:
+      'Son regard est reste serein pendant toute la crise serveur. Pendant que certains criaient, il listait les priorites sur un tableau et distribuait les taches avec calme. Le professionnalisme peut etre discret et decisif.',
+  },
+  {
+    selectedText: 'bousculer',
+    expectedEn: 'to disrupt',
+    context:
+      "La reorganisation va bousculer nos habitudes, c'est evident. Mais garder des routines inefficaces juste par confort serait pire. Nous avons decide de tester pendant un mois avant de juger.",
+  },
+  {
+    selectedText: 'tâtonner',
+    expectedEn: 'to grope',
+    context:
+      "Au debut, nous avancions en tatonnant, sans plan parfaitement etabli. Chaque erreur nous donnait pourtant une information utile pour la suite. L'apprentissage reel est rarement lineaire.",
+  },
+  {
+    selectedText: 'atténuer',
+    expectedEn: 'to soften',
+    context:
+      'Un simple changement de formulation peut attenuer un conflit inutile. Nous avons remplace les accusations par des observations factuelles, et la conversation est devenue productive. Les mots peuvent ouvrir ou fermer une porte.',
+  },
+  {
+    selectedText: 'solide',
+    expectedEn: 'solid',
+    context:
+      "Leur amitie est solide parce qu'elle a traverse des periodes de silence sans se rompre. Ils reprennent la discussion la ou elle s'etait arretee, sans theatre. Cette confiance est rare et precieuse.",
+  },
+  {
+    selectedText: 'fragile',
+    expectedEn: 'fragile',
+    context:
+      "L'equilibre du projet reste fragile tant que deux personnes portent tout. Nous avons commence a documenter les procedures pour partager la charge. La durabilite commence souvent par l'ecriture.",
+  },
+  {
+    selectedText: 'honnête',
+    expectedEn: 'honest',
+    context:
+      "Son retour etait honnete et precis: utile, parfois rude, jamais humiliant. J'ai d'abord grimace, puis j'ai corrige le texte en deux heures. Une critique juste fait gagner du temps.",
+  },
+  {
+    selectedText: 'ralentir',
+    expectedEn: 'to slow down',
+    context:
+      'Il fallait ralentir avant de commettre une erreur irreparable. Nous avons pris une pause de vingt minutes, puis relu chaque etape calmement. Aller moins vite a parfois evite des semaines de correction.',
+  },
+  {
+    selectedText: 'fissure',
+    expectedEn: 'crack',
+    context:
+      "Une fissure est apparue dans le mur et, avec elle, toutes nos discussions reportees sur les travaux. Le devis etait sale, mais ignorer le probleme couterait plus cher. L'entretien est une forme de prevision.",
+  },
+  {
+    selectedText: 'soutien',
+    expectedEn: 'support',
+    context:
+      "Le soutien du quartier nous a surpris apres l'incendie du local associatif. En deux jours, nous avions des tables, des couvertures et des volontaires. La solidarite concrete a plus de poids que les slogans.",
+  },
+  {
+    selectedText: 'élucider',
+    expectedEn: 'to clarify',
+    context:
+      "Nous devons elucider ce bug avant la mise en production. Les symptomes changent selon l'heure et le navigateur, ce qui brouille les pistes. En isolant les variables, on avance enfin.",
+  },
+  {
+    selectedText: 'retenir',
+    expectedEn: 'to hold back',
+    context:
+      "J'ai du me retenir de repondre impulsivement a ce message agressif. Le lendemain, avec une tete plus claire, j'ai ecrit une reponse ferme mais utile. La nuit peut sauver une conversation.",
+  },
+  {
+    selectedText: 'évident',
+    expectedEn: 'obvious',
+    context:
+      "Ce qui paraissait evident hier ne tenait plus avec les nouvelles donnees. Nous avons revise l'hypothese sans dramatiser et continue le test. Changer d'avis n'est pas perdre la face.",
+  },
+  {
+    selectedText: 'apprendre',
+    expectedEn: 'to learn',
+    context:
+      "Apprendre a dire non poliment m'a pris des annees. Maintenant, je protege des plages de concentration et j'evite les reunions sans objectif clair. Ma fatigue a diminue sans nuire a l'equipe.",
+  },
+  {
+    selectedText: 'écouter',
+    expectedEn: 'to listen',
+    context:
+      "Ecouter vraiment demande plus d'effort que repondre vite. Pendant l'entretien, j'ai laisse des silences et la personne a formule elle-meme la solution. Le conseil le plus utile est parfois une question.",
+  },
+  {
+    selectedText: 'retrouver',
+    expectedEn: 'to rediscover',
+    context:
+      "J'ai retrouve dans un carton mes anciens cahiers de croquis. Les dessins etaient maladroits, mais l'envie etait intacte. J'ai reserve une heure dimanche pour recommencer.",
+  },
+  {
+    selectedText: 'ajuster',
+    expectedEn: 'to adjust',
+    context:
+      'Nous devons ajuster le planning apres la panne materielle de ce matin. Plutot que prolonger la journee, nous avons coupe les taches secondaires. Le resultat sera moins ambitieux mais plus fiable.',
+  },
+  {
+    selectedText: 'réconcilier',
+    expectedEn: 'to reconcile',
+    context:
+      'Ils ont choisi un petit cafe pour se reconcilier loin des regards. La conversation etait maladroite, parfois lente, mais sincere. A la fin, ils avaient un plan concret pour repartir.',
+  },
+  {
+    selectedText: 'modeste',
+    expectedEn: 'modest',
+    context:
+      'Le gain est modeste, seulement quelques secondes par operation, mais sur un mois cela change tout. Les ameliorations invisibles soutiennent les grandes annonces.',
+  },
+  {
+    selectedText: 'troubler',
+    expectedEn: 'to unsettle',
+    context:
+      "La nouvelle m'a trouble plus que je ne veux l'admettre. J'ai marche longtemps avant de rentrer et d'en parler calmement. Prendre du recul n'est pas ignorer le reel.",
+  },
+  {
+    selectedText: 'persister',
+    expectedEn: 'to persist',
+    context:
+      "Nous avons corrige trois fois la meme erreur; elle semble persister comme une ombre dans le code. Finalement, le probleme venait d'un parametre oublie dans un ancien script. La patience a paye.",
+  },
+  {
+    selectedText: 'répit',
+    expectedEn: 'respite',
+    context:
+      "Ce week-end a ete un repit bienvenu apres des mois de tension. Rien d'extraordinaire, juste dormir tard et cuisiner lentement. Le corps se souvient vite de ce qui lui manque.",
+  },
+  {
+    selectedText: 'préserver',
+    expectedEn: 'to preserve',
+    context:
+      "Nous voulons preserver l'esprit du projet tout en changeant son architecture. C'est un equilibre delicat entre memoire et adaptation. La documentation nous aide a ne pas trahir l'intention initiale.",
+  },
+  {
+    selectedText: 'chancelant',
+    expectedEn: 'unsteady',
+    context:
+      'Le tabouret chancelant du bureau devait etre repare depuis des semaines. Ce matin, il a enfin cede sous un carton de dossiers, heureusement sans blessure. Nous avons appris a ne plus repousser les petites urgences.',
+  },
+  {
+    selectedText: 'décaler',
+    expectedEn: 'to shift',
+    context:
+      "Il faut decaler l'atelier a mardi parce que la salle est indisponible. Ce contretemps complique tout, mais il evite de travailler dans la precipitation. Mieux vaut un retard net qu'un resultat bancal.",
+  },
+  {
+    selectedText: 'accueillir',
+    expectedEn: 'to welcome',
+    context:
+      'Accueillir les nouveaux ne se limite pas a un discours de bienvenue. Il faut expliquer les habitudes implicites et autoriser les questions simples. Sinon, chacun improvise dans son coin.',
+  },
+  {
+    selectedText: 'souci',
+    expectedEn: 'worry',
+    context:
+      "Mon principal souci en ce moment n'est pas la charge de travail, mais la qualite des decisions prises trop vite. Nous avons donc impose une relecture croisee avant validation finale.",
+  },
+  {
+    selectedText: 'constance',
+    expectedEn: 'consistency',
+    context:
+      'La constance de son effort impressionne tout le monde, meme sans resultat spectaculaire immediat. Chaque jour, il corrige une partie du systeme et documente proprement. Le progres durable a ce rythme.',
+  },
+  {
+    selectedText: 'insister',
+    expectedEn: 'to insist',
+    context:
+      "J'ai du insister pour que l'on teste aussi le parcours mobile, pas seulement desktop. Le bug principal n'apparaissait que sur petit ecran. Sans cette verification, nous aurions livre un produit casse.",
+  },
+  {
+    selectedText: 'soulagement',
+    expectedEn: 'relief',
+    context:
+      "Quel soulagement de voir enfin la file d'attente diminuer au service administratif. Les agents ont simplifie les formulaires et ouvert un guichet d'orientation. Parfois, l'amelioration vient d'une organisation plus humaine.",
+  },
+  {
+    selectedText: 'reprendre',
+    expectedEn: 'to resume',
+    context:
+      "Apres une semaine malade, reprendre le rythme a ete plus dur que prevu. J'ai commence par les taches courtes pour retrouver confiance. En deux jours, la sensation de retard avait deja baisse.",
+  },
+  {
+    selectedText: 'clarifier',
+    expectedEn: 'to clarify',
+    context:
+      'Nous devons clarifier les responsabilites avant le prochain sprint. Tant que tout le monde est "un peu" responsable, personne ne l\'est vraiment. Une ligne claire evite les frustrations diffuses.',
+  },
+  {
+    selectedText: 'attendre',
+    expectedEn: 'to wait',
+    context:
+      'Attendre la bonne information est parfois plus efficace que produire vite une mauvaise conclusion. Cette discipline est contre-intuitive, surtout sous pression. Pourtant elle evite des corrections couteuses.',
+  },
+  {
+    selectedText: 'renouveau',
+    expectedEn: 'renewal',
+    context:
+      'Ce printemps ressemble a un renouveau modeste: quelques habitudes meilleures et moins de promesses grandioses. Je prefere les changements tenables aux declarations brillantes de janvier.',
+  },
+  {
+    selectedText: 'partager',
+    expectedEn: 'to share',
+    context:
+      "Nous avons appris a partager les responsabilites plutot que d'attendre un heros de service. Depuis, les absences ne paralysent plus l'equipe et la qualite reste stable. Le collectif devient solide quand la connaissance circule.",
+  },
 ];
 
 const DE_SEEDS: Seed[] = [
-  { selectedText: 'Schadenfreude', expectedEn: 'schadenfreude', context: 'Ich habe diesen Satz in mein Notizbuch geschrieben, nachdem die Besprechung aus dem Ruder gelaufen war. Seine Schadenfreude war kurz sichtbar, als der Konkurrent sich verhaspelte, doch danach wurde der Ton wieder sachlich. Solche Momente zeigen, wie schnell ein Teamklima kippen kann.' },
-  { selectedText: 'Gelassenheit', expectedEn: 'composure', context: 'Ihre Gelassenheit hat uns heute durch den Serverausfall getragen. Wahrend andere hektisch wurden, schrieb sie Prioritaten an die Tafel und verteilte Aufgaben klar. Am Ende war nicht alles perfekt, aber alles stabil.' },
-  { selectedText: 'Fernweh', expectedEn: 'wanderlust', context: 'Zwischen Rechnungen und Einkaufszetteln tauchte plotzlich Fernweh auf. Ich sah aus dem Fenster auf den Regen und stellte mir eine langsame Zugfahrt ans Meer vor. Vielleicht reicht schon ein Wochenende, um den Kopf zu luftern.' },
-  { selectedText: 'Zweifel', expectedEn: 'doubt', context: 'Vor dem Vortrag kamen wieder Zweifel, obwohl ich gut vorbereitet war. Ich atmete dreimal tief ein, ging auf die Buhne und sprach den ersten Satz absichtlich langsam. Danach trug die Routine den Rest.' },
-  { selectedText: 'Achtsamkeit', expectedEn: 'mindfulness', context: 'Achtsamkeit klingt oft nach Modewort, aber heute war sie ganz praktisch. Ich bemerkte, dass ich die gleiche Mail zum dritten Mal gereizt beantwortete, machte eine Pause und schrieb dann klarer. Das sparte uns einen unnotigen Konflikt.' },
-  { selectedText: 'ausdauernd', expectedEn: 'persistent', context: 'Sie arbeitet ausdauernd an Problemen, die andere langst aufgegeben hatten. Jeden Tag ein kleiner Schritt, sauber dokumentiert und ohne Theater. Genau so wurde aus einem Chaosprojekt wieder ein verlassliches System.' },
-  { selectedText: 'umsichtig', expectedEn: 'prudent', context: 'Seine umsichtige Planung verhinderte, dass wir mit halbfertigen Zahlen in die Prasentation gingen. Erst als alle Daten gepruft waren, gab er das Signal. Vorsicht hat uns hier Zeit und Glaubwurdigkeit gerettet.' },
-  { selectedText: 'verzögern', expectedEn: 'to delay', context: 'Wir mussten den Start um zwei Tage verzogern, weil ein Zulieferteil fehlte. Das war unangenehm, aber besser als eine unsichere Auslieferung. Transparenz half, den Frust im Team niedrig zu halten.' },
-  { selectedText: 'behutsam', expectedEn: 'careful', context: 'Das Gesprach mit meiner Schwester verlief behutsam, fast tastend. Nach Monaten Funkstille suchten wir keine perfekten Worte, nur einen brauchbaren Anfang. Beim zweiten Kaffee war die Spannung deutlich kleiner.' },
-  { selectedText: 'überfordert', expectedEn: 'overwhelmed', context: 'Ich war heute kurz uberfordert von den vielen parallelen Aufgaben. Dann habe ich alles in drei Listen geteilt: dringend, wichtig, spater. Plotzlich wurde der Tag wieder machbar.' },
-  { selectedText: 'Entlastung', expectedEn: 'relief', context: 'Die neue Regelung brachte echte Entlastung fur das Nachtteam. Weniger uberflussige Formulare bedeuteten mehr Zeit fur die eigentliche Arbeit. Kleine Prozesseingriffe konnen grosse Wirkung haben.' },
-  { selectedText: 'versöhnlich', expectedEn: 'conciliatory', context: 'Sein versohnlicher Ton machte die hitzige Diskussion wieder produktiv. Er wiederholte zuerst, worin alle ubereinstimmten, und ging dann auf die offenen Punkte ein. So konnte niemand sein Gesicht verlieren.' },
-  { selectedText: 'bedeutungsvoll', expectedEn: 'meaningful', context: 'Der Abend war unspektakular und trotzdem bedeutungsvoll. Wir reparierten gemeinsam den alten Schrank und redeten dabei uber Dinge, die sonst keinen Platz finden. Manchmal entsteht Nahe bei banalen Aufgaben.' },
-  { selectedText: 'nachdenklich', expectedEn: 'thoughtful', context: 'Auf dem Heimweg blieb ich nachdenklich, weil der Kunde zwar freundlich war, aber deutlich unzufrieden. Ich notierte sofort drei Verbesserungen, bevor der Alltag die Details verwischte. So wurde Kritik zu Arbeit statt zu Krankung.' },
-  { selectedText: 'anpassen', expectedEn: 'to adapt', context: 'Wir mussten den Ablauf anpassen, weil zwei Kolleginnen krank wurden. Statt Uberstunden einzuplanen, strichen wir Nebenaufgaben und fokussierten den Kern. Das Ergebnis war kleiner, aber verlasslicher.' },
-  { selectedText: 'unerwartet', expectedEn: 'unexpected', context: 'Unerwartet kam heute Hilfe aus einer Abteilung, mit der wir selten Kontakt haben. Sie schickten nicht nur Daten, sondern auch eine klare Auswertung. Solche Gesten verandern die Zusammenarbeit langfristig.' },
-  { selectedText: 'klären', expectedEn: 'to clarify', context: 'Bevor wir weiterdiskutieren, mussen wir die Verantwortlichkeiten klaren. Solange alles halb verteilt ist, bleibt jedes Problem ohne Besitzer. Ein klares Raster verhindert stillen Frust.' },
-  { selectedText: 'verlässlich', expectedEn: 'reliable', context: 'Ihre verlassliche Art ist im Team wichtiger als jede Selbstdarstellung. Wenn sie etwas zusagt, passiert es auch unter Druck. Vertrauen entsteht aus wiederholter Verlasslichkeit, nicht aus grossen Worten.' },
-  { selectedText: 'zögerlich', expectedEn: 'hesitant', context: 'Sein zogerlicher Einstieg in die Diskussion wirkte zuerst unsicher. Dann stellte er genau die Frage, die wir alle ubersehen hatten. Vorsicht kann ein Vorteil sein, wenn sie zu Prazision fuhrt.' },
-  { selectedText: 'Wendepunkt', expectedEn: 'turning point', context: 'Der heutige Tag war ein Wendepunkt im Projekt, obwohl von aussen wenig sichtbar ist. Wir haben endlich die alte Schnittstelle ersetzt, die seit Monaten Fehler erzeugte. Seitdem laufen die Tests stabil.' },
-  { selectedText: 'aufrichtig', expectedEn: 'sincere', context: 'Ihre Entschuldigung klang aufrichtig, weil sie konkret war und keine Ausreden enthielt. Sie benannte den Schaden und bot eine klare Wiedergutmachung an. Das hat mehr bewirkt als jedes allgemeine Bedauern.' },
-  { selectedText: 'mühsam', expectedEn: 'tedious', context: 'Die Datenerfassung war muhsam und voller Doppelschritte. Trotzdem hat das Team ruhig durchgezogen, bis die Tabelle endlich konsistent war. Manche Fortschritte fuhlen sich unspektakular an und tragen doch alles.' },
-  { selectedText: 'Feingefühl', expectedEn: 'tact', context: 'Im Gesprach mit dem Kunden war viel Feingefuhl noetig. Zu harte Worte hatten die Kooperation gefahrdet, zu weiche Worte die Wahrheit verschleiert. Wir fanden einen Ton, der beides hielt.' },
-  { selectedText: 'unterbrechen', expectedEn: 'to interrupt', context: 'Ich musste lernen, in Meetings weniger zu unterbrechen. Seit ich mir Notizen mache und erst am Ende antworte, sind meine Beitrage kurzer und praziser. Das verbessert die Stimmung deutlich.' },
-  { selectedText: 'behelfsmäßig', expectedEn: 'makeshift', context: 'Unsere behelfsmassige Losung hielt langer als erwartet, war aber nie fur Dauerbetrieb gedacht. Heute haben wir sie sauber ersetzt und dabei alte Risiken dokumentiert. Provisorien brauchen ein Ablaufdatum.' },
-  { selectedText: 'Ausgleich', expectedEn: 'balance', context: 'Den Ausgleich nach langen Tagen finde ich beim Kochen, nicht im Scrollen am Handy. Zwanzig Minuten schneiden, ruhren, abschmecken und der Kopf wird wieder still. Kleine Rituale retten grosse Wochen.' },
-  { selectedText: 'abschätzen', expectedEn: 'to estimate', context: 'Wir mussen den Aufwand realistisch abschatzen, sonst verlieren wir wieder Vertrauen. Lieber konservativ planen und positiv uberraschen als umgekehrt. Ehrliche Prognosen sind Teil guter Arbeit.' },
-  { selectedText: 'vorsichtig', expectedEn: 'careful', context: 'Sie formulierte ihre Kritik vorsichtig, aber eindeutig. Dadurch blieb niemand in Abwehrhaltung und wir konnten direkt an den Problemen arbeiten. Harte Inhalte brauchen nicht immer harte Formen.' },
-  { selectedText: 'Umbruch', expectedEn: 'transition', context: 'Der Umbruch in der Abteilung ist spurb ar, auch wenn die Organigramme noch gleich aussehen. Rollen verschieben sich, Entscheidungen dauern langer, und alle suchen neue Routine. Das braucht Geduld.' },
-  { selectedText: 'durchatmen', expectedEn: 'to breathe', context: 'Nach dem Notfall musste das Team erst einmal durchatmen. Wir machten zehn Minuten Pause, tranken Wasser und sortierten dann gemeinsam die nachsten Schritte. Ruhe ist Teil professioneller Reaktion.' },
-  { selectedText: 'gelingen', expectedEn: 'to succeed', context: 'Der Pilotversuch konnte nur gelingen, weil wir den Umfang radikal reduziert haben. Weniger Funktionen, dafur klare Qualitat und echte Tests. Erfolg begann mit mutigem Verzicht.' },
-  { selectedText: 'unscheinbar', expectedEn: 'unassuming', context: 'Sein Beitrag war unscheinbar, aber entscheidend: Er entdeckte einen Zeilenfehler im Vertrag, den niemand gesehen hatte. Danach war allen klar, wie wichtig sorgfaltige Schlussprufungen sind.' },
-  { selectedText: 'auflösen', expectedEn: 'to dissolve', context: 'Die Spannung begann sich aufzulosen, als wir aufhorten, Schuldige zu suchen, und stattdessen Daten sammelten. Mit Fakten wurde aus Streit wieder Zusammenarbeit. Das war langst uberfallig.' },
-  { selectedText: 'Beständigkeit', expectedEn: 'consistency', context: 'Bestandigkeit schlagt oft brillante Einzelleistungen. Wer jeden Tag sauber arbeitet, tragt das Team durch schwierige Phasen. Heute habe ich diese Wahrheit wieder konkret gesehen.' },
-  { selectedText: 'nachholen', expectedEn: 'to catch up', context: 'Wir mussten viel Dokumentation nachholen, weil in der Hektik der letzten Monate vieles nur im Kopf blieb. Jetzt schreiben wir jede Entscheidung mit Grund auf. Das kostet Zeit und spart spatere Krisen.' },
-  { selectedText: 'vorsorgen', expectedEn: 'to prepare', context: 'Besser vorsorgen als spater improvisieren, sagte meine Kollegin, und bestellte Ersatzteile fur den Winter. Zwei Wochen spater fiel tatsachlich eine Lieferung aus. Ihre Voraussicht hat uns gerettet.' },
-  { selectedText: 'ernüchternd', expectedEn: 'sobering', context: 'Die ersten Nutzerzahlen waren ernuchternd, aber nicht hoffnungslos. Wir haben die Annahmen gepruft und den Einstieg vereinfacht. Seitdem steigen die Ruckmeldungen langsam, aber stetig.' },
-  { selectedText: 'abwägen', expectedEn: 'to weigh', context: 'Wir mussten Kosten und Risiken sorgfaltig abwagen, bevor wir den Vertrag unterschrieben. Am Ende entschieden wir uns fur die robustere, nicht die billigere Option. Kurzfristiger Preis ist nicht alles.' },
-  { selectedText: 'verspätet', expectedEn: 'delayed', context: 'Der Zug kam verspatet, also schrieb ich im Abteil endlich die Mail, die ich seit Tagen aufschob. Manchmal erzeugen unerwunschte Pausen den noetigen Fokus. Bei Ankunft war der wichtigste Punkt erledigt.' },
-  { selectedText: 'zugänglich', expectedEn: 'accessible', context: 'Unsere Anleitung war fachlich korrekt, aber nicht zuganglich fur neue Kolleginnen. Wir haben Fachjargon reduziert und echte Beispiele eingefugt. Seitdem gibt es deutlich weniger Ruckfragen.' },
-  { selectedText: 'Zuspruch', expectedEn: 'encouragement', context: 'Der Zuspruch aus dem Team kam genau im richtigen Moment, als ich am Konzept zweifelte. Keine ubertriebene Lobhudelei, nur konkrete Hinweise, was schon funktioniert. Das reichte vollkommen.' },
-  { selectedText: 'nachgeben', expectedEn: 'to yield', context: 'In dieser Verhandlung wollten beide Seiten nicht nachgeben. Erst als wir die Minimalziele offen legten, wurde ein Kompromiss moglich. Starrheit kostet oft mehr als Zugestandnisse.' },
-  { selectedText: 'Halt', expectedEn: 'support', context: 'In schwierigen Wochen gibt mir eine klare Tagesstruktur Halt. Aufstehen, Spaziergang, fokussierter Block, Pause, dann Kommunikation. Einfach, aber wirksam gegen Dauerstress.' },
-  { selectedText: 'entwirren', expectedEn: 'to untangle', context: 'Wir mussten den alten Datenfluss entwirren, weil uber Jahre zu viele Sonderregeln hinzugekommen waren. Mit jeder entfernten Ausnahme wurde das System verstandlicher. Komplexitat verschwindet nicht von allein.' },
-  { selectedText: 'wiederfinden', expectedEn: 'to find again', context: 'Nach der langen Krankheitsphase musste ich meinen Arbeitsrhythmus wiederfinden. Kleine Ziele am Morgen halfen mehr als grosse Vorsatze am Sonntagabend. Nach einer Woche war ich wieder im Tritt.' },
-  { selectedText: 'umschalten', expectedEn: 'to switch', context: 'Es fiel schwer umzuschalten vom Krisenmodus in den normalen Betrieb. Wir brauchten bewusst neue Routinen, damit niemand permanent auf Alarm blieb. Auch Erholung muss organisiert werden.' },
-  { selectedText: 'kluger', expectedEn: 'wiser', context: 'Rueckblickend waere ich kluger gewesen, fruher Hilfe zu holen. Statt alles allein zu tragen, hatte ich Aufgaben teilen sollen. Heute mache ich es besser und schlafe wieder ruhiger.' },
-  { selectedText: 'still', expectedEn: 'quiet', context: 'Der Raum war still, als die Entscheidung verlesen wurde. Keine Jubelrufe, nur konzentriertes Nicken und sofortige Umsetzung. Manchmal zeigt sich Professionalitat in ruhiger Geschwindigkeit.' },
-  { selectedText: 'erneuern', expectedEn: 'to renew', context: 'Wir wollen Prozesse erneuern, ohne das Erfahrungswissen der alten Teams zu verlieren. Deshalb dokumentieren wir zuerst, bevor wir umbauen. Respekt vor Geschichte erleichtert Wandel.' },
-  { selectedText: 'zuversichtlich', expectedEn: 'confident', context: 'Trotz der offenen Risiken blieb das Team zuversichtlich, weil wir aus den letzten Fehlern konkrete Regeln abgeleitet haben. Der Plan ist nicht perfekt, aber belastbar. Diese Haltung macht lange Projekte tragbar.' },
+  {
+    selectedText: 'Schadenfreude',
+    expectedEn: 'schadenfreude',
+    context:
+      'Ich habe diesen Satz in mein Notizbuch geschrieben, nachdem die Besprechung aus dem Ruder gelaufen war. Seine Schadenfreude war kurz sichtbar, als der Konkurrent sich verhaspelte, doch danach wurde der Ton wieder sachlich. Solche Momente zeigen, wie schnell ein Teamklima kippen kann.',
+  },
+  {
+    selectedText: 'Gelassenheit',
+    expectedEn: 'composure',
+    context:
+      'Ihre Gelassenheit hat uns heute durch den Serverausfall getragen. Wahrend andere hektisch wurden, schrieb sie Prioritaten an die Tafel und verteilte Aufgaben klar. Am Ende war nicht alles perfekt, aber alles stabil.',
+  },
+  {
+    selectedText: 'Fernweh',
+    expectedEn: 'wanderlust',
+    context:
+      'Zwischen Rechnungen und Einkaufszetteln tauchte plotzlich Fernweh auf. Ich sah aus dem Fenster auf den Regen und stellte mir eine langsame Zugfahrt ans Meer vor. Vielleicht reicht schon ein Wochenende, um den Kopf zu luftern.',
+  },
+  {
+    selectedText: 'Zweifel',
+    expectedEn: 'doubt',
+    context:
+      'Vor dem Vortrag kamen wieder Zweifel, obwohl ich gut vorbereitet war. Ich atmete dreimal tief ein, ging auf die Buhne und sprach den ersten Satz absichtlich langsam. Danach trug die Routine den Rest.',
+  },
+  {
+    selectedText: 'Achtsamkeit',
+    expectedEn: 'mindfulness',
+    context:
+      'Achtsamkeit klingt oft nach Modewort, aber heute war sie ganz praktisch. Ich bemerkte, dass ich die gleiche Mail zum dritten Mal gereizt beantwortete, machte eine Pause und schrieb dann klarer. Das sparte uns einen unnotigen Konflikt.',
+  },
+  {
+    selectedText: 'ausdauernd',
+    expectedEn: 'persistent',
+    context:
+      'Sie arbeitet ausdauernd an Problemen, die andere langst aufgegeben hatten. Jeden Tag ein kleiner Schritt, sauber dokumentiert und ohne Theater. Genau so wurde aus einem Chaosprojekt wieder ein verlassliches System.',
+  },
+  {
+    selectedText: 'umsichtig',
+    expectedEn: 'prudent',
+    context:
+      'Seine umsichtige Planung verhinderte, dass wir mit halbfertigen Zahlen in die Prasentation gingen. Erst als alle Daten gepruft waren, gab er das Signal. Vorsicht hat uns hier Zeit und Glaubwurdigkeit gerettet.',
+  },
+  {
+    selectedText: 'verzögern',
+    expectedEn: 'to delay',
+    context:
+      'Wir mussten den Start um zwei Tage verzogern, weil ein Zulieferteil fehlte. Das war unangenehm, aber besser als eine unsichere Auslieferung. Transparenz half, den Frust im Team niedrig zu halten.',
+  },
+  {
+    selectedText: 'behutsam',
+    expectedEn: 'careful',
+    context:
+      'Das Gesprach mit meiner Schwester verlief behutsam, fast tastend. Nach Monaten Funkstille suchten wir keine perfekten Worte, nur einen brauchbaren Anfang. Beim zweiten Kaffee war die Spannung deutlich kleiner.',
+  },
+  {
+    selectedText: 'überfordert',
+    expectedEn: 'overwhelmed',
+    context:
+      'Ich war heute kurz uberfordert von den vielen parallelen Aufgaben. Dann habe ich alles in drei Listen geteilt: dringend, wichtig, spater. Plotzlich wurde der Tag wieder machbar.',
+  },
+  {
+    selectedText: 'Entlastung',
+    expectedEn: 'relief',
+    context:
+      'Die neue Regelung brachte echte Entlastung fur das Nachtteam. Weniger uberflussige Formulare bedeuteten mehr Zeit fur die eigentliche Arbeit. Kleine Prozesseingriffe konnen grosse Wirkung haben.',
+  },
+  {
+    selectedText: 'versöhnlich',
+    expectedEn: 'conciliatory',
+    context:
+      'Sein versohnlicher Ton machte die hitzige Diskussion wieder produktiv. Er wiederholte zuerst, worin alle ubereinstimmten, und ging dann auf die offenen Punkte ein. So konnte niemand sein Gesicht verlieren.',
+  },
+  {
+    selectedText: 'bedeutungsvoll',
+    expectedEn: 'meaningful',
+    context:
+      'Der Abend war unspektakular und trotzdem bedeutungsvoll. Wir reparierten gemeinsam den alten Schrank und redeten dabei uber Dinge, die sonst keinen Platz finden. Manchmal entsteht Nahe bei banalen Aufgaben.',
+  },
+  {
+    selectedText: 'nachdenklich',
+    expectedEn: 'thoughtful',
+    context:
+      'Auf dem Heimweg blieb ich nachdenklich, weil der Kunde zwar freundlich war, aber deutlich unzufrieden. Ich notierte sofort drei Verbesserungen, bevor der Alltag die Details verwischte. So wurde Kritik zu Arbeit statt zu Krankung.',
+  },
+  {
+    selectedText: 'anpassen',
+    expectedEn: 'to adapt',
+    context:
+      'Wir mussten den Ablauf anpassen, weil zwei Kolleginnen krank wurden. Statt Uberstunden einzuplanen, strichen wir Nebenaufgaben und fokussierten den Kern. Das Ergebnis war kleiner, aber verlasslicher.',
+  },
+  {
+    selectedText: 'unerwartet',
+    expectedEn: 'unexpected',
+    context:
+      'Unerwartet kam heute Hilfe aus einer Abteilung, mit der wir selten Kontakt haben. Sie schickten nicht nur Daten, sondern auch eine klare Auswertung. Solche Gesten verandern die Zusammenarbeit langfristig.',
+  },
+  {
+    selectedText: 'klären',
+    expectedEn: 'to clarify',
+    context:
+      'Bevor wir weiterdiskutieren, mussen wir die Verantwortlichkeiten klaren. Solange alles halb verteilt ist, bleibt jedes Problem ohne Besitzer. Ein klares Raster verhindert stillen Frust.',
+  },
+  {
+    selectedText: 'verlässlich',
+    expectedEn: 'reliable',
+    context:
+      'Ihre verlassliche Art ist im Team wichtiger als jede Selbstdarstellung. Wenn sie etwas zusagt, passiert es auch unter Druck. Vertrauen entsteht aus wiederholter Verlasslichkeit, nicht aus grossen Worten.',
+  },
+  {
+    selectedText: 'zögerlich',
+    expectedEn: 'hesitant',
+    context:
+      'Sein zogerlicher Einstieg in die Diskussion wirkte zuerst unsicher. Dann stellte er genau die Frage, die wir alle ubersehen hatten. Vorsicht kann ein Vorteil sein, wenn sie zu Prazision fuhrt.',
+  },
+  {
+    selectedText: 'Wendepunkt',
+    expectedEn: 'turning point',
+    context:
+      'Der heutige Tag war ein Wendepunkt im Projekt, obwohl von aussen wenig sichtbar ist. Wir haben endlich die alte Schnittstelle ersetzt, die seit Monaten Fehler erzeugte. Seitdem laufen die Tests stabil.',
+  },
+  {
+    selectedText: 'aufrichtig',
+    expectedEn: 'sincere',
+    context:
+      'Ihre Entschuldigung klang aufrichtig, weil sie konkret war und keine Ausreden enthielt. Sie benannte den Schaden und bot eine klare Wiedergutmachung an. Das hat mehr bewirkt als jedes allgemeine Bedauern.',
+  },
+  {
+    selectedText: 'mühsam',
+    expectedEn: 'tedious',
+    context:
+      'Die Datenerfassung war muhsam und voller Doppelschritte. Trotzdem hat das Team ruhig durchgezogen, bis die Tabelle endlich konsistent war. Manche Fortschritte fuhlen sich unspektakular an und tragen doch alles.',
+  },
+  {
+    selectedText: 'Feingefühl',
+    expectedEn: 'tact',
+    context:
+      'Im Gesprach mit dem Kunden war viel Feingefuhl noetig. Zu harte Worte hatten die Kooperation gefahrdet, zu weiche Worte die Wahrheit verschleiert. Wir fanden einen Ton, der beides hielt.',
+  },
+  {
+    selectedText: 'unterbrechen',
+    expectedEn: 'to interrupt',
+    context:
+      'Ich musste lernen, in Meetings weniger zu unterbrechen. Seit ich mir Notizen mache und erst am Ende antworte, sind meine Beitrage kurzer und praziser. Das verbessert die Stimmung deutlich.',
+  },
+  {
+    selectedText: 'behelfsmäßig',
+    expectedEn: 'makeshift',
+    context:
+      'Unsere behelfsmassige Losung hielt langer als erwartet, war aber nie fur Dauerbetrieb gedacht. Heute haben wir sie sauber ersetzt und dabei alte Risiken dokumentiert. Provisorien brauchen ein Ablaufdatum.',
+  },
+  {
+    selectedText: 'Ausgleich',
+    expectedEn: 'balance',
+    context:
+      'Den Ausgleich nach langen Tagen finde ich beim Kochen, nicht im Scrollen am Handy. Zwanzig Minuten schneiden, ruhren, abschmecken und der Kopf wird wieder still. Kleine Rituale retten grosse Wochen.',
+  },
+  {
+    selectedText: 'abschätzen',
+    expectedEn: 'to estimate',
+    context:
+      'Wir mussen den Aufwand realistisch abschatzen, sonst verlieren wir wieder Vertrauen. Lieber konservativ planen und positiv uberraschen als umgekehrt. Ehrliche Prognosen sind Teil guter Arbeit.',
+  },
+  {
+    selectedText: 'vorsichtig',
+    expectedEn: 'careful',
+    context:
+      'Sie formulierte ihre Kritik vorsichtig, aber eindeutig. Dadurch blieb niemand in Abwehrhaltung und wir konnten direkt an den Problemen arbeiten. Harte Inhalte brauchen nicht immer harte Formen.',
+  },
+  {
+    selectedText: 'Umbruch',
+    expectedEn: 'transition',
+    context:
+      'Der Umbruch in der Abteilung ist spurb ar, auch wenn die Organigramme noch gleich aussehen. Rollen verschieben sich, Entscheidungen dauern langer, und alle suchen neue Routine. Das braucht Geduld.',
+  },
+  {
+    selectedText: 'durchatmen',
+    expectedEn: 'to breathe',
+    context:
+      'Nach dem Notfall musste das Team erst einmal durchatmen. Wir machten zehn Minuten Pause, tranken Wasser und sortierten dann gemeinsam die nachsten Schritte. Ruhe ist Teil professioneller Reaktion.',
+  },
+  {
+    selectedText: 'gelingen',
+    expectedEn: 'to succeed',
+    context:
+      'Der Pilotversuch konnte nur gelingen, weil wir den Umfang radikal reduziert haben. Weniger Funktionen, dafur klare Qualitat und echte Tests. Erfolg begann mit mutigem Verzicht.',
+  },
+  {
+    selectedText: 'unscheinbar',
+    expectedEn: 'unassuming',
+    context:
+      'Sein Beitrag war unscheinbar, aber entscheidend: Er entdeckte einen Zeilenfehler im Vertrag, den niemand gesehen hatte. Danach war allen klar, wie wichtig sorgfaltige Schlussprufungen sind.',
+  },
+  {
+    selectedText: 'auflösen',
+    expectedEn: 'to dissolve',
+    context:
+      'Die Spannung begann sich aufzulosen, als wir aufhorten, Schuldige zu suchen, und stattdessen Daten sammelten. Mit Fakten wurde aus Streit wieder Zusammenarbeit. Das war langst uberfallig.',
+  },
+  {
+    selectedText: 'Beständigkeit',
+    expectedEn: 'consistency',
+    context:
+      'Bestandigkeit schlagt oft brillante Einzelleistungen. Wer jeden Tag sauber arbeitet, tragt das Team durch schwierige Phasen. Heute habe ich diese Wahrheit wieder konkret gesehen.',
+  },
+  {
+    selectedText: 'nachholen',
+    expectedEn: 'to catch up',
+    context:
+      'Wir mussten viel Dokumentation nachholen, weil in der Hektik der letzten Monate vieles nur im Kopf blieb. Jetzt schreiben wir jede Entscheidung mit Grund auf. Das kostet Zeit und spart spatere Krisen.',
+  },
+  {
+    selectedText: 'vorsorgen',
+    expectedEn: 'to prepare',
+    context:
+      'Besser vorsorgen als spater improvisieren, sagte meine Kollegin, und bestellte Ersatzteile fur den Winter. Zwei Wochen spater fiel tatsachlich eine Lieferung aus. Ihre Voraussicht hat uns gerettet.',
+  },
+  {
+    selectedText: 'ernüchternd',
+    expectedEn: 'sobering',
+    context:
+      'Die ersten Nutzerzahlen waren ernuchternd, aber nicht hoffnungslos. Wir haben die Annahmen gepruft und den Einstieg vereinfacht. Seitdem steigen die Ruckmeldungen langsam, aber stetig.',
+  },
+  {
+    selectedText: 'abwägen',
+    expectedEn: 'to weigh',
+    context:
+      'Wir mussten Kosten und Risiken sorgfaltig abwagen, bevor wir den Vertrag unterschrieben. Am Ende entschieden wir uns fur die robustere, nicht die billigere Option. Kurzfristiger Preis ist nicht alles.',
+  },
+  {
+    selectedText: 'verspätet',
+    expectedEn: 'delayed',
+    context:
+      'Der Zug kam verspatet, also schrieb ich im Abteil endlich die Mail, die ich seit Tagen aufschob. Manchmal erzeugen unerwunschte Pausen den noetigen Fokus. Bei Ankunft war der wichtigste Punkt erledigt.',
+  },
+  {
+    selectedText: 'zugänglich',
+    expectedEn: 'accessible',
+    context:
+      'Unsere Anleitung war fachlich korrekt, aber nicht zuganglich fur neue Kolleginnen. Wir haben Fachjargon reduziert und echte Beispiele eingefugt. Seitdem gibt es deutlich weniger Ruckfragen.',
+  },
+  {
+    selectedText: 'Zuspruch',
+    expectedEn: 'encouragement',
+    context:
+      'Der Zuspruch aus dem Team kam genau im richtigen Moment, als ich am Konzept zweifelte. Keine ubertriebene Lobhudelei, nur konkrete Hinweise, was schon funktioniert. Das reichte vollkommen.',
+  },
+  {
+    selectedText: 'nachgeben',
+    expectedEn: 'to yield',
+    context:
+      'In dieser Verhandlung wollten beide Seiten nicht nachgeben. Erst als wir die Minimalziele offen legten, wurde ein Kompromiss moglich. Starrheit kostet oft mehr als Zugestandnisse.',
+  },
+  {
+    selectedText: 'Halt',
+    expectedEn: 'support',
+    context:
+      'In schwierigen Wochen gibt mir eine klare Tagesstruktur Halt. Aufstehen, Spaziergang, fokussierter Block, Pause, dann Kommunikation. Einfach, aber wirksam gegen Dauerstress.',
+  },
+  {
+    selectedText: 'entwirren',
+    expectedEn: 'to untangle',
+    context:
+      'Wir mussten den alten Datenfluss entwirren, weil uber Jahre zu viele Sonderregeln hinzugekommen waren. Mit jeder entfernten Ausnahme wurde das System verstandlicher. Komplexitat verschwindet nicht von allein.',
+  },
+  {
+    selectedText: 'wiederfinden',
+    expectedEn: 'to find again',
+    context:
+      'Nach der langen Krankheitsphase musste ich meinen Arbeitsrhythmus wiederfinden. Kleine Ziele am Morgen halfen mehr als grosse Vorsatze am Sonntagabend. Nach einer Woche war ich wieder im Tritt.',
+  },
+  {
+    selectedText: 'umschalten',
+    expectedEn: 'to switch',
+    context:
+      'Es fiel schwer umzuschalten vom Krisenmodus in den normalen Betrieb. Wir brauchten bewusst neue Routinen, damit niemand permanent auf Alarm blieb. Auch Erholung muss organisiert werden.',
+  },
+  {
+    selectedText: 'kluger',
+    expectedEn: 'wiser',
+    context:
+      'Rueckblickend waere ich kluger gewesen, fruher Hilfe zu holen. Statt alles allein zu tragen, hatte ich Aufgaben teilen sollen. Heute mache ich es besser und schlafe wieder ruhiger.',
+  },
+  {
+    selectedText: 'still',
+    expectedEn: 'quiet',
+    context:
+      'Der Raum war still, als die Entscheidung verlesen wurde. Keine Jubelrufe, nur konzentriertes Nicken und sofortige Umsetzung. Manchmal zeigt sich Professionalitat in ruhiger Geschwindigkeit.',
+  },
+  {
+    selectedText: 'erneuern',
+    expectedEn: 'to renew',
+    context:
+      'Wir wollen Prozesse erneuern, ohne das Erfahrungswissen der alten Teams zu verlieren. Deshalb dokumentieren wir zuerst, bevor wir umbauen. Respekt vor Geschichte erleichtert Wandel.',
+  },
+  {
+    selectedText: 'zuversichtlich',
+    expectedEn: 'confident',
+    context:
+      'Trotz der offenen Risiken blieb das Team zuversichtlich, weil wir aus den letzten Fehlern konkrete Regeln abgeleitet haben. Der Plan ist nicht perfekt, aber belastbar. Diese Haltung macht lange Projekte tragbar.',
+  },
 ];
 
 const PT_SEEDS: Seed[] = [
-  { selectedText: 'saudade', expectedEn: 'longing', context: 'Escrevi este trecho no caderno da cozinha enquanto o cafe esfriava. A saudade da minha cidade antiga aparece quando escuto certos sotaques no mercado. Nao e tristeza pura, e uma mistura de afeto, memoria e vontade de voltar por alguns dias.' },
-  { selectedText: 'teimosia', expectedEn: 'stubbornness', context: 'A teimosia do meu vizinho salvou a janela da sala, que todos queriam trocar. Passamos a tarde lixando madeira antiga e no fim ela voltou a abrir sem ranger. Persistencia tambem pode ser cuidado.' },
-  { selectedText: 'alívio', expectedEn: 'relief', context: 'Senti um alivio enorme quando o medico explicou que os exames estavam normais. Voltei para casa andando devagar, debaixo de uma garoa fina, sem a pressa de sempre. Em dias assim, ate o transito parece menos agressivo.' },
-  { selectedText: 'cansaço', expectedEn: 'fatigue', context: 'Este cansaco nao vem so de horas extras; vem de decidir tudo com urgencia. Hoje tentei uma estrategia simples: priorizar tres tarefas e aceitar que o resto pode esperar. Funcionou melhor do que eu esperava.' },
-  { selectedText: 'acolher', expectedEn: 'to welcome', context: 'Acolher quem chega novo na equipe exige mais do que um tour rapido. E preciso explicar os acordos informais, os atalhos e tambem os erros comuns. Quando fazemos isso direito, o ambiente fica mais justo para todos.' },
-  { selectedText: 'desconforto', expectedEn: 'discomfort', context: 'O desconforto da conversa de ontem ainda ecoa, mas trouxe clareza. Percebemos que estavamos discutindo sintomas e ignorando a causa principal. Hoje abrimos os dados e o clima melhorou.' },
-  { selectedText: 'apressado', expectedEn: 'hasty', context: 'Meu tom apressado no email criou um ruido desnecessario com o cliente. Reescrevi a mensagem com exemplos concretos e menos pressa. A resposta veio positiva em menos de uma hora.' },
-  { selectedText: 'sereno', expectedEn: 'serene', context: 'Ela manteve um jeito sereno durante toda a falha do sistema. Enquanto alguns entravam em panico, ela listou prioridades e distribuiu tarefas com calma. No fim, a equipe saiu cansada, mas inteira.' },
-  { selectedText: 'adiar', expectedEn: 'to postpone', context: 'Decidimos adiar o evento porque o material ainda estava inconsistente. Foi frustrante, claro, mas melhor que entregar algo quebrado. Transparencia com o publico evitou especulacoes.' },
-  { selectedText: 'reparo', expectedEn: 'repair', context: 'O reparo da bicicleta parecia simples, mas revelou uma sequencia de pecas desgastadas. Passei duas horas sujo de graxa e aprendi mais do que em varios videos. Consertar ensina paciencia e humildade.' },
-  { selectedText: 'desgaste', expectedEn: 'wear', context: 'O desgaste emocional deste semestre aparece em pequenos esquecimentos. Mesmo assim, nossa rotina de revisar tarefas no fim do dia tem impedido erros graves. Metodo e afeto seguram o ritmo.' },
-  { selectedText: 'cautela', expectedEn: 'caution', context: 'A cautela da analista evitou um contrato mal redigido. Ela pediu mais vinte minutos para conferir clausulas e encontrou uma incoerencia importante. Prudencia custa pouco perto de um processo juridico.' },
-  { selectedText: 'desabafar', expectedEn: 'to vent', context: 'Precisei desabafar depois da reuniao, mas escolhi fazer isso sem atacar ninguem. Escrevi no diario, respirei e voltei com propostas praticas. Reclamar com foco produz resultado.' },
-  { selectedText: 'sutil', expectedEn: 'subtle', context: 'A mudanca foi sutil, quase invisivel: trocamos a ordem de duas etapas no cadastro. Em uma semana, o abandono caiu bastante. Pequenos ajustes podem transformar a experiencia.' },
-  { selectedText: 'retomar', expectedEn: 'to resume', context: 'Depois de ficar doente, retomar o ritmo exigiu gentileza comigo mesmo. Comecei com blocos curtos e intervalos planejados. Em poucos dias a produtividade voltou sem exaustao.' },
-  { selectedText: 'afeto', expectedEn: 'affection', context: 'O afeto da minha avo aparece em detalhes: bilhetes curtos, comida guardada e perguntas simples sobre meu dia. Nada disso parece grandioso, mas sustenta semanas inteiras.' },
-  { selectedText: 'insistir', expectedEn: 'to insist', context: 'Tive que insistir para testarmos o aplicativo em celulares antigos. O principal bug estava escondido justamente ali. Se tivessemos ignorado, o lancamento seria um fracasso para muita gente.' },
-  { selectedText: 'equilíbrio', expectedEn: 'balance', context: 'Buscar equilibrio entre entrega e descanso nao e luxo, e manutencao basica. Quando passamos do limite por semanas, o erro vira rotina. Esta semana protegemos noites livres e o trabalho melhorou.' },
-  { selectedText: 'trégua', expectedEn: 'truce', context: 'No fim da tarde houve uma tregua na discussao do orçamento. Ninguem saiu feliz, mas todos aceitaram revisar os numeros com criterios comuns. Paz provisoria ainda e paz.' },
-  { selectedText: 'acolhimento', expectedEn: 'care', context: 'O acolhimento no posto de saude fez diferenca antes mesmo da consulta. A recepcionista explicou cada etapa com paciencia e sem pressa. Ser tratado com respeito reduz metade da angustia.' },
-  { selectedText: 'enfrentar', expectedEn: 'to face', context: 'Decidi enfrentar a pendencia financeira em vez de adiar de novo. Organizei documentos, marquei horario no banco e resolvi em uma manha. O medo era maior que o problema real.' },
-  { selectedText: 'hesitar', expectedEn: 'to hesitate', context: 'Eu ia hesitar mais uma vez antes de enviar o portfolio. Uma amiga revisou comigo e disse apenas: \"esta bom o bastante, manda\". Cliquei em enviar com a mao tremendo e depois veio alivio.' },
-  { selectedText: 'gentileza', expectedEn: 'kindness', context: 'Uma gentileza no onibus mudou meu humor do dia inteiro. Um desconhecido levantou para uma senhora e depois ajudou com as sacolas sem alarde. Pequenos gestos reorganizam o mundo.' },
-  { selectedText: 'incerteza', expectedEn: 'uncertainty', context: 'A incerteza sobre o contrato novo pesa mais que o volume de trabalho. Mesmo assim, mantive a rotina de estudar trinta minutos por noite. Continuar aprendendo reduz a sensacao de estagnação.' },
-  { selectedText: 'persistir', expectedEn: 'to persist', context: 'O erro no relatorio continuava aparecendo de forma aleatoria. Em vez de culpar pessoas, revisamos o fluxo inteiro e descobrimos uma dependencia antiga mal configurada. Persistir com metodo evitou retrabalho.' },
-  { selectedText: 'descompasso', expectedEn: 'mismatch', context: 'Havia um descompasso claro entre o discurso da diretoria e o dia a dia da equipe. Levamos exemplos concretos e conseguimos ajustes reais no processo. Falar com dados ajudou mais que falar alto.' },
-  { selectedText: 'modesto', expectedEn: 'modest', context: 'O resultado do piloto foi modesto, mas consistente em todos os bairros testados. Prefiro um ganho pequeno e confiavel a um salto instavel. Escala vem depois de estabilidade.' },
-  { selectedText: 'reencontro', expectedEn: 'reunion', context: 'O reencontro com colegas antigos comecou travado e terminou em gargalhadas. Descobrimos que todos envelheceram de jeitos parecidos: menos pose, mais honestidade. Foi bom revisitar essa parte da vida.' },
-  { selectedText: 'reconciliar', expectedEn: 'to reconcile', context: 'Fomos a uma padaria cedo para reconciliar sem plateia. Entre cafe e pao na chapa, cada um reconheceu sua parte no conflito. Saimos sem abraços dramaticos, mas com combinados claros.' },
-  { selectedText: 'abrigar', expectedEn: 'to shelter', context: 'Durante a chuva forte, abrigo virou palavra concreta: teto, cobertor e informação correta. O centro comunitario se organizou rapido e evitou desespero. Solidariedade eficiente salva noites inteiras.' },
-  { selectedText: 'frágil', expectedEn: 'fragile', context: 'A confianca estava fragil depois de tantas promessas quebradas. Decidimos reconstruir com metas pequenas e verificaveis. Lentidao aqui e responsabilidade, nao fraqueza.' },
-  { selectedText: 'afinar', expectedEn: 'to refine', context: 'Precisamos afinar o texto da campanha para parecer conversa, nao comunicado oficial. Cortamos frases pomposas e incluimos exemplos do cotidiano. A leitura ficou mais humana imediatamente.' },
-  { selectedText: 'trancar', expectedEn: 'to lock', context: 'Esqueci de trancar a porta e percebi isso no meio do caminho para o trabalho. Voltei correndo, irritado comigo mesmo, e acabei encontrando um vizinho que precisava de ajuda com compras. Ate o erro gerou encontro.' },
-  { selectedText: 'rígido', expectedEn: 'rigid', context: 'O processo estava rigido demais para casos fora do padrao. Ajustamos duas regras e abrimos canal para excecoes justificadas. A qualidade aumentou sem perder controle.' },
-  { selectedText: 'amparo', expectedEn: 'support', context: 'Encontrei amparo em amigos quando precisei cuidar do meu pai no hospital. Cada um ajudou de um jeito: carona, comida, silencio respeitoso. Rede de apoio se mede em atos concretos.' },
-  { selectedText: 'renovar', expectedEn: 'to renew', context: 'Quero renovar os habitos sem prometer uma versao ideal de mim mesmo. Menos exagero, mais constancia. Esta formula simples tem funcionado melhor do que metas heroicas.' },
-  { selectedText: 'sossego', expectedEn: 'calm', context: 'O sossego voltou quando desliguei notificacoes por duas horas para concluir uma tarefa complexa. A concentracao profunda parece luxo hoje, mas deveria ser rotina. Entreguei com menos erro e menos ansiedade.' },
-  { selectedText: 'despedida', expectedEn: 'farewell', context: 'A despedida na estacao foi contida, quase burocratica, mas carregada de afeto. Ninguem queria chorar em publico, entao sorrimos demais. Depois o silencio falou por todos.' },
-  { selectedText: 'improvisar', expectedEn: 'to improvise', context: 'Com o projetor quebrado, tivemos que improvisar com cartazes e canetas. Curiosamente, a audiencia participou mais e fez perguntas melhores. Falha tecnica virou aula viva.' },
-  { selectedText: 'refazer', expectedEn: 'to redo', context: 'Foi doloroso refazer metade do trabalho, mas a primeira versao estava inconsistente. Desta vez documentamos cada decisao para evitar repeticao do erro. Retrabalho com aprendizado ainda e progresso.' },
-  { selectedText: 'cuidar', expectedEn: 'to care for', context: 'Cuidar da minha mae idosa exige rotina, paciencia e adaptacao diaria. Nem todo dia e leve, mas os pequenos avanços compensam o cansaco. Amor tambem e organizacao.' },
-  { selectedText: 'discordar', expectedEn: 'to disagree', context: 'Aprendemos a discordar sem humilhar durante as reunioes mais tensas. Em vez de acusacoes, usamos exemplos e propostas alternativas. O debate ficou firme e mais produtivo.' },
-  { selectedText: 'respiro', expectedEn: 'breather', context: 'Este fim de semana foi um respiro depois de meses acelerados. Dormi ate tarde, cozinhei sem pressa e organizei contas antigas. Segunda-feira chegou menos pesada.' },
-  { selectedText: 'resguardar', expectedEn: 'to protect', context: 'Precisamos resguardar os dados dos usuarios antes de qualquer nova integracao. Segurança nao pode ser detalhe de ultima hora. A pressa comercial nao justifica risco tecnico.' },
-  { selectedText: 'custoso', expectedEn: 'costly', context: 'O processo de regularizacao foi custoso em tempo e energia, alem de dinheiro. Mesmo assim, concluir essa etapa trouxe tranquilidade para planejar o proximo ano. Burocracia vencida vira liberdade.' },
-  { selectedText: 'ouvir', expectedEn: 'to listen', context: 'Ouvir com atencao mudou completamente a conversa com o cliente irritado. Quando ele se sentiu compreendido, aceitou discutir alternativas reais. Escuta economiza conflito.' },
-  { selectedText: 'estável', expectedEn: 'stable', context: 'Depois de semanas de ajustes, o sistema finalmente ficou estavel. Nao houve celebracao grande, apenas um suspiro coletivo e um cafe forte. Estabilidade e uma conquista silenciosa.' },
-  { selectedText: 'encarar', expectedEn: 'to confront', context: 'Precisei encarar a planilha de dividas sem autoengano. Organizei por prioridade, negociei prazos e cortei gastos pequenos. Pela primeira vez em meses, o futuro parece administravel.' },
-  { selectedText: 'confiável', expectedEn: 'reliable', context: 'Ferramenta confiavel nao e a que promete tudo, e a que falha pouco e avisa quando falha. Com esse criterio, escolhemos a opcao menos chamativa e mais robusta. Foi a melhor decisao do trimestre.' },
-  { selectedText: 'recomeço', expectedEn: 'new beginning', context: 'Este recomeço nao tem trilha sonora, apenas agenda organizada e expectativas mais realistas. Guardei o que funcionou, descartei o excesso e comecei de novo com calma. Simples e suficiente.' },
+  {
+    selectedText: 'saudade',
+    expectedEn: 'longing',
+    context:
+      'Escrevi este trecho no caderno da cozinha enquanto o cafe esfriava. A saudade da minha cidade antiga aparece quando escuto certos sotaques no mercado. Nao e tristeza pura, e uma mistura de afeto, memoria e vontade de voltar por alguns dias.',
+  },
+  {
+    selectedText: 'teimosia',
+    expectedEn: 'stubbornness',
+    context:
+      'A teimosia do meu vizinho salvou a janela da sala, que todos queriam trocar. Passamos a tarde lixando madeira antiga e no fim ela voltou a abrir sem ranger. Persistencia tambem pode ser cuidado.',
+  },
+  {
+    selectedText: 'alívio',
+    expectedEn: 'relief',
+    context:
+      'Senti um alivio enorme quando o medico explicou que os exames estavam normais. Voltei para casa andando devagar, debaixo de uma garoa fina, sem a pressa de sempre. Em dias assim, ate o transito parece menos agressivo.',
+  },
+  {
+    selectedText: 'cansaço',
+    expectedEn: 'fatigue',
+    context:
+      'Este cansaco nao vem so de horas extras; vem de decidir tudo com urgencia. Hoje tentei uma estrategia simples: priorizar tres tarefas e aceitar que o resto pode esperar. Funcionou melhor do que eu esperava.',
+  },
+  {
+    selectedText: 'acolher',
+    expectedEn: 'to welcome',
+    context:
+      'Acolher quem chega novo na equipe exige mais do que um tour rapido. E preciso explicar os acordos informais, os atalhos e tambem os erros comuns. Quando fazemos isso direito, o ambiente fica mais justo para todos.',
+  },
+  {
+    selectedText: 'desconforto',
+    expectedEn: 'discomfort',
+    context:
+      'O desconforto da conversa de ontem ainda ecoa, mas trouxe clareza. Percebemos que estavamos discutindo sintomas e ignorando a causa principal. Hoje abrimos os dados e o clima melhorou.',
+  },
+  {
+    selectedText: 'apressado',
+    expectedEn: 'hasty',
+    context:
+      'Meu tom apressado no email criou um ruido desnecessario com o cliente. Reescrevi a mensagem com exemplos concretos e menos pressa. A resposta veio positiva em menos de uma hora.',
+  },
+  {
+    selectedText: 'sereno',
+    expectedEn: 'serene',
+    context:
+      'Ela manteve um jeito sereno durante toda a falha do sistema. Enquanto alguns entravam em panico, ela listou prioridades e distribuiu tarefas com calma. No fim, a equipe saiu cansada, mas inteira.',
+  },
+  {
+    selectedText: 'adiar',
+    expectedEn: 'to postpone',
+    context:
+      'Decidimos adiar o evento porque o material ainda estava inconsistente. Foi frustrante, claro, mas melhor que entregar algo quebrado. Transparencia com o publico evitou especulacoes.',
+  },
+  {
+    selectedText: 'reparo',
+    expectedEn: 'repair',
+    context:
+      'O reparo da bicicleta parecia simples, mas revelou uma sequencia de pecas desgastadas. Passei duas horas sujo de graxa e aprendi mais do que em varios videos. Consertar ensina paciencia e humildade.',
+  },
+  {
+    selectedText: 'desgaste',
+    expectedEn: 'wear',
+    context:
+      'O desgaste emocional deste semestre aparece em pequenos esquecimentos. Mesmo assim, nossa rotina de revisar tarefas no fim do dia tem impedido erros graves. Metodo e afeto seguram o ritmo.',
+  },
+  {
+    selectedText: 'cautela',
+    expectedEn: 'caution',
+    context:
+      'A cautela da analista evitou um contrato mal redigido. Ela pediu mais vinte minutos para conferir clausulas e encontrou uma incoerencia importante. Prudencia custa pouco perto de um processo juridico.',
+  },
+  {
+    selectedText: 'desabafar',
+    expectedEn: 'to vent',
+    context:
+      'Precisei desabafar depois da reuniao, mas escolhi fazer isso sem atacar ninguem. Escrevi no diario, respirei e voltei com propostas praticas. Reclamar com foco produz resultado.',
+  },
+  {
+    selectedText: 'sutil',
+    expectedEn: 'subtle',
+    context:
+      'A mudanca foi sutil, quase invisivel: trocamos a ordem de duas etapas no cadastro. Em uma semana, o abandono caiu bastante. Pequenos ajustes podem transformar a experiencia.',
+  },
+  {
+    selectedText: 'retomar',
+    expectedEn: 'to resume',
+    context:
+      'Depois de ficar doente, retomar o ritmo exigiu gentileza comigo mesmo. Comecei com blocos curtos e intervalos planejados. Em poucos dias a produtividade voltou sem exaustao.',
+  },
+  {
+    selectedText: 'afeto',
+    expectedEn: 'affection',
+    context:
+      'O afeto da minha avo aparece em detalhes: bilhetes curtos, comida guardada e perguntas simples sobre meu dia. Nada disso parece grandioso, mas sustenta semanas inteiras.',
+  },
+  {
+    selectedText: 'insistir',
+    expectedEn: 'to insist',
+    context:
+      'Tive que insistir para testarmos o aplicativo em celulares antigos. O principal bug estava escondido justamente ali. Se tivessemos ignorado, o lancamento seria um fracasso para muita gente.',
+  },
+  {
+    selectedText: 'equilíbrio',
+    expectedEn: 'balance',
+    context:
+      'Buscar equilibrio entre entrega e descanso nao e luxo, e manutencao basica. Quando passamos do limite por semanas, o erro vira rotina. Esta semana protegemos noites livres e o trabalho melhorou.',
+  },
+  {
+    selectedText: 'trégua',
+    expectedEn: 'truce',
+    context:
+      'No fim da tarde houve uma tregua na discussao do orçamento. Ninguem saiu feliz, mas todos aceitaram revisar os numeros com criterios comuns. Paz provisoria ainda e paz.',
+  },
+  {
+    selectedText: 'acolhimento',
+    expectedEn: 'care',
+    context:
+      'O acolhimento no posto de saude fez diferenca antes mesmo da consulta. A recepcionista explicou cada etapa com paciencia e sem pressa. Ser tratado com respeito reduz metade da angustia.',
+  },
+  {
+    selectedText: 'enfrentar',
+    expectedEn: 'to face',
+    context:
+      'Decidi enfrentar a pendencia financeira em vez de adiar de novo. Organizei documentos, marquei horario no banco e resolvi em uma manha. O medo era maior que o problema real.',
+  },
+  {
+    selectedText: 'hesitar',
+    expectedEn: 'to hesitate',
+    context:
+      'Eu ia hesitar mais uma vez antes de enviar o portfolio. Uma amiga revisou comigo e disse apenas: \"esta bom o bastante, manda\". Cliquei em enviar com a mao tremendo e depois veio alivio.',
+  },
+  {
+    selectedText: 'gentileza',
+    expectedEn: 'kindness',
+    context:
+      'Uma gentileza no onibus mudou meu humor do dia inteiro. Um desconhecido levantou para uma senhora e depois ajudou com as sacolas sem alarde. Pequenos gestos reorganizam o mundo.',
+  },
+  {
+    selectedText: 'incerteza',
+    expectedEn: 'uncertainty',
+    context:
+      'A incerteza sobre o contrato novo pesa mais que o volume de trabalho. Mesmo assim, mantive a rotina de estudar trinta minutos por noite. Continuar aprendendo reduz a sensacao de estagnação.',
+  },
+  {
+    selectedText: 'persistir',
+    expectedEn: 'to persist',
+    context:
+      'O erro no relatorio continuava aparecendo de forma aleatoria. Em vez de culpar pessoas, revisamos o fluxo inteiro e descobrimos uma dependencia antiga mal configurada. Persistir com metodo evitou retrabalho.',
+  },
+  {
+    selectedText: 'descompasso',
+    expectedEn: 'mismatch',
+    context:
+      'Havia um descompasso claro entre o discurso da diretoria e o dia a dia da equipe. Levamos exemplos concretos e conseguimos ajustes reais no processo. Falar com dados ajudou mais que falar alto.',
+  },
+  {
+    selectedText: 'modesto',
+    expectedEn: 'modest',
+    context:
+      'O resultado do piloto foi modesto, mas consistente em todos os bairros testados. Prefiro um ganho pequeno e confiavel a um salto instavel. Escala vem depois de estabilidade.',
+  },
+  {
+    selectedText: 'reencontro',
+    expectedEn: 'reunion',
+    context:
+      'O reencontro com colegas antigos comecou travado e terminou em gargalhadas. Descobrimos que todos envelheceram de jeitos parecidos: menos pose, mais honestidade. Foi bom revisitar essa parte da vida.',
+  },
+  {
+    selectedText: 'reconciliar',
+    expectedEn: 'to reconcile',
+    context:
+      'Fomos a uma padaria cedo para reconciliar sem plateia. Entre cafe e pao na chapa, cada um reconheceu sua parte no conflito. Saimos sem abraços dramaticos, mas com combinados claros.',
+  },
+  {
+    selectedText: 'abrigar',
+    expectedEn: 'to shelter',
+    context:
+      'Durante a chuva forte, abrigo virou palavra concreta: teto, cobertor e informação correta. O centro comunitario se organizou rapido e evitou desespero. Solidariedade eficiente salva noites inteiras.',
+  },
+  {
+    selectedText: 'frágil',
+    expectedEn: 'fragile',
+    context:
+      'A confianca estava fragil depois de tantas promessas quebradas. Decidimos reconstruir com metas pequenas e verificaveis. Lentidao aqui e responsabilidade, nao fraqueza.',
+  },
+  {
+    selectedText: 'afinar',
+    expectedEn: 'to refine',
+    context:
+      'Precisamos afinar o texto da campanha para parecer conversa, nao comunicado oficial. Cortamos frases pomposas e incluimos exemplos do cotidiano. A leitura ficou mais humana imediatamente.',
+  },
+  {
+    selectedText: 'trancar',
+    expectedEn: 'to lock',
+    context:
+      'Esqueci de trancar a porta e percebi isso no meio do caminho para o trabalho. Voltei correndo, irritado comigo mesmo, e acabei encontrando um vizinho que precisava de ajuda com compras. Ate o erro gerou encontro.',
+  },
+  {
+    selectedText: 'rígido',
+    expectedEn: 'rigid',
+    context:
+      'O processo estava rigido demais para casos fora do padrao. Ajustamos duas regras e abrimos canal para excecoes justificadas. A qualidade aumentou sem perder controle.',
+  },
+  {
+    selectedText: 'amparo',
+    expectedEn: 'support',
+    context:
+      'Encontrei amparo em amigos quando precisei cuidar do meu pai no hospital. Cada um ajudou de um jeito: carona, comida, silencio respeitoso. Rede de apoio se mede em atos concretos.',
+  },
+  {
+    selectedText: 'renovar',
+    expectedEn: 'to renew',
+    context:
+      'Quero renovar os habitos sem prometer uma versao ideal de mim mesmo. Menos exagero, mais constancia. Esta formula simples tem funcionado melhor do que metas heroicas.',
+  },
+  {
+    selectedText: 'sossego',
+    expectedEn: 'calm',
+    context:
+      'O sossego voltou quando desliguei notificacoes por duas horas para concluir uma tarefa complexa. A concentracao profunda parece luxo hoje, mas deveria ser rotina. Entreguei com menos erro e menos ansiedade.',
+  },
+  {
+    selectedText: 'despedida',
+    expectedEn: 'farewell',
+    context:
+      'A despedida na estacao foi contida, quase burocratica, mas carregada de afeto. Ninguem queria chorar em publico, entao sorrimos demais. Depois o silencio falou por todos.',
+  },
+  {
+    selectedText: 'improvisar',
+    expectedEn: 'to improvise',
+    context:
+      'Com o projetor quebrado, tivemos que improvisar com cartazes e canetas. Curiosamente, a audiencia participou mais e fez perguntas melhores. Falha tecnica virou aula viva.',
+  },
+  {
+    selectedText: 'refazer',
+    expectedEn: 'to redo',
+    context:
+      'Foi doloroso refazer metade do trabalho, mas a primeira versao estava inconsistente. Desta vez documentamos cada decisao para evitar repeticao do erro. Retrabalho com aprendizado ainda e progresso.',
+  },
+  {
+    selectedText: 'cuidar',
+    expectedEn: 'to care for',
+    context:
+      'Cuidar da minha mae idosa exige rotina, paciencia e adaptacao diaria. Nem todo dia e leve, mas os pequenos avanços compensam o cansaco. Amor tambem e organizacao.',
+  },
+  {
+    selectedText: 'discordar',
+    expectedEn: 'to disagree',
+    context:
+      'Aprendemos a discordar sem humilhar durante as reunioes mais tensas. Em vez de acusacoes, usamos exemplos e propostas alternativas. O debate ficou firme e mais produtivo.',
+  },
+  {
+    selectedText: 'respiro',
+    expectedEn: 'breather',
+    context:
+      'Este fim de semana foi um respiro depois de meses acelerados. Dormi ate tarde, cozinhei sem pressa e organizei contas antigas. Segunda-feira chegou menos pesada.',
+  },
+  {
+    selectedText: 'resguardar',
+    expectedEn: 'to protect',
+    context:
+      'Precisamos resguardar os dados dos usuarios antes de qualquer nova integracao. Segurança nao pode ser detalhe de ultima hora. A pressa comercial nao justifica risco tecnico.',
+  },
+  {
+    selectedText: 'custoso',
+    expectedEn: 'costly',
+    context:
+      'O processo de regularizacao foi custoso em tempo e energia, alem de dinheiro. Mesmo assim, concluir essa etapa trouxe tranquilidade para planejar o proximo ano. Burocracia vencida vira liberdade.',
+  },
+  {
+    selectedText: 'ouvir',
+    expectedEn: 'to listen',
+    context:
+      'Ouvir com atencao mudou completamente a conversa com o cliente irritado. Quando ele se sentiu compreendido, aceitou discutir alternativas reais. Escuta economiza conflito.',
+  },
+  {
+    selectedText: 'estável',
+    expectedEn: 'stable',
+    context:
+      'Depois de semanas de ajustes, o sistema finalmente ficou estavel. Nao houve celebracao grande, apenas um suspiro coletivo e um cafe forte. Estabilidade e uma conquista silenciosa.',
+  },
+  {
+    selectedText: 'encarar',
+    expectedEn: 'to confront',
+    context:
+      'Precisei encarar a planilha de dividas sem autoengano. Organizei por prioridade, negociei prazos e cortei gastos pequenos. Pela primeira vez em meses, o futuro parece administravel.',
+  },
+  {
+    selectedText: 'confiável',
+    expectedEn: 'reliable',
+    context:
+      'Ferramenta confiavel nao e a que promete tudo, e a que falha pouco e avisa quando falha. Com esse criterio, escolhemos a opcao menos chamativa e mais robusta. Foi a melhor decisao do trimestre.',
+  },
+  {
+    selectedText: 'recomeço',
+    expectedEn: 'new beginning',
+    context:
+      'Este recomeço nao tem trilha sonora, apenas agenda organizada e expectativas mais realistas. Guardei o que funcionou, descartei o excesso e comecei de novo com calma. Simples e suficiente.',
+  },
 ];
 
 const SOURCE_SEEDS: Record<string, Seed[]> = {
@@ -325,7 +1525,9 @@ function buildFixtures() {
   for (const pair of PAIRS) {
     const seeds = SOURCE_SEEDS[pair.source];
     if (!seeds || seeds.length !== 50) {
-      throw new Error(`Expected exactly 50 seeds for source ${pair.source}, got ${seeds?.length ?? 0}`);
+      throw new Error(
+        `Expected exactly 50 seeds for source ${pair.source}, got ${seeds?.length ?? 0}`,
+      );
     }
 
     seeds.forEach((seed, index) => {

@@ -9,11 +9,7 @@
     "gemma-4-E2B-it-Q4_K_M",
     "gemma-4-E4B-it-Q4_K_M"
   ],
-  "profiles": [
-    "balanced",
-    "strictGemma",
-    "lenientQwen"
-  ],
+  "profiles": ["balanced", "strictGemma", "lenientQwen"],
   "results": [
     {
       "profile": "balanced",

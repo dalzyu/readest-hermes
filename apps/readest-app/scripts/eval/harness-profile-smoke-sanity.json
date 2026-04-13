@@ -2,12 +2,8 @@
   "endpoint": "http://127.0.0.1:8081",
   "fixturePath": "C:\\repos\\context aware translate\\readest\\.worktrees\\context-translation-harness-loop\\apps\\readest-app\\scripts\\eval\\mini-weak-clusters-fixtures.json",
   "perPair": 1,
-  "models": [
-    "gemma-4-E4B-it-Q4_K_M"
-  ],
-  "profiles": [
-    "balanced"
-  ],
+  "models": ["gemma-4-E4B-it-Q4_K_M"],
+  "profiles": ["balanced"],
   "results": [
     {
       "profile": "balanced",

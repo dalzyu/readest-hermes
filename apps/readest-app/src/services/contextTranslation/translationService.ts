@@ -19,10 +19,7 @@ import {
 } from './defaults';
 import { sanitizeFieldContent, sanitizeTranslationResult } from './translationSanitizer';
 
-function hasUsablePrimaryField(
-  parsed: TranslationResult,
-  request: TranslationRequest,
-): boolean {
+function hasUsablePrimaryField(parsed: TranslationResult, request: TranslationRequest): boolean {
   const primary = request.outputFields.find((field) => field.enabled)?.id ?? 'translation';
   return Boolean(parsed[primary]?.trim());
 }
@@ -126,7 +123,8 @@ export async function finalizeTranslationWithContext(
 ): Promise<FinalizedTranslation> {
   const harness = resolveContextTranslationHarnessSettings(request.harness);
   const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
-  let latestRawText = seed?.initialRawText ?? ((await callLLM(systemPrompt, userPrompt, model!, abortSignal)) ?? '');
+  let latestRawText =
+    seed?.initialRawText ?? (await callLLM(systemPrompt, userPrompt, model!, abortSignal)) ?? '';
   let parsed = sanitizeTranslationResult(
     seed?.initialFields ?? parseTranslationResponse(latestRawText, request.outputFields),
     harness,
@@ -147,7 +145,8 @@ export async function finalizeTranslationWithContext(
         .sort((a, b) => a.order - b.order)
         .map((field) => field.id),
     );
-    latestRawText = (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
+    latestRawText =
+      (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
     parsed = sanitizeTranslationResult(
       parseTranslationResponse(latestRawText, request.outputFields),
       harness,
@@ -155,7 +154,11 @@ export async function finalizeTranslationWithContext(
     responseContaminated = responseLooksContaminated(latestRawText, harness);
   }
 
-  if (harness.flow === 'production' && harness.perFieldRescueEnabled && (!hasUsablePrimaryField(parsed, request) || responseContaminated)) {
+  if (
+    harness.flow === 'production' &&
+    harness.perFieldRescueEnabled &&
+    (!hasUsablePrimaryField(parsed, request) || responseContaminated)
+  ) {
     const stitched: TranslationResult = {};
     const enabledFields = request.outputFields
       .filter((field) => field.enabled)
@@ -179,7 +182,8 @@ export async function finalizeTranslationWithContext(
           perField.systemPrompt,
           perField.userPrompt,
         );
-        fieldValue = (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
+        fieldValue =
+          (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
         sanitizedFieldValue = sanitizeFieldContent(field.id, fieldValue, harness);
       }
 
@@ -335,7 +339,13 @@ export async function* streamPerFieldTranslation(
   // Poll merged results while any stream is still running
   const allDone = Promise.all(fieldStreams);
   let settled = false;
-  allDone.then(() => { settled = true; }).catch(() => { settled = true; });
+  allDone
+    .then(() => {
+      settled = true;
+    })
+    .catch(() => {
+      settled = true;
+    });
 
   while (!settled) {
     // Yield current snapshot

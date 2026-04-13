@@ -2,16 +2,13 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import type { PromptTestFixture, PromptTestResult } from '@/services/contextTranslation/promptTestHarness';
+import type {
+  PromptTestFixture,
+  PromptTestResult,
+} from '@/services/contextTranslation/promptTestHarness';
 import { runPromptEval } from '@/services/contextTranslation/promptTestHarness';
-import {
-  runProductionPromptEval,
-} from './productionTranslationEval';
-import {
-  getFixturePair,
-  sampleFixturesByPair,
-  selectTranslationModels,
-} from './evalHarnessUtils';
+import { runProductionPromptEval } from './productionTranslationEval';
+import { getFixturePair, sampleFixturesByPair, selectTranslationModels } from './evalHarnessUtils';
 
 type ChatResponse = {
   choices?: Array<{ message?: { content?: string } }>;
@@ -151,7 +148,7 @@ async function postLifecycle(baseUrl: string, path: string, model: string): Prom
 
     if (isRetryableStatus(response.status) && attempt < RETRY_DELAYS_MS.length) {
       const retryDelayMs = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)] ?? 0;
-        await sleep(retryDelayMs);
+      await sleep(retryDelayMs);
       continue;
     }
 
@@ -279,11 +276,10 @@ function summarize(report: { results: EvalResult[]; summary: { averageLatencyMs:
       ? usabilityScores.filter((score) => score >= 0.65).length
       : structuralUsability.filter((score) => score >= 1).length;
   const avgUsability = Number(
-    (
-      (usabilityScores.length > 0
-        ? usabilityScores.reduce((sum, score) => sum + score, 0) / usabilityScores.length
-        : structuralUsability.reduce((sum, score) => sum + score, 0) /
-          Math.max(structuralUsability.length, 1))
+    (usabilityScores.length > 0
+      ? usabilityScores.reduce((sum, score) => sum + score, 0) / usabilityScores.length
+      : structuralUsability.reduce((sum, score) => sum + score, 0) /
+        Math.max(structuralUsability.length, 1)
     ).toFixed(3),
   );
 
@@ -301,9 +297,11 @@ function summarize(report: { results: EvalResult[]; summary: { averageLatencyMs:
     avgUsability,
     avgAttempts,
     avgLatencyMs: report.summary.averageLatencyMs,
-    parsedMetaCount: report.results.filter((result) => result.structuralFlags?.['parsedMeta']).length,
-    missingPrimaryCount: report.results.filter((result) => result.structuralFlags?.['missingPrimary'])
+    parsedMetaCount: report.results.filter((result) => result.structuralFlags?.['parsedMeta'])
       .length,
+    missingPrimaryCount: report.results.filter(
+      (result) => result.structuralFlags?.['missingPrimary'],
+    ).length,
     rawContaminatedCount: report.results.filter(
       (result) => result.structuralFlags?.['rawContaminated'],
     ).length,
@@ -338,7 +336,9 @@ async function main() {
   const fixtures = sampleFixturesByPair(allFixtures, perPair);
   const fixturePairs = [...new Set(fixtures.map((fixture) => getFixturePair(fixture)))].sort();
 
-  console.log(`Loaded ${allFixtures.length} fixtures, sampled ${fixtures.length} (${perPair}/pair)`);
+  console.log(
+    `Loaded ${allFixtures.length} fixtures, sampled ${fixtures.length} (${perPair}/pair)`,
+  );
 
   const availableModels = await listModels(endpoint);
   const requestedModels = values.models
@@ -355,14 +355,18 @@ async function main() {
   }
 
   if (modelSelection.missingModels.length > 0) {
-    console.warn(`Requested models missing from endpoint: ${modelSelection.missingModels.join(', ')}`);
+    console.warn(
+      `Requested models missing from endpoint: ${modelSelection.missingModels.join(', ')}`,
+    );
   }
 
   if (activeModels.length === 0) {
     throw new Error('No matching translation models to evaluate.');
   }
 
-  console.log(`Models: ${activeModels.map((model) => `${model} (${getModelTier(model)})`).join(', ')}`);
+  console.log(
+    `Models: ${activeModels.map((model) => `${model} (${getModelTier(model)})`).join(', ')}`,
+  );
 
   const runReport: Record<string, unknown> = {
     timestamp: Date.now(),
@@ -382,18 +386,27 @@ async function main() {
     reports: {},
   };
 
-  await unloadAll(endpoint, availableModels.map((model) => model.id));
+  await unloadAll(
+    endpoint,
+    availableModels.map((model) => model.id),
+  );
 
   for (const model of activeModels) {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`Model: ${model} (tier: ${getModelTier(model)})`);
     console.log(`${'='.repeat(60)}`);
 
-    await unloadAll(endpoint, availableModels.map((candidate) => candidate.id));
+    await unloadAll(
+      endpoint,
+      availableModels.map((candidate) => candidate.id),
+    );
     await loadModel(endpoint, model);
     await verifyModelHealthy(endpoint, model);
 
-    const checkpointPath = outputPath.replace(/\.json$/, `.checkpoint-${model.replace(/[/\\:]/g, '_')}.json`);
+    const checkpointPath = outputPath.replace(
+      /\.json$/,
+      `.checkpoint-${model.replace(/[/\\:]/g, '_')}.json`,
+    );
     const checkpoint = useCheckpoint ? loadCheckpoint(checkpointPath, model) : null;
     const completedFixtureIds = new Set(checkpoint?.completedFixtureIds ?? []);
     const remainingFixtures = checkpoint
@@ -507,7 +520,9 @@ async function main() {
     }
 
     await unloadModel(endpoint, model).catch(() => undefined);
-    console.log(`Done: ${JSON.stringify((runReport['summaries'] as Record<string, unknown>)[model])}`);
+    console.log(
+      `Done: ${JSON.stringify((runReport['summaries'] as Record<string, unknown>)[model])}`,
+    );
   }
 
   writeFileSync(outputPath, JSON.stringify(runReport, null, 2));
@@ -518,4 +533,3 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-

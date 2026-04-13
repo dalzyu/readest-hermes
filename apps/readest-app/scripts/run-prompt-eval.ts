@@ -42,10 +42,7 @@ async function main() {
 
   const fixturePath = values.fixture
     ? resolve(values.fixture)
-    : resolve(
-        __dirname,
-        '../src/services/contextTranslation/fixtures/coreFixtures.json',
-      );
+    : resolve(__dirname, '../src/services/contextTranslation/fixtures/coreFixtures.json');
   const outputPath = resolve(values.output ?? 'prompt-eval-results.json');
 
   console.log(`Loading fixtures from: ${fixturePath}`);
@@ -54,9 +51,7 @@ async function main() {
   console.log(`Provider: ${providerType}, Model: ${modelId}`);
 
   // Dynamic import of the harness (uses TS paths — run via tsx)
-  const { runPromptEval } = await import(
-    '../src/services/contextTranslation/promptTestHarness'
-  );
+  const { runPromptEval } = await import('../src/services/contextTranslation/promptTestHarness');
 
   // Create a simple model caller using the ai SDK
   const { generateText } = await import('ai');

@@ -580,7 +580,7 @@ const AITranslatePanel: React.FC = () => {
                     }}
                   />
                 </div>
-                <div className='config-item !px-0 mt-2'>
+                <div className='config-item mt-2 !px-0'>
                   <span className='text-sm'>{_('Harness flow')}</span>
                   <select
                     className='select select-bordered select-xs'
@@ -601,7 +601,7 @@ const AITranslatePanel: React.FC = () => {
                     {_('Parallel mode uses one API call per field — costs 3-4× more per lookup.')}
                   </p>
                 )}
-                <div className='config-item !px-0 mt-2'>
+                <div className='config-item mt-2 !px-0'>
                   <span className='text-sm'>{_('Auto-expand selection to word boundary')}</span>
                   <input
                     type='checkbox'
@@ -615,7 +615,7 @@ const AITranslatePanel: React.FC = () => {
                     }}
                   />
                 </div>
-                <div className='config-item !px-0 mt-2'>
+                <div className='config-item mt-2 !px-0'>
                   <span className='text-sm'>{_('Repair pass')}</span>
                   <input
                     type='checkbox'
@@ -625,7 +625,7 @@ const AITranslatePanel: React.FC = () => {
                     onChange={() => saveCtxHarness({ repairEnabled: !ctxHarness.repairEnabled })}
                   />
                 </div>
-                <div className='config-item !px-0 mt-2'>
+                <div className='config-item mt-2 !px-0'>
                   <span className='text-sm'>{_('Per-field rescue')}</span>
                   <input
                     type='checkbox'
@@ -637,7 +637,7 @@ const AITranslatePanel: React.FC = () => {
                     }
                   />
                 </div>
-                <div className='config-item !px-0 mt-2'>
+                <div className='config-item mt-2 !px-0'>
                   <span className='text-sm'>{_('Completion threshold')}</span>
                   <input
                     type='number'
@@ -647,15 +647,12 @@ const AITranslatePanel: React.FC = () => {
                     value={Math.round(ctxHarness.completionThreshold * 100)}
                     disabled={!ctxEnabled || !isAiSource}
                     onChange={(e) => {
-                      const percent = Math.max(
-                        0,
-                        Math.min(100, parseInt(e.target.value, 10) || 0),
-                      );
+                      const percent = Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0));
                       saveCtxHarness({ completionThreshold: percent / 100 });
                     }}
                   />
                 </div>
-                <div className='config-item !px-0 mt-2'>
+                <div className='config-item mt-2 !px-0'>
                   <span className='text-sm'>{_('Translation max words')}</span>
                   <input
                     type='number'
@@ -746,7 +743,10 @@ const AITranslatePanel: React.FC = () => {
                           max={5}
                           value={ctxHarness.maxRepairAttempts}
                           onChange={(e) => {
-                            const value = Math.max(0, Math.min(5, parseInt(e.target.value, 10) || 0));
+                            const value = Math.max(
+                              0,
+                              Math.min(5, parseInt(e.target.value, 10) || 0),
+                            );
                             saveCtxHarness({ maxRepairAttempts: value });
                           }}
                         />
@@ -760,7 +760,10 @@ const AITranslatePanel: React.FC = () => {
                           max={5}
                           value={ctxHarness.maxPerFieldRepairAttempts}
                           onChange={(e) => {
-                            const value = Math.max(0, Math.min(5, parseInt(e.target.value, 10) || 0));
+                            const value = Math.max(
+                              0,
+                              Math.min(5, parseInt(e.target.value, 10) || 0),
+                            );
                             saveCtxHarness({ maxPerFieldRepairAttempts: value });
                           }}
                         />
