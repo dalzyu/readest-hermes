@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import AIPanel from '@/components/settings/AIPanel';
 import AITranslatePanel from '@/components/settings/AITranslatePanel';
 import SettingsDialog from '@/components/settings/SettingsDialog';
+import type { TranslationSource } from '@/services/contextTranslation/simpleLookup';
 
 const saveSettingsMock = vi.fn().mockResolvedValue(undefined);
 const setSettingsMock = vi.fn();
@@ -35,6 +36,7 @@ const { stableSettings } = vi.hoisted(() => {
     globalReadSettings: {
       contextTranslation: {
         enabled: true,
+        source: 'ai' as TranslationSource,
         targetLanguage: 'en',
         recentContextPages: 3,
         lookAheadWords: 80,
