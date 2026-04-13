@@ -9,6 +9,7 @@ import { runContextLookup } from '@/services/contextTranslation/contextLookupSer
 import { runSimpleLookup } from '@/services/contextTranslation/simpleLookup';
 import type { TranslationSource } from '@/services/contextTranslation/simpleLookup';
 import {
+  finalizeTranslationWithContext,
   streamTranslationWithContext,
   streamLookupWithContext,
   streamPerFieldTranslation,
@@ -249,8 +250,30 @@ export function useContextLookup({
 
           setStreaming(false);
 
+          let finalizedFields = finalFields;
+          let finalizedRawText = finalRawText;
+
+          if (!useMultiField) {
+            const finalized = await finalizeTranslationWithContext(
+              {
+                ...translationRequest,
+                harness: requestSnapshot.settings.harness,
+              },
+              model,
+              abortController.signal,
+              Object.keys(finalFields).length > 0 || finalRawText
+                ? {
+                    initialRawText: finalRawText,
+                    initialFields: finalFields,
+                  }
+                : undefined,
+            );
+            finalizedFields = finalized.fields;
+            finalizedRawText = finalized.rawText;
+          }
+
           // If streaming yielded no fields, call without preNormalizedFields to force a fresh LLM request
-          const hasStreamingResult = Object.keys(finalFields).length > 0;
+          const hasStreamingResult = Object.keys(finalizedFields).length > 0;
 
           // Post-stream: repair (if needed) + enrichment + telemetry via runContextLookup
           const lookupResult = await runContextLookup({
@@ -264,7 +287,7 @@ export function useContextLookup({
             abortSignal: abortController.signal,
             preDictionaryEntries: dictionaryEntries,
             ...(hasStreamingResult
-              ? { preNormalizedFields: finalFields, rawResponse: finalRawText }
+              ? { preNormalizedFields: finalizedFields, rawResponse: finalizedRawText }
               : {}),
           });
 

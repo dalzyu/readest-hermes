@@ -50,6 +50,18 @@ describe('DEFAULT_CONTEXT_TRANSLATION_SETTINGS', () => {
     });
   });
 
+  test('default translation field demands a short direct answer', () => {
+    const translation = s.outputFields.find((f) => f.id === 'translation');
+    expect(translation?.promptInstruction).toContain('1-3 words maximum');
+    expect(translation?.promptInstruction).toContain('Do NOT include explanations');
+  });
+
+  test('default examples field requires target-language-only examples', () => {
+    const examples = s.outputFields.find((f) => f.id === 'examples');
+    expect(examples?.promptInstruction).toContain('TARGET LANGUAGE');
+    expect(examples?.promptInstruction).toContain('Do NOT use the source word');
+  });
+
   test('fields have unique, sequential order values', () => {
     const orders = s.outputFields.map((f) => f.order).sort((a, b) => a - b);
     orders.forEach((o, i) => expect(o).toBe(i));
@@ -64,6 +76,16 @@ describe('DEFAULT_CONTEXT_TRANSLATION_SETTINGS', () => {
   test('provides separate toggles for same-book and prior-volume rag', () => {
     expect(s.sameBookRagEnabled).toBe(true);
     expect(s.priorVolumeRagEnabled).toBe(true);
+  });
+
+  test('ships production harness defaults for repair and sanitization', () => {
+    expect(s.harness).toBeDefined();
+    expect(s.harness?.flow).toBe('production');
+    expect(s.harness?.repairEnabled).toBe(true);
+    expect(s.harness?.perFieldRescueEnabled).toBe(true);
+    expect(s.harness?.translationMaxWords).toBe(8);
+    expect(s.harness?.contaminationMarkers?.length ?? 0).toBeGreaterThan(0);
+    expect(s.harness?.reasoningMarkers?.length ?? 0).toBeGreaterThan(0);
   });
 
   test('supports ordered series volumes in the context translation model', () => {

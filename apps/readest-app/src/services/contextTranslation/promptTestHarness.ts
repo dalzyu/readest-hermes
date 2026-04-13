@@ -11,8 +11,6 @@
 import type { TranslationOutputField } from './types';
 import { buildPerFieldPrompt, buildTranslationPrompt } from './promptBuilder';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface PromptTestFixture {
   id: string;
   sourceText: string;
@@ -52,13 +50,31 @@ export interface PromptEvalReport {
   };
 }
 
-// ─── Default output fields for evaluation ─────────────────────────────────────
-
 const EVAL_OUTPUT_FIELDS: TranslationOutputField[] = [
-  { id: 'translation', label: 'Translation', enabled: true, order: 0, promptInstruction: 'Translate the selected text into the target language.' },
-  { id: 'contextualMeaning', label: 'Contextual Meaning', enabled: true, order: 1, promptInstruction: 'Explain what the selected text means in this specific context.' },
-  { id: 'phonetic', label: 'Phonetic', enabled: true, order: 2, promptInstruction: 'Provide the phonetic reading (pinyin/romaji/IPA as appropriate).' },
-  { id: 'examples', label: 'Examples', enabled: true, order: 3, promptInstruction: 'Provide 2-3 example sentences using the selected text.' },
+  {
+    id: 'translation',
+    label: 'Translation',
+    enabled: true,
+    order: 0,
+    promptInstruction:
+      'Provide ONLY the translated word or short phrase in the target language (1-3 words maximum). Do NOT include explanations, alternatives, parentheticals, or meta-commentary. If there is no exact equivalent, choose the single closest concept.',
+  },
+  {
+    id: 'contextualMeaning',
+    label: 'Contextual Meaning',
+    enabled: true,
+    order: 1,
+    promptInstruction:
+      'Explain what the selected word or phrase specifically means given the surrounding narrative context. Note any nuances, connotations, or cultural significance that differ from a generic dictionary definition.',
+  },
+  {
+    id: 'examples',
+    label: 'Examples',
+    enabled: true,
+    order: 2,
+    promptInstruction:
+      'Provide 2-3 short example sentences in the TARGET LANGUAGE that use the translated word or phrase naturally. Every sentence must be written entirely in the target language. Do NOT use the source word in examples.',
+  },
 ];
 
 function parseTaggedFields(text: string, fields: TranslationOutputField[]): Record<string, string> {
@@ -104,12 +120,15 @@ function scoreResult(
 ): Record<string, number> {
   const scores: Record<string, number> = {};
 
-  const hasTranslation = Boolean(fields['translation']?.trim());
-  scores['translationPresent'] = hasTranslation ? 1 : 0;
-  scores['xmlCoverage'] = completionRatio(fields, EVAL_OUTPUT_FIELDS);
-  scores['noReasoningLeak'] = /<(translation|contextualMeaning|phonetic|examples)>/i.test(rawResponse)
+  const hasTranslation = Boolean(fields["translation"]?.trim());
+  scores["translationPresent"] = hasTranslation ? 1 : 0;
+  scores["xmlCoverage"] = completionRatio(fields, EVAL_OUTPUT_FIELDS);
+  scores["noReasoningLeak"] = /<(translation|contextualMeaning|phonetic|examples)>/i.test(rawResponse)
     ? 1
     : 0;
+
+  const translationLen = (fields["translation"] ?? '').length;
+  scores["translationConcise"] = translationLen <= 60 ? 1 : translationLen <= 120 ? 0.5 : 0;
 
   if (fixture.expectedFields) {
     for (const [key, expected] of Object.entries(fixture.expectedFields)) {
@@ -118,7 +137,6 @@ function scoreResult(
     }
   }
 
-  // Composite usability: prioritize non-empty translation and XML structure compliance.
   const expectedScores = Object.entries(scores)
     .filter(([key]) => key.startsWith('expected_'))
     .map(([, value]) => value);
@@ -126,13 +144,15 @@ function scoreResult(
     expectedScores.length > 0
       ? expectedScores.reduce((sum, value) => sum + value, 0) / expectedScores.length
       : 1;
-  const usability = scores['translationPresent'] * 0.45 + scores['xmlCoverage'] * 0.35 + expectedMean * 0.2;
-  scores['usability'] = Number(usability.toFixed(3));
+  const usability =
+    scores["translationPresent"] * 0.4 +
+    scores["xmlCoverage"] * 0.3 +
+    scores["translationConcise"] * 0.15 +
+    expectedMean * 0.15;
+  scores["usability"] = Number(usability.toFixed(3));
 
   return scores;
 }
-
-// ─── Runner ───────────────────────────────────────────────────────────────────
 
 export async function runPromptEval(
   fixtures: PromptTestFixture[],
@@ -188,7 +208,6 @@ export async function runPromptEval(
 
       if (!parsedFields['translation']) {
         attemptCount += 1;
-        // Final rescue: call per-field prompts and stitch a minimal usable record.
         const stitched: Record<string, string> = {};
         for (const field of EVAL_OUTPUT_FIELDS.filter((f) => f.enabled)) {
           const perField = buildPerFieldPrompt(field, {

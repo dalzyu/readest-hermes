@@ -1,112 +1,110 @@
-/**
+﻿/**
  * Grammar hint generation for the translation/dictionary popup.
  *
  * Japanese: deterministic POS analysis via kuromoji (no LLM needed).
- * Other languages: returns null — grammar hints come from the LLM field instead.
+ * Other languages: returns null 鈥?grammar hints come from the LLM field instead.
  */
 import { isTokenizerReady, tokenizeRaw } from './plugins/jpTokenizer';
 import type { IpadicToken } from 'kuromoji';
 
-// Japanese POS → English label lookup
+// Japanese POS \u922b?English label lookup
 const POS_LABELS: Record<string, string> = {
-  名詞: 'Noun',
-  動詞: 'Verb',
-  形容詞: 'i-Adjective',
-  形容動詞: 'na-Adjective',
-  副詞: 'Adverb',
-  連体詞: 'Prenominal',
-  接続詞: 'Conjunction',
-  感動詞: 'Interjection',
-  助詞: 'Particle',
-  助動詞: 'Auxiliary',
-  接頭詞: 'Prefix',
-  記号: 'Symbol',
-  フィラー: 'Filler',
+  '\u935a\u5d88\ue7fb': 'Noun',
+  '\u9355\u66e1\ue7fb': 'Verb',
+  '\u8930\u3220\ue190\u746d?': 'i-Adjective',
+  '\u8930\u3220\ue190\u9355\u66e1\ue7fb': 'na-Adjective',
+  '\u9353\ue21d\ue7fb': 'Adverb',
+  '\u95ab\uff44\u7d8b\u746d?': 'Prenominal',
+  '\u93ba\u30e7\u7a13\u746d?': 'Conjunction',
+  '\u93b0\u71b7\u5aca\u746d?': 'Interjection',
+  '\u9354\u2544\ue7fb': 'Particle',
+  '\u9354\u2541\u5aca\u746d?': 'Auxiliary',
+  '\u93ba\u30e9\u7260\u746d?': 'Prefix',
+  '\u7477\u6a3a\u5f7f': 'Symbol',
+  '\u9289\u66d8\u5045\u9289\u253f\u5157': 'Filler',
 };
 
 const POS_DETAIL_LABELS: Record<string, string> = {
-  一般: '',
-  自立: '',
-  非自立: 'dependent',
-  接尾: 'suffix',
-  数: 'numeral',
-  固有名詞: 'proper noun',
-  代名詞: 'pronoun',
-  副詞可能: 'adverbial',
-  サ変接続: 'suru-verb',
-  形容動詞語幹: 'na-adj stem',
-  ナイ形容詞語幹: 'nai-adj stem',
-  格助詞: 'case particle',
-  係助詞: 'binding particle',
-  副助詞: 'adverbial particle',
-  接続助詞: 'conjunctive particle',
-  終助詞: 'sentence-final particle',
-  連体化: 'adnominal',
-  引用: 'quotation',
+  '\u6d93\u20ac\u9478?': '',
+  '\u9477\ue046\u73db': '',
+  '\u95c8\u70b6\u569c\u7ed4?': 'dependent',
+  '\u93ba\u30e5\u71ac': 'suffix',
+  '\u93c1?': 'numeral',
+  '\u9365\u70d8\u6e41\u935a\u5d88\ue7fb': 'proper noun',
+  '\u6d60\uff45\u6095\u746d?': 'pronoun',
+  '\u9353\ue21d\ue7fb\u9359\ue21d\u5158': 'adverbial',
+  '\u9288\u975b\ue62e\u93ba\u30e7\u7a13': 'suru-verb',
+  '\u8930\u3220\ue190\u9355\u66e1\ue7fb\u747e\u70b2\u6784': 'na-adj stem',
+  '\u9289\u5a3f\u5046\u8930\u3220\ue190\u746d\u70b6\u736e\u9a9e?': 'nai-adj stem',
+  '\u93cd\u714e\u59ea\u746d?': 'case particle',
+  '\u6dc7\u509a\u59ea\u746d?': 'binding particle',
+  '\u9353\ue21a\u59ea\u746d?': 'adverbial particle',
+  '\u93ba\u30e7\u7a13\u9354\u2544\ue7fb': 'conjunctive particle',
+  '\u7ef2\u509a\u59ea\u746d?': 'sentence-final particle',
+  '\u95ab\uff44\u7d8b\u9356?': 'adnominal',
+  '\u5bee\u66e0\u6564': 'quotation',
 };
 
 const CONJUGATED_FORM_LABELS: Record<string, string> = {
-  基本形: 'plain form',
-  連用形: 'conjunctive',
-  連用タ接続: 'ta-conjunctive',
-  未然形: 'irrealis',
-  未然ウ接続: 'volitional base',
-  仮定形: 'conditional',
-  命令ｅ: 'imperative',
-  命令ｉ: 'imperative',
-  体言接続: 'attributive',
-  仮定縮約１: 'contracted conditional',
-  ガル接続: 'garu-conjunctive',
-  連用デ接続: 'de-conjunctive',
+  '\u9369\u70d8\u6e70\u8930?': 'plain form',
+  '\u95ab\uff47\u6564\u8930?': 'conjunctive',
+  '\u95ab\uff47\u6564\u9288\u630e\u5e34\u7f0d?': 'ta-conjunctive',
+  '\u93c8\ue046\u52a7\u8930?': 'irrealis',
+  '\u93c8\ue046\u52a7\u9288\ufe3d\u5e34\u7f0d?': 'volitional base',
+  '\u6d60\ue1bc\u757e\u8930?': 'conditional',
+  '\u935b\u6212\u62a4\u951d?': 'imperative',
+  '\u6d63\u64b9\u2588\u93ba\u30e7\u7a13': 'attributive',
+  '\u6d60\ue1bc\u757e\u7efa\ue1be\u78e9\u951b?': 'contracted conditional',
+  '\u9288\ue0fe\u5137\u93ba\u30e7\u7a13': 'garu-conjunctive',
+  '\u95ab\uff47\u6564\u9289\u56e8\u5e34\u7f0d?': 'de-conjunctive',
 };
 
 const CONJUGATED_TYPE_LABELS: Record<string, string> = {
-  一段: 'ichidan',
-  '五段・カ行イ音便': 'godan ka-row',
-  '五段・サ行': 'godan sa-row',
-  '五段・タ行': 'godan ta-row',
-  '五段・ナ行': 'godan na-row',
-  '五段・バ行': 'godan ba-row',
-  '五段・マ行': 'godan ma-row',
-  '五段・ラ行': 'godan ra-row',
-  '五段・ワ行促音便': 'godan wa-row',
-  '五段・ガ行': 'godan ga-row',
-  カ変・クル: 'kuru irregular',
-  サ変・スル: 'suru irregular',
-  特殊・タ: 'ta-form',
-  特殊・ナイ: 'nai-form',
-  特殊・タイ: 'tai-form',
-  特殊・デス: 'desu',
-  特殊・マス: 'masu',
-  形容詞・アウオ段: 'adj auo-row',
-  形容詞・イ段: 'adj i-row',
-  不変化型: 'uninflected',
+  '\u6d93\u20ac\u5a08?': 'ichidan',
+  '\u6d5c\u65c0\ue18c\u9289\u6c47\u5052\u741b\u5c7b\u5046\u95ca\u5145\u7a76': 'godan ka-row',
+  '\u6d5c\u65c0\ue18c\u9289\u6c47\u505f\u741b?': 'godan sa-row',
+  '\u6d5c\u65c0\ue18c\u9289\u6c47\u506a\u741b?': 'godan ta-row',
+  '\u6d5c\u65c0\ue18c\u9289\u6c47\u5115\u741b?': 'godan na-row',
+  '\u6d5c\u65c0\ue18c\u9289\u6c47\u511b\u741b?': 'godan ba-row',
+  '\u6d5c\u65c0\ue18c\u9289\u6c47\u512a\u741b?': 'godan ma-row',
+  '\u6d5c\u65c0\ue18c\u9289\u6c47\u5135\u741b?': 'godan ra-row',
+  '\u6d5c\u65c0\ue18c\u9289\u6c47\u513b\u741b\u5c7c\u7e3e\u95ca\u5145\u7a76': 'godan wa-row',
+  '\u6d5c\u65c0\ue18c\u9289\u6c47\u5053\u741b?': 'godan ga-row',
+  '\u9288\ue0a2\ue62e\u9289\u6c47\u5057\u9289?': 'kuru irregular',
+  '\u9288\u975b\ue62e\u9289\u6c47\u5063\u9289?': 'suru irregular',
+  '\u9417\u89c4\u7569\u9289\u6c47\u506a': 'ta-form',
+  '\u9417\u89c4\u7569\u9289\u6c47\u5115\u9288?': 'nai-form',
+  '\u9417\u89c4\u7569\u9289\u6c47\u506a\u9288?': 'tai-form',
+  '\u9417\u89c4\u7569\u9289\u6c47\u5111\u9288?': 'desu',
+  '\u9417\u89c4\u7569\u9289\u6c47\u512a\u9288?': 'masu',
+  '\u8930\u3220\ue190\u746d\u70aa\u5153\u9288\ue76c\u504a\u9288\ue045\ue18c': 'adj auo-row',
+  '\u8930\u3220\ue190\u746d\u70aa\u5153\u9288\u3086\ue18c': 'adj i-row',
+  '\u6d93\u5d85\ue62e\u9356\u6827\u7037': 'uninflected',
 };
 
 // Conjugated form -> human-readable transformation name.
 const FORM_EXPLANATION: Record<string, string> = {
-  連用形: 'Conjunctive form',
-  連用タ接続: 'Past tense',
-  未然形: 'Negative / potential base',
-  未然ウ接続: 'Volitional',
-  仮定形: 'Conditional',
-  命令ｅ: 'Imperative',
-  命令ｉ: 'Imperative',
-  体言接続: 'Attributive',
-  仮定縮約１: 'Contracted conditional',
-  ガル接続: '-garu form',
-  連用デ接続: 'te-form (de-connection)',
+  '\u95ab\uff47\u6564\u8930?': 'Conjunctive form',
+  '\u95ab\uff47\u6564\u9288\u630e\u5e34\u7f0d?': 'Past tense',
+  '\u93c8\ue046\u52a7\u8930?': 'Negative / potential base',
+  '\u93c8\ue046\u52a7\u9288\ufe3d\u5e34\u7f0d?': 'Volitional',
+  '\u6d60\ue1bc\u757e\u8930?': 'Conditional',
+  '\u935b\u6212\u62a4\u951d?': 'Imperative',
+  '\u6d63\u64b9\u2588\u93ba\u30e7\u7a13': 'Attributive',
+  '\u6d60\ue1bc\u757e\u7efa\ue1be\u78e9\u951b?': 'Contracted conditional',
+  '\u9288\ue0fe\u5137\u93ba\u30e7\u7a13': '-garu form',
+  '\u95ab\uff47\u6564\u9289\u56e8\u5e34\u7f0d?': 'te-form (de-connection)',
 };
 
 /**
  * Build a contextual grammar explanation for a conjugated Japanese token.
- * Example: "Past tense of 食べる (ichidan verb). Pattern: 食べ + た"
+ * Example: "Past tense of 椋熴伖銈?(ichidan verb). Pattern: 椋熴伖 + 銇?
  */
 function buildConjugationExplanation(token: IpadicToken): string | undefined {
   if (!token.basic_form || token.basic_form === '*' || token.basic_form === token.surface_form) {
     return undefined;
   }
-  if (!token.conjugated_form || token.conjugated_form === '*' || token.conjugated_form === '基本形') {
+  if (!token.conjugated_form || token.conjugated_form === '*' || token.conjugated_form === '鍩烘湰褰?') {
     return undefined;
   }
 
@@ -148,9 +146,9 @@ function buildConjugationExplanation(token: IpadicToken): string | undefined {
 }
 
 export interface GrammarHint {
-  label: string; // e.g. "Verb · ichidan · conjunctive"
+  label: string; // e.g. "Verb 路 ichidan 路 conjunctive"
   pos: string; // raw POS tag
-  explanation?: string; // e.g. "Past tense of 食べる (ichidan). Pattern: stem + た"
+  explanation?: string; // e.g. "Past tense of 椋熴伖銈?(ichidan). Pattern: stem + 銇?
 }
 
 /**
@@ -166,7 +164,7 @@ export function getJapaneseGrammarHint(text: string): GrammarHint | null {
   // For single-token: give full POS breakdown
   // For multi-token: give POS of the head token (last content word)
   const contentTokens = tokens.filter(
-    (t) => t.pos !== '記号' && t.pos !== 'BOS/EOS',
+    (t) => t.pos !== '瑷樺彿' && t.pos !== 'BOS/EOS',
   );
   if (contentTokens.length === 0) return null;
 
@@ -203,7 +201,7 @@ export function getJapaneseGrammarHint(text: string): GrammarHint | null {
   }
 
   return {
-    label: parts.join(' · '),
+    label: parts.join(' 路 '),
     pos: target.pos,
     explanation: buildConjugationExplanation(target),
   };

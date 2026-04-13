@@ -55,11 +55,16 @@ vi.mock('@/services/contextTranslation/translationService', () => ({
       done: true,
     };
   }),
+  finalizeTranslationWithContext: vi.fn().mockResolvedValue({
+    fields: { translation: 'close friend' },
+    rawText: '<translation>close friend</translation>',
+  }),
 }));
 
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
 import { saveLookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
+import { finalizeTranslationWithContext } from '@/services/contextTranslation/translationService';
 import { useContextLookup } from '@/hooks/useContextLookup';
 import type { PopupContextBundle } from '@/services/contextTranslation/types';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
@@ -112,6 +117,20 @@ describe('useContextLookup', () => {
 
     await waitFor(() => expect(result.current.result).not.toBeNull());
     expect(result.current.result?.['translation']).toBe('close friend');
+    expect(finalizeTranslationWithContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedText: expect.any(String),
+        harness: expect.objectContaining({
+          flow: 'production',
+        }),
+      }),
+      expect.anything(),
+      expect.any(AbortSignal),
+      expect.objectContaining({
+        initialRawText: '<lookup_json>{"translation":"close friend"}</lookup_json>',
+        initialFields: { translation: 'close friend' },
+      }),
+    );
 
     await waitFor(() => expect(saveLookupHistoryEntry).toHaveBeenCalledTimes(1));
     expect(saveLookupHistoryEntry).toHaveBeenCalledWith(

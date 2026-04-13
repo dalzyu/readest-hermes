@@ -1,0 +1,122 @@
+[
+  {
+    "fixtureId": "en-es-000",
+    "pair": "en->es",
+    "parsed": {
+      "translation": "Distanciada",
+      "contextualMeaning": "En este contexto, se refiere a una sensación de ajenidad o extrañeza profunda entre el recuerdo emocional de la narradora y la realidad física del lugar, sugiriendo que el lugar ya no resuena con la memoria pasada."
+    },
+    "parsedMeta": false,
+    "attempts": [
+      {
+        "stage": "initial",
+        "preview": "<translation>Distanciada</translation>\n<contextualMeaning>En este contexto, se refiere a una sensación de ajenidad o extrañeza profunda entre el recuerdo emocional de la narradora y la realidad física del lugar, sugiriendo que el lugar ya no resuena con la memoria pasada.</contextualMeaning>"
+      }
+    ]
+  },
+  {
+    "fixtureId": "en-de-000",
+    "pair": "en->de",
+    "parsed": {
+      "translation": "entfremdet",
+      "contextualMeaning": "In diesem Kontext bedeutet es, dass das Haus sich von der Erinnerung der Protagonistin so weit entfernt hat, dass es sich fremd und nicht mehr vertraut anfühlt, obwohl es äußerlich unverändert ist. Es beschreibt eine emotionale Distanzierung."
+    },
+    "parsedMeta": false,
+    "attempts": [
+      {
+        "stage": "initial",
+        "preview": "<translation>entfremdet</translation>\n<contextualMeaning>In diesem Kontext bedeutet es, dass das Haus sich von der Erinnerung der Protagonistin so weit entfernt hat, dass es sich fremd und nicht mehr vertraut anfühlt, obwohl es äußerlich unverändert ist. Es beschreibt eine emotionale Distanzierung.<"
+      }
+    ]
+  },
+  {
+    "fixtureId": "en-pt-000",
+    "pair": "en->pt",
+    "parsed": {
+      "translation": "distanciado",
+      "contextualMeaning": "Neste contexto, refere-se a um sentimento de estranheza profunda e desconexão entre o passado (a memória) e o presente (a casa), indicando que o lugar não corresponde mais à vivência emocional anterior."
+    },
+    "parsedMeta": false,
+    "attempts": [
+      {
+        "stage": "initial",
+        "preview": "<translation>distanciado</translation>\n<contextualMeaning>Neste contexto, refere-se a um sentimento de estranheza profunda e desconexão entre o passado (a memória) e o presente (a casa), indicando que o lugar não corresponde mais à vivência emocional anterior.</contextualMeaning>"
+      }
+    ]
+  },
+  {
+    "fixtureId": "en-it-000",
+    "pair": "en->it",
+    "parsed": {
+      "translation": "estraniata",
+      "contextualMeaning": "In questo contesto, non significa semplicemente \"lontana\" o \"separata\", ma suggerisce una profonda e incolmabile disconnessione emotiva o spirituale tra il ricordo passato e la realtà presente della casa, come se l'essenza del luogo fosse cambiata rispetto alla memoria."
+    },
+    "parsedMeta": false,
+    "attempts": [
+      {
+        "stage": "initial",
+        "preview": "<translation>estraniata</translation>\n<contextualMeaning>In questo contesto, non significa semplicemente \"lontana\" o \"separata\", ma suggerisce una profonda e incolmabile disconnessione emotiva o spirituale tra il ricordo passato e la realtà presente della casa, come se l'essenza del luogo fosse camb"
+      }
+    ]
+  },
+  {
+    "fixtureId": "en-ru-000",
+    "pair": "en->ru",
+    "parsed": {
+      "translation": "отчужденный",
+      "contextualMeaning": "В данном контексте \"отчужденный\" означает чувство глубокой, необратимой разобщенности или чуждости между воспоминаниями героини и реальностью дома, которая осталась неизменной внешне, но изменилась для нее самой."
+    },
+    "parsedMeta": false,
+    "attempts": [
+      {
+        "stage": "initial",
+        "preview": "<translation>отчужденный</translation>\n<contextualMeaning>В данном контексте \"отчужденный\" означает чувство глубокой, необратимой разобщенности или чуждости между воспоминаниями героини и реальностью дома, которая осталась неизменной внешне, но изменилась для нее самой.</contextualMeaning>"
+      }
+    ]
+  },
+  {
+    "fixtureId": "en-hi-000",
+    "pair": "en->hi",
+    "parsed": {
+      "translation": "विमुख",
+      "contextualMeaning": "इस संदर्भ में, 'estranged' का अर्थ है भावनात्मक या संबंधपरक दूरी होना; यहाँ यह उस पुरानी याद और वर्तमान वास्तविकता के बीच एक गहरा अलगाव या तालमेल की कमी को दर्शाता है, जैसे कि घर अब उस अतीत की भावना से मेल नहीं खाता जो पात्र अपने साथ लाई है।"
+    },
+    "parsedMeta": false,
+    "attempts": [
+      {
+        "stage": "initial",
+        "preview": "<translation>विमुख</translation>\n<contextualMeaning>इस संदर्भ में, 'estranged' का अर्थ है भावनात्मक या संबंधपरक दूरी होना; यहाँ यह उस पुरानी याद और वर्तमान वास्तविकता के बीच एक गहरा अलगाव या तालमेल की कमी को दर्शाता है, जैसे कि घर अब उस अतीत की भावना से मेल नहीं खाता जो पात्र अपने साथ लाई है।</conte"
+      }
+    ]
+  },
+  {
+    "fixtureId": "es-de-000",
+    "pair": "es->de",
+    "parsed": {
+      "translation": "tiefe Einsamkeit",
+      "contextualMeaning": "Hier bezeichnet es eine überwältigende, fast greifbare und existenzielle Einsamkeit, die durch den Verlust und die Isolation der Figur verursacht wird, nicht nur das Fehlen anderer Menschen."
+    },
+    "parsedMeta": false,
+    "attempts": [
+      {
+        "stage": "initial",
+        "preview": "<translation>tiefe Einsamkeit</translation>\n<contextualMeaning>Hier bezeichnet es eine überwältigende, fast greifbare und existenzielle Einsamkeit, die durch den Verlust und die Isolation der Figur verursacht wird, nicht nur das Fehlen anderer Menschen.</contextualMeaning>"
+      }
+    ]
+  },
+  {
+    "fixtureId": "es-ru-000",
+    "pair": "es->ru",
+    "parsed": {
+      "translation": "Глубокое одиночество",
+      "contextualMeaning": "Здесь это не просто отсутствие людей, а всепоглощающее, почти осязаемое состояние душевной пустоты и изоляции, которое является центральной темой повествования о горе и потере."
+    },
+    "parsedMeta": false,
+    "attempts": [
+      {
+        "stage": "initial",
+        "preview": "<translation>Глубокое одиночество</translation>\n<contextualMeaning>Здесь это не просто отсутствие людей, а всепоглощающее, почти осязаемое состояние душевной пустоты и изоляции, которое является центральной темой повествования о горе и потере.</contextualMeaning>"
+      }
+    ]
+  }
+]
