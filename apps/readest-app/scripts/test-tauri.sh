@@ -4,7 +4,8 @@
 # (no file watcher, no built-in dev server), waits for the WebDriver
 # server on port 4445, runs tests, then tears down everything cleanly.
 #
-set -euo pipefail
+set -eu
+set -o pipefail
 
 DEV_PORT=3000
 WEBDRIVER_PORT=4445
