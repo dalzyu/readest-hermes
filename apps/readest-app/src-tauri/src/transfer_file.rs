@@ -220,8 +220,9 @@ pub async fn download_file(
     let file = Arc::new(tokio::sync::Mutex::new(file));
     let progress = Arc::new(tokio::sync::Mutex::new(TransferStats::default()));
 
-    stream::iter(0..part_count)
-        .for_each_concurrent(8, |i| {
+    let multipart_result: Result<()> = stream::iter(0..part_count)
+        .map(Ok::<u64, Error>)
+        .try_for_each_concurrent(8, |i| {
             let client = client.clone();
             let file = Arc::clone(&file);
             let progress = Arc::clone(&progress);
@@ -239,26 +240,28 @@ pub async fn download_file(
                     req = req.header(key, value);
                 }
 
-                let resp = match req.send().await {
-                    Ok(r) => r,
-                    Err(_) => return,
-                };
-
-                if !resp.status().is_success()
-                    && resp.status() != reqwest::StatusCode::PARTIAL_CONTENT
-                {
-                    return;
+                let resp = req.send().await?;
+                if resp.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+                    let status = resp.status();
+                    return Err(Error::HttpErrorCode(
+                        status.as_u16(),
+                        resp.text().await.unwrap_or_default(),
+                    ));
                 }
 
-                let bytes = match resp.bytes().await {
-                    Ok(b) => b,
-                    Err(_) => return,
-                };
+                let bytes = resp.bytes().await?;
+                let expected_len = (end - start + 1) as usize;
+                if bytes.len() != expected_len {
+                    return Err(Error::ContentLength(format!(
+                        "range response length mismatch for bytes {start}-{end}: expected {expected_len}, got {}",
+                        bytes.len()
+                    )));
+                }
 
                 {
                     let mut f = file.lock().await;
-                    f.seek(std::io::SeekFrom::Start(start)).await.unwrap();
-                    f.write_all(&bytes).await.unwrap();
+                    f.seek(std::io::SeekFrom::Start(start)).await?;
+                    f.write_all(&bytes).await?;
                 }
 
                 {
@@ -270,9 +273,18 @@ pub async fn download_file(
                         transfer_speed: stat.transfer_speed,
                     });
                 }
+
+                Ok(())
             }
         })
         .await;
+
+    if let Err(error) = multipart_result {
+        let _ = tokio::fs::remove_file(file_path).await;
+        return Err(error);
+    }
+
+    file.lock().await.sync_all().await?;
 
     Ok(resp_headers)
 }

@@ -4,6 +4,7 @@ import type {
   TranslationOutputField,
   TranslationRequest,
 } from '@/services/contextTranslation/types';
+import { resolveContextTranslationHarnessSettings } from '@/services/contextTranslation/defaults';
 
 vi.mock('@/services/contextTranslation/llmClient', () => ({
   callLLM: vi.fn(),
@@ -119,27 +120,10 @@ describe('harness LLM call budget (maxTotalLLMCalls)', () => {
     expect(result['examples']).toBe('He remained a close friend through the crisis.');
   });
 
-  test('single-pass flow skips per-field rescue even with budget remaining', async () => {
-    // Call 1: contaminated → repair triggers
-    // Call 2: repair produces clean result → done (no per-field rescue in single-pass)
-    mockCallLLM
-      .mockResolvedValueOnce(
-        '<translation>Thinking Process:\nAnalyze.</translation>\n<contextualMeaning>junk</contextualMeaning>',
-      )
-      .mockResolvedValueOnce(
-        '<translation>close friend</translation>\n' +
-          '<contextualMeaning>A soulmate.</contextualMeaning>\n' +
-          '<examples>He found a close friend.</examples>',
-      );
-
-    const result = await translateWithContext({
-      ...baseRequest,
-      harness: { flow: 'single-pass', maxTotalLLMCalls: 10 },
-    });
-
-    // single-pass allows repair but not per-field rescue
-    expect(mockCallLLM).toHaveBeenCalledTimes(2);
-    expect(result['translation']).toBe('close friend');
+  test('legacy single-pass harness settings normalize to production', () => {
+    expect(resolveContextTranslationHarnessSettings({ flow: 'single-pass' as never }).flow).toBe(
+      'production',
+    );
   });
 
   test('repair disabled limits to 1 call even with production flow and budget', async () => {

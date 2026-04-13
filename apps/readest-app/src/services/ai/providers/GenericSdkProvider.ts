@@ -3,6 +3,7 @@ import { createMistral } from '@ai-sdk/mistral';
 import { createGroq } from '@ai-sdk/groq';
 import type { LanguageModel, EmbeddingModel } from 'ai';
 import type { AIProvider, ProviderConfig, AIProviderType, InferenceParams } from '../types';
+import { providerTypeSupportsEmbeddings, resolveEmbeddingModelId } from '../constants';
 import { aiLogger } from '../logger';
 import { AI_TIMEOUTS } from '../utils/retry';
 
@@ -16,8 +17,6 @@ const SDK_FACTORIES: Partial<Record<AIProviderType, SdkFactory>> = {
   mistral: createMistral as unknown as SdkFactory,
   groq: createGroq as unknown as SdkFactory,
 };
-
-const EMBEDDING_CAPABLE: Set<AIProviderType> = new Set(['mistral']);
 
 export class GenericSdkProvider implements AIProvider {
   id: string;
@@ -52,19 +51,23 @@ export class GenericSdkProvider implements AIProvider {
   }
 
   getEmbeddingModel(): EmbeddingModel {
-    if (!EMBEDDING_CAPABLE.has(this.providerType) || !this.client.textEmbeddingModel) {
+    if (!providerTypeSupportsEmbeddings(this.providerType) || !this.client.textEmbeddingModel) {
       throw new Error(
         `${this.providerType} does not support embeddings. Configure a separate embedding provider.`,
       );
     }
-    return this.client.textEmbeddingModel(this.config.embeddingModel || '');
+    const embeddingModel = resolveEmbeddingModelId(this.config);
+    if (!embeddingModel) {
+      throw new Error(`Configure an embedding model for ${this.providerType}.`);
+    }
+    return this.client.textEmbeddingModel(embeddingModel);
   }
 
   async isAvailable(): Promise<boolean> {
     return !!this.config.apiKey;
   }
 
-  async healthCheck(): Promise<boolean> {
+  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
     if (!this.config.apiKey) return false;
     try {
       // Most providers expose an OpenAI-compatible /v1/models endpoint
@@ -73,7 +76,15 @@ export class GenericSdkProvider implements AIProvider {
         headers: { Authorization: `Bearer ${this.config.apiKey}` },
         signal: AbortSignal.timeout(AI_TIMEOUTS.HEALTH_CHECK),
       });
-      return response.ok;
+      if (!response.ok) return false;
+      const data = (await response.json()) as { data?: Array<{ id: string }> };
+      const models = (data.data ?? []).map((model) => model.id);
+      if (!models.includes(this.config.model)) return false;
+      if (!options?.requireEmbedding) return true;
+      if (!providerTypeSupportsEmbeddings(this.providerType)) return false;
+
+      const embeddingModel = resolveEmbeddingModelId(this.config);
+      return !!embeddingModel && models.includes(embeddingModel);
     } catch (e) {
       aiLogger.provider.error(this.id, (e as Error).message);
       return false;

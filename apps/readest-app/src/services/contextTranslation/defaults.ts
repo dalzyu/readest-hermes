@@ -59,6 +59,7 @@ export function resolveContextTranslationHarnessSettings(
   return {
     ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
     ...harness,
+    flow: 'production',
     contaminationMarkers:
       harness?.contaminationMarkers ??
       DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.contaminationMarkers,

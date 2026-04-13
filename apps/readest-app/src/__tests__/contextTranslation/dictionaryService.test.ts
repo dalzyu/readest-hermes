@@ -5,6 +5,7 @@ import {
   importUserDictionary,
   deleteUserDictionary,
   getUserDictionaryMeta,
+  lookupDefinitions,
   saveUserDictionaryMeta,
 } from '@/services/contextTranslation/dictionaryService';
 
@@ -52,6 +53,9 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
 
 vi.mock('fflate', () => ({
   gzip: vi.fn((data: Uint8Array, cb: (err: Error | null, result: Uint8Array) => void) => {
+    cb(null, data);
+  }),
+  decompress: vi.fn((data: Uint8Array, cb: (err: Error | null, result: Uint8Array) => void) => {
     cb(null, data);
   }),
 }));
@@ -199,6 +203,18 @@ describe('importUserDictionary', () => {
     expect(result.importedAt).toBeGreaterThan(0);
   });
 
+  test('wraps plain-text import errors with filename context', async () => {
+    const brokenFile = new File(['hello\nworld'], 'broken.txt', { type: 'text/plain' });
+
+    await expect(
+      importUserDictionary(brokenFile, {
+        name: 'Broken',
+        language: 'en',
+        targetLanguage: 'zh',
+      }),
+    ).rejects.toThrow('Failed to import broken.txt');
+  });
+
   test('saves meta to settings store after import', async () => {
     await importUserDictionary(fakeZipBuffer(), {
       name: 'Second',
@@ -319,6 +335,77 @@ describe('deleteUserDictionary', () => {
 
   test('deleting non-existent id does not throw', async () => {
     await expect(deleteUserDictionary('does-not-exist')).resolves.not.toThrow();
+  });
+});
+
+describe('lookupDefinitions', () => {
+  const encoder = new TextEncoder();
+
+  const storeDictionaryRecord = (meta: UserDictionary, entries: DictionaryEntry[]) => {
+    records.set(meta.id, {
+      id: meta.id,
+      meta,
+      blob: encoder.encode(JSON.stringify(entries)),
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    settingsRef.current = [];
+    records.clear();
+
+    storeDictionaryRecord(
+      {
+        id: 'bundled-zh-en',
+        name: 'bundled-zh-en',
+        language: 'zh',
+        targetLanguage: 'en',
+        entryCount: 1,
+        source: 'bundled',
+        importedAt: 0,
+        bundledVersion: '1.0.0',
+        enabled: true,
+      },
+      [{ headword: '你好', definition: 'bundled hello' }],
+    );
+  });
+
+  test('returns bundled dictionary matches when the bundled pair is enabled', async () => {
+    const result = await lookupDefinitions('你好', 'zh', 'en');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.definition).toBe('bundled hello');
+    expect(result[0]!.source).toBe('bundled-zh-en');
+  });
+
+  test('prefers matching user dictionaries over bundled dictionaries', async () => {
+    settingsRef.current = [
+      {
+        id: 'user-zh-en',
+        name: 'Custom Zh-En',
+        language: 'zh',
+        targetLanguage: 'en',
+        entryCount: 1,
+        source: 'user',
+        importedAt: 1_800_000_000,
+        enabled: true,
+      },
+    ];
+    storeDictionaryRecord(settingsRef.current[0]!, [
+      { headword: '你好', definition: 'custom hello' },
+    ]);
+
+    const result = await lookupDefinitions('你好', 'zh', 'en');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.definition).toBe('custom hello');
+    expect(result[0]!.source).toBe('Custom Zh-En');
+  });
+
+  test('skips bundled dictionaries that are disabled in settings', async () => {
+    const result = await lookupDefinitions('你好', 'zh', 'en', ['bundled-zh-en']);
+
+    expect(result).toEqual([]);
   });
 });
 

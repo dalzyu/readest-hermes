@@ -1,16 +1,17 @@
 import clsx from 'clsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { PiSpinner, PiTrash, PiWarningCircle } from 'react-icons/pi';
+import { PiSpinner, PiTrash } from 'react-icons/pi';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import {
-  BUNDLED_DICTIONARIES,
   previewDictionaryZip,
   importUserDictionary,
   deleteUserDictionary,
+  SUPPORTED_DICTIONARY_IMPORT_EXTENSIONS,
+  SUPPORTED_DICTIONARY_IMPORT_FORMATS,
 } from '@/services/contextTranslation/dictionaryService';
 import { getTranslatorLanguageOptions } from '@/services/translatorLanguages';
 import type {
@@ -36,6 +37,12 @@ type HarnessPresetId = keyof typeof CONTEXT_TRANSLATION_HARNESS_PRESETS;
 
 function formatHarnessJson(harness: ContextTranslationHarnessSettings): string {
   return JSON.stringify(harness, null, 2);
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return fallback;
 }
 
 const AITranslatePanel: React.FC = () => {
@@ -89,12 +96,6 @@ const AITranslatePanel: React.FC = () => {
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
     ctxDictSettings.sourceExamples,
   );
-  const [ctxDictSource, setCtxDictSource] = useState<'ai' | 'dictionary'>(
-    ctxDictSettings.source ?? 'ai',
-  );
-
-  // Dictionaries section state
-  const [dictionaryUnavailableBanner, setDictionaryUnavailableBanner] = useState(false);
   const [userDictionaries, setUserDictionaries] = useState<UserDictionary[]>(
     settings?.userDictionaryMeta ?? [],
   );
@@ -279,8 +280,8 @@ const AITranslatePanel: React.FC = () => {
       setImportSourceLang('');
       setImportTargetLang('');
       setShowModal(true);
-    } catch {
-      setImportError(_('Failed to read dictionary file'));
+    } catch (error) {
+      setImportError(getErrorMessage(error, _('Failed to read dictionary file')));
     } finally {
       // Reset input value so same file can be selected again
       e.target.value = '';
@@ -304,7 +305,7 @@ const AITranslatePanel: React.FC = () => {
       setImportPreview(null);
       setSelectedZipFile(null);
     } catch (err) {
-      setImportError((err as Error).message || _('Failed to import dictionary'));
+      setImportError(getErrorMessage(err, _('Failed to import dictionary')));
     } finally {
       setImporting(false);
     }
@@ -318,23 +319,6 @@ const AITranslatePanel: React.FC = () => {
       console.error('Failed to delete dictionary:', err);
     }
   };
-
-  const toggleBundledDict = useCallback(
-    (id: string) => {
-      const currentSettings = settingsRef.current;
-      if (!currentSettings) return;
-      const current: ContextTranslationSettings =
-        currentSettings.globalReadSettings.contextTranslation ??
-        DEFAULT_CONTEXT_TRANSLATION_SETTINGS;
-      const disabled = current.disabledBundledDicts ?? [];
-      const isCurrentlyDisabled = disabled.includes(id);
-      const disabledBundledDicts = isCurrentlyDisabled
-        ? disabled.filter((d) => d !== id)
-        : [...disabled, id];
-      saveCtxTransSetting({ disabledBundledDicts });
-    },
-    [saveCtxTransSetting],
-  );
 
   const toggleUserDict = useCallback(
     (id: string) => {
@@ -362,7 +346,7 @@ const AITranslatePanel: React.FC = () => {
       <input
         ref={fileInputRef}
         type='file'
-        accept='.zip,.dsl,.dsl.dz,.mdx'
+        accept={SUPPORTED_DICTIONARY_IMPORT_EXTENSIONS.join(',')}
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />
@@ -574,19 +558,9 @@ const AITranslatePanel: React.FC = () => {
                 </div>
                 <div className='config-item mt-2 !px-0'>
                   <span className='text-sm'>{_('Harness flow')}</span>
-                  <select
-                    className='select select-bordered select-xs'
-                    value={ctxHarness.flow}
-                    disabled={!ctxEnabled || !isAiSource}
-                    onChange={(e) =>
-                      saveCtxHarness({
-                        flow: e.target.value as ContextTranslationHarnessSettings['flow'],
-                      })
-                    }
-                  >
-                    <option value='production'>{_('Production')}</option>
-                    <option value='single-pass'>{_('Single pass')}</option>
-                  </select>
+                  <span className='text-base-content/60 text-xs font-medium'>
+                    {_('Production only')}
+                  </span>
                 </div>
                 {ctxFieldStrategy === 'multi' && (
                   <p className='text-warning mt-1 text-xs'>
@@ -914,7 +888,7 @@ const AITranslatePanel: React.FC = () => {
         <h2 className='mb-2 font-medium'>{_('Dictionary Lookup')}</h2>
         <p className='text-base-content/70 mb-3 text-sm'>
           {_(
-            'When enabled, selecting text in the reader triggers a dictionary lookup. Use AI for context-aware definitions or a traditional dictionary for instant results.',
+            'When enabled, selecting text in the reader triggers a dictionary lookup. Use AI for context-aware definitions.',
           )}
         </p>
         <div className='card border-base-200 bg-base-100 border shadow'>
@@ -934,38 +908,10 @@ const AITranslatePanel: React.FC = () => {
               />
             </div>
 
-            {/* Dictionary source — available even when AI is disabled */}
             <div
               className={clsx(
                 'config-item',
                 !ctxDictEnabled && 'pointer-events-none select-none opacity-50',
-              )}
-            >
-              <label htmlFor='ctx-dict-source-select'>{_('Lookup Source')}</label>
-              <select
-                id='ctx-dict-source-select'
-                className='select select-bordered select-sm'
-                value={ctxDictSource}
-                disabled={!ctxDictEnabled}
-                onChange={(e) => {
-                  const next = e.target.value as 'ai' | 'dictionary';
-                  setCtxDictSource(next);
-                  saveCtxDictSetting({ source: next });
-                }}
-              >
-                <option value='ai' disabled={!aiEnabled}>
-                  {_('AI')}
-                  {!aiEnabled ? ` (${_('Enable AI first')})` : ''}
-                </option>
-                <option value='dictionary'>{_('Traditional Dictionary')}</option>
-              </select>
-            </div>
-
-            <div
-              className={clsx(
-                'config-item',
-                (!ctxDictEnabled || ctxDictSource !== 'ai') &&
-                  'pointer-events-none select-none opacity-50',
               )}
             >
               <label htmlFor='ctx-dict-source-examples-toggle'>
@@ -976,7 +922,7 @@ const AITranslatePanel: React.FC = () => {
                 type='checkbox'
                 className='toggle'
                 checked={ctxDictSourceExamples}
-                disabled={!ctxDictEnabled || ctxDictSource !== 'ai'}
+                disabled={!ctxDictEnabled}
                 onChange={() => {
                   const next = !ctxDictSourceExamples;
                   setCtxDictSourceExamples(next);
@@ -1017,51 +963,7 @@ const AITranslatePanel: React.FC = () => {
           </div>
         </div>
 
-        {dictionaryUnavailableBanner && (
-          <div className='alert alert-warning mb-3'>
-            <PiWarningCircle className='size-5' />
-            <span>{_('Some bundled dictionaries are not available')}</span>
-            <button
-              className='btn btn-ghost btn-xs'
-              onClick={() => setDictionaryUnavailableBanner(false)}
-            >
-              {_('Dismiss')}
-            </button>
-          </div>
-        )}
-
         <div className='card border-base-200 bg-base-100 border shadow'>
-          {/* Bundled Dictionaries sub-section */}
-          <div className='border-base-200 border-b px-4 py-3'>
-            <h3 className='mb-2 text-sm font-medium'>{_('Bundled Dictionaries')}</h3>
-            <div className='space-y-1'>
-              {BUNDLED_DICTIONARIES.map((dict) => {
-                const disabledBundledDicts = ctxTransSettings.disabledBundledDicts ?? [];
-                const isEnabled = !disabledBundledDicts.includes(dict.id);
-                return (
-                  <div key={dict.id} className='flex items-center justify-between text-sm'>
-                    <span>
-                      {getLanguageName(dict.language)} → {getLanguageName(dict.targetLanguage)}
-                    </span>
-                    <div className='flex items-center gap-2'>
-                      <span className='text-base-content/60'>
-                        {dict.language.toUpperCase()} → {dict.targetLanguage.toUpperCase()} ·{' '}
-                        <span className='text-success'>✓ {_('ready')}</span>
-                      </span>
-                      <input
-                        type='checkbox'
-                        data-testid={`bundled-dict-toggle-${dict.id}`}
-                        className='toggle toggle-sm'
-                        checked={isEnabled}
-                        onChange={() => toggleBundledDict(dict.id)}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           {/* User Dictionaries sub-section */}
           <div className='px-4 py-3'>
             <div className='mb-2 flex items-center justify-between'>
@@ -1069,6 +971,10 @@ const AITranslatePanel: React.FC = () => {
               <button className='btn btn-outline btn-xs' onClick={handleAddDictionaryClick}>
                 {_('Add Dictionary')}
               </button>
+            </div>
+
+            <div className='text-base-content/70 mb-2 text-xs'>
+              {`${_('Supported formats')}: ${SUPPORTED_DICTIONARY_IMPORT_FORMATS}`}
             </div>
 
             {userDictionaries.length === 0 ? (

@@ -3,6 +3,7 @@ import { aiStore } from './storage/aiStore';
 import { chunkSection, extractTextFromDocument } from './utils/chunker';
 import { withRetryAndTimeout, AI_TIMEOUTS, AI_RETRY_CONFIGS } from './utils/retry';
 import { getProviderForTask } from './providers';
+import { resolveEmbeddingModelId } from './constants';
 import { aiLogger } from './logger';
 import type {
   AISettings,
@@ -101,7 +102,7 @@ export async function indexBook(
   }
 
   aiLogger.rag.indexStart(bookHash, title);
-  const { provider } = getProviderForTask(settings, 'embedding');
+  const { provider, config } = getProviderForTask(settings, 'embedding');
   const sections = bookDoc.sections || [];
   const toc = bookDoc.toc || [];
 
@@ -174,9 +175,7 @@ export async function indexBook(
     }
 
     onProgress?.({ current: 0, total: allChunks.length, phase: 'embedding' });
-    // Resolve the embedding model name for logging from the active provider config
-    const activeConfig = settings.providers.find((p) => p.id === settings.activeProviderId);
-    const embeddingModelName = activeConfig?.embeddingModel || 'unknown';
+    const embeddingModelName = resolveEmbeddingModelId(config) || 'unknown';
     aiLogger.embedding.start(embeddingModelName, allChunks.length);
 
     const embeddingModel = provider.getEmbeddingModel();
@@ -242,8 +241,9 @@ export async function indexBook(
     state.progress = 100;
     const durationMs = Date.now() - startTime;
     aiLogger.rag.indexComplete(bookHash, allChunks.length, durationMs);
+    const status = errorMessages.length > 0 ? 'partial' : 'complete';
     return {
-      status: 'complete',
+      status,
       chunksProcessed: allChunks.length,
       totalSections: sections.length,
       skippedSections: skippedCount,

@@ -109,7 +109,10 @@ fn set_window_open_with_files(app: &AppHandle, files: Vec<PathBuf>) {
         })
         .collect::<Vec<_>>()
         .join(",");
-    let window = app.get_webview_window("main").unwrap();
+    let Some(window) = app.get_webview_window("main") else {
+        log::warn!("Main window not ready when attempting to pass open-with files");
+        return;
+    };
     let script = format!("window.OPEN_WITH_FILES = [{files}];");
     if let Err(e) = window.eval(&script) {
         eprintln!("Failed to set open files variable: {e}");
@@ -197,16 +200,32 @@ pub fn run() {
     let builder = builder.plugin(
         tauri_plugin_single_instance::Builder::new()
             .callback(move |app, argv, cwd| {
-                let _ = app
-                    .get_webview_window("main")
-                    .expect("no main window")
-                    .set_focus();
                 let files = get_files_from_argv(argv.clone());
                 if !files.is_empty() {
                     allow_file_in_scopes(app, files.clone());
                 }
-                app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
-                    .unwrap();
+
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_focus();
+                } else {
+                    log::warn!("Single-instance callback fired before main window was ready");
+                    if !files.is_empty() {
+                        let app_handle = app.clone();
+                        let deferred_files = files.clone();
+                        app.listen("window-ready", move |_| {
+                            set_window_open_with_files(&app_handle, deferred_files.clone());
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.set_focus();
+                            }
+                        });
+                    }
+                }
+
+                if let Err(error) =
+                    app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
+                {
+                    log::warn!("Failed to emit single-instance payload: {error}");
+                }
             })
             .dbus_id("com.bilingify.readest".to_owned())
             .build(),

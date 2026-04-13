@@ -41,7 +41,8 @@ export class AnthropicProvider implements AIProvider {
     return !!this.config.apiKey;
   }
 
-  async healthCheck(): Promise<boolean> {
+  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
+    if (options?.requireEmbedding) return false;
     if (!this.config.apiKey) return false;
     try {
       const baseUrl = this.config.baseUrl || 'https://api.anthropic.com';

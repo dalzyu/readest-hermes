@@ -14,7 +14,12 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
 import { createProviderFromConfig } from '@/services/ai/providers';
-import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
+import {
+  DEFAULT_AI_SETTINGS,
+  providerConfigCanServeEmbeddings,
+  providerTypeSupportsEmbeddings,
+  resolveEmbeddingModelId,
+} from '@/services/ai/constants';
 import type {
   AISettings,
   AIProviderType,
@@ -76,15 +81,6 @@ const REQUIRES_API_KEY: Set<AIProviderType> = new Set([
 
 const HAS_API_STYLE: Set<AIProviderType> = new Set(['openai-compatible', 'openai']);
 
-const HAS_EMBEDDING: Set<AIProviderType> = new Set([
-  'ollama',
-  'openai',
-  'openai-compatible',
-  'google',
-  'mistral',
-  'ai-gateway',
-]);
-
 const TASK_LABELS: Record<AITaskType, string> = {
   translation: 'Translation',
   dictionary: 'Dictionary',
@@ -106,9 +102,22 @@ function emptyConfig(providerType: AIProviderType): ProviderConfig {
         ? 'http://127.0.0.1:11434'
         : providerType === 'openai-compatible'
           ? 'http://127.0.0.1:8080'
-          : '',
+          : providerType === 'openai'
+            ? 'https://api.openai.com'
+            : '',
     model: providerType === 'ollama' ? 'llama3.2' : '',
-    embeddingModel: providerType === 'ollama' ? 'nomic-embed-text' : undefined,
+    embeddingModel:
+      providerType === 'ollama'
+        ? 'nomic-embed-text'
+        : providerType === 'openai'
+          ? 'text-embedding-3-small'
+          : providerType === 'google'
+            ? 'gemini-embedding-001'
+            : providerType === 'mistral'
+              ? 'mistral-embed'
+              : providerType === 'ai-gateway'
+                ? 'openai/text-embedding-3-small'
+                : undefined,
     embeddingBaseUrl: providerType === 'openai-compatible' ? 'http://127.0.0.1:8081' : undefined,
     apiStyle: HAS_API_STYLE.has(providerType) ? 'chat-completions' : undefined,
   };
@@ -317,7 +326,7 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
         </div>
 
         {/* Embedding fields */}
-        {HAS_EMBEDDING.has(config.providerType) && (
+        {providerTypeSupportsEmbeddings(config.providerType) && (
           <>
             {config.providerType === 'openai-compatible' && (
               <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
@@ -371,11 +380,18 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
                 />
               </div>
             )}
+            {!resolveEmbeddingModelId(config) && (
+              <div className='config-item'>
+                <span className='text-warning text-xs'>
+                  {_('Configure an embedding model before using this provider for book indexing.')}
+                </span>
+              </div>
+            )}
           </>
         )}
 
         {/* No embedding warning */}
-        {!HAS_EMBEDDING.has(config.providerType) && (
+        {!providerTypeSupportsEmbeddings(config.providerType) && (
           <div className='config-item'>
             <span className='text-warning text-xs'>
               {_(
@@ -502,9 +518,29 @@ const AIPanel: React.FC = () => {
     if (!config || !enabled) return;
     setConnectionStatus('testing');
     setErrorMessage('');
+
+    const embeddingProviderId =
+      (modelAssignments.embedding &&
+      providers.some((provider) => provider.id === modelAssignments.embedding)
+        ? modelAssignments.embedding
+        : activeProviderId) ?? activeProviderId;
+    const requireEmbedding = embeddingProviderId === config.id;
+
+    if (requireEmbedding && !providerConfigCanServeEmbeddings(config)) {
+      setConnectionStatus('error');
+      setErrorMessage(
+        providerTypeSupportsEmbeddings(config.providerType)
+          ? _('Configure an embedding model before using this provider for book indexing.')
+          : _(
+              'This provider does not support embeddings. Assign a separate embedding provider for book indexing.',
+            ),
+      );
+      return;
+    }
+
     try {
       const provider = createProviderFromConfig(config);
-      const ok = await provider.healthCheck();
+      const ok = await provider.healthCheck({ requireEmbedding });
       if (ok) {
         setConnectionStatus('success');
       } else {
@@ -721,13 +757,13 @@ const AIPanel: React.FC = () => {
                 {(['translation', 'dictionary', 'chat', 'embedding'] as AITaskType[]).map(
                   (task) => {
                     const assignedId = modelAssignments[task];
-                    const effectiveProvider = assignedId
-                      ? providers.find((p) => p.id === assignedId)
-                      : activeConfig;
+                    const effectiveProvider =
+                      (assignedId ? providers.find((p) => p.id === assignedId) : undefined) ??
+                      activeConfig;
                     const embeddingMissing =
                       task === 'embedding' &&
                       effectiveProvider &&
-                      !HAS_EMBEDDING.has(effectiveProvider.providerType);
+                      !providerConfigCanServeEmbeddings(effectiveProvider);
                     return (
                       <div
                         key={task}
@@ -754,9 +790,13 @@ const AIPanel: React.FC = () => {
                         {embeddingMissing && (
                           <p className='text-warning flex items-center gap-1 text-xs'>
                             <PiWarningCircle className='size-3.5 shrink-0' />
-                            {_(
-                              'This provider does not support embeddings. Book indexing will not work. Assign an embedding-capable provider (e.g. OpenAI, Ollama, Google AI) or use OpenAI-Compatible mode.',
-                            )}
+                            {providerTypeSupportsEmbeddings(effectiveProvider.providerType)
+                              ? _(
+                                  'This provider is missing an embedding model. Configure one before using it for book indexing.',
+                                )
+                              : _(
+                                  'This provider does not support embeddings. Book indexing will not work. Assign an embedding-capable provider (e.g. OpenAI, Ollama, Google AI) or use OpenAI-Compatible mode.',
+                                )}
                           </p>
                         )}
                       </div>

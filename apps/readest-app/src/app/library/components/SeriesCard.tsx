@@ -13,6 +13,51 @@ import type { Book } from '@/types/book';
 import type { AppService } from '@/types/system';
 import type { BookSeries } from '@/services/contextTranslation/types';
 
+type SeriesIndexSummary = {
+  indexed: number;
+  skipped: number;
+  failed: number;
+  warnings: number;
+};
+
+export function buildSeriesIndexMessage(
+  summary: SeriesIndexSummary,
+  translate: ReturnType<typeof useTranslation>,
+): { message: string; type: 'info' | 'success' | 'warning' | 'error' } {
+  const lines: string[] = [];
+
+  if (summary.indexed > 0) {
+    lines.push(translate('Indexed {{count}} volume(s)', { count: summary.indexed }));
+  }
+  if (summary.warnings > 0) {
+    lines.push(
+      translate('Indexed with warnings for {{count}} volume(s)', { count: summary.warnings }),
+    );
+  }
+  if (summary.skipped > 0) {
+    lines.push(translate('Skipped {{count}} volume(s)', { count: summary.skipped }));
+  }
+  if (summary.failed > 0) {
+    lines.push(translate('Failed to index {{count}} volume(s)', { count: summary.failed }));
+  }
+
+  const type =
+    summary.failed > 0
+      ? summary.indexed > 0 || summary.warnings > 0 || summary.skipped > 0
+        ? 'warning'
+        : 'error'
+      : summary.warnings > 0
+        ? 'warning'
+        : summary.indexed > 0
+          ? 'success'
+          : 'info';
+
+  return {
+    message: lines.join('\n') || translate('No volumes needed indexing'),
+    type,
+  };
+}
+
 export async function loadSeriesIndexStates(series: BookSeries): Promise<Record<string, boolean>> {
   const entries = await Promise.all(
     series.volumes.map(async (volume) => [
@@ -29,17 +74,23 @@ export async function indexSeriesVolumes(
   libraryBooks: Book[],
   appService: AppService | null | undefined,
   aiSettings: AISettings | undefined,
-): Promise<{ indexed: number; skipped: number; failed: number }> {
-  if (!appService || !aiSettings) return { indexed: 0, skipped: 0, failed: 0 };
+): Promise<SeriesIndexSummary> {
+  if (!appService || !aiSettings) return { indexed: 0, skipped: 0, failed: 0, warnings: 0 };
 
   let indexed = 0;
   let skipped = 0;
   let failed = 0;
+  let warnings = 0;
 
   const orderedVolumes = [...series.volumes].sort((a, b) => a.volumeIndex - b.volumeIndex);
   for (const volume of orderedVolumes) {
     const book = libraryBooks.find((item) => item.hash === volume.bookHash);
     if (!book) continue;
+
+    if (await aiStore.isIndexed(volume.bookHash)) {
+      skipped++;
+      continue;
+    }
 
     try {
       const { file } = await appService.loadBookContent(book);
@@ -50,8 +101,13 @@ export async function indexSeriesVolumes(
         book.hash,
         aiSettings,
       );
-      if (result.status === 'complete' || result.status === 'already-indexed') {
+      if (result.status === 'complete') {
         indexed++;
+      } else if (result.status === 'partial') {
+        indexed++;
+        warnings++;
+      } else if (result.status === 'already-indexed') {
+        skipped++;
       } else if (result.status === 'empty') {
         skipped++;
       }
@@ -60,7 +116,7 @@ export async function indexSeriesVolumes(
     }
   }
 
-  return { indexed, skipped, failed };
+  return { indexed, skipped, failed, warnings };
 }
 
 interface SeriesCardProps {
@@ -112,8 +168,15 @@ const SeriesCard: React.FC<SeriesCardProps> = ({ series, libraryBooks, onIndexed
   const handleIndexAll = async () => {
     setIsIndexing(true);
     try {
-      await indexSeriesVolumes(series, libraryBooks, appService, settings.aiSettings);
+      const summary = await indexSeriesVolumes(
+        series,
+        libraryBooks,
+        appService,
+        settings.aiSettings,
+      );
       setIndexStates(await loadSeriesIndexStates(series));
+      const toast = buildSeriesIndexMessage(summary, _);
+      void eventDispatcher.dispatch('toast', toast);
       await onIndexed?.();
     } finally {
       setIsIndexing(false);

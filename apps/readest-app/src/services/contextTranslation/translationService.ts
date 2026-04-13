@@ -160,7 +160,6 @@ export async function finalizeTranslationWithContext(
   }
 
   if (
-    harness.flow === 'production' &&
     harness.perFieldRescueEnabled &&
     (!hasUsablePrimaryField(parsed, request) || responseContaminated)
   ) {

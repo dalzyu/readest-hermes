@@ -213,6 +213,18 @@ vi.mock('@/services/contextTranslation/dictionaryService', () => ({
     { id: 'bundled-zh-en', language: 'zh', targetLanguage: 'en', bundledVersion: '1.0.0' },
     { id: 'bundled-ja-en', language: 'ja', targetLanguage: 'en', bundledVersion: '1.0.0' },
   ],
+  SUPPORTED_DICTIONARY_IMPORT_EXTENSIONS: [
+    '.zip',
+    '.dsl',
+    '.dsl.dz',
+    '.csv',
+    '.tsv',
+    '.txt',
+    '.json',
+    '.jsonl',
+  ],
+  SUPPORTED_DICTIONARY_IMPORT_FORMATS:
+    'StarDict (.zip), DSL (.dsl/.dz), CSV (.csv), TSV (.tsv), plain text (.txt), JSON (.json/.jsonl)',
   initBundledDictionaries: vi.fn().mockReturnValue(Promise.resolve()),
   previewDictionaryZip: vi.fn().mockResolvedValue({ name: 'TestDict', wordcount: 100 }),
   importUserDictionary: vi.fn().mockResolvedValue({}),
@@ -222,6 +234,7 @@ vi.mock('@/services/contextTranslation/dictionaryService', () => ({
 describe('AIPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    stableSettings.globalReadSettings.contextTranslation.source = 'ai';
     Object.defineProperty(global.navigator, 'clipboard', {
       value: { writeText: writeClipboardMock },
       configurable: true,
@@ -237,6 +250,13 @@ describe('AIPanel', () => {
 
     expect(screen.getByText('Use same-book memory')).toBeTruthy();
     expect(screen.getByText('Use prior-volume memory')).toBeTruthy();
+  });
+
+  test('locks context translation harness to production only', () => {
+    render(<AITranslatePanel />);
+
+    expect(screen.getByText('Production only')).toBeTruthy();
+    expect(screen.queryByText('Single pass')).toBeNull();
   });
 
   test('renders provider list with configured providers', () => {
@@ -268,16 +288,21 @@ describe('AIPanel', () => {
     expect(screen.getByLabelText(/enable dictionary lookup/i)).toBeTruthy();
   });
 
-  test('renders Dictionaries section with bundled and user sections', () => {
+  test('renders Dictionaries section with user section', () => {
     render(<AITranslatePanel />);
     expect(screen.getByText('Dictionaries')).toBeTruthy();
-    expect(screen.getByText('Bundled Dictionaries')).toBeTruthy();
     expect(screen.getByText('User Dictionaries')).toBeTruthy();
+    expect(screen.queryByText('Bundled Dictionaries')).toBeNull();
   });
 
   test('shows Add Dictionary button in User Dictionaries section', () => {
     render(<AITranslatePanel />);
     expect(screen.getByText('Add Dictionary')).toBeTruthy();
+  });
+
+  test('shows supported dictionary import formats', () => {
+    render(<AITranslatePanel />);
+    expect(screen.getByText(/Supported formats:/)).toBeTruthy();
   });
 
   test('SettingsDialog renders AI Translate tab button', () => {
@@ -309,14 +334,10 @@ describe('AIPanel', () => {
     expect(textarea.value).toBe(defaultValue);
   });
 
-  test('bundled dictionary has enable toggle', () => {
+  test('bundled dictionary controls are no longer shown', () => {
     render(<AITranslatePanel />);
-    // The bundled dicts are bundled-zh-en and bundled-ja-en from the mock
-    const zhToggle = screen.getByTestId('bundled-dict-toggle-bundled-zh-en');
-    expect(zhToggle).toBeTruthy();
-    expect((zhToggle as HTMLInputElement).type).toBe('checkbox');
-    // By default enabled (undefined === enabled)
-    expect((zhToggle as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByTestId('bundled-dict-toggle-bundled-zh-en')).toBeNull();
+    expect(screen.queryByTestId('bundled-dict-toggle-bundled-ja-en')).toBeNull();
   });
 
   test('user dictionary enable toggle updates checked state when clicked', async () => {
@@ -332,11 +353,24 @@ describe('AIPanel', () => {
     });
   });
 
-  test('source dropdown allows selecting Dictionary', () => {
+  test('translation source dropdown includes Dictionary', () => {
     render(<AITranslatePanel />);
     const dropdown = screen.getByTestId('translation-source');
     expect(dropdown).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Dictionary' })).toBeTruthy();
     fireEvent.change(dropdown, { target: { value: 'deepl' } });
+  });
+
+  test('preserves saved dictionary translation source on mount', () => {
+    stableSettings.globalReadSettings.contextTranslation.source = 'dictionary';
+
+    render(<AITranslatePanel />);
+
+    expect((screen.getByTestId('translation-source') as HTMLSelectElement).value).toBe(
+      'dictionary',
+    );
+    expect(setSettingsMock).not.toHaveBeenCalled();
+    expect(saveSettingsMock).not.toHaveBeenCalled();
   });
 
   test('renders harness controls and applies advanced harness JSON overrides', () => {

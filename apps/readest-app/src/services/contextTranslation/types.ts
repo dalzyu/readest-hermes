@@ -9,8 +9,8 @@ export interface TranslationOutputField {
 }
 
 export interface ContextTranslationHarnessSettings {
-  /** 'production' applies repair + rescue + sanitization. 'single-pass' trusts the initial response. */
-  flow: 'production' | 'single-pass';
+  /** Production-only harness. Legacy single-pass values are normalized away on load. */
+  flow: 'production';
   repairEnabled: boolean;
   repairOnContamination: boolean;
   repairOnMissingPrimary: boolean;

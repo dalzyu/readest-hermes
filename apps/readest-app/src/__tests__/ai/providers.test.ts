@@ -37,7 +37,7 @@ vi.mock('@ai-sdk/openai', () => ({
 import { OllamaProvider } from '@/services/ai/providers/OllamaProvider';
 import { AIGatewayProvider } from '@/services/ai/providers/AIGatewayProvider';
 import { OpenAICompatibleProvider } from '@/services/ai/providers/OpenAICompatibleProvider';
-import { getAIProvider } from '@/services/ai/providers';
+import { getAIProvider, getProviderForTask } from '@/services/ai/providers';
 import type { AISettings, ProviderConfig } from '@/services/ai/types';
 import { DEFAULT_AI_SETTINGS, DEFAULT_OLLAMA_CONFIG } from '@/services/ai/constants';
 
@@ -60,6 +60,31 @@ describe('OllamaProvider', () => {
 
     const result = await provider.isAvailable();
     expect(result).toBe(true);
+  });
+
+  test('healthCheck requires exact configured chat and embedding models', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        models: [{ name: 'llama3.2:latest' }, { name: 'nomic-embed-text:latest' }],
+      }),
+    });
+    const provider = new OllamaProvider(DEFAULT_OLLAMA_CONFIG);
+
+    await expect(provider.healthCheck({ requireEmbedding: true })).resolves.toBe(true);
+  });
+
+  test('healthCheck rejects substring model matches', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ models: [{ name: 'llama3.2:latest' }] }),
+    });
+    const provider = new OllamaProvider({
+      ...DEFAULT_OLLAMA_CONFIG,
+      model: 'llama3',
+    });
+
+    await expect(provider.healthCheck()).resolves.toBe(false);
   });
 });
 
@@ -186,5 +211,54 @@ describe('getAIProvider', () => {
     const provider = getAIProvider(settings);
 
     expect(provider.id).toBe('oc-1');
+  });
+
+  test('rejects embedding assignments to providers without embedding support', () => {
+    const settings: AISettings = {
+      ...DEFAULT_AI_SETTINGS,
+      enabled: true,
+      providers: [
+        {
+          id: 'anthropic-1',
+          name: 'Anthropic',
+          providerType: 'anthropic',
+          baseUrl: '',
+          model: 'claude-3-5-sonnet',
+          apiKey: 'test-key',
+        },
+      ],
+      activeProviderId: 'anthropic-1',
+      modelAssignments: {
+        embedding: 'anthropic-1',
+      },
+    };
+
+    expect(() => getProviderForTask(settings, 'embedding')).toThrow(
+      'Anthropic does not support embeddings.',
+    );
+  });
+
+  test('rejects embedding-capable providers that have no embedding model configured', () => {
+    const settings: AISettings = {
+      ...DEFAULT_AI_SETTINGS,
+      enabled: true,
+      providers: [
+        {
+          id: 'oc-1',
+          name: 'OpenAI-Compatible',
+          providerType: 'openai-compatible',
+          baseUrl: 'http://127.0.0.1:8080',
+          model: 'gemma-3-4b',
+        },
+      ],
+      activeProviderId: 'oc-1',
+      modelAssignments: {
+        embedding: 'oc-1',
+      },
+    };
+
+    expect(() => getProviderForTask(settings, 'embedding')).toThrow(
+      'OpenAI-Compatible is missing an embedding model.',
+    );
   });
 });

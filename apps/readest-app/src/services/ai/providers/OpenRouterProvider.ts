@@ -40,7 +40,8 @@ export class OpenRouterProvider implements AIProvider {
     return !!this.config.apiKey;
   }
 
-  async healthCheck(): Promise<boolean> {
+  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
+    if (options?.requireEmbedding) return false;
     if (!this.config.apiKey) return false;
     try {
       const response = await fetch('https://openrouter.ai/api/v1/models', {

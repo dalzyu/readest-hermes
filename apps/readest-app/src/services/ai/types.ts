@@ -90,7 +90,7 @@ export interface AIProvider {
   getEmbeddingModel(): EmbeddingModel;
 
   isAvailable(): Promise<boolean>;
-  healthCheck(): Promise<boolean>;
+  healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
