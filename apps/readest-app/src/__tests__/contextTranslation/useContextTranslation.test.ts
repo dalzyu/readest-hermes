@@ -51,6 +51,19 @@ vi.mock('@/services/contextTranslation/translationService', () => ({
       done: true,
     };
   }),
+  streamLookupWithContext: vi.fn(function* () {}),
+  streamPerFieldTranslation: vi.fn(function* () {}),
+  finalizeTranslationWithContext: vi
+    .fn()
+    .mockImplementation(async (_request, _model, _signal, existing) => ({
+      fields: existing?.initialFields ?? {
+        translation: 'close friend',
+        contextualMeaning: 'a deeply trusted companion',
+      },
+      rawText:
+        existing?.initialRawText ??
+        '<lookup_json>{"translation":"close friend","contextualMeaning":"a deeply trusted companion"}</lookup_json>',
+    })),
 }));
 
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';

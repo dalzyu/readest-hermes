@@ -1,6 +1,7 @@
 import type { LanguageModel } from 'ai';
 import type {
   ContextDictionarySettings,
+  ContextTranslationHarnessSettings,
   TranslationRequest,
   TranslationResult,
   TranslationStreamResult,
@@ -11,12 +12,14 @@ import { buildTranslationPrompt, buildLookupPrompt, buildPerFieldPrompt } from '
 import { parseTranslationResponse, StreamingParser } from './responseParser';
 import { normalizeLookupResponse } from './normalizer';
 import { callLLM, streamLLM } from './llmClient';
-import { getContextDictionaryOutputFields, DEFAULT_CONTEXT_DICTIONARY_SETTINGS } from './defaults';
+import {
+  getContextDictionaryOutputFields,
+  DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+  resolveContextTranslationHarnessSettings,
+} from './defaults';
+import { sanitizeFieldContent, sanitizeTranslationResult } from './translationSanitizer';
 
-function hasUsablePrimaryField(
-  parsed: TranslationResult,
-  request: TranslationRequest,
-): boolean {
+function hasUsablePrimaryField(parsed: TranslationResult, request: TranslationRequest): boolean {
   const primary = request.outputFields.find((field) => field.enabled)?.id ?? 'translation';
   return Boolean(parsed[primary]?.trim());
 }
@@ -28,6 +31,22 @@ function completionRatio(parsed: TranslationResult, request: TranslationRequest)
     (field) => field.enabled && Boolean(parsed[field.id]?.trim()),
   ).length;
   return completed / enabledCount;
+}
+
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function responseLooksContaminated(
+  response: string,
+  harness: ContextTranslationHarnessSettings,
+): boolean {
+  if (!harness.detectContamination || !response.trim()) return false;
+  const markers = [...harness.contaminationMarkers, ...harness.reasoningMarkers]
+    .map((marker) => escapeRegexLiteral(marker.trim()))
+    .filter(Boolean);
+  if (markers.length === 0) return false;
+  return new RegExp(markers.join('|'), 'i').test(response);
 }
 
 function buildTranslationRepairPrompt(
@@ -42,9 +61,142 @@ function buildTranslationRepairPrompt(
 The previous answer did not follow the required XML shape.
 Rewrite the answer now with ONLY these tags and in this exact order:
 ${template}
-Do not include reasoning, markdown, or any extra text.`,
+Do not include reasoning, markdown, or any extra text.
+Do not write phrases like "Thinking Process", "The user wants me", "Analyze the Request", steps, plans, or self-referential analysis inside any tag.`,
     userPrompt: `Retry the same request exactly and return only valid XML tags in the required order.\n\nOriginal request:\n${originalUserPrompt}`,
   };
+}
+
+function buildPerFieldRepairPrompt(
+  fieldId: string,
+  targetLanguage: string,
+  originalSystemPrompt: string,
+  originalUserPrompt: string,
+): { systemPrompt: string; userPrompt: string } {
+  return {
+    systemPrompt: `You are a literary translation assistant.
+
+Return ONLY the final ${fieldId} content in ${targetLanguage}.
+Do not reveal your reasoning. Do not write "Thinking Process", "The user wants me", "Analyze the Request", confidence scores, plans, steps, XML tags, labels, markdown, or extra commentary.
+Original field request:
+${originalSystemPrompt}`,
+    userPrompt: `Retry the same ${fieldId} request and output only the final content.
+
+Original request:
+${originalUserPrompt}`,
+  };
+}
+
+function shouldRunRepair(
+  parsed: TranslationResult,
+  request: TranslationRequest,
+  responseContaminated: boolean,
+  harness: ContextTranslationHarnessSettings,
+): boolean {
+  if (!harness.repairEnabled) return false;
+  if (harness.repairOnContamination && responseContaminated) return true;
+  if (harness.repairOnMissingPrimary && !hasUsablePrimaryField(parsed, request)) return true;
+  if (
+    harness.repairOnLowCompletion &&
+    completionRatio(parsed, request) < harness.completionThreshold
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export type FinalizeTranslationSeed = {
+  initialRawText?: string;
+  initialFields?: TranslationResult;
+};
+
+export type FinalizedTranslation = {
+  fields: TranslationResult;
+  rawText: string;
+};
+
+export async function finalizeTranslationWithContext(
+  request: TranslationRequest,
+  model?: LanguageModel,
+  abortSignal?: AbortSignal,
+  seed?: FinalizeTranslationSeed,
+): Promise<FinalizedTranslation> {
+  const harness = resolveContextTranslationHarnessSettings(request.harness);
+  const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
+  let latestRawText =
+    seed?.initialRawText ?? (await callLLM(systemPrompt, userPrompt, model!, abortSignal)) ?? '';
+  let parsed = sanitizeTranslationResult(
+    seed?.initialFields ?? parseTranslationResponse(latestRawText, request.outputFields),
+    harness,
+  );
+  let responseContaminated = responseLooksContaminated(latestRawText, harness);
+
+  let repairAttempts = 0;
+  while (
+    repairAttempts < harness.maxRepairAttempts &&
+    shouldRunRepair(parsed, request, responseContaminated, harness)
+  ) {
+    repairAttempts += 1;
+    const repair = buildTranslationRepairPrompt(
+      systemPrompt,
+      userPrompt,
+      request.outputFields
+        .filter((field) => field.enabled)
+        .sort((a, b) => a.order - b.order)
+        .map((field) => field.id),
+    );
+    latestRawText =
+      (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
+    parsed = sanitizeTranslationResult(
+      parseTranslationResponse(latestRawText, request.outputFields),
+      harness,
+    );
+    responseContaminated = responseLooksContaminated(latestRawText, harness);
+  }
+
+  if (
+    harness.flow === 'production' &&
+    harness.perFieldRescueEnabled &&
+    (!hasUsablePrimaryField(parsed, request) || responseContaminated)
+  ) {
+    const stitched: TranslationResult = {};
+    const enabledFields = request.outputFields
+      .filter((field) => field.enabled)
+      .sort((a, b) => a.order - b.order);
+
+    for (const field of enabledFields) {
+      const perField = buildPerFieldPrompt(field, request);
+      let fieldValue =
+        (await callLLM(perField.systemPrompt, perField.userPrompt, model!, abortSignal)) ?? '';
+      let sanitizedFieldValue = sanitizeFieldContent(field.id, fieldValue, harness);
+
+      let perFieldRepairAttempts = 0;
+      while (
+        perFieldRepairAttempts < harness.maxPerFieldRepairAttempts &&
+        (responseLooksContaminated(fieldValue, harness) || !sanitizedFieldValue.trim())
+      ) {
+        perFieldRepairAttempts += 1;
+        const repair = buildPerFieldRepairPrompt(
+          field.id,
+          request.targetLanguage,
+          perField.systemPrompt,
+          perField.userPrompt,
+        );
+        fieldValue =
+          (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
+        sanitizedFieldValue = sanitizeFieldContent(field.id, fieldValue, harness);
+      }
+
+      stitched[field.id] = sanitizedFieldValue;
+    }
+
+    parsed = stitched;
+    latestRawText = enabledFields
+      .map((field) => `<${field.id}>${parsed[field.id] ?? ''}</${field.id}>`)
+      .join('\n');
+  }
+
+  return { fields: parsed, rawText: latestRawText };
 }
 
 /**
@@ -57,29 +209,10 @@ export async function translateWithContext(
   request: TranslationRequest,
   model?: LanguageModel,
   abortSignal?: AbortSignal,
+  seed?: FinalizeTranslationSeed,
 ): Promise<TranslationResult> {
-  const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
-  const response = await callLLM(systemPrompt, userPrompt, model!, abortSignal);
-  let parsed = parseTranslationResponse(response, request.outputFields);
-
-  // Weak models frequently drift outside required tags; retry once with a strict repair prompt.
-  if (!hasUsablePrimaryField(parsed, request) || completionRatio(parsed, request) < 0.5) {
-    const repair = buildTranslationRepairPrompt(
-      systemPrompt,
-      userPrompt,
-      request.outputFields
-        .filter((field) => field.enabled)
-        .sort((a, b) => a.order - b.order)
-        .map((field) => field.id),
-    );
-    const repairedResponse = await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal);
-    const repairedParsed = parseTranslationResponse(repairedResponse, request.outputFields);
-    if (hasUsablePrimaryField(repairedParsed, request)) {
-      parsed = repairedParsed;
-    }
-  }
-
-  return formatTranslationResult(parsed, request);
+  const finalized = await finalizeTranslationWithContext(request, model, abortSignal, seed);
+  return formatTranslationResult(finalized.fields, request);
 }
 
 export async function* streamTranslationWithContext(
@@ -88,6 +221,7 @@ export async function* streamTranslationWithContext(
   abortSignal?: AbortSignal,
 ): AsyncGenerator<TranslationStreamResult> {
   const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
+  const harness = resolveContextTranslationHarnessSettings(request.harness);
   let rawText = '';
   const parser = new StreamingParser();
 
@@ -104,7 +238,7 @@ export async function* streamTranslationWithContext(
 
   yield {
     fields: formatTranslationResult(
-      parseTranslationResponse(rawText, request.outputFields),
+      sanitizeTranslationResult(parseTranslationResponse(rawText, request.outputFields), harness),
       request,
     ),
     activeFieldId: null,
@@ -205,7 +339,13 @@ export async function* streamPerFieldTranslation(
   // Poll merged results while any stream is still running
   const allDone = Promise.all(fieldStreams);
   let settled = false;
-  allDone.then(() => { settled = true; }).catch(() => { settled = true; });
+  allDone
+    .then(() => {
+      settled = true;
+    })
+    .catch(() => {
+      settled = true;
+    });
 
   while (!settled) {
     // Yield current snapshot

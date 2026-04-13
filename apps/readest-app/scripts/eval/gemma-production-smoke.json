@@ -1,0 +1,170 @@
+{
+  "sampledFixtureCount": 36,
+  "models": {
+    "gemma-4-E2B-it-Q4_K_M": {
+      "summary": {
+        "total": 36,
+        "rawMetaCount": 3,
+        "parsedMetaCount": 0,
+        "missingPrimaryCount": 0,
+        "avgAttempts": 1.42
+      },
+      "examples": [
+        {
+          "fixtureId": "ja-de-000",
+          "pair": "ja->de",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": false,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "Vergänglicher Traum",
+            "contextualMeaning": "Source text: 儚い夢 (hakanai yume)\nContext: あの日、彼は窓辺に座り、儚い夢のように消えていく月を眺めていた。人生とはこのようなものなのだろうか。すべてが泡沫のようにはかなく、指の間からこぼれ落ちていく。彼の心は、その景色に引き寄せられたまま、動くことができなかった。\nContext analysis:\n1.  \"儚い夢のように消えていく月を眺めていた\" (He was gazing at the moon disappearing like a fleeting dream).\n2.  \"すべてが泡沫のようにはかなく、指の間からこぼれ落ちていく\" (Everything is transient/ephemeral like foam/bubbles, slipping through between the fingers).\n\"儚い夢\" (hakanai yume) literally means \"fleeting/ephemeral dream.\"\nNuances:\n*   儚い (hakanai): Implies transience, fragility, impermanence, and a sense of sadness or wistfulness about something beautiful that cannot last. It carries a strong emotional weight.\n*   夢 (yume): Dream.\nIn this context, it refers to something beautiful, perhaps a hope, a moment, or existence itself, that is inherently fragile and destined to vanish quickly.\nTarget language: German. Needs to capture the sense of fragility and transience.\nDrafting the German translation/explanation:\n\"儚い夢\" should be translated to convey this sense of fleetingness and fragility.\n*   Literal: Flüchtiger Traum. (Too weak)\n*   Better: Vergänglicher Traum. (Accurate, but perhaps lacks the poetic feel)\n*   Contextual fit: Something that vanishes quickly, like a dream that fades away.\nThe explanation must focus on the emotional and philosophical weight of the phrase in relation to the surrounding text.<channel|>flüchtiger Traum"
+          },
+          "rawPreview": "\n---ATTEMPT---\n\n---ATTEMPT---\nVergänglicher Traum\n---ATTEMPT---\nThe user wants me to explain the meaning of the Japanese phrase \"儚い夢\" within the provided context and translate it naturally into German.\n\nSource text: 儚い夢 (hakanai yume)\nContext: あの日、彼は窓辺に座り、儚い夢のように消えていく月を眺めていた。人生とはこのようなものなのだろうか。すべてが泡沫のようにはかなく、指の間からこぼれ落ちていく。彼の心は、その景色に引き寄せられたまま、動くことができなかった。\n\nContext analysis:\n1.  \"儚い夢のように消えていく月を眺めていた\" (He was gazing at the moon disappearing like a fleeting dream).\n2.  \"すべてが泡沫のようにはかなく、指の間からこぼれ落ちていく\" "
+        },
+        {
+          "fixtureId": "ru-de-000",
+          "pair": "ru->de",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": false,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "Seelenleid",
+            "contextualMeaning": "Source text: \"В глубине его сердца жило странное томленье духа, которое не могло найти ни выхода, ни утешения. Это была боль, которая терзала его каждый день, заставляя видеть мир сквозь завесу печали и тревоги.\"\nContext analysis:\n1.  **\"томленье\"**: Implies being suppressed, stifled, held back, or languishing. It suggests an internal, persistent state of suffering or emotional constraint.\n2.  **\"духа\"**: Refers to the spirit, soul, or inner self.\n3.  **\"странное томленье духа\"**: Highlights that this is a peculiar, unique, and deep-seated form of suffering related to the spirit.\n4.  **\"не могло найти ни выхода, ни утешения\"**: Emphasizes the hopelessness and entrapment of the feeling.\n5.  **\"боль, которая терзала его каждый день\"**: Confirms it is a constant, agonizing pain.\nDrafting the German explanation:\n\"Томленье духа\" is not just simple sadness. It conveys a deep, suffocating, and unresolved spiritual or emotional anguish. It suggests a state of being trapped internally, a persistent, agonizing spiritual malaise that lacks relief or escape.\nRefining for concise, idiomatic German output.<channel|>Eine tief sitzende, erstickende seelische Qual oder ein inneres Leiden des Geistes. Es beschreibt einen Zustand anhaltender, ungelöster emotionaler oder spiritueller Not, der sich wie eine erdrückende Last im Inneren anfühlt und keine Möglichkeit zur Entlastung oder zum Ausbruch bietet."
+          },
+          "rawPreview": "\n---ATTEMPT---\n\n---ATTEMPT---\nSeelenleid\n---ATTEMPT---\nThe user wants me to explain the meaning and nuance of the Russian phrase \"томленье духа\" within the provided context.\n\nSource text: \"В глубине его сердца жило странное томленье духа, которое не могло найти ни выхода, ни утешения. Это была боль, которая терзала его каждый день, заставляя видеть мир сквозь завесу печали и тревоги.\"\n\nContext analysis:\n1.  **\"томленье\"**: Implies being suppressed, stifled, held back, or languishing. It suggests"
+        },
+        {
+          "fixtureId": "hi-de-000",
+          "pair": "hi->de",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": false,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "Seelische Leere",
+            "contextualMeaning": "Source text: आत्मिक शून्यता (Ātmik śūnyatā)\nContext: \"उपन्यास के इस महत्वपूर्ण क्षण में नायक को यह अहसास हुआ कि जीवन भर की अपेक्षाओं के टूटने के बाद जो कुछ बचा था वह केवल आत्मिक शून्यता ही थी। शहर की भीड़ में अकेला खड़ा होकर वह सोचने लगा कि क्या कभी यह खाली अनुभूति भर सकेगी। उसके चारों ओर की दुनिया क्रूर और निर्मम दिख रही थी।\" (In this important moment of the novel, the protagonist realized that what remained after the breaking of lifelong expectations was only spiritual emptiness. Standing alone in the city crowd, he started thinking whether this empty feeling could ever be filled. The world around him seemed cruel and merciless.)\n    *   आत्मिक (Ātmik): Pertaining to the soul, spirit, or self (spiritual).\n    *   शून्यता (Śūnyatā): Emptiness, void, nothingness.\n3.  **Determine the best German translation/explanation:** The translation must capture the profound, existential, and spiritual nature of the emptiness, going beyond a simple \"Leere\" (emptiness).\n4.  **Formulate the explanation in idiomatic German.**<channel|>Spirituelle Leere; ein Zustand tiefer seelischer Entleerung und Sinnlosigkeit, der die Existenz des Protagonisten nach dem Zusammenbruch seiner Erwartungen kennzeichnet. Es impliziert eine existenzielle Krise und eine tief empfundene emotionale und seelische Leere."
+          },
+          "rawPreview": "\n---ATTEMPT---\n<translation>Seelische Leere</translation\n---ATTEMPT---\nSeelische Leere\n---ATTEMPT---\nThe user wants me to explain the meaning of the Hindi phrase \"आत्मिक शून्यता\" within the provided literary context and respond entirely in German.\n\nSource text: आत्मिक शून्यता (Ātmik śūnyatā)\nContext: \"उपन्यास के इस महत्वपूर्ण क्षण में नायक को यह अहसास हुआ कि जीवन भर की अपेक्षाओं के टूटने के बाद जो कुछ बचा था वह केवल आत्मिक शून्यता ही थी। शहर की भीड़ में अकेला खड़ा होकर वह सोचने लगा कि क्या कभी य"
+        }
+      ]
+    },
+    "gemma-4-E4B-it-Q4_K_M": {
+      "summary": {
+        "total": 36,
+        "rawMetaCount": 36,
+        "parsedMetaCount": 16,
+        "missingPrimaryCount": 2,
+        "avgAttempts": 3.94
+      },
+      "examples": [
+        {
+          "fixtureId": "en-es-000",
+          "pair": "en->es",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": false,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "distanciada",
+            "contextualMeaning": "*   Selected word: \"estranged\"\n    *   Meaning in context: The house (the physical reality) does not match the memory (the internal, emotional reality). The feeling is one of profound disconnect, alienation, or incompatibility between the present perception and the past experience.\n3.  **Determine the Nuance:** \"Estranged\" here is not just \"different\" or \"changed.\" It implies a fundamental break, a loss of connection, or a sense of foreignness despite physical familiarity.\n    *   *Initial thought:* Significa que no se parece a su recuerdo. (Too simple.)\n    *   *Refining the nuance:* Implica una desconexión profunda, una extrañeza que va más allá de lo físico. La casa es ajena a la memoria.\n    *   *Final Polish (Focusing on the emotional/existential disconnect):* La casa no solo ha cambiado físicamente, sino que se siente ajena, desconectada de la esencia o el significado que ella le había dado en el pasado. Es una extrañeza emocional.\n5.  **Final Selection and Formatting:** Ensure the response is concise and purely in Spanish, meeting all constraints. (The chosen Spanish explanation captures the sense of profound, irreconcilable disconnect.)<channel|>Se refiere a una desconexión profunda e irreconciliable. No es solo que la casa haya cambiado físicamente, sino que se siente ajena, extraña, o desvinculada de la esencia y el significado que ella había asociado con ella en su memoria. Es una extrañeza emocional."
+          },
+          "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The output must be entirely in Spanish, using specific XML tags, and adhere to strict formatting rules.\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:**\n    *   *Source sentence:* \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything about the place fel"
+        },
+        {
+          "fixtureId": "en-de-000",
+          "pair": "en->de",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": true,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "entfremdet",
+            "contextualMeaning": "The context describes a woman returning to her childhood home after fourteen years. She notes that the house itself looks physically unchanged, but \"everything about the place felt irrevocably estranged from the memory she had carried with her.\"\n3.  **Determine the nuance:** It's a profound, emotional alienation—a sense that the past self and the present reality no longer align, even if the physical objects remain.\n4.  **Translate/Explain in German:** The explanation must be concise and idiomatic, focusing on the emotional/psychological distance.\n*Self-Correction/Refinement:* I must avoid a dictionary definition and focus on the *contextual* meaning (the disconnect between memory and reality).\n*Drafting the German explanation.*<channel|>Die Entfremdung beschreibt hier nicht eine physische Veränderung des Hauses, sondern ein tiefes, emotionales Gefühl der Diskrepanz zwischen der Erinnerung, die die Protagonistin mit sich trägt, und der Realität des Ortes. Das Gefühl ist, dass das Haus, obwohl es äußerlich gleich geblieben ist, nicht mehr mit der inneren Welt oder der Vergangenheit der Protagonistin in Resonanz steht; es ist emotional distanziert oder fremd geworden."
+          },
+          "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The target language is German. I must adhere strictly to the XML format and constraints (no extra text, specific field content, etc.).\n\n2.  **Analyze the Source Word:** \"estranged.\"\n    *   *General meaning:* Separated, alienated, distant.\n    *   *Contextual usage:* \"...everything about the place felt irrevocably estranged from the memor"
+        },
+        {
+          "fixtureId": "en-pt-000",
+          "pair": "en->pt",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": false,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "distanciado",
+            "contextualMeaning": "*   **Selected Word:** \"estranged\"\n    *   **Context:** \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything about the place felt irrevocably estranged from the memory she had carried with her across two continents.\"\n    *   **Meaning in Context:** The house itself hasn't physically changed, but the *feeling* or the *relationship* between the house and the narrator's memory is broken. The house no longer resonates with the past self; it feels alien or disconnected from the emotional history the narrator holds.\n3.  **Determine the Nuance:**\n    *   *Dictionary definition:* Separated, alienated.\n    *   *Contextual nuance:* Not just physical separation, but a profound emotional or psychological disconnect. The past self (the memory) is incompatible with the present reality (the house). It implies a loss of familiarity or resonance.\n    *   *Initial thought:* Significa que o lugar é diferente da memória. (Too simple.)\n    *   *Adding depth:* Não é só físico. É uma desconexão emocional. A memória dela não se encaixa mais no lugar.\n    *   *Refining for literary tone (Portuguese):* O termo não se refere a uma mudança física, mas a uma profunda dissonância emocional. O lugar, embora idêntico, perdeu a ressonância afetiva para a narradora. É um sentimento de estranheza ou alienação em relação ao passado que ela carrega."
+          },
+          "rawPreview": "Thought Process:\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The output must be entirely in Portuguese, using specific XML tags, and adhere to strict formatting rules.\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:** \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything about the place felt irrevocably estranged from the m"
+        },
+        {
+          "fixtureId": "en-it-000",
+          "pair": "en->it",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": true,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "distaccata",
+            "contextualMeaning": "*   *Sentence:* \"...everything about the place felt irrevocably estranged from the memory she had carried with her across two continents.\"\n    *   *Contextual Setup:* The narrator is returning to a childhood home after 14 years. The physical house looks the same (green shutters, leaning mailbox, old oak).\n    *   *The Conflict:* Despite the physical sameness, the *feeling* is that the house is disconnected from her memory.\n    *   *The Resolution (Thematic Core):* The narrator realizes the change isn't in the house, but in *her* (\"It was the girl who had once lived inside it...\").\n    *   *Meaning of \"estranged\" here:* It doesn't mean the house is physically separated or hostile. It means there is a profound, emotional, and psychological disconnect between the physical reality of the house and the idealized, emotional reality of her past self/memory. The memory no longer fits the reality.\n3.  **Determine the Nuance/Connotation:**\n    *   *Generic definition:* Separated, alienated.\n    *   *Contextual meaning:* A profound sense of alienation or incompatibility between the past self/memory and the present reality. A feeling of loss or irreconcilability. The memory is a ghost that doesn't match the living structure.\n    *   *Initial thought:* Non è solo separazione fisica, ma un distacco emotivo.\n    *   *Refining for literary prose:* The feeling is one of profound incompatibility. The memory is a separate entity from the physical place.\n    *   *Self-Correction/Polishing:* Use vocabulary that conveys deep emotional distance (e.g., *disconnessione*, *alienazione*, *irriconciliabile*).\n5.  **Final Italian Output Generation (Review against constraints):**\n    *   Is it entirely in Italian? Yes.\n    *   Is it"
+          },
+          "rawPreview": "Thought Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The output must be entirely in Italian, using specific XML tags, and adhere to strict formatting rules (no preamble, no extra commentary, specific order).\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:** \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything abou"
+        },
+        {
+          "fixtureId": "en-ru-000",
+          "pair": "en->ru",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": false,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "отчужденный",
+            "contextualMeaning": "*   *Source word:* \"estranged\"\n    *   *Sentence:* \"...everything about the place felt irrevocably estranged from the memory she had carried with her across two continents.\"\n    *   *Narrative:* The protagonist returns to an old house after 14 years. The physical house looks the same (green shutters, leaning mailbox, oak tree). However, she feels a fundamental disconnect. The house *feels* different from the memory she holds.\n    *   *Key Contrast:* Physical stasis vs. Emotional/Perceptual change.\n    *   *Meaning of \"estranged\" here:* It doesn't mean the house is physically separated or alienated from its owner. It means the *essence* or *feeling* of the house no longer matches the internal, emotional reality of the memory. There is a profound, irreconcilable gap between the past perception and the present reality.\n3.  **Determine the Nuance/Connotation:**\n    *   Generic definition: Separated, alienated.\n    *   Contextual meaning: A deep, fundamental dissonance; a loss of connection or resonance between the object (house) and the subjective experience (memory). It implies a sense of loss or alienation from one's own past self/experience.\n    *   *Initial thought:* Это значит, что дом не совпадает с воспоминаниями. (Too simple.)\n    *   *Refining the nuance:* The feeling of disconnection between the past self and the present perception of the place.\n    *   *Selecting appropriate vocabulary:* Instead of just \"separated,\" use terms like \"отчужденный,\" \"несоответствующий,\" or \"потерявший связь.\"\n    *   *Structuring the explanation:* The word here signifies a profound emotional or existential disconnect, not a physical one. The house, though unchanged, feels alien to the memory because the person who remembers it has changed."
+          },
+          "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The output must be entirely in Russian, using specific XML tags, and adhere to strict formatting rules.\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:**\n    *   *Source Sentence:* \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything about the place fel"
+        },
+        {
+          "fixtureId": "en-hi-000",
+          "pair": "en->hi",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": false,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "विमुख",
+            "contextualMeaning": "*   *Sentence:* \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything about the place felt irrevocably estranged from the memory she had carried with her across two continents.\"\n    *   *Key Idea:* The physical house is the same, but the *feeling* or the *connection* between the house and the protagonist's memory is broken.\n    *   *Meaning of \"estranged\" here:* It doesn't mean the house physically moved away. It means the house no longer resonates with, or matches, the emotional landscape of the memory. There is a profound disconnect.\n3.  **Determine the Core Meaning (Nuance):**\n    *   *Dictionary:* Separated, alienated.\n    *   *Contextual Meaning:* A deep, emotional, or psychological distance; a feeling of being fundamentally different or incompatible with the past self/memory. It's not just \"different\"; it's *alienating*.\n4.  **Translate and Refine (Hindi):**\n    *   *Initial thought for \"estranged\":* अलग (alag - separate), दूर (door - distant). These are too weak.\n    *   *Focus on the emotional disconnect:* The memory feels incompatible with the present reality of the house.\n    *   *Refining the concept:* The memory and the place are no longer in harmony.\n    *   *Selecting appropriate Hindi vocabulary:*\n        *   \"Irrevocably estranged\" suggests a permanent, deep rift.\n        *   *Keywords:* अलगाव (algaav - separation/alienation), विसंगति (visangati - inconsistency/discrepancy), मेल न खाना (mel na khaana - not matching).\n    *   The house itself hasn't changed, but the *feeling* of the house is disconnected from the memory.\n    *   *Drafting in Hindi"
+          },
+          "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided context. The output must be entirely in Hindi, using specific XML tags (<translation> and <contextualMeaning>).\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:**\n    *   *Sentence:* \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything about the place felt irrevocably est"
+        },
+        {
+          "fixtureId": "es-de-000",
+          "pair": "es->de",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": false,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "tiefe Einsamkeit",
+            "contextualMeaning": "*   The context describes María living in profound isolation after her husband left her three years ago.\n    *   The atmosphere is heavy, palpable, dark, and silent (\"La soledad profunda que envolvía la habitación era casi palpable...\").\n    *   She is alone, unremembered, and her only companion is this solitude (\"La soledad profunda era su único compañero fiel...\").\n    *   She is trapped in memories and silence.\n    *   *Soledad:* Loneliness, solitude.\n    *   *Profunda:* Deep.\n    *   *Generic meaning:* Deep loneliness.\n    *   *Contextual meaning:* It is not just the absence of people; it is an existential, crushing, pervasive state of being. It is a heavy, almost physical presence that defines her existence.\n4.  **Determine the Nuances/Connotations:**\n    *   It's not merely *being* alone; it's *suffering* the isolation.\n    *   It has a melancholic, almost oppressive quality (palpable, tinieblas).\n    *   It is a state of profound emotional and existential emptiness.\n    *   *Initial thought:* Es bedeutet tiefe Einsamkeit. (Too simple)\n    *   *Adding nuance:* Es ist eine existenzielle, erdrückende Einsamkeit. (Better)\n    *   *Refining for literary tone:* The solitude is a heavy, enveloping presence.\n    *   *Final German phrasing:* Focus on the depth and the oppressive nature, linking it to the emotional state of the character.\n6.  **Final Review against Constraints:**\n    *   Explain meaning based on context? Yes.\n    *   Note nuances/connotations? Yes (existential, oppressive).\n    *   Respond"
+          },
+          "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the Spanish phrase \"soledad profunda\" into German, using the provided literary context. The output must strictly follow the XML format and be entirely in German.\n2.  **Analyze the Source Text:**\n    *   Source phrase: \"soledad profunda\"\n    *   Context: The context describes a woman (María) experiencing profound loneliness after her husband's death. The loneliness is described as \"palpable,\" a cons"
+        },
+        {
+          "fixtureId": "es-ru-000",
+          "pair": "es->ru",
+          "attempts": 4,
+          "rawHasMeta": true,
+          "parsedHasMeta": true,
+          "missingPrimary": false,
+          "parsed": {
+            "translation": "Translation:",
+            "contextualMeaning": "*   **Source Text:** *soledad profunda* (deep solitude).\n    *   **Context:** A narrative about a grieving widow (María) who is isolated after her husband's sudden departure. The atmosphere is heavy, melancholic, and oppressive.\n    *   **Task:** Explain the specific meaning, nuances, connotations, and cultural significance of *soledad profunda* within this context.\n    *   **Output Format:** Pure Russian, literary/natural phrasing, no extra text/labels.\n    *   *Soledad* (Solitude/Loneliness): While often translated as \"loneliness,\" in a literary context, it can imply isolation.\n    *   *Profunda* (Deep): Intensifies the feeling.\n    *   **Contextual Meaning:** It's not just being alone; it's a profound, existential, and painful state of isolation resulting from loss and abandonment. It's a crushing weight, an enveloping presence.\n3.  **Determine Nuances and Connotations (The \"Why\"):**\n    *   The solitude is *active*—it \"envolvía la habitación\" (enveloped the room). It's a palpable force.\n    *   It is tied to grief, memory, and the absence of connection (\"No había nadie que la llamara por su nombre verdadero\").\n    *   It is a companion, albeit a painful one (\"su único compañero fiel\").\n    *   It suggests a deep internal void, not just external circumstances.\n    *   *Initial thought (Literal):* Глубокое одиночество — это сильное чувство изоляции. (Too simple.)\n    *   *Refining the tone (Adding depth and emotion):* В данном контексте *soledad profunda* выходит за рамки простого отсутствия людей. Это не просто одиночество, а экзистенциальное состояние.\n    *   *Incorporating the narrative weight:* Это тяжелое, всепоглощающее чувство, которое ощущается как физическая, осязаемая сущность, окутывающая пространство.\n    *"
+          },
+          "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the Spanish phrase \"soledad profunda\" into Russian, based on the provided literary context.\n2.  **Analyze the Source Text:**\n    *   Source phrase: \"soledad profunda\" (Spanish).\n    *   Context: A narrative about a woman (María) experiencing profound loneliness after her husband's sudden departure. The loneliness is described as palpable, a constant companion, and tied to the silence and darkness o"
+        }
+      ]
+    }
+  }
+}

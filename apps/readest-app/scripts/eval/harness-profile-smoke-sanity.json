@@ -1,0 +1,345 @@
+{
+  "endpoint": "http://127.0.0.1:8081",
+  "fixturePath": "C:\\repos\\context aware translate\\readest\\.worktrees\\context-translation-harness-loop\\apps\\readest-app\\scripts\\eval\\mini-weak-clusters-fixtures.json",
+  "perPair": 1,
+  "models": ["gemma-4-E4B-it-Q4_K_M"],
+  "profiles": ["balanced"],
+  "results": [
+    {
+      "profile": "balanced",
+      "model": "gemma-4-E4B-it-Q4_K_M",
+      "totalFixtures": 36,
+      "usableRate": 1,
+      "avgAttempts": 1,
+      "parsedMetaCount": 0,
+      "missingPrimaryCount": 0,
+      "rawContaminatedCount": 0,
+      "fixtures": [
+        {
+          "fixtureId": "en-es-000",
+          "attempts": 1,
+          "translation": "Distanciada",
+          "contextualMeaning": "En este contexto, se refiere a una desconexión profunda y emocional entre la memoria de la narradora y la realidad del lugar, sugiriendo que el lugar ya no resuena con la experiencia pasada.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "en-de-000",
+          "attempts": 1,
+          "translation": "entfremdet",
+          "contextualMeaning": "In diesem Kontext bedeutet es, dass das Haus sich von der Erinnerung der Protagonistin so weit entfernt hat, dass es sich fremd oder nicht mehr vertraut anfühlt, obwohl es äußerlich unverändert ist. Es beschreibt eine emotionale Distanzierung.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "en-pt-000",
+          "attempts": 1,
+          "translation": "distanciado",
+          "contextualMeaning": "Neste contexto, refere-se a um sentimento de estranheza profunda e desconexão entre a memória da personagem e a realidade do lugar, indicando que o ambiente não corresponde mais à sua vivência emocional passada.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "en-it-000",
+          "attempts": 1,
+          "translation": "estraniato",
+          "contextualMeaning": "In questo contesto, non significa semplicemente \"lontano\" o \"diverso\", ma suggerisce una profonda e incolmabile disconnessione emotiva o spirituale tra l'oggetto (la casa) e il ricordo o la percezione del narratore. È un senso di alienazione rispetto al passato.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "en-ru-000",
+          "attempts": 1,
+          "translation": "отчужденный",
+          "contextualMeaning": "В данном контексте слово означает чувство глубокой, необратимой отстраненности или чуждости между воспоминанием и реальностью, которая кажется чуждой прошлому.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "en-hi-000",
+          "attempts": 1,
+          "translation": "विमुख",
+          "contextualMeaning": "इस संदर्भ में, 'estranged' का अर्थ है भावनात्मक रूप से दूर हो जाना या संबंध विच्छेद हो जाना। यह उस पुरानी याद और वर्तमान वास्तविकता के बीच की गहरी दूरी को दर्शाता है, जहाँ चीज़ें भौतिक रूप से समान होने के बावजूद भावनात्मक रूप से अलग हो चुकी हैं।",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "es-de-000",
+          "attempts": 1,
+          "translation": "tiefe Einsamkeit",
+          "contextualMeaning": "Hier bezeichnet es eine überwältigende, fast greifbare und existenzielle Einsamkeit, die durch den Verlust und die Isolation der Figur verursacht wird, nicht nur das Fehlen anderer Menschen.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "es-ru-000",
+          "attempts": 1,
+          "translation": "глубокое одиночество",
+          "contextualMeaning": "В данном контексте это не просто отсутствие людей, а всепоглощающее, почти осязаемое состояние душевной пустоты и изоляции, которое является центральной темой повествования о горе и потере.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "fr-de-000",
+          "attempts": 1,
+          "translation": "die Morgenhelligkeit",
+          "contextualMeaning": "Bezieht sich auf das klare, frische Licht des frühen Morgens, das nach der Nacht hereinbricht und eine Atmosphäre von Ruhe und Neubeginn schafft.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "fr-ru-000",
+          "attempts": 1,
+          "translation": "Утренняя ясность",
+          "contextualMeaning": "Здесь это не просто физическое освещение, а состояние пробуждения, чистоты и свежести, которое приносит рассвет. Оно несет в себе ощущение начала нового, спокойного дня.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "de-ru-000",
+          "attempts": 1,
+          "translation": "Тоска/Страстное томление",
+          "contextualMeaning": "В данном контексте это глубокое, неуловимое и болезненное стремление к чему-то идеализированному, утраченному или неопределенному. Это не просто желание, а экзистенциальная тоска по чему-то, что никогда не было полностью достигнуто, что окрашено ностальгией по прошлому.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "pt-de-000",
+          "attempts": 1,
+          "translation": "Flüstern der Blätter",
+          "contextualMeaning": "Hier bezeichnet es das sanfte, fast unhörbare Geräusch, das die Blätter in Bewegung setzen, und hat im Kontext der Erzählung eine tief spirituelle oder melancholische Bedeutung, die den Rhythmus der Natur und der Zeit symbolisiert.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "pt-ru-000",
+          "attempts": 1,
+          "translation": "Шепот листьев",
+          "contextualMeaning": "Звук, который в данном контексте не просто физическое шелестение, а метафорическое, сакральное звучание природы, несущее мудрость и утешение, как это воспринимают жители деревни.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "it-de-000",
+          "attempts": 1,
+          "translation": "die Vergänglichkeit der Dinge",
+          "contextualMeaning": "Hier bezieht sich \"Caducità\" nicht nur auf den physikalischen Verfall, sondern auf die philosophische Erkenntnis der Endlichkeit und Nicht-Dauerhaftigkeit aller menschlichen Errungenschaften und Existenz, was eine melancholische, aber auch erhebende Betrachtung darstellt.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "it-ru-000",
+          "attempts": 1,
+          "translation": "мимолетность вещей",
+          "contextualMeaning": "В данном контексте это не просто физическое увядание, а философское понятие о неизбежном распаде, конечности и преходящей природе всего сущего, особенно человеческих достижений и надежд.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "it-hi-000",
+          "attempts": 1,
+          "translation": "चीजों की नश्वरता",
+          "contextualMeaning": "यह वाक्यांश जीवन की क्षणभंगुरता और हर वस्तु के अस्थायी होने के विचार को दर्शाता है, विशेष रूप से मानवीय उपलब्धियों और अस्तित्व की अस्थिरता के संदर्भ में, जैसा कि आसपास के पाठ में बताया गया है।",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "zh-de-000",
+          "attempts": 1,
+          "translation": "Erlassenheit",
+          "contextualMeaning": "Hier bedeutet es nicht nur \"leer\" oder \"verwahrlost\", sondern trägt eine tiefere, melancholische Konnotation von Alter, Verfall und dem Gefühl des Vergangenen, das eine stille, fast erhabene Traurigkeit ausstrahlt.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "zh-ru-000",
+          "attempts": 1,
+          "translation": "Унылая пустынность",
+          "contextualMeaning": "В данном контексте это не просто \"пустынный\", а глубокое, меланхоличное ощущение упадка, старости и одиночества, вызванное историческими потрясениями и упадком былого величия. Это чувство глубокой, печальной меланхолии.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "ja-de-000",
+          "attempts": 1,
+          "translation": "Vergänglicher Traum",
+          "contextualMeaning": "Bezieht sich hier auf etwas Zerbrechliches, Flüchtiges und Nicht-Beständiges, wie ein Traum, der nicht ewig währt. Es vermittelt eine melancholische Stimmung der Vergänglichkeit des Lebens.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "ja-ru-000",
+          "attempts": 1,
+          "translation": "Хрупкая мечта",
+          "contextualMeaning": "В данном контексте это не просто \"мимолетный сон\", а скорее эфемерное, недолговечное, угасающее видение или надежда, которая не может устоять перед реальностью, подобно луне, исчезающей в небе.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "ko-de-000",
+          "attempts": 1,
+          "translation": "ziemlich",
+          "contextualMeaning": "In diesem Kontext bedeutet es, dass die Stille in Gyeongju in dieser Zeit eine bemerkenswerte, ausgeprägte oder tiefgreifende Qualität hatte, nicht nur eine leichte oder geringfügige.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "ko-ru-000",
+          "attempts": 1,
+          "translation": "довольно такой",
+          "contextualMeaning": "В данном контексте \"자못\" используется для придания оттенка некоторой степени или заметности, а \"그러한\" относится к описанному состоянию. Фраза передает ощущение, что тишина была не просто тихой, а обладала определенной, ощутимой, почти значимой степенью покоя.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "ar-de-000",
+          "attempts": 1,
+          "translation": "Betrachte den kleinen Vogel",
+          "contextualMeaning": "Hier bedeutet \"تأمل\" nicht nur das passive Nachdenken, sondern eine bewusste, fast meditative Betrachtung oder Beobachtung. Im Kontext des kleinen Vogels ist es die Handlung des sorgfältigen Hinschauens auf sich selbst oder auf etwas, was ihn fasziniert.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "ar-ru-000",
+          "attempts": 1,
+          "translation": "Размышление маленькой птички",
+          "contextualMeaning": "В данном контексте это не просто наблюдение, а глубокое, почти философское созерцание или медитация, которое маленькая птичка совершает, глядя на свое отражение в капле росы. Это придает действию оттенок невинного, но значимого самопознания.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "ru-de-000",
+          "attempts": 1,
+          "translation": "Seelensehnsucht",
+          "contextualMeaning": "Hier bezeichnet es ein tiefes, melancholisches und unbefriedigtes Gefühl der Seele, eine innere Qual oder Sehnsucht, die nicht gelöst werden kann, wie im Kontext der tiefen inneren Last des Charakters.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-en-000",
+          "attempts": 1,
+          "translation": "Spiritual emptiness",
+          "contextualMeaning": "A profound, existential void or hollowness within the soul, suggesting a lack of inner meaning or fulfillment despite external life experiences.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-es-000",
+          "attempts": 1,
+          "translation": "Vacío espiritual",
+          "contextualMeaning": "Se refiere a un profundo y existencial sentimiento de vacío interior o falta de propósito en el alma, que surge tras la desilusión con las expectativas de la vida.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-fr-000",
+          "attempts": 1,
+          "translation": "Vide intérieur",
+          "contextualMeaning": "Il ne s'agit pas d'un vide physique, mais d'un sentiment profond et existentiel de vacuité ou de manque spirituel ressenti par le personnage après l'effondrement de ses attentes de vie.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-de-000",
+          "attempts": 1,
+          "translation": "Seelische Leere",
+          "contextualMeaning": "Bezieht sich auf ein tiefes, existentielles Gefühl der Leere oder des Mangels in der Seele, das nach dem Zerbrechen weltlicher Erwartungen entsteht. Es ist eine spirituelle oder emotionale Vakuumzustand.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-pt-000",
+          "attempts": 1,
+          "translation": "Vazio interior",
+          "contextualMeaning": "Refere-se a um sentimento profundo e existencial de vazio ou falta de propósito na alma, que surge após a desilusão com as expectativas da vida, como descrito no contexto do romance.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-it-000",
+          "attempts": 1,
+          "translation": "Vuoto spirituale",
+          "contextualMeaning": "Si riferisce a un senso profondo e esistenziale di vuoto interiore, una mancanza di significato o scopo che trascende la semplice tristezza, tipico di una crisi spirituale o esistenziale nel contesto narrativo.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-zh-000",
+          "attempts": 1,
+          "translation": "精神的空虚",
+          "contextualMeaning": "指内心深处的一种彻底的、形而上的空虚感，超越了简单的悲伤或失落，是生命意义感的缺失，符合小说中主角在期望破灭后的感受。",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-ja-000",
+          "attempts": 1,
+          "translation": "精神的な空虚",
+          "contextualMeaning": "人生の期待が崩壊した後に残された、内面的な満たされなさや虚無感を指します。単なる物理的な空っぽさではなく、魂や精神の深い部分における欠如感を意味します。",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-ko-000",
+          "attempts": 1,
+          "translation": "영혼의 공허함",
+          "contextualMeaning": "삶의 기대가 무너진 후 남겨진, 내면 깊은 곳의 채워지지 않는 공허하고 근원적인 상실감을 의미합니다. 단순한 슬픔이 아닌 존재론적인 공허함의 상태를 나타냅니다.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-ar-000",
+          "attempts": 1,
+          "translation": "فراغ روحي",
+          "contextualMeaning": "يشير إلى حالة من الفراغ الداخلي أو العدم الروحي العميق الذي يشعر به الشخص بعد خيبة الأمل أو فقدان المعنى في الحياة، وهو أعمق من مجرد الحزن العابر.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        },
+        {
+          "fixtureId": "hi-ru-000",
+          "attempts": 1,
+          "translation": "Духовная пустота",
+          "contextualMeaning": "В данном контексте это не просто отсутствие чего-либо, а глубокое, экзистенциальное чувство внутренней опустошенности, потерянности и бессмысленности, которое наступает после краха жизненных ожиданий.",
+          "parsedMeta": false,
+          "missingPrimary": false,
+          "rawContaminated": false
+        }
+      ]
+    }
+  ]
+}

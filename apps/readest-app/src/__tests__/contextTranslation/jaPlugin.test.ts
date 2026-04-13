@@ -62,7 +62,7 @@ describe('jaPlugin', () => {
   test('romanizes kanji text when kuromoji tokenizer is available', () => {
     _setTokenizerForTest(
       mockTokenizer({
-        '食べる': [
+        食べる: [
           {
             surface_form: '食べ',
             reading: 'タベ',
@@ -104,7 +104,7 @@ describe('jaPlugin', () => {
   test('romanizes kanji in examples when tokenizer is available', () => {
     _setTokenizerForTest(
       mockTokenizer({
-        '食べ物': [
+        食べ物: [
           {
             surface_form: '食べ物',
             reading: 'タベモノ',

@@ -123,6 +123,7 @@ ${fieldInstructions}
 
 Emit fields in this exact order: ${orderedFieldIds}.
 Respond with ONLY the tagged fields. Do not add any preamble, reasoning, markdown, or extra commentary outside the tags.
+Do not include internal reasoning inside any field. Never write phrases like "Thinking Process", "The user wants me", "Analyze the Request", plans, steps, or self-referential analysis in any tag.
 Never leave a requested field empty. If context is limited, provide the shortest safe answer rather than an empty tag.
 Use this exact output shape:
 ${responseTemplate}${examplesLayoutInstruction}${referenceDictionaryInstruction}${pairHints}`;
@@ -264,7 +265,8 @@ export function buildPerFieldPrompt(
 
 Task: ${field.promptInstruction}
 
-Respond entirely in ${targetLang}. Output ONLY the requested content — no preamble, no XML tags, no labels.${examplesLayout}${referenceDictNote}${pairHints}`;
+Respond entirely in ${targetLang}. Output ONLY the requested content — no preamble, no XML tags, no labels.
+Do not reveal your reasoning. Never write "Thinking Process", "The user wants me", "Analyze the Request", steps, plans, or any self-referential analysis.${examplesLayout}${referenceDictNote}${pairHints}`;
 
   const userPrompt = `<selected_text>${request.selectedText}</selected_text>
 

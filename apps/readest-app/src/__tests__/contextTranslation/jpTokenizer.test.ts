@@ -58,7 +58,7 @@ describe('jpTokenizer', () => {
   test('romanizes kanji via katakana reading → wanakana', () => {
     _setTokenizerForTest(
       mockTokenizer({
-        '食べる': [
+        食べる: [
           {
             surface_form: '食べ',
             reading: 'タベ',
@@ -99,7 +99,7 @@ describe('jpTokenizer', () => {
   test('romanizes compound kanji word', () => {
     _setTokenizerForTest(
       mockTokenizer({
-        '東京': [
+        東京: [
           {
             surface_form: '東京',
             reading: 'トウキョウ',

@@ -8,6 +8,7 @@ import SettingsDialog from '@/components/settings/SettingsDialog';
 
 const saveSettingsMock = vi.fn().mockResolvedValue(undefined);
 const setSettingsMock = vi.fn();
+const writeClipboardMock = vi.fn().mockResolvedValue(undefined);
 
 // vi.hoisted runs before vi.mock factories — use it to create stable object references
 // that won't cause useEffect infinite re-render loops.
@@ -41,6 +42,25 @@ const { stableSettings } = vi.hoisted(() => {
         priorVolumeRagEnabled: true,
         sameBookChunkCount: 3,
         priorVolumeChunkCount: 2,
+        harness: {
+          flow: 'production',
+          repairEnabled: true,
+          repairOnContamination: true,
+          repairOnMissingPrimary: true,
+          repairOnLowCompletion: true,
+          completionThreshold: 0.5,
+          maxRepairAttempts: 1,
+          perFieldRescueEnabled: true,
+          maxPerFieldRepairAttempts: 1,
+          detectContamination: true,
+          sanitizeOutput: true,
+          extractChannelTail: true,
+          extractNestedTags: true,
+          stripReasoning: true,
+          translationMaxWords: 8,
+          contaminationMarkers: ['Thinking Process', 'Confidence Score'],
+          reasoningMarkers: ['Thinking Process', 'The user wants me'],
+        },
         outputFields: [
           {
             id: 'translation',
@@ -202,6 +222,10 @@ vi.mock('@/services/contextTranslation/dictionaryService', () => ({
 describe('AIPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(global.navigator, 'clipboard', {
+      value: { writeText: writeClipboardMock },
+      configurable: true,
+    });
   });
 
   afterEach(() => {
@@ -273,7 +297,7 @@ describe('AIPanel', () => {
     render(<AITranslatePanel />);
     const textarea = screen.getByTestId('prompt-textarea-translation') as HTMLTextAreaElement;
     const defaultValue =
-      'Provide a concise, direct translation of the selected text into the target language.';
+      'Provide ONLY the translated word or short phrase in the target language (1-3 words maximum). Do NOT include explanations, alternatives, parentheticals, or meta-commentary. If there is no exact equivalent, choose the single closest concept.';
 
     // Edit the textarea to something different
     fireEvent.change(textarea, { target: { value: 'custom instruction' } });
@@ -313,6 +337,87 @@ describe('AIPanel', () => {
     const dropdown = screen.getByTestId('translation-source');
     expect(dropdown).toBeTruthy();
     fireEvent.change(dropdown, { target: { value: 'deepl' } });
+  });
+
+  test('renders harness controls and applies advanced harness JSON overrides', () => {
+    render(<AITranslatePanel />);
+
+    const summary = screen.getByTestId('advanced-harness-summary');
+    fireEvent.click(summary);
+
+    const textarea = screen.getByTestId('harness-json-textarea') as HTMLTextAreaElement;
+    fireEvent.change(textarea, {
+      target: {
+        value: JSON.stringify(
+          {
+            flow: 'production',
+            repairEnabled: true,
+            repairOnContamination: true,
+            repairOnMissingPrimary: true,
+            repairOnLowCompletion: true,
+            completionThreshold: 0.75,
+            maxRepairAttempts: 2,
+            perFieldRescueEnabled: true,
+            maxPerFieldRepairAttempts: 2,
+            detectContamination: true,
+            sanitizeOutput: true,
+            extractChannelTail: true,
+            extractNestedTags: true,
+            stripReasoning: true,
+            translationMaxWords: 12,
+            contaminationMarkers: ['Thinking Process', 'Internal note'],
+            reasoningMarkers: ['Thinking Process', 'The user wants me', 'Internal note'],
+          },
+          null,
+          2,
+        ),
+      },
+    });
+
+    fireEvent.click(screen.getByTestId('apply-harness-json'));
+
+    expect(setSettingsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        globalReadSettings: expect.objectContaining({
+          contextTranslation: expect.objectContaining({
+            harness: expect.objectContaining({
+              completionThreshold: 0.75,
+              maxRepairAttempts: 2,
+              translationMaxWords: 12,
+              contaminationMarkers: ['Thinking Process', 'Internal note'],
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(saveSettingsMock).toHaveBeenCalled();
+  });
+
+  test('loads built-in harness presets and exports the current harness JSON', async () => {
+    render(<AITranslatePanel />);
+
+    fireEvent.click(screen.getByTestId('advanced-harness-summary'));
+    fireEvent.change(screen.getByTestId('harness-preset-select'), {
+      target: { value: 'lenientQwen' },
+    });
+    fireEvent.click(screen.getByTestId('load-harness-preset'));
+
+    expect(setSettingsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        globalReadSettings: expect.objectContaining({
+          contextTranslation: expect.objectContaining({
+            harness: expect.objectContaining({
+              translationMaxWords: 12,
+              repairOnLowCompletion: false,
+            }),
+          }),
+        }),
+      }),
+    );
+
+    fireEvent.click(screen.getByTestId('export-harness-json'));
+    await waitFor(() => expect(writeClipboardMock).toHaveBeenCalledTimes(1));
+    expect(writeClipboardMock.mock.calls[0]?.[0]).toContain('"translationMaxWords": 12');
   });
 });
 

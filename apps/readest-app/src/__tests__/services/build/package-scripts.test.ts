@@ -58,6 +58,16 @@ describe('package build scripts', () => {
     expect(packageJson.scripts['build-check']).toContain('corepack pnpm');
   });
 
+  test('routes build-output checks through the shared Node helper', () => {
+    expect(packageJson.scripts['check:translations']).toContain('scripts/check-build-output.mjs');
+    expect(packageJson.scripts['check:optional-chaining']).toContain(
+      'scripts/check-build-output.mjs',
+    );
+    expect(packageJson.scripts['check:lookbehind-regex']).toContain(
+      'scripts/check-build-output.mjs',
+    );
+  });
+
   test('routes generic local tauri commands through the local override config', () => {
     expect(packageJson.scripts['tauri']).toContain('scripts/tauri-local.mjs');
     expect(packageJson.scripts['tauri:build:test']).toContain('scripts/tauri-local.mjs');

@@ -127,7 +127,12 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
     sourceCJKLang === 'japanese' ? getJapaneseGrammarHint(selectedText) : null;
 
   // Frequency / proficiency level badge
-  const detectedLang = sourceCJKLang === 'chinese' ? 'zh' : sourceCJKLang === 'japanese' ? 'ja' : (bookLanguage ?? 'en');
+  const detectedLang =
+    sourceCJKLang === 'chinese'
+      ? 'zh'
+      : sourceCJKLang === 'japanese'
+        ? 'ja'
+        : (bookLanguage ?? 'en');
   const frequencyBadge = getFrequencyBadge(selectedText, detectedLang);
 
   const handleSpeak = (text: string, lang?: string) => {

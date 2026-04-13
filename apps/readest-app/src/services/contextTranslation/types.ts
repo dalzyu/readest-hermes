@@ -8,6 +8,27 @@ export interface TranslationOutputField {
   promptInstruction: string;
 }
 
+export interface ContextTranslationHarnessSettings {
+  /** 'production' applies repair + rescue + sanitization. 'single-pass' trusts the initial response. */
+  flow: 'production' | 'single-pass';
+  repairEnabled: boolean;
+  repairOnContamination: boolean;
+  repairOnMissingPrimary: boolean;
+  repairOnLowCompletion: boolean;
+  completionThreshold: number;
+  maxRepairAttempts: number;
+  perFieldRescueEnabled: boolean;
+  maxPerFieldRepairAttempts: number;
+  detectContamination: boolean;
+  sanitizeOutput: boolean;
+  extractChannelTail: boolean;
+  extractNestedTags: boolean;
+  stripReasoning: boolean;
+  translationMaxWords: number;
+  contaminationMarkers: string[];
+  reasoningMarkers: string[];
+}
+
 /** The parsed result from the LLM, keyed by field id */
 export type TranslationResult = Record<string, string>;
 
@@ -48,6 +69,8 @@ export interface TranslationRequest {
   targetLanguage: string;
   /** Fields to populate in the response */
   outputFields: TranslationOutputField[];
+  /** Optional runtime controls for repair / rescue / sanitization. */
+  harness?: Partial<ContextTranslationHarnessSettings>;
 }
 
 /** Schema version for VocabularyEntry persistence format */
@@ -164,6 +187,8 @@ export interface ContextTranslationSettings {
   fieldStrategy?: 'single' | 'multi';
   /** Auto-expand selection to word boundaries before lookup (default: true). */
   autoExpandSelection?: boolean;
+  /** Advanced repair / rescue / sanitization controls for the translation harness. */
+  harness?: Partial<ContextTranslationHarnessSettings>;
 }
 
 /** A single entry from a StarDict dictionary. */

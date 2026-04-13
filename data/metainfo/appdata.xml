@@ -59,6 +59,15 @@
   <launchable type="desktop-id">com.bilingify.readest.desktop</launchable>
 
   <releases>
+    <release version="0.2.2" date="2026-04-14">
+      <description>
+        <ul>
+          <li>Context translation now ships with the hardened production repair, rescue, and sanitization flow enabled in the live app</li>
+          <li>Advanced translation settings now let users customize the full harness behavior, including repair and sanitization controls</li>
+          <li>Release and test tooling were hardened for Hermes CI, Windows worktrees, and multi-model regression coverage</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-04-11">
       <description>
         <ul>
@@ -223,7 +232,7 @@
           <li>OPDS: Improved compatibility with older versions of Calibre Web</li>
           <li>OPDS: Added an instant search bar for faster browsing in OPDS catalogs</li>
           <li>OPDS: Added a curated book catalog from Standard Ebooks</li>
-          <li>Bookshelf: Added a “Group Books” action to the context menu</li>
+          <li>Bookshelf: Added a 鈥淕roup Books鈥?action to the context menu</li>
           <li>Comics: Fixed layout issues to improve comic book reading</li>
           <li>Layout: Footnote popups now adapt correctly to different screen sizes</li>
           <li>Layout: Fixed an issue where the maximum inline width was not applied to EPUBs</li>

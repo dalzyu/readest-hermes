@@ -1,8 +1,9 @@
-import { describe, expect, test } from 'vitest';
+﻿import { describe, expect, test } from 'vitest';
 
 import {
   buildTranslationPrompt,
   buildLookupPrompt,
+  buildPerFieldPrompt,
 } from '@/services/contextTranslation/promptBuilder';
 import type {
   TranslationOutputField,
@@ -146,6 +147,70 @@ describe('buildTranslationPrompt', () => {
     expect(systemPrompt).toContain('Emit fields in this exact order');
     expect(systemPrompt).toContain('contextualMeaning, translation');
   });
+
+  test('includes ordered language-pair hints after the fixed output shape', () => {
+    const { systemPrompt } = buildTranslationPrompt({
+      ...baseRequest,
+      sourceLanguage: 'en',
+      targetLanguage: 'ru',
+    });
+
+    expect(systemPrompt).toContain('Use this exact output shape:');
+    const exactIndex = systemPrompt.indexOf('English lacks grammatical aspect and case');
+    const sourceWildcardIndex = systemPrompt.indexOf('English source text often hides idioms');
+    const targetWildcardIndex = systemPrompt.indexOf(
+      'Russian should use a natural literary phrase',
+    );
+    expect(exactIndex).toBeGreaterThan(-1);
+    expect(sourceWildcardIndex).toBeGreaterThan(exactIndex);
+    expect(targetWildcardIndex).toBeGreaterThan(sourceWildcardIndex);
+  });
+
+  test('tightens the translation and examples field instructions for weak models', () => {
+    const { systemPrompt } = buildTranslationPrompt({
+      ...baseRequest,
+      sourceLanguage: 'en',
+      targetLanguage: 'es',
+      outputFields: [
+        {
+          id: 'translation',
+          label: 'Translation',
+          enabled: true,
+          order: 0,
+          promptInstruction:
+            'Provide ONLY the translated word or short phrase in the target language (1-3 words maximum). Do NOT include explanations, alternatives, parentheticals, or meta-commentary. If there is no exact equivalent, choose the single closest concept.',
+        },
+        {
+          id: 'examples',
+          label: 'Examples',
+          enabled: true,
+          order: 1,
+          promptInstruction:
+            'Provide 2-3 short example sentences in the TARGET LANGUAGE that use the translated word or phrase naturally. Every sentence must be written entirely in the target language. Do NOT use the source word in examples.',
+        },
+      ],
+    });
+
+    expect(systemPrompt).toContain('1-3 words maximum');
+    expect(systemPrompt).toContain('Do NOT include explanations');
+    expect(systemPrompt).toContain(
+      'Every sentence must be written entirely in the target language',
+    );
+    expect(systemPrompt).toContain('Do NOT use the source word in examples');
+  });
+
+  test('forbids chain-of-thought markers inside tagged fields', () => {
+    const { systemPrompt } = buildTranslationPrompt({
+      ...baseRequest,
+      sourceLanguage: 'en',
+      targetLanguage: 'de',
+    });
+
+    expect(systemPrompt).toContain('Do not include internal reasoning inside any field');
+    expect(systemPrompt).toContain('"Thinking Process"');
+    expect(systemPrompt).toContain('"The user wants me"');
+    expect(systemPrompt).toContain('"Analyze the Request"');
+  });
 });
 
 describe('buildLookupPrompt', () => {
@@ -206,5 +271,25 @@ describe('buildLookupPrompt', () => {
     };
     const { userPrompt } = buildTranslationPrompt(req);
     expect(userPrompt).not.toContain('reference_dictionary');
+  });
+});
+
+describe('buildPerFieldPrompt', () => {
+  test('forbids reasoning markers in single-field rescue prompts', () => {
+    const { systemPrompt } = buildPerFieldPrompt(
+      {
+        id: 'contextualMeaning',
+        promptInstruction: 'Explain what the word or phrase means in context.',
+      },
+      {
+        ...baseRequest,
+        sourceLanguage: 'en',
+        targetLanguage: 'fr',
+      },
+    );
+
+    expect(systemPrompt).toContain('Do not reveal your reasoning');
+    expect(systemPrompt).toContain('"Thinking Process"');
+    expect(systemPrompt).toContain('steps');
   });
 });

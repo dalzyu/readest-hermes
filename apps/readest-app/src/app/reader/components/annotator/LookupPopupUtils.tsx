@@ -1,7 +1,10 @@
 import React from 'react';
 import { pinyin as pinyinPro } from 'pinyin-pro';
 import { toRomaji } from 'wanakana';
-import { getReadingRomaji, isTokenizerReady } from '@/services/contextTranslation/plugins/jpTokenizer';
+import {
+  getReadingRomaji,
+  isTokenizerReady,
+} from '@/services/contextTranslation/plugins/jpTokenizer';
 import type {
   LookupAnnotations,
   PopupContextBundle,

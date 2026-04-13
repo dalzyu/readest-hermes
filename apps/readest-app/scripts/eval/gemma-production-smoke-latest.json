@@ -1,0 +1,23 @@
+{
+  "sampledFixtureCount": 36,
+  "models": {
+    "gemma-4-E2B-it-Q4_K_M": {
+      "summary": {
+        "total": 36,
+        "parsedMetaCount": 0,
+        "missingPrimaryCount": 0,
+        "avgAttempts": 1
+      },
+      "examples": []
+    },
+    "gemma-4-E4B-it-Q4_K_M": {
+      "summary": {
+        "total": 36,
+        "parsedMetaCount": 0,
+        "missingPrimaryCount": 0,
+        "avgAttempts": 1
+      },
+      "examples": []
+    }
+  }
+}

@@ -198,9 +198,7 @@ describe('ReadingStatsService', () => {
       ];
 
       // Only today (1800s) meets the 30-min goal; yesterday (1200s = 20min) doesn't
-      expect(
-        service.getCurrentStreak(dailyStats, { timeGoalMinutes: 30, pageGoal: 0 }),
-      ).toBe(1);
+      expect(service.getCurrentStreak(dailyStats, { timeGoalMinutes: 30, pageGoal: 0 })).toBe(1);
     });
 
     test('counts any reading day when both goals are zero', () => {
@@ -210,9 +208,7 @@ describe('ReadingStatsService', () => {
         { date: localDateStr(1), totalSecondsRead: 120, totalPagesRead: 2, sessions: 1 },
       ];
 
-      expect(
-        service.getCurrentStreak(dailyStats, { timeGoalMinutes: 0, pageGoal: 0 }),
-      ).toBe(2);
+      expect(service.getCurrentStreak(dailyStats, { timeGoalMinutes: 0, pageGoal: 0 })).toBe(2);
     });
 
     test('streak starts from yesterday when today has not yet met the goal', () => {
@@ -224,9 +220,7 @@ describe('ReadingStatsService', () => {
       ];
 
       // Today doesn't meet 30-min goal, but yesterday and day before do → streak = 2
-      expect(
-        service.getCurrentStreak(dailyStats, { timeGoalMinutes: 30, pageGoal: 0 }),
-      ).toBe(2);
+      expect(service.getCurrentStreak(dailyStats, { timeGoalMinutes: 30, pageGoal: 0 })).toBe(2);
     });
   });
 

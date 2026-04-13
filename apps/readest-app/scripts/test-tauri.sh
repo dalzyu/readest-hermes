@@ -4,7 +4,8 @@
 # (no file watcher, no built-in dev server), waits for the WebDriver
 # server on port 4445, runs tests, then tears down everything cleanly.
 #
-set -euo pipefail
+set -eu
+set -o pipefail
 
 DEV_PORT=3000
 WEBDRIVER_PORT=4445
@@ -29,7 +30,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "Starting Next.js dev server..."
-dotenv -e .env.tauri -- next dev &
+corepack pnpm exec dotenv -e .env.tauri -- next dev &
 DEV_PID=$!
 
 echo "Waiting for dev server on port $DEV_PORT..."
@@ -48,7 +49,7 @@ while ! curl -sf "http://localhost:${DEV_PORT}" >/dev/null 2>&1; do
 done
 
 echo "Starting Tauri app with webdriver (no-watch, skip beforeDevCommand)..."
-dotenv -e .env.tauri -- tauri dev --features webdriver --no-watch \
+corepack pnpm exec dotenv -e .env.tauri -- tauri dev --features webdriver --no-watch \
   --config '{"build":{"beforeDevCommand":""}}' &
 TAURI_PID=$!
 

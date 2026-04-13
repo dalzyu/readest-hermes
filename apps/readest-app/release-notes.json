@@ -1,5 +1,14 @@
 {
   "releases": {
+    "0.2.2": {
+      "date": "2026-04-14",
+      "notes": [
+        "The production context-translation path now uses the hardened repair, rescue, and sanitization harness that was previously only exercised in evaluation",
+        "Translation settings now expose full user-customizable harness controls, including advanced JSON editing for repair and sanitization behavior",
+        "Gemma and Qwen structural reliability improved through stricter finalization, field rescue, and cross-model regression smoke coverage",
+        "PR build scripts were hardened for CI and Windows worktrees, including the sharded Vitest runner and Tauri test launcher"
+      ]
+    },
     "0.2.1": {
       "date": "2026-04-12",
       "notes": [

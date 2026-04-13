@@ -287,7 +287,10 @@ function isTargetScriptPlausible(targetText: string, targetLanguage?: string): b
   const stripped = targetText.replace(/[\s\d\p{P}]/gu, '');
   if (stripped.length > 0 && isCJKStr(stripped)) {
     // Check if ALL characters are CJK — that's clearly wrong for a Latin target
-    const cjkChars = stripped.replace(/[^\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu, '');
+    const cjkChars = stripped.replace(
+      /[^\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu,
+      '',
+    );
     if (cjkChars.length === stripped.length) return false;
   }
 

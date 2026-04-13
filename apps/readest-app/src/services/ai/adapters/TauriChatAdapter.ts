@@ -127,7 +127,11 @@ export function createTauriAdapter(getOptions: () => TauriAdapterOptions): ChatM
       }));
 
       try {
-        const useApiRoute = typeof window !== 'undefined' && settings.providers.some(p => p.id === settings.activeProviderId && p.providerType === 'ai-gateway');
+        const useApiRoute =
+          typeof window !== 'undefined' &&
+          settings.providers.some(
+            (p) => p.id === settings.activeProviderId && p.providerType === 'ai-gateway',
+          );
 
         let text = '';
 

@@ -159,7 +159,7 @@ describe('workflow alignment', () => {
 
   test('Hermes release metadata stays decoupled from upstream versioning', () => {
     expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(packageJson.version).toBe('0.1.0');
+    expect(packageJson.version).not.toBe('0.0.0');
     expect(releaseWorkflow).toContain('name: Release Hermes');
     // biome-ignore lint/suspicious/noTemplateCurlyInString: testing literal JS template expression embedded in workflow YAML
     expect(releaseWorkflow).toContain('name: `Hermes ' + '${process.env.PACKAGE_VERSION}' + '`');

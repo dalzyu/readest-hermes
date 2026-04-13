@@ -1,0 +1,128 @@
+Loading judge model: gemma-4-26B-A4B-it-MXFP4_MOE
+Judge model loaded.
+
+============================================================
+Judging: Qwen3.5-0.8B-UD-Q6_K_XL (396 results)
+============================================================
+[Qwen3.5-0.8B-UD-Q6_K_XL] 20/396 (5.1%) - ETA 38m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 40/396 (10.1%) - ETA 32m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 60/396 (15.2%) - ETA 31m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 80/396 (20.2%) - ETA 30m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 100/396 (25.3%) - ETA 28m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 120/396 (30.3%) - ETA 26m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 140/396 (35.4%) - ETA 24m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 160/396 (40.4%) - ETA 22m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 180/396 (45.5%) - ETA 21m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 200/396 (50.5%) - ETA 19m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 220/396 (55.6%) - ETA 17m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 240/396 (60.6%) - ETA 15m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 260/396 (65.7%) - ETA 13m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 280/396 (70.7%) - ETA 12m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 300/396 (75.8%) - ETA 10m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 320/396 (80.8%) - ETA 8m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 340/396 (85.9%) - ETA 6m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 360/396 (90.9%) - ETA 4m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 380/396 (96.0%) - ETA 2m
+[Qwen3.5-0.8B-UD-Q6_K_XL] 396/396 (100.0%) - ETA 0m
+Avg accuracy: 1.09, fluency: 1.17, context: 1.09
+
+============================================================
+Judging: Qwen3.5-4B-Q4_K_M (396 results)
+============================================================
+[Qwen3.5-4B-Q4_K_M] 20/396 (5.1%) - ETA 1h6m
+[Qwen3.5-4B-Q4_K_M] 40/396 (10.1%) - ETA 57m
+[Qwen3.5-4B-Q4_K_M] 60/396 (15.2%) - ETA 52m
+[Qwen3.5-4B-Q4_K_M] 80/396 (20.2%) - ETA 47m
+[Qwen3.5-4B-Q4_K_M] 100/396 (25.3%) - ETA 42m
+[Qwen3.5-4B-Q4_K_M] 120/396 (30.3%) - ETA 38m
+[Qwen3.5-4B-Q4_K_M] 140/396 (35.4%) - ETA 35m
+[Qwen3.5-4B-Q4_K_M] 160/396 (40.4%) - ETA 32m
+[Qwen3.5-4B-Q4_K_M] 180/396 (45.5%) - ETA 29m
+[Qwen3.5-4B-Q4_K_M] 200/396 (50.5%) - ETA 26m
+[Qwen3.5-4B-Q4_K_M] 220/396 (55.6%) - ETA 24m
+[Qwen3.5-4B-Q4_K_M] 240/396 (60.6%) - ETA 21m
+[Qwen3.5-4B-Q4_K_M] 260/396 (65.7%) - ETA 19m
+[Qwen3.5-4B-Q4_K_M] 280/396 (70.7%) - ETA 16m
+[Qwen3.5-4B-Q4_K_M] 300/396 (75.8%) - ETA 14m
+[Qwen3.5-4B-Q4_K_M] 320/396 (80.8%) - ETA 11m
+[Qwen3.5-4B-Q4_K_M] 340/396 (85.9%) - ETA 8m
+[Qwen3.5-4B-Q4_K_M] 360/396 (90.9%) - ETA 5m
+[Qwen3.5-4B-Q4_K_M] 380/396 (96.0%) - ETA 3m
+[Qwen3.5-4B-Q4_K_M] 396/396 (100.0%) - ETA 0m
+Avg accuracy: 3.71, fluency: 3.95, context: 3.54
+
+============================================================
+Judging: Qwen3.5-9B-Q4_K_M (396 results)
+============================================================
+[Qwen3.5-9B-Q4_K_M] 20/396 (5.1%) - ETA 1h6m
+[Qwen3.5-9B-Q4_K_M] 40/396 (10.1%) - ETA 58m
+[Qwen3.5-9B-Q4_K_M] 60/396 (15.2%) - ETA 49m
+[Qwen3.5-9B-Q4_K_M] 80/396 (20.2%) - ETA 43m
+[Qwen3.5-9B-Q4_K_M] 100/396 (25.3%) - ETA 39m
+[Qwen3.5-9B-Q4_K_M] 120/396 (30.3%) - ETA 37m
+[Qwen3.5-9B-Q4_K_M] 140/396 (35.4%) - ETA 34m
+[Qwen3.5-9B-Q4_K_M] 160/396 (40.4%) - ETA 31m
+[Qwen3.5-9B-Q4_K_M] 180/396 (45.5%) - ETA 29m
+[Qwen3.5-9B-Q4_K_M] 200/396 (50.5%) - ETA 26m
+[Qwen3.5-9B-Q4_K_M] 220/396 (55.6%) - ETA 24m
+[Qwen3.5-9B-Q4_K_M] 240/396 (60.6%) - ETA 22m
+[Qwen3.5-9B-Q4_K_M] 260/396 (65.7%) - ETA 19m
+[Qwen3.5-9B-Q4_K_M] 280/396 (70.7%) - ETA 16m
+[Qwen3.5-9B-Q4_K_M] 300/396 (75.8%) - ETA 14m
+[Qwen3.5-9B-Q4_K_M] 320/396 (80.8%) - ETA 11m
+[Qwen3.5-9B-Q4_K_M] 340/396 (85.9%) - ETA 8m
+[Qwen3.5-9B-Q4_K_M] 360/396 (90.9%) - ETA 5m
+[Qwen3.5-9B-Q4_K_M] 380/396 (96.0%) - ETA 3m
+[Qwen3.5-9B-Q4_K_M] 396/396 (100.0%) - ETA 0m
+Avg accuracy: 4.11, fluency: 4.39, context: 3.85
+
+============================================================
+Judging: gemma-4-E2B-it-Q4_K_M (396 results)
+============================================================
+Resumed: 40 already judged
+[gemma-4-E2B-it-Q4_K_M] 60/396 (15.2%) - ETA 11m
+[gemma-4-E2B-it-Q4_K_M] 80/396 (20.2%) - ETA 15m
+[gemma-4-E2B-it-Q4_K_M] 100/396 (25.3%) - ETA 18m
+[gemma-4-E2B-it-Q4_K_M] 120/396 (30.3%) - ETA 20m
+[gemma-4-E2B-it-Q4_K_M] 140/396 (35.4%) - ETA 21m
+[gemma-4-E2B-it-Q4_K_M] 160/396 (40.4%) - ETA 20m
+[gemma-4-E2B-it-Q4_K_M] 180/396 (45.5%) - ETA 21m
+[gemma-4-E2B-it-Q4_K_M] 200/396 (50.5%) - ETA 20m
+[gemma-4-E2B-it-Q4_K_M] 220/396 (55.6%) - ETA 19m
+[gemma-4-E2B-it-Q4_K_M] 240/396 (60.6%) - ETA 18m
+[gemma-4-E2B-it-Q4_K_M] 260/396 (65.7%) - ETA 16m
+[gemma-4-E2B-it-Q4_K_M] 280/396 (70.7%) - ETA 14m
+[gemma-4-E2B-it-Q4_K_M] 300/396 (75.8%) - ETA 12m
+[gemma-4-E2B-it-Q4_K_M] 320/396 (80.8%) - ETA 10m
+[gemma-4-E2B-it-Q4_K_M] 340/396 (85.9%) - ETA 7m
+[gemma-4-E2B-it-Q4_K_M] 360/396 (90.9%) - ETA 5m
+[gemma-4-E2B-it-Q4_K_M] 380/396 (96.0%) - ETA 2m
+[gemma-4-E2B-it-Q4_K_M] 396/396 (100.0%) - ETA 0m
+Avg accuracy: 4.34, fluency: 4.61, context: 4.09
+
+============================================================
+Judging: gemma-4-E4B-it-Q4_K_M (396 results)
+============================================================
+[gemma-4-E4B-it-Q4_K_M] 20/396 (5.1%) - ETA 1h2m
+[gemma-4-E4B-it-Q4_K_M] 40/396 (10.1%) - ETA 1h6m
+[gemma-4-E4B-it-Q4_K_M] 60/396 (15.2%) - ETA 56m
+[gemma-4-E4B-it-Q4_K_M] 80/396 (20.2%) - ETA 50m
+[gemma-4-E4B-it-Q4_K_M] 100/396 (25.3%) - ETA 46m
+[gemma-4-E4B-it-Q4_K_M] 120/396 (30.3%) - ETA 43m
+[gemma-4-E4B-it-Q4_K_M] 140/396 (35.4%) - ETA 40m
+[gemma-4-E4B-it-Q4_K_M] 160/396 (40.4%) - ETA 36m
+[gemma-4-E4B-it-Q4_K_M] 180/396 (45.5%) - ETA 32m
+[gemma-4-E4B-it-Q4_K_M] 200/396 (50.5%) - ETA 28m
+[gemma-4-E4B-it-Q4_K_M] 220/396 (55.6%) - ETA 28m
+[gemma-4-E4B-it-Q4_K_M] 240/396 (60.6%) - ETA 25m
+[gemma-4-E4B-it-Q4_K_M] 260/396 (65.7%) - ETA 22m
+[gemma-4-E4B-it-Q4_K_M] 280/396 (70.7%) - ETA 18m
+[gemma-4-E4B-it-Q4_K_M] 300/396 (75.8%) - ETA 15m
+[gemma-4-E4B-it-Q4_K_M] 320/396 (80.8%) - ETA 12m
+[gemma-4-E4B-it-Q4_K_M] 340/396 (85.9%) - ETA 9m
+[gemma-4-E4B-it-Q4_K_M] 360/396 (90.9%) - ETA 6m
+[gemma-4-E4B-it-Q4_K_M] 380/396 (96.0%) - ETA 3m
+[gemma-4-E4B-it-Q4_K_M] 396/396 (100.0%) - ETA 0m
+Avg accuracy: 4.47, fluency: 4.61, context: 4.32
+
+Wrote quality scores: C:\repos\context aware translate\readest\.worktrees\context-translation-harness-loop\apps\readest-app\scripts\eval\quality-full-5translation.json

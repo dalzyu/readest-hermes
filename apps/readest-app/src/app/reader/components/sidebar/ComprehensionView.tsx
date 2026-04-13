@@ -50,14 +50,7 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
 
       // Get local context around current reading position (up to 10 pages back)
       const currentPage = progress?.page ?? 0;
-      const localContext = await getPopupLocalContext(
-        bookKey,
-        bookHash,
-        currentPage,
-        10,
-        '',
-        0,
-      );
+      const localContext = await getPopupLocalContext(bookKey, bookHash, currentPage, 10, '', 0);
 
       const sectionLabel = progress?.sectionLabel ?? 'Current section';
 
@@ -132,7 +125,7 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
       </div>
 
       <div className='flex-1 overflow-y-auto px-3 py-2'>
-        {error && <p className='text-sm text-error'>{error}</p>}
+        {error && <p className='text-error text-sm'>{error}</p>}
 
         {questions.length === 0 && !loading && !error && (
           <div className='mt-8 text-center'>
@@ -158,10 +151,7 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
         {questions.length > 0 && (
           <div className='space-y-4'>
             {questions.map((q, qi) => (
-              <div
-                key={q.id}
-                className='border-base-300 bg-base-100 rounded-lg border p-3'
-              >
+              <div key={q.id} className='border-base-300 bg-base-100 rounded-lg border p-3'>
                 <p className='mb-2 text-sm font-medium'>
                   {qi + 1}. {q.question}
                 </p>
@@ -210,7 +200,7 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
                       disabled={revealed.has(q.id)}
                     />
                     {revealed.has(q.id) && q.suggestedAnswer && (
-                      <p className='mt-1 text-xs text-success'>
+                      <p className='text-success mt-1 text-xs'>
                         {_('Suggested:')} {q.suggestedAnswer}
                       </p>
                     )}

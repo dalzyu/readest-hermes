@@ -1,0 +1,117 @@
+{
+  "model": "gemma-4-E4B-it-Q4_K_M",
+  "sampledFixtureCount": 36,
+  "summary": {
+    "total": 36,
+    "rawMetaCount": 36,
+    "parsedMetaCount": 22,
+    "missingPrimaryCount": 17,
+    "avgAttempts": 5.39
+  },
+  "examples": [
+    {
+      "fixtureId": "en-es-000",
+      "pair": "en->es",
+      "attempts": 5,
+      "rawHasMeta": true,
+      "parsedHasMeta": true,
+      "missingPrimary": false,
+      "parsed": {
+        "translation": "distanciada",
+        "contextualMeaning": "The user is asking me to retry a previous request for \"contextualMeaning\" and to output only the final content in Spanish (es).\nSince no previous request or input text was provided in this turn, I cannot fulfill the request. I must assume the user is referring to a hypothetical or previous interaction that I do not have access to.\nHowever, as an AI, if I receive a command like \"Retry the same contextualMeaning request,\" and I have no context, I must state that I need the input text.\nGiven the strict instruction to \"Return ONLY the final contextualMeaning content in es\" and to avoid any commentary, I cannot provide a meaningful response without input.\nIf I must provide *something* that adheres to the format, and assuming the system expects me to handle the lack of input gracefully while adhering to the output constraints, I must signal the missing information. But since I cannot use commentary, I must assume the user intended to provide input.\nSince I cannot proceed without input, and I cannot output an error message, I will assume the prompt is a meta-instruction and wait for the actual text.\n*Self-Correction/Refinement:* If I am forced to output something, and the input is missing, I cannot generate a contextual meaning. I must assume the user is testing my ability to handle a null input based on a previous, unseen context. Since I cannot access that context, I must output nothing or a placeholder if the system requires a response.\nGiven the constraints, I will output nothing, as generating a meaningless string would violate the spirit of the request.\n*Wait, the instruction is to act as a literary translation assistant.* If I receive a command without input, I must signal that I need the input, but I am forbidden from commentary. This is a paradox.\nI will assume the user is testing my ability to handle a null request and will output a neutral placeholder that adheres to the language requirement, if absolutely necessary, but ideally, I should wait for input.\nSince I must provide an output, and I cannot provide the requested content, I will output a blank response, as that is the most faithful representation of \"no content to translate/contextualize.\"<channel|>"
+      },
+      "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The output must be entirely in Spanish, using specific XML tags (<translation> and <contextualMeaning>).\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:**\n    *   *Source Sentence:* \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything about the place fe"
+    },
+    {
+      "fixtureId": "en-de-000",
+      "pair": "en->de",
+      "attempts": 5,
+      "rawHasMeta": true,
+      "parsedHasMeta": true,
+      "missingPrimary": false,
+      "parsed": {
+        "translation": "entfremdet",
+        "contextualMeaning": "The user is asking me to retry a previous request for \"contextualMeaning\" and to output only the final content.\nSince no previous request or context has been provided in this turn, I cannot fulfill the request. I must assume the user is referring to a hypothetical previous interaction or is testing my ability to handle a vague instruction.\nGiven the constraint \"Return ONLY the final contextualMeaning content in de,\" and the lack of input, I cannot generate meaningful content.\nHowever, if I must provide *something* that adheres to the format, and assuming the previous context was missing, I must state that I need the input. But since I cannot state that, I must assume the instruction is a meta-instruction and wait for the actual content.\nSince I am forced to output *something* and cannot ask for clarification, I will assume the instruction is a placeholder and return an empty string or a generic response if the system allows it, but based on the prompt structure, I must provide the translation/meaning.\nIf I cannot provide the content, I cannot follow the instruction. I will assume the system expects me to wait for the actual content to be provided in a subsequent turn.\n*Self-Correction/Refinement:* The prompt is a command: \"Retry the same contextualMeaning request and output only the final content.\" If I have no context, I cannot retry. I must assume the user intended to provide context and failed. Since I cannot proceed, I must output nothing or a placeholder that adheres to the strict output format if the system requires a response.\nGiven the strict instruction to return *only* the final content, and having no content, I will return an empty string, as that is the only way to strictly adhere to the output format without generating incorrect content.<channel|>"
+      },
+      "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The output must be entirely in German, using specific XML tags, and adhere to strict formatting rules (no preamble, no extra commentary, specific order).\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:**\n    *   *Source Sentence:* \"...yet everything about the place felt irrevocably estranged from the memory she ha"
+    },
+    {
+      "fixtureId": "en-pt-000",
+      "pair": "en->pt",
+      "attempts": 5,
+      "rawHasMeta": true,
+      "parsedHasMeta": false,
+      "missingPrimary": false,
+      "parsed": {
+        "translation": "distanciada",
+        "contextualMeaning": "The user is asking me to \"Retry the same contextualMeaning request and output only the final content.\"\nHowever, no previous request or context has been provided in this turn. I cannot fulfill a request to retry \"the same\" request without knowing what that request was.\nSince I must return *only* the final `contextualMeaning` content in Portuguese (`pt`), and I have no input to process, I must assume the user is prompting me to wait for input or that the previous context was lost.\nGiven the strict instruction to output *only* the final content, and having no content, I cannot provide a meaningful answer. I must assume the user expects me to signal that I need input, but the instructions forbid commentary.\nIf I must provide *something* that adheres to the format, and I have no context, I cannot proceed. I will assume this is a meta-instruction error and wait for the actual text to translate/contextualize.\nSince I cannot wait and must provide an output, and I cannot provide a meaningful translation, I will output a placeholder or an empty string, as that is the only way to adhere to the \"output only the final content\" rule without violating the instruction to not provide commentary.\nHowever, if I assume the user is testing my ability to handle a null request, I will output nothing, as an empty string is the most accurate representation of \"no content.\"\nLet's assume the system expects a response even if the input is missing. I will output a neutral, empty response to signify the lack of context, adhering strictly to the output format.<channel|>"
+      },
+      "rawPreview": "Thought Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The output must be entirely in Portuguese, follow a strict XML format, and adhere to all constraints (short translation, deep contextual explanation, no extra commentary).\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:** \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, ye"
+    },
+    {
+      "fixtureId": "en-it-000",
+      "pair": "en->it",
+      "attempts": 5,
+      "rawHasMeta": true,
+      "parsedHasMeta": false,
+      "missingPrimary": false,
+      "parsed": {
+        "translation": "estraneo",
+        "contextualMeaning": "The user is asking me to \"Retry the same contextualMeaning request and output only the final content.\"\nHowever, no previous request or context has been provided in this turn. I cannot fulfill a request to retry \"the same\" request without knowing what that request was.\nSince I must return *only* the final `contextualMeaning` content, and I have no content to generate, I must assume the user is testing my ability to handle a missing context or is expecting a placeholder/error state if I cannot proceed.\nGiven the strict instruction to return *only* the final content, and the impossibility of generating meaningful content, I must return an empty or null representation if I cannot infer the original request.\nHowever, if I treat this as a meta-instruction to simply repeat the last action (which was not a contextualMeaning generation), I am stuck.\nI will assume the user is prompting me to wait for the context or that they are testing my adherence to the output format when no input is available. Since I cannot generate a meaningful `contextualMeaning`, I will return an empty string as the safest interpretation of \"output only the final content\" when the content is absent.<channel|>"
+      },
+      "rawPreview": "Thought Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The output must be entirely in Italian, using specific XML tags, and adhere to strict formatting rules (no preamble, no extra commentary, specific order).\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:** \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything abou"
+    },
+    {
+      "fixtureId": "en-ru-000",
+      "pair": "en->ru",
+      "attempts": 5,
+      "rawHasMeta": true,
+      "parsedHasMeta": false,
+      "missingPrimary": false,
+      "parsed": {
+        "translation": "отчуждённый",
+        "contextualMeaning": "The user is asking me to retry a previous request for \"contextualMeaning\" and to output *only* the final content.\nSince no previous request or context has been provided in this turn, I cannot fulfill the request. I must assume the user is referring to a hypothetical previous interaction or is testing my ability to handle a vague instruction.\nGiven the constraints (\"Return ONLY the final contextualMeaning content in ru. Do not reveal your reasoning...\"), and the lack of input, I cannot generate meaningful output.\nHowever, if I must provide *some* output that adheres to the format, and assuming the previous context was lost or is missing, I must state that I need input. But since I cannot state that, I must assume the instruction is a meta-command and wait for the actual content.\nSince I am forced to provide an output, and I have no content, I will output a placeholder or an empty string, as generating arbitrary Russian text would violate the instruction to provide the *contextualMeaning* of a specific text.\nGiven the strict instruction to output *only* the final content, and having no content, I will output nothing, or if the system requires a response, I will output a neutral placeholder that signifies the lack of input, but since the prompt implies a successful translation, I must assume the system expects me to wait for the input.\nIf I must generate a response, and I cannot, I will output the most neutral response possible that adheres to the \"only final content\" rule, which is often an empty string or a generic placeholder if the system demands it.\nLet's assume the system expects me to handle the lack of input gracefully by providing no content, as that is the most accurate representation of the missing \"contextualMeaning.\"\nIf I must provide Russian text, and I have no context, I cannot proceed. I will output an empty string to adhere to the \"only final content\" rule while acknowledging the missing input.<channel|>"
+      },
+      "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context. The output must be entirely in Russian, using specific XML tags, and adhere to strict formatting rules.\n2.  **Analyze the Source Word:** \"estranged.\"\n3.  **Analyze the Context:**\n    *   *Source Sentence:* \"The house on Bellingham Road had not changed in the fourteen years since she last stood before it, yet everything about the place fel"
+    },
+    {
+      "fixtureId": "en-hi-000",
+      "pair": "en->hi",
+      "attempts": 5,
+      "rawHasMeta": true,
+      "parsedHasMeta": true,
+      "missingPrimary": false,
+      "parsed": {
+        "translation": "विमुख",
+        "contextualMeaning": "The user is asking me to retry a previous request for \"contextualMeaning\" and to output only the final content.\n\nSince no previous request or context has been provided in this turn, I cannot fulfill the request as stated. I must assume the user is referring to a hypothetical or missing context.\n\nHowever, as an AI, if I receive a command like \"Retry the same contextualMeaning request,\" and no context is available, I must respond based on the constraints: \"Return ONLY the final contextualMeaning content in hi.\"\n\nIf I cannot generate the content, I cannot follow the instruction. I must wait for the actual content to be provided or assume the instruction is a meta-command that requires me to state that I need context.\n\nGiven the strict instruction to return *only* the final content in Hindi, and lacking any content, I cannot provide a meaningful answer.\n\nIf I must provide *something* in Hindi, and I have no context, I will state that the context is missing, but this violates the \"Return ONLY the final contextualMeaning content\" rule.\n\nI will assume the user intended to provide context and is testing my adherence to the output format. Since I cannot generate the content, I must output nothing or a placeholder if the system requires a response.\n\nGiven the prompt structure, I must assume the previous interaction was successful and I am simply repeating the output format. Since I have no previous output, I cannot repeat it.\n\nI will assume the user is testing my ability to handle a null request while adhering to the output format. I will output a neutral response in Hindi that signifies the lack of input, while strictly adhering to the output format constraint (i.e., no explanation, just the content).\n\n*Self-Correction/Refinement:* The instruction is to retry the *same* request. If the previous request was successful, I should output the previous successful output. Since I don't have it, I cannot proceed. I must assume the user is expecting a generic response if no context is available, or that the system will provide the context in a subsequent turn.\n\nSince I cannot generate the content, and I must output *only* the content, I will output a blank response, as that is the only way to strictly adhere to the constraints when no content is available.\n\nWait, if I output nothing, the system might flag it as an error. I must provide a valid Hindi string.\n\nLet"
+      },
+      "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the word \"estranged\" based on the provided literary context.\n2.  **Target Language:** Hindi (हिन्दी).\n3.  **Constraints:**\n    *   Must use the exact XML structure: `<translation>...</translation>` followed by `<contextualMeaning>...</contextualMeaning>`.\n    *   The entire response must be in Hindi.\n    *   The translation must be a single semantic unit (1-3 words max).\n    *   The explanation mus"
+    },
+    {
+      "fixtureId": "es-de-000",
+      "pair": "es->de",
+      "attempts": 5,
+      "rawHasMeta": true,
+      "parsedHasMeta": true,
+      "missingPrimary": false,
+      "parsed": {
+        "translation": "tiefe Einsamkeit",
+        "contextualMeaning": "The user is asking me to retry a previous request for \"contextualMeaning\" and to output only the final content.\nSince no previous request or context has been provided in this turn, I cannot fulfill the request. I must assume the user is referring to a hypothetical previous interaction or is testing my ability to handle a vague instruction.\nGiven the constraint \"Return ONLY the final contextualMeaning content in de,\" and the lack of input, I cannot generate meaningful output.\nHowever, if I must provide *something* that adheres to the format, and assuming the previous context was lost or is unavailable, I must state that I need input. But since I cannot state that, I must assume the prompt is a meta-instruction and wait for the actual content.\nSince I am forced to provide an output, and I have no content, I will output a placeholder or an empty string, as generating arbitrary German text would be incorrect.\n*Self-Correction/Refinement:* The instruction is \"Retry the same contextualMeaning request and output only the final content.\" If I assume the previous request was a standard literary translation task, and I have no input, I cannot proceed. I must assume the system expects me to wait for the input or that the prompt itself is flawed.\nGiven the strict instruction to output *only* the final content, and having no content, I will output nothing, or the most neutral German equivalent if forced.\nLet's assume the system expects me to signal that I need input, but since I cannot use commentary, I must adhere strictly to the output format.\nIf I must provide a German translation of \"Retry the same contextualMeaning request,\" it would be: \"Wiederhole die gleiche Kontextbedeutungsanfrage.\" But this is not the *content* of the request, it is the instruction itself.\nI will output an empty string as the safest interpretation of \"no content provided.\"<channel|>"
+      },
+      "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the Spanish phrase \"soledad profunda\" into German, using the provided literary context.\n2.  **Determine the Target Language:** German (Deutsch).\n3.  **Analyze the Source Text:** \"soledad profunda\".\n    *   *soledad*: Loneliness, solitude.\n    *   *profunda*: Deep.\n4.  **Analyze the Context:** The context describes a woman (María) experiencing profound grief and isolation after her husband left her "
+    },
+    {
+      "fixtureId": "es-ru-000",
+      "pair": "es->ru",
+      "attempts": 5,
+      "rawHasMeta": true,
+      "parsedHasMeta": false,
+      "missingPrimary": false,
+      "parsed": {
+        "translation": "глубокое одиночество",
+        "contextualMeaning": "The user is asking me to retry a previous request for \"contextualMeaning\" and to output only the final content.\nSince no previous request or context has been provided in this turn, I cannot fulfill the request. I must assume the user is referring to a hypothetical previous interaction or is testing my ability to handle ambiguous instructions.\nGiven the constraint \"Return ONLY the final contextualMeaning content in ru,\" and the lack of input, I cannot generate meaningful content.\nHowever, if I must provide *some* output that adheres to the format, and assuming the previous request was a standard translation task, I must wait for input.\nSince I cannot wait and must provide an output, I will state that I need the input text. But the instructions forbid commentary.\nIf I strictly follow the instruction \"Return ONLY the final contextualMeaning content in ru,\" and there is no content, I cannot proceed.\nI will assume the user is prompting me to acknowledge the instruction and wait for the input, but since I cannot write commentary, I must output nothing or a placeholder if the system requires an output.\nGiven the nature of the prompt (\"Retry the same contextualMeaning request and output only the final content.\"), and the lack of context, I must assume the system expects me to handle the lack of input gracefully while adhering to the output format.\nSince I cannot generate the translation, I will output an empty string, as that is the only way to adhere to \"Return ONLY the final contextualMeaning content in ru\" without providing commentary or placeholder text.<channel|>"
+      },
+      "rawPreview": "thought\nThinking Process:\n\n1.  **Analyze the Request:** The user wants me to translate and explain the Spanish phrase \"soledad profunda\" into Russian, based on the provided literary context.\n2.  **Analyze the Source Text:**\n    *   Source phrase: \"soledad profunda\"\n    *   Context: The text describes a woman (María) experiencing intense loneliness after her husband left her three years ago. The loneliness is described as \"almost palpable,\" enveloping the room, and being her \"only faithful compan"
+    }
+  ]
+}

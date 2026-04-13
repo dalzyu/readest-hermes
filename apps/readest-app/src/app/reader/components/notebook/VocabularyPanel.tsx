@@ -410,17 +410,14 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     }
   }, [advanceToNext, fillBlankCorrect, fillBlankInput, isReviewSaving, reviewIndex, reviewQueue]);
 
-  const handleSpeakTerm = useCallback(
-    (entry: VocabularyEntry) => {
-      eventDispatcher.dispatch('tts-speak', {
-        bookKey: '',
-        text: entry.term,
-        oneTime: true,
-        ...(entry.sourceLanguage ? { lang: entry.sourceLanguage } : {}),
-      });
-    },
-    [],
-  );
+  const handleSpeakTerm = useCallback((entry: VocabularyEntry) => {
+    eventDispatcher.dispatch('tts-speak', {
+      bookKey: '',
+      text: entry.term,
+      oneTime: true,
+      ...(entry.sourceLanguage ? { lang: entry.sourceLanguage } : {}),
+    });
+  }, []);
 
   const enabledFields = ctxSettings.outputFields
     .filter((f) => f.enabled)
@@ -513,7 +510,11 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
                 {sessionCorrect}/{sessionTotal} {_('correct')}
               </span>
               {sessionStreak > 1 && <span>🔥 {sessionStreak}</span>}
-              {avgTimePerCard > 0 && <span>~{avgTimePerCard}s/{_('card')}</span>}
+              {avgTimePerCard > 0 && (
+                <span>
+                  ~{avgTimePerCard}s/{_('card')}
+                </span>
+              )}
             </div>
           )}
 
@@ -526,13 +527,9 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
             {/* Card front — varies by quiz mode */}
             {quizMode === 'reverse' ? (
               <>
-                <p className='text-lg font-medium'>
-                  {getTranslationPreview(currentReviewEntry)}
-                </p>
+                <p className='text-lg font-medium'>{getTranslationPreview(currentReviewEntry)}</p>
                 {isAnswerRevealed && (
-                  <p className='text-base-content/70 mt-2 text-base'>
-                    {currentReviewEntry.term}
-                  </p>
+                  <p className='text-base-content/70 mt-2 text-base'>{currentReviewEntry.term}</p>
                 )}
               </>
             ) : quizMode === 'listening' ? (
@@ -544,9 +541,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
                 >
                   <PiSpeakerHigh size={20} />
                 </button>
-                <p className='text-base-content/50 text-sm'>
-                  {_('Listen and type the word')}
-                </p>
+                <p className='text-base-content/50 text-sm'>{_('Listen and type the word')}</p>
               </>
             ) : quizMode === 'fill-blank' ? (
               <>
@@ -554,9 +549,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
                   {getTranslationPreview(currentReviewEntry)}
                 </p>
                 {currentReviewEntry.context && (
-                  <p className='text-base-content/40 mt-1 text-xs'>
-                    {currentReviewEntry.context}
-                  </p>
+                  <p className='text-base-content/40 mt-1 text-xs'>{currentReviewEntry.context}</p>
                 )}
               </>
             ) : (
@@ -582,8 +575,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
             ) : quizMode === 'multiple-choice' ? (
               <div className='mt-3 space-y-2'>
                 {mcChoices.map((choice, i) => {
-                  const isCorrectChoice =
-                    choice === getTranslationPreview(currentReviewEntry);
+                  const isCorrectChoice = choice === getTranslationPreview(currentReviewEntry);
                   const isSelectedChoice = mcSelected === i;
                   let choiceClass = 'btn btn-sm btn-outline w-full text-left justify-start';
                   if (mcSelected !== null) {
@@ -622,7 +614,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
                   }}
                 />
                 {fillBlankCorrect === false && (
-                  <p className='mt-1 text-xs text-error'>
+                  <p className='text-error mt-1 text-xs'>
                     {_('Answer:')} {currentReviewEntry.term}
                   </p>
                 )}
