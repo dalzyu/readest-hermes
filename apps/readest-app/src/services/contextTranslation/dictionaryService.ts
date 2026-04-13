@@ -31,6 +31,24 @@ export const BUNDLED_DICTIONARIES: BUNDLED_DICT[] = [
 /** In-memory cache: dictionary id -> entries */
 const memoryCache = new Map<string, DictionaryEntry[]>();
 
+let bundledDictsInitialized = false;
+let bundledDictsInitPromise: Promise<void> | null = null;
+
+export async function ensureBundledDictsInitialized(): Promise<void> {
+  if (bundledDictsInitialized) return;
+  if (bundledDictsInitPromise) return bundledDictsInitPromise;
+  bundledDictsInitPromise = initBundledDictionaries().then(() => {
+    bundledDictsInitialized = true;
+  });
+  return bundledDictsInitPromise;
+}
+
+export function isBundledPairSupported(sourceLang: string, targetLang: string): boolean {
+  return BUNDLED_DICTIONARIES.some(
+    (d) => d.language === sourceLang && d.targetLanguage === targetLang,
+  );
+}
+
 /** Levenshtein distance via classic DP O(mn) table. */
 function levenshtein(a: string, b: string): number {
   const m = a.length;
@@ -397,6 +415,8 @@ export async function lookupDefinitions(
   disabledBundledDicts: string[] = [],
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
+
+  await ensureBundledDictsInitialized();
 
   // For Japanese, deconjugate to dictionary form and search both surface + base form
   const isJapanese = sourceLang === 'ja';

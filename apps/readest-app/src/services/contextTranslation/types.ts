@@ -19,6 +19,7 @@ export interface ContextTranslationHarnessSettings {
   maxRepairAttempts: number;
   perFieldRescueEnabled: boolean;
   maxPerFieldRepairAttempts: number;
+  maxTotalLLMCalls?: number;
   detectContamination: boolean;
   sanitizeOutput: boolean;
   extractChannelTail: boolean;
@@ -168,6 +169,8 @@ export interface ContextDictionarySettings {
 export interface ContextTranslationSettings {
   enabled: boolean;
   targetLanguage: string;
+  /** Whether to run reference dictionary lookups and inject results into AI prompts (default: true). */
+  referenceDictionaryEnabled?: boolean;
   recentContextPages: number;
   lookAheadWords: number;
   sameBookRagEnabled: boolean;

@@ -52,6 +52,10 @@ const PROVIDER_TYPES_ORDERED: AIProviderType[] = [
   'deepseek',
   'mistral',
   'groq',
+  'xai',
+  'cohere',
+  'fireworks',
+  'togetherai',
   'ai-gateway',
 ];
 
@@ -688,8 +692,8 @@ const AIPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Advanced: Model Assignments */}
-      {providers.length > 1 && (
+      {/* Task Routing */}
+      {providers.length > 0 && (
         <div className={clsx('w-full', disabledSection)}>
           <button
             className='mb-2 flex items-center gap-1 font-medium'
@@ -698,44 +702,66 @@ const AIPanel: React.FC = () => {
             <span className={clsx('transition-transform', showAdvanced && 'rotate-90')}>
               &#9654;
             </span>
-            {_('Task Routing (Advanced)')}
+            {_('Task Routing')}
           </button>
           {showAdvanced && (
             <div className='card border-base-200 bg-base-100 border shadow'>
               <div className='divide-base-200 divide-y'>
                 <div className='px-4 py-2'>
                   <p className='text-base-content/50 text-xs'>
-                    {_(
-                      'Assign different providers to different tasks. Leave as "Default" to use the active provider.',
-                    )}
+                    {providers.length > 1
+                      ? _(
+                          'Assign different providers to different tasks. Leave as "Default" to use the active provider.',
+                        )
+                      : _(
+                          'Task routing lets you assign specific providers to each task. Add more providers to use different models for different tasks.',
+                        )}
                   </p>
                 </div>
                 {(['translation', 'dictionary', 'chat', 'embedding'] as AITaskType[]).map(
-                  (task) => (
-                    <div
-                      key={task}
-                      className='config-item !h-auto flex-col !items-start gap-2 py-3'
-                    >
-                      <span>{_(TASK_LABELS[task])}</span>
-                      <select
-                        className='select select-bordered select-sm bg-base-100 text-base-content w-full'
-                        value={modelAssignments[task] ?? ''}
-                        onChange={(e) =>
-                          setModelAssignments({
-                            ...modelAssignments,
-                            [task]: e.target.value || undefined,
-                          })
-                        }
+                  (task) => {
+                    const assignedId = modelAssignments[task];
+                    const effectiveProvider = assignedId
+                      ? providers.find((p) => p.id === assignedId)
+                      : activeConfig;
+                    const embeddingMissing =
+                      task === 'embedding' &&
+                      effectiveProvider &&
+                      !HAS_EMBEDDING.has(effectiveProvider.providerType);
+                    return (
+                      <div
+                        key={task}
+                        className='config-item !h-auto flex-col !items-start gap-2 py-3'
                       >
-                        <option value=''>{_('Default (active provider)')}</option>
-                        {providers.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} — {p.model}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ),
+                        <span>{_(TASK_LABELS[task])}</span>
+                        <select
+                          className='select select-bordered select-sm bg-base-100 text-base-content w-full'
+                          value={modelAssignments[task] ?? ''}
+                          onChange={(e) =>
+                            setModelAssignments({
+                              ...modelAssignments,
+                              [task]: e.target.value || undefined,
+                            })
+                          }
+                        >
+                          <option value=''>{_('Default (active provider)')}</option>
+                          {providers.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} — {p.model}
+                            </option>
+                          ))}
+                        </select>
+                        {embeddingMissing && (
+                          <p className='text-warning flex items-center gap-1 text-xs'>
+                            <PiWarningCircle className='size-3.5 shrink-0' />
+                            {_(
+                              'This provider does not support embeddings. Book indexing will not work. Assign an embedding-capable provider (e.g. OpenAI, Ollama, Google AI) or use OpenAI-Compatible mode.',
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  },
                 )}
               </div>
             </div>

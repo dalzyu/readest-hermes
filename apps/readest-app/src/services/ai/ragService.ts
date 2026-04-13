@@ -4,7 +4,14 @@ import { chunkSection, extractTextFromDocument } from './utils/chunker';
 import { withRetryAndTimeout, AI_TIMEOUTS, AI_RETRY_CONFIGS } from './utils/retry';
 import { getProviderForTask } from './providers';
 import { aiLogger } from './logger';
-import type { AISettings, TextChunk, ScoredChunk, EmbeddingProgress, BookIndexMeta } from './types';
+import type {
+  AISettings,
+  TextChunk,
+  ScoredChunk,
+  EmbeddingProgress,
+  BookIndexMeta,
+  IndexResult,
+} from './types';
 import type { PageSearchBounds } from './storage/aiStore';
 
 interface SectionItem {
@@ -77,13 +84,20 @@ export async function indexBook(
   bookHash: string,
   settings: AISettings,
   onProgress?: (progress: EmbeddingProgress) => void,
-): Promise<void> {
+): Promise<IndexResult> {
   const startTime = Date.now();
   const title = extractTitle(bookDoc.metadata);
 
   if (await aiStore.isIndexed(bookHash)) {
     aiLogger.rag.isIndexed(bookHash, true);
-    return;
+    return {
+      status: 'already-indexed',
+      chunksProcessed: 0,
+      totalSections: 0,
+      skippedSections: 0,
+      errorMessages: [],
+      durationMs: 0,
+    };
   }
 
   aiLogger.rag.indexStart(bookHash, title);
@@ -113,13 +127,18 @@ export async function indexBook(
     onProgress?.({ current: 0, total: 1, phase: 'chunking' });
     aiLogger.rag.indexProgress('chunking', 0, sections.length);
     const allChunks: TextChunk[] = [];
+    let skippedCount = 0;
+    const errorMessages: string[] = [];
 
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i]!;
       try {
         const doc = await section.createDocument();
         const text = extractTextFromDocument(doc);
-        if (text.length < 100) continue;
+        if (text.length < 100) {
+          skippedCount++;
+          continue;
+        }
         const sectionChunks = chunkSection(
           doc,
           i,
@@ -130,7 +149,9 @@ export async function indexBook(
         aiLogger.chunker.section(i, text.length, sectionChunks.length);
         allChunks.push(...sectionChunks);
       } catch (e) {
-        aiLogger.chunker.error(i, (e as Error).message);
+        const msg = (e as Error).message;
+        aiLogger.chunker.error(i, msg);
+        errorMessages.push(`Section ${i}: ${msg}`);
       }
     }
 
@@ -138,10 +159,18 @@ export async function indexBook(
     state.totalChunks = allChunks.length;
 
     if (allChunks.length === 0) {
+      const durationMs = Date.now() - startTime;
       state.status = 'complete';
       state.progress = 100;
-      aiLogger.rag.indexComplete(bookHash, 0, Date.now() - startTime);
-      return;
+      aiLogger.rag.indexComplete(bookHash, 0, durationMs);
+      return {
+        status: 'empty',
+        chunksProcessed: 0,
+        totalSections: sections.length,
+        skippedSections: skippedCount,
+        errorMessages,
+        durationMs,
+      };
     }
 
     onProgress?.({ current: 0, total: allChunks.length, phase: 'embedding' });
@@ -211,7 +240,16 @@ export async function indexBook(
     onProgress?.({ current: 2, total: 2, phase: 'indexing' });
     state.status = 'complete';
     state.progress = 100;
-    aiLogger.rag.indexComplete(bookHash, allChunks.length, Date.now() - startTime);
+    const durationMs = Date.now() - startTime;
+    aiLogger.rag.indexComplete(bookHash, allChunks.length, durationMs);
+    return {
+      status: 'complete',
+      chunksProcessed: allChunks.length,
+      totalSections: sections.length,
+      skippedSections: skippedCount,
+      errorMessages,
+      durationMs,
+    };
   } catch (error) {
     state.status = 'error';
     state.error = (error as Error).message;

@@ -141,6 +141,8 @@ export function useContextLookup({
         const detectedLanguage = detectLookupLanguage(lookupText, bookLanguage);
 
         // Launch bundle building (with prefetch check) and dictionary lookup in parallel
+        const dictEnabled = requestSnapshot.settings.referenceDictionaryEnabled !== false;
+
         const [bundle, rawDictEntries] = await Promise.all([
           consumePrefetch(bookHash, requestSnapshot.currentPage, lookupText).then(
             (prefetched) =>
@@ -154,12 +156,14 @@ export function useContextLookup({
                 aiSettings: requestSnapshot.aiSettings,
               }),
           ),
-          lookupDefinitions(
-            lookupText,
-            detectedLanguage.language,
-            requestSnapshot.settings.targetLanguage,
-            requestSnapshot.settings.disabledBundledDicts ?? [],
-          ).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>),
+          dictEnabled
+            ? lookupDefinitions(
+                lookupText,
+                detectedLanguage.language,
+                requestSnapshot.settings.targetLanguage,
+                requestSnapshot.settings.disabledBundledDicts ?? [],
+              ).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>)
+            : Promise.resolve([] as Awaited<ReturnType<typeof lookupDefinitions>>),
         ]);
 
         // Build string entries for LLM prompt + structured results for display

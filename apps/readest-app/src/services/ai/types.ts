@@ -148,6 +148,15 @@ export interface EmbeddingProgress {
   phase: 'chunking' | 'embedding' | 'indexing';
 }
 
+export interface IndexResult {
+  status: 'complete' | 'empty' | 'partial' | 'already-indexed';
+  chunksProcessed: number;
+  totalSections: number;
+  skippedSections: number;
+  errorMessages: string[];
+  durationMs: number;
+}
+
 // stored AI conversation for a book
 export interface AIConversation {
   id: string;

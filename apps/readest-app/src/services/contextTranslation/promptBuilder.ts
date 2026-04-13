@@ -28,7 +28,9 @@ function isChineseTarget(request: TranslationRequest): boolean {
 
 function buildContextSections(request: TranslationRequest): string {
   const sections = [
-    `<local_past_context>${request.popupContext.localPastContext}</local_past_context>`,
+    request.popupContext.localPastContext
+      ? `<local_past_context>${request.popupContext.localPastContext}</local_past_context>`
+      : '',
     request.popupContext.localFutureBuffer
       ? `<local_future_buffer>${request.popupContext.localFutureBuffer}</local_future_buffer>`
       : '',

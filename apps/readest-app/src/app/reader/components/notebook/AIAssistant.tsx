@@ -24,7 +24,7 @@ import {
   getLastSources,
   clearLastSources,
 } from '@/services/ai';
-import type { EmbeddingProgress, AISettings, AIMessage } from '@/services/ai/types';
+import type { EmbeddingProgress, AISettings, AIMessage, IndexResult } from '@/services/ai/types';
 import { useEnv } from '@/context/EnvContext';
 
 import { Button } from '@/components/ui/button';
@@ -308,13 +308,17 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
     if (!bookData?.bookDoc || !aiSettings) return;
     setIsIndexing(true);
     try {
-      await indexBook(
+      const result: IndexResult = await indexBook(
         bookData.bookDoc as Parameters<typeof indexBook>[0],
         bookHash,
         aiSettings,
         setIndexProgress,
       );
-      setIndexed(true);
+      if (result.status === 'complete' || result.status === 'already-indexed') {
+        setIndexed(true);
+      } else if (result.status === 'empty') {
+        aiLogger.rag.indexError(bookHash, 'No indexable content found');
+      }
     } catch (e) {
       aiLogger.rag.indexError(bookHash, (e as Error).message);
     } finally {

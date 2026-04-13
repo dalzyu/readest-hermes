@@ -8,7 +8,7 @@ import { eventDispatcher } from '@/utils/event';
 import { DocumentLoader } from '@/libs/document';
 import { indexBook } from '@/services/ai';
 import { aiStore } from '@/services/ai/storage/aiStore';
-import type { AISettings } from '@/services/ai/types';
+import type { AISettings, IndexResult } from '@/services/ai/types';
 import type { Book } from '@/types/book';
 import type { AppService } from '@/types/system';
 import type { BookSeries } from '@/services/contextTranslation/types';
@@ -29,19 +29,38 @@ export async function indexSeriesVolumes(
   libraryBooks: Book[],
   appService: AppService | null | undefined,
   aiSettings: AISettings | undefined,
-): Promise<void> {
-  if (!appService || !aiSettings) return;
+): Promise<{ indexed: number; skipped: number; failed: number }> {
+  if (!appService || !aiSettings) return { indexed: 0, skipped: 0, failed: 0 };
+
+  let indexed = 0;
+  let skipped = 0;
+  let failed = 0;
 
   const orderedVolumes = [...series.volumes].sort((a, b) => a.volumeIndex - b.volumeIndex);
   for (const volume of orderedVolumes) {
     const book = libraryBooks.find((item) => item.hash === volume.bookHash);
     if (!book) continue;
 
-    const { file } = await appService.loadBookContent(book);
-    const loader = new DocumentLoader(file);
-    const { book: bookDoc } = await loader.open();
-    await indexBook(bookDoc as Parameters<typeof indexBook>[0], book.hash, aiSettings);
+    try {
+      const { file } = await appService.loadBookContent(book);
+      const loader = new DocumentLoader(file);
+      const { book: bookDoc } = await loader.open();
+      const result: IndexResult = await indexBook(
+        bookDoc as Parameters<typeof indexBook>[0],
+        book.hash,
+        aiSettings,
+      );
+      if (result.status === 'complete' || result.status === 'already-indexed') {
+        indexed++;
+      } else if (result.status === 'empty') {
+        skipped++;
+      }
+    } catch {
+      failed++;
+    }
   }
+
+  return { indexed, skipped, failed };
 }
 
 interface SeriesCardProps {

@@ -133,6 +133,7 @@ describe('translateWithContext', () => {
     const result = await translateWithContext({
       ...baseRequest,
       outputFields: fieldsWithExamples,
+      harness: { maxTotalLLMCalls: 10 },
     });
 
     expect(mockCallLLM).toHaveBeenCalledTimes(5);
@@ -233,6 +234,7 @@ describe('translateWithContext', () => {
       sourceLanguage: 'en',
       targetLanguage: 'es',
       outputFields: fieldsWithExamples,
+      harness: { maxTotalLLMCalls: 10 },
     });
 
     expect(mockCallLLM).toHaveBeenCalledTimes(5);
@@ -266,6 +268,7 @@ describe('translateWithContext', () => {
       sourceLanguage: 'en',
       targetLanguage: 'es',
       outputFields: fieldsWithExamples,
+      harness: { maxTotalLLMCalls: 10 },
     });
 
     expect(mockCallLLM).toHaveBeenCalledTimes(7);
@@ -305,6 +308,7 @@ describe('translateWithContext', () => {
       sourceLanguage: 'en',
       targetLanguage: 'es',
       outputFields: fieldsWithExamples,
+      harness: { maxTotalLLMCalls: 10 },
     });
 
     expect(mockCallLLM).toHaveBeenCalledTimes(7);

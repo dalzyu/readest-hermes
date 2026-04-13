@@ -8,7 +8,6 @@ import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import {
   BUNDLED_DICTIONARIES,
-  initBundledDictionaries,
   previewDictionaryZip,
   importUserDictionary,
   deleteUserDictionary,
@@ -237,13 +236,6 @@ const AITranslatePanel: React.FC = () => {
       // Leave the JSON in the textarea as a manual copy fallback.
     }
   }, [ctxHarness]);
-
-  // Initialize bundled dictionaries on mount
-  useEffect(() => {
-    initBundledDictionaries().catch(() => {
-      setDictionaryUnavailableBanner(true);
-    });
-  }, []);
 
   // Sync userDictionaries from settings
   useEffect(() => {
@@ -999,6 +991,31 @@ const AITranslatePanel: React.FC = () => {
       {/* ── Dictionaries ───────────────────────────────────────────── */}
       <div className='w-full'>
         <h2 className='mb-2 font-medium'>{_('Dictionaries')}</h2>
+
+        {/* Reference dictionary in AI prompts toggle */}
+        <div className='card border-base-200 bg-base-100 mb-3 border shadow'>
+          <div className='divide-base-200 divide-y'>
+            <div className='config-item'>
+              <div>
+                <span>{_('Include dictionary definitions in AI prompts')}</span>
+                <p className='text-base-content/60 text-xs'>
+                  {_(
+                    'When enabled, matching dictionary entries are included as context for AI translation',
+                  )}
+                </p>
+              </div>
+              <input
+                type='checkbox'
+                className='toggle'
+                checked={ctxTransSettings.referenceDictionaryEnabled !== false}
+                onChange={() => {
+                  const next = !(ctxTransSettings.referenceDictionaryEnabled !== false);
+                  saveCtxTransSetting({ referenceDictionaryEnabled: next });
+                }}
+              />
+            </div>
+          </div>
+        </div>
 
         {dictionaryUnavailableBanner && (
           <div className='alert alert-warning mb-3'>
