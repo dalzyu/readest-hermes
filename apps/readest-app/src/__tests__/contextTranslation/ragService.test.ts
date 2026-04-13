@@ -122,6 +122,8 @@ beforeEach(() => {
     provider: {
       getEmbeddingModel: () => ({ maxEmbeddingsPerCall: 100 }),
     },
+    inferenceParams: {},
+    config: baseSettings.providers[0],
   } as never);
 
   mockEmbedMany.mockResolvedValue({

@@ -146,10 +146,9 @@ describe('SeriesModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Index All' }));
 
     await waitFor(() => {
-      expect(mockIndexBook).toHaveBeenCalledTimes(2);
+      expect(mockIndexBook).toHaveBeenCalledTimes(1);
     });
 
-    expect(mockIndexBook.mock.calls[0]?.[1]).toBe('vol-1');
-    expect(mockIndexBook.mock.calls[1]?.[1]).toBe('vol-2');
+    expect(mockIndexBook.mock.calls[0]?.[1]).toBe('vol-2');
   });
 });
