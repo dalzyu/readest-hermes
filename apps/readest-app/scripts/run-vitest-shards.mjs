@@ -12,16 +12,17 @@ if (!Number.isInteger(totalShards) || totalShards < 1) {
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(scriptDir, '..');
-const corepackCommand = process.platform === 'win32' ? 'corepack.cmd' : 'corepack';
+const spawnCommand = process.platform === 'win32' ? 'corepack.cmd' : 'corepack';
 
 const runVitest = (args) => {
   const result = spawnSync(
-    corepackCommand,
+    spawnCommand,
     ['pnpm', 'exec', 'dotenv', '-e', '.env', '-e', '.env.test.local', '--', 'vitest', ...args],
     {
       cwd: appRoot,
       stdio: 'inherit',
       env: process.env,
+      shell: process.platform === 'win32',
     },
   );
 
