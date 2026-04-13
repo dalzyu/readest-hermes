@@ -165,7 +165,7 @@ const EN_SEEDS: Seed[] = [
   {
     selectedText: 'tender',
     context:
-      'Grandfather\'s handwriting has become shaky, but his notes are still tender and precise. He wrote a recipe for lentil stew and added, in tiny letters, \"salt only after tasting.\" Even his instructions feel like care rather than control.',
+      'Grandfather\'s handwriting has become shaky, but his notes are still tender and precise. He wrote a recipe for lentil stew and added, in tiny letters, "salt only after tasting." Even his instructions feel like care rather than control.',
   },
   {
     selectedText: 'echo',
@@ -1339,7 +1339,7 @@ const PT_SEEDS: Seed[] = [
     selectedText: 'hesitar',
     expectedEn: 'to hesitate',
     context:
-      'Eu ia hesitar mais uma vez antes de enviar o portfolio. Uma amiga revisou comigo e disse apenas: \"esta bom o bastante, manda\". Cliquei em enviar com a mao tremendo e depois veio alivio.',
+      'Eu ia hesitar mais uma vez antes de enviar o portfolio. Uma amiga revisou comigo e disse apenas: "esta bom o bastante, manda". Cliquei em enviar com a mao tremendo e depois veio alivio.',
   },
   {
     selectedText: 'gentileza',

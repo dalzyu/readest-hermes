@@ -32,7 +32,7 @@ const countCodeMatches = (files, token) =>
 const countCodeToken = (content, token) => {
   let count = 0;
   let mode = 'code';
-  let escape = false;
+  let isEscaped = false;
   const templateExpressionStack = [];
 
   for (let index = 0; index < content.length; index += 1) {
@@ -53,12 +53,12 @@ const countCodeToken = (content, token) => {
     }
 
     if (mode === 'single-quote' || mode === 'double-quote') {
-      if (escape) {
-        escape = false;
+      if (isEscaped) {
+        isEscaped = false;
         continue;
       }
       if (char === '\\') {
-        escape = true;
+        isEscaped = true;
         continue;
       }
       if ((mode === 'single-quote' && char === "'") || (mode === 'double-quote' && char === '"')) {
@@ -68,12 +68,12 @@ const countCodeToken = (content, token) => {
     }
 
     if (mode === 'template') {
-      if (escape) {
-        escape = false;
+      if (isEscaped) {
+        isEscaped = false;
         continue;
       }
       if (char === '\\') {
-        escape = true;
+        isEscaped = true;
         continue;
       }
       if (char === '`') {

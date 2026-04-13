@@ -219,7 +219,7 @@ async function runFixture(
   const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
 
   let attempts = 1;
-  let rawSegments: string[] = [];
+  const rawSegments: string[] = [];
   let rawResponse = await callOpenAICompat(baseUrl, model, systemPrompt, userPrompt);
   rawSegments.push(rawResponse);
   let parsed = sanitizeTranslationResult(
