@@ -8,15 +8,15 @@
 
 Hermes is open-source, and contributions are welcome! Feel free to open issues, suggest features, or submit pull requests. Please **review our [contributing guidelines](CONTRIBUTING.md) before you start**. We also welcome you to join our [Discord][link-discord] community for either support or contributing guidance.
 
-<a href="https://github.com/dalzyu/readest-hermes/graphs/contributors">
+<a href="https://github.com/dalzyu/readest-Readest/graphs/contributors">
   <p align="left">
-    <img width="500" src="https://contrib.rocks/image?repo=dalzyu/readest-hermes" alt="A table of avatars from the project's contributors" />
+    <img width="500" src="https://contrib.rocks/image?repo=dalzyu/readest-Readest" alt="A table of avatars from the project's contributors" />
   </p>
 </a>
 
 ## Support
 
-If Hermes has been useful to you, consider supporting its development. You can [become a sponsor on GitHub](https://github.com/sponsors/readest), [donate via Stripe](https://donate.stripe.com/4gMcN5aZdcE52kW3TFgjC01), or [donate with crypto](https://donate.readest.com). Your contribution helps us squash bugs faster, improve performance, and keep building great features.
+If Readest has been useful to you, consider supporting its development. You can [become a sponsor on GitHub](https://github.com/sponsors/readest), [donate via Stripe](https://donate.stripe.com/4gMcN5aZdcE52kW3TFgjC01), or [donate with crypto](https://donate.readest.com). Your contribution helps us squash bugs faster, improve performance, and keep building great features.
 
 ### Sponsors
 
@@ -51,15 +51,15 @@ We would also like to thank the [Web Chinese Fonts Plan](https://chinese-font.ne
 
 ---
 
-<div align="center" style="color: gray;">Happy reading with Hermes!</div>
+<div align="center" style="color: gray;">Happy reading with Readest!</div>
 
 [badge-website]: https://img.shields.io/badge/website-readest.com-orange
 [badge-web-app]: https://img.shields.io/badge/read%20online-web.readest.com-orange
-[badge-license]: https://img.shields.io/github/license/dalzyu/readest-hermes?color=teal
-[badge-release]: https://img.shields.io/github/release/dalzyu/readest-hermes?color=green
+[badge-license]: https://img.shields.io/github/license/dalzyu/readest-Readest?color=teal
+[badge-release]: https://img.shields.io/github/release/dalzyu/readest-Readest?color=green
 [badge-platforms]: https://img.shields.io/badge/platforms-macOS%2C%20Windows%2C%20Linux%2C%20Android%2C%20iOS%2C%20Web%2C%20PWA-green
-[badge-last-commit]: https://img.shields.io/github/last-commit/dalzyu/readest-hermes?color=blue
-[badge-commit-activity]: https://img.shields.io/github/commit-activity/m/dalzyu/readest-hermes?color=blue
+[badge-last-commit]: https://img.shields.io/github/last-commit/dalzyu/readest-Readest?color=blue
+[badge-commit-activity]: https://img.shields.io/github/commit-activity/m/dalzyu/readest-Readest?color=blue
 [badge-discord]: https://img.shields.io/discord/1314226120886976544?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square
 [badge-hellogithub]: https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=8a5b6ade2aee461a8bd94e59200682a7&claim_uid=eRLUbPOy2qZtDgw&theme=small
 [badge-donate]: https://donate.readest.com/badge.svg
@@ -71,15 +71,15 @@ We would also like to thank the [Web Chinese Fonts Plan](https://chinese-font.ne
 [link-website]: https://readest.com?utm_source=github&utm_medium=referral&utm_campaign=readme
 [link-flathub]: https://flathub.org/en/apps/com.bilingify.readest
 [link-web-readest]: https://web.readest.com
-[link-gh-releases]: https://github.com/dalzyu/readest-hermes/releases
-[link-gh-commits]: https://github.com/dalzyu/readest-hermes/commits/main
-[link-gh-pulse]: https://github.com/dalzyu/readest-hermes/pulse
-[link-gh-wiki]: https://github.com/dalzyu/readest-hermes/wiki
+[link-gh-releases]: https://github.com/dalzyu/readest-Readest/releases
+[link-gh-commits]: https://github.com/dalzyu/readest-Readest/commits/main
+[link-gh-pulse]: https://github.com/dalzyu/readest-Readest/pulse
+[link-gh-wiki]: https://github.com/dalzyu/readest-Readest/wiki
 [link-discord]: https://discord.gg/gntyVNk3BJ
 [link-parallel-read]: https://readest.com/#parallel-read
 [link-koreader]: https://github.com/koreader/koreader
 [link-hellogithub]: https://hellogithub.com/repository/8a5b6ade2aee461a8bd94e59200682a7
 [link-deepwiki]: https://deepwiki.com/readest/readest
-[link-locales]: https://github.com/dalzyu/readest-hermes/tree/main/apps/readest-app/public/locales
+[link-locales]: https://github.com/dalzyu/readest-Readest/tree/main/apps/readest-app/public/locales
 [link-kosync-wiki]: https://github.com/readest/readest/wiki/Sync-with-Koreader-devices
 [link-reddit]: https://reddit.com/r/readest/
