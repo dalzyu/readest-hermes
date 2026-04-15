@@ -7,6 +7,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { eventDispatcher } from '@/utils/event';
 import { DocumentLoader } from '@/libs/document';
 import { indexBook } from '@/services/ai';
+import { aiLogger } from '@/services/ai/logger';
 import { aiStore } from '@/services/ai/storage/aiStore';
 import type { AISettings, IndexResult } from '@/services/ai/types';
 import type { Book } from '@/types/book';
@@ -104,15 +105,15 @@ export async function indexSeriesVolumes(
       if (result.status === 'complete') {
         indexed++;
       } else if (result.status === 'partial') {
-        indexed++;
         warnings++;
       } else if (result.status === 'already-indexed') {
         skipped++;
       } else if (result.status === 'empty') {
         skipped++;
       }
-    } catch {
+    } catch (error) {
       failed++;
+      aiLogger.rag.indexError(volume.bookHash, `indexSeriesVolumes: ${error}`);
     }
   }
 
