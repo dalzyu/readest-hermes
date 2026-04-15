@@ -11,6 +11,17 @@ export async function POST(req: Request): Promise<Response> {
 
     const { texts, single, apiKey, model } = await req.json();
 
+    const ALLOWED_EMBEDDING_MODELS = new Set([
+      'openai/text-embedding-3-small',
+      'openai/text-embedding-3-large',
+      'google/text-embedding-004',
+      'cohere/embed-multilingual-v3',
+    ]);
+
+    if (model && !ALLOWED_EMBEDDING_MODELS.has(model as string)) {
+      return NextResponse.json({ error: 'Embedding model not allowed' }, { status: 400 });
+    }
+
     if (!texts || !Array.isArray(texts) || texts.length === 0) {
       return NextResponse.json({ error: 'Texts array required' }, { status: 400 });
     }
