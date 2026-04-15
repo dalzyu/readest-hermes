@@ -279,7 +279,10 @@ describe('AIPanel', () => {
     await waitFor(() => expect(saveSettingsMock).toHaveBeenCalled());
 
     const savedSettings = saveSettingsMock.mock.calls.at(-1)?.[1] as typeof stableSettings;
-    expect(savedSettings.aiSettings.providers[0].inferenceParams).toMatchObject({
+    const savedProvider = savedSettings.aiSettings.providers[0] as {
+      inferenceParams?: Record<string, unknown>;
+    };
+    expect(savedProvider.inferenceParams).toMatchObject({
       temperature: 0.4,
       maxTokens: 512,
       topP: 0.75,

@@ -1,5 +1,7 @@
 import type { InferenceParams } from '@/services/ai/types';
 
+export type { InferenceParams };
+
 /** A single configurable output field shown in the translation popup */
 export interface TranslationOutputField {
   id: string;
