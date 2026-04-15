@@ -42,9 +42,14 @@ let bundledDictsInitPromise: Promise<void> | null = null;
 export async function ensureBundledDictsInitialized(): Promise<void> {
   if (bundledDictsInitialized) return;
   if (bundledDictsInitPromise) return bundledDictsInitPromise;
-  bundledDictsInitPromise = initBundledDictionaries().then(() => {
-    bundledDictsInitialized = true;
-  });
+  bundledDictsInitPromise = initBundledDictionaries()
+    .then(() => {
+      bundledDictsInitialized = true;
+    })
+    .catch((error) => {
+      bundledDictsInitPromise = null; // allow retry next call
+      throw error;
+    });
   return bundledDictsInitPromise;
 }
 
