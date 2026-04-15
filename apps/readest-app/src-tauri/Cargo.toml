@@ -1,6 +1,6 @@
 [package]
 name = "Readest"
-version = "0.2.2"
+version = "0.2.3"
 description = "Hermes, the offline-first fork of Readest"
 authors = ["Bilingify LLC"]
 license = ""

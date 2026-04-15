@@ -1,5 +1,19 @@
 {
   "releases": {
+    "0.2.3": {
+      "date": "2026-04-15",
+      "notes": [
+        "Fixed listener leak in Tauri single-instance handler by switching from listen() to once() for window-ready events",
+        "Dictionary initialization now retries after transient failures instead of permanently caching rejected promises",
+        "Embedding API route now enforces an allowlist of permitted models to prevent unauthorized model usage",
+        "Context prompt builder now sanitizes book text to prevent XML pseudo-tag injection from user content",
+        "CJK language disambiguation now correctly uses book language metadata for Japanese/Chinese differentiation",
+        "Removed obsolete disabledBundledDicts filter and added human-readable dictionary display names",
+        "AI provider fixes: Anthropic healthCheck guard order, OpenAI-compatible /v1 dedup, AIGateway auth error logging, Ollama model availability logging",
+        "Series indexing now uses exclusive partial counters and logs catch errors for better diagnostics",
+        "Cleaned up dead PhoneticResult.status field and test hygiene improvements"
+      ]
+    },
     "0.2.2": {
       "date": "2026-04-14",
       "notes": [
