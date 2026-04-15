@@ -35,8 +35,7 @@ export interface ContextLookupRequest {
   sourceLanguage?: string;
   outputFields: TranslationOutputField[];
   dictionarySettings?: ContextDictionarySettings;
-  /** IDs of bundled dictionaries disabled by the user. Passed through to lookupDefinitions. */
-  disabledBundledDicts?: string[];
+
   model?: LanguageModel;
   abortSignal?: AbortSignal;
   /**
@@ -174,7 +173,6 @@ export async function runContextLookup(
         request.selectedText,
         sourceLanguage,
         request.targetLanguage,
-        request.disabledBundledDicts ?? [],
       );
       dictionaryEntries = entries.map((e) => `${e.headword}: ${e.definition}`);
     } catch {

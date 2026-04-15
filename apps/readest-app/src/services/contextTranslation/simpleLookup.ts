@@ -32,7 +32,6 @@ export async function runSimpleLookup(
       request.selectedText,
       srcLang,
       request.targetLanguage,
-      request.disabledBundledDicts ?? [],
     );
     const content = entries.map((e) => `${e.headword}: ${e.definition}`).join('\n');
     return buildSimpleResult(content, srcLang);

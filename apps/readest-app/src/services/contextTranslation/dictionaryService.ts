@@ -427,10 +427,8 @@ function rankEntry(
   };
 }
 
-function getBundledDictionaryMeta(disabledBundledDicts: string[]): UserDictionary[] {
-  return BUNDLED_DICTIONARIES.filter(
-    (dictionary) => !disabledBundledDicts.includes(dictionary.id),
-  ).map((dictionary) => ({
+function getBundledDictionaryMeta(): UserDictionary[] {
+  return BUNDLED_DICTIONARIES.map((dictionary) => ({
     id: dictionary.id,
     name: dictionary.id,
     language: dictionary.language,
@@ -456,7 +454,6 @@ export async function lookupDefinitions(
   text: string,
   sourceLang: string,
   targetLang: string,
-  disabledBundledDicts: string[] = [],
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
 
@@ -469,7 +466,7 @@ export async function lookupDefinitions(
 
   const MAX_RESULTS = 3;
 
-  const allBundled = getBundledDictionaryMeta(disabledBundledDicts);
+  const allBundled = getBundledDictionaryMeta();
   const allUser = (await getUserDictionaryMeta()).filter(
     (dictionary) => dictionary.enabled !== false,
   );

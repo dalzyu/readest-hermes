@@ -178,8 +178,7 @@ export interface ContextTranslationSettings {
   sameBookChunkCount: number;
   priorVolumeChunkCount: number;
   outputFields: TranslationOutputField[];
-  /** IDs of bundled dictionaries that have been explicitly disabled. */
-  disabledBundledDicts?: string[];
+
   /** Translation source to use when looking up selected text. Defaults to 'ai'. */
   source?: 'ai' | 'dictionary' | 'azure' | 'deepl' | 'google' | 'yandex';
   /**

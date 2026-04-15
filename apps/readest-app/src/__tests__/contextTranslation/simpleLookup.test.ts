@@ -38,7 +38,6 @@ const baseRequest: ContextLookupRequest = {
   targetLanguage: 'es',
   sourceLanguage: 'en',
   outputFields: [],
-  disabledBundledDicts: [],
 };
 
 describe('runSimpleLookup', () => {
@@ -72,12 +71,8 @@ describe('runSimpleLookup', () => {
     expect(result.detectedLanguage.language).toBe('en');
   });
 
-  test('disabledBundledDicts is forwarded to lookupDefinitions', async () => {
-    const reqWithDisabled: ContextLookupRequest = {
-      ...baseRequest,
-      disabledBundledDicts: ['bundled-zh-en'],
-    };
-    await runSimpleLookup(reqWithDisabled, 'dictionary');
-    expect(mockLookupDefinitions).toHaveBeenCalledWith('hello', 'en', 'es', ['bundled-zh-en']);
+  test('lookupDefinitions is called without disabledBundledDicts', async () => {
+    await runSimpleLookup(baseRequest, 'dictionary');
+    expect(mockLookupDefinitions).toHaveBeenCalledWith('hello', 'en', 'es');
   });
 });
