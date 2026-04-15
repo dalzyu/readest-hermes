@@ -18,7 +18,11 @@ function languageName(code: string): string {
 function isChineseSource(request: TranslationRequest): boolean {
   if (request.sourceLanguage === 'zh') return true;
   return (
-    getCJKLanguage(request.selectedText, request.popupContext?.localPastContext ?? '') === 'chinese'
+    getCJKLanguage(
+      request.selectedText,
+      request.popupContext?.localPastContext ?? '',
+      request.sourceLanguage,
+    ) === 'chinese'
   );
 }
 
