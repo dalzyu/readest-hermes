@@ -427,10 +427,23 @@ function rankEntry(
   };
 }
 
+const BUNDLED_DICT_DISPLAY_NAMES: Record<string, string> = {
+  'bundled-zh-en': 'CC-CEDICT',
+  'bundled-ja-en': 'JMdict',
+  'bundled-de-en': 'Dict.cc DE-EN',
+  'bundled-fr-en': 'Dict.cc FR-EN',
+  'bundled-es-en': 'Dict.cc ES-EN',
+  'bundled-pt-en': 'Dict.cc PT-EN',
+  'bundled-it-en': 'Dict.cc IT-EN',
+  'bundled-ru-en': 'Dict.cc RU-EN',
+  'bundled-ar-en': 'Dict.cc AR-EN',
+  'bundled-ko-en': 'Dict.cc KO-EN',
+};
+
 function getBundledDictionaryMeta(): UserDictionary[] {
   return BUNDLED_DICTIONARIES.map((dictionary) => ({
     id: dictionary.id,
-    name: dictionary.id,
+    name: BUNDLED_DICT_DISPLAY_NAMES[dictionary.id] ?? dictionary.id,
     language: dictionary.language,
     targetLanguage: dictionary.targetLanguage,
     entryCount: 0,
