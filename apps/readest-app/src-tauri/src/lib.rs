@@ -207,24 +207,28 @@ pub fn run() {
 
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.set_focus();
+                    if let Err(error) =
+                        app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
+                    {
+                        log::warn!("Failed to emit single-instance payload: {error}");
+                    }
                 } else {
                     log::warn!("Single-instance callback fired before main window was ready");
-                    if !files.is_empty() {
-                        let app_handle = app.clone();
-                        let deferred_files = files.clone();
-                        app.listen("window-ready", move |_| {
-                            set_window_open_with_files(&app_handle, deferred_files.clone());
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.set_focus();
-                            }
-                        });
-                    }
-                }
-
-                if let Err(error) =
-                    app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
-                {
-                    log::warn!("Failed to emit single-instance payload: {error}");
+                    let app_handle = app.clone();
+                    let deferred_files = if !files.is_empty() { Some(files.clone()) } else { None };
+                    app.once("window-ready", move |_| {
+                        if let Some(files) = deferred_files {
+                            set_window_open_with_files(&app_handle, files);
+                        }
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.set_focus();
+                        }
+                        if let Err(error) =
+                            app_handle.emit("single-instance", SingleInstancePayload { args: argv, cwd })
+                        {
+                            log::warn!("Failed to emit deferred single-instance payload: {error}");
+                        }
+                    });
                 }
             })
             .dbus_id("com.bilingify.readest".to_owned())
