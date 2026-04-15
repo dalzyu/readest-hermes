@@ -6,7 +6,7 @@ import { getReadingRomaji, isTokenizerReady, initJapaneseTokenizer } from './jpT
 
 export { isTokenizerReady };
 
-export type PhoneticResult = { value: string; status: 'ready' | 'loading' | 'unavailable' };
+export type PhoneticResult = { value: string };
 
 // Pre-warm the tokenizer so it is ready when the user first selects text.
 // This is a no-op if the tokenizer is already loading / loaded.
@@ -31,23 +31,20 @@ function containsKanji(text: string): boolean {
  * Strategy:
  * 1. If text is kana-only → wanakana (instant, no dict needed)
  * 2. If text contains kanji AND kuromoji is ready → kuromoji (accurate)
- * 3. If text contains kanji AND kuromoji NOT ready → return loading status
+ * 3. If text contains kanji AND kuromoji NOT ready → return empty
  *
  * The LLM is NEVER used as the source of truth for phonetics.
  */
 function safeRomaji(text: string): PhoneticResult {
   if (containsKanji(text)) {
-    // kuromoji provides deterministic, context-aware readings for kanji
     if (isTokenizerReady()) {
-      const romaji = getReadingRomaji(text);
-      return { value: romaji, status: 'ready' };
+      return { value: getReadingRomaji(text) };
     }
-    return { value: '', status: 'loading' }; // tokenizer warming up
+    return { value: '' }; // tokenizer warming up
   }
   const romaji = toRomaji(text).trim();
-  // Guard: if toRomaji returned the input unchanged, there was nothing to convert
-  if (romaji === text) return { value: '', status: 'unavailable' };
-  return { value: romaji, status: 'ready' };
+  if (romaji === text) return { value: '' };
+  return { value: romaji };
 }
 
 function buildExampleAnnotations(
