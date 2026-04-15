@@ -33,7 +33,7 @@ export class OpenAICompatibleProvider implements AIProvider {
   }
 
   private normalizeBaseUrl(baseUrl?: string): string {
-    return (baseUrl || '').trim().replace(/\/+$/, '');
+    return (baseUrl || '').trim().replace(/\/+$/, '').replace(/\/v1$/, '');
   }
 
   private getProviderBaseUrl(): string {
