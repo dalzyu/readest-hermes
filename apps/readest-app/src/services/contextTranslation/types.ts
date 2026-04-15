@@ -9,8 +9,8 @@ export interface TranslationOutputField {
 }
 
 export interface ContextTranslationHarnessSettings {
-  /** 'production' applies repair + rescue + sanitization. 'single-pass' trusts the initial response. */
-  flow: 'production' | 'single-pass';
+  /** Production-only harness. Legacy single-pass values are normalized away on load. */
+  flow: 'production';
   repairEnabled: boolean;
   repairOnContamination: boolean;
   repairOnMissingPrimary: boolean;
@@ -19,6 +19,7 @@ export interface ContextTranslationHarnessSettings {
   maxRepairAttempts: number;
   perFieldRescueEnabled: boolean;
   maxPerFieldRepairAttempts: number;
+  maxTotalLLMCalls?: number;
   detectContamination: boolean;
   sanitizeOutput: boolean;
   extractChannelTail: boolean;
@@ -168,6 +169,8 @@ export interface ContextDictionarySettings {
 export interface ContextTranslationSettings {
   enabled: boolean;
   targetLanguage: string;
+  /** Whether to run reference dictionary lookups and inject results into AI prompts (default: true). */
+  referenceDictionaryEnabled?: boolean;
   recentContextPages: number;
   lookAheadWords: number;
   sameBookRagEnabled: boolean;
@@ -175,8 +178,7 @@ export interface ContextTranslationSettings {
   sameBookChunkCount: number;
   priorVolumeChunkCount: number;
   outputFields: TranslationOutputField[];
-  /** IDs of bundled dictionaries that have been explicitly disabled. */
-  disabledBundledDicts?: string[];
+
   /** Translation source to use when looking up selected text. Defaults to 'ai'. */
   source?: 'ai' | 'dictionary' | 'azure' | 'deepl' | 'google' | 'yandex';
   /**

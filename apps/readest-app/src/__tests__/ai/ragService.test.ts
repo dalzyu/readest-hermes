@@ -109,6 +109,14 @@ describe('ragService', () => {
         getEmbeddingModel: () => ({ modelId: 'test-embedding-model' }),
       },
       inferenceParams: {},
+      config: {
+        id: 'oc-test',
+        name: 'OpenAI-Compatible',
+        providerType: 'openai-compatible',
+        baseUrl: 'http://127.0.0.1:8080',
+        model: 'test-llm',
+        embeddingModel: 'embeddinggemma',
+      },
     });
     mockEmbed.mockResolvedValue({ embedding: [0.1, 0.2] });
     mockEmbedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
@@ -172,5 +180,53 @@ describe('ragService', () => {
       maxPage: 7,
       minPage: 2,
     });
+  });
+
+  test('returns partial when some sections fail but later sections still index', async () => {
+    const settings: AISettings = {
+      ...DEFAULT_AI_SETTINGS,
+      enabled: true,
+      providers: [
+        {
+          id: 'oc-test',
+          name: 'OpenAI-Compatible',
+          providerType: 'openai-compatible',
+          baseUrl: 'http://127.0.0.1:8080',
+          model: 'test-llm',
+          embeddingModel: 'embeddinggemma',
+        },
+      ],
+      activeProviderId: 'oc-test',
+    };
+    const bookDoc = {
+      metadata: { title: 'Partially Broken Book', author: 'Tester' },
+      sections: [
+        {
+          id: 'section-1',
+          size: 100_000,
+          linear: 'yes',
+          createDocument: async () => {
+            throw new Error('section parse failed');
+          },
+        },
+        {
+          id: 'section-2',
+          size: 100_000,
+          linear: 'yes',
+          createDocument: async () => document.implementation.createHTMLDocument('section'),
+        },
+      ],
+      toc: [
+        { id: 0, label: 'Chapter 1' },
+        { id: 1, label: 'Chapter 2' },
+      ],
+    };
+
+    const result = await indexBook(bookDoc, 'partial-book', settings);
+
+    expect(result.status).toBe('partial');
+    expect(result.errorMessages).toEqual(['Section 0: section parse failed']);
+    expect(mockSaveChunks).toHaveBeenCalledTimes(1);
+    expect(mockSaveMeta).toHaveBeenCalledTimes(1);
   });
 });

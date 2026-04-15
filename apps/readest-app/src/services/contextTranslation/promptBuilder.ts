@@ -18,7 +18,11 @@ function languageName(code: string): string {
 function isChineseSource(request: TranslationRequest): boolean {
   if (request.sourceLanguage === 'zh') return true;
   return (
-    getCJKLanguage(request.selectedText, request.popupContext?.localPastContext ?? '') === 'chinese'
+    getCJKLanguage(
+      request.selectedText,
+      request.popupContext?.localPastContext ?? '',
+      request.sourceLanguage,
+    ) === 'chinese'
   );
 }
 
@@ -26,23 +30,31 @@ function isChineseTarget(request: TranslationRequest): boolean {
   return request.targetLanguage === 'zh';
 }
 
+/** Strip angle brackets to prevent book text from closing or opening XML pseudo-tags. */
+function sanitizeContextText(text: string): string {
+  return text.replace(/</g, '\u2039').replace(/>/g, '\u203a');
+}
+
 function buildContextSections(request: TranslationRequest): string {
+  const sc = sanitizeContextText;
   const sections = [
-    `<local_past_context>${request.popupContext.localPastContext}</local_past_context>`,
+    request.popupContext.localPastContext
+      ? `<local_past_context>${sc(request.popupContext.localPastContext)}</local_past_context>`
+      : '',
     request.popupContext.localFutureBuffer
-      ? `<local_future_buffer>${request.popupContext.localFutureBuffer}</local_future_buffer>`
+      ? `<local_future_buffer>${sc(request.popupContext.localFutureBuffer)}</local_future_buffer>`
       : '',
     request.popupContext.sameBookChunks.length > 0
-      ? `<same_book_memory>${request.popupContext.sameBookChunks.join('\n\n')}</same_book_memory>`
+      ? `<same_book_memory>${request.popupContext.sameBookChunks.map(sc).join('\n\n')}</same_book_memory>`
       : '',
     request.popupContext.priorVolumeChunks.length > 0
-      ? `<prior_volume_memory>${request.popupContext.priorVolumeChunks.join('\n\n')}</prior_volume_memory>`
+      ? `<prior_volume_memory>${request.popupContext.priorVolumeChunks.map(sc).join('\n\n')}</prior_volume_memory>`
       : '',
   ];
 
   if (request.popupContext.dictionaryEntries.length > 0) {
     sections.push(
-      `<reference_dictionary>${request.popupContext.dictionaryEntries.join('\n')}</reference_dictionary>`,
+      `<reference_dictionary>${request.popupContext.dictionaryEntries.map(sc).join('\n')}</reference_dictionary>`,
     );
   }
 

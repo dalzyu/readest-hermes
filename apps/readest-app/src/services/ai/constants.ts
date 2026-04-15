@@ -1,4 +1,4 @@
-import type { AISettings, ProviderConfig } from './types';
+import type { AISettings, ProviderConfig, AIProviderType } from './types';
 
 // cheapest popular models as of 2025
 export const GATEWAY_MODELS = {
@@ -50,6 +50,47 @@ export const DEFAULT_AI_GATEWAY_CONFIG: ProviderConfig = {
   model: GATEWAY_MODELS.GEMINI_FLASH_LITE,
   embeddingModel: 'openai/text-embedding-3-small',
 };
+
+export const EMBEDDING_CAPABLE_PROVIDER_TYPES: ReadonlySet<AIProviderType> = new Set([
+  'ollama',
+  'openai',
+  'openai-compatible',
+  'google',
+  'mistral',
+  'ai-gateway',
+]);
+
+export function providerTypeSupportsEmbeddings(providerType: AIProviderType): boolean {
+  return EMBEDDING_CAPABLE_PROVIDER_TYPES.has(providerType);
+}
+
+export function resolveEmbeddingModelId(
+  config: Pick<ProviderConfig, 'providerType' | 'embeddingModel'>,
+): string | undefined {
+  const configuredModel = config.embeddingModel?.trim();
+  if (configuredModel) return configuredModel;
+
+  switch (config.providerType) {
+    case 'ollama':
+      return 'nomic-embed-text';
+    case 'openai':
+      return 'text-embedding-3-small';
+    case 'google':
+      return 'gemini-embedding-001';
+    case 'mistral':
+      return 'mistral-embed';
+    case 'ai-gateway':
+      return 'openai/text-embedding-3-small';
+    default:
+      return undefined;
+  }
+}
+
+export function providerConfigCanServeEmbeddings(
+  config: Pick<ProviderConfig, 'providerType' | 'embeddingModel'>,
+): boolean {
+  return providerTypeSupportsEmbeddings(config.providerType) && !!resolveEmbeddingModelId(config);
+}
 
 export const DEFAULT_AI_SETTINGS: AISettings = {
   enabled: false,

@@ -15,6 +15,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useAIChatStore } from '@/store/aiChatStore';
+import { eventDispatcher } from '@/utils/event';
 import {
   indexBook,
   isBookIndexed,
@@ -24,7 +25,7 @@ import {
   getLastSources,
   clearLastSources,
 } from '@/services/ai';
-import type { EmbeddingProgress, AISettings, AIMessage } from '@/services/ai/types';
+import type { EmbeddingProgress, AISettings, AIMessage, IndexResult } from '@/services/ai/types';
 import { useEnv } from '@/context/EnvContext';
 
 import { Button } from '@/components/ui/button';
@@ -285,6 +286,10 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState<EmbeddingProgress | null>(null);
   const [indexed, setIndexed] = useState(false);
+  const [indexNotice, setIndexNotice] = useState<{
+    type: 'warning' | 'error';
+    message: string;
+  } | null>(null);
 
   const bookHash = bookKey.split('-')[0] || '';
   const bookTitle = bookData?.book?.title || 'Unknown';
@@ -307,16 +312,55 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
   const handleIndex = useCallback(async () => {
     if (!bookData?.bookDoc || !aiSettings) return;
     setIsIndexing(true);
+    setIndexNotice(null);
     try {
-      await indexBook(
+      const result: IndexResult = await indexBook(
         bookData.bookDoc as Parameters<typeof indexBook>[0],
         bookHash,
         aiSettings,
         setIndexProgress,
       );
-      setIndexed(true);
+      if (
+        result.status === 'complete' ||
+        result.status === 'already-indexed' ||
+        result.status === 'partial'
+      ) {
+        setIndexed(true);
+      }
+
+      if (result.status === 'complete' || result.status === 'already-indexed') {
+        void eventDispatcher.dispatch('toast', {
+          message: _('Book indexed successfully'),
+          type: 'success',
+        });
+        return;
+      }
+
+      if (result.status === 'partial') {
+        void eventDispatcher.dispatch('toast', {
+          message: _('Book indexed with warnings. {{count}} section(s) could not be processed.', {
+            count: result.errorMessages.length,
+          }),
+          type: 'warning',
+        });
+        return;
+      }
+
+      const emptyMessage = _('No indexable content was found in this book.');
+      setIndexNotice({ type: 'warning', message: emptyMessage });
+      aiLogger.rag.indexError(bookHash, 'No indexable content found');
+      void eventDispatcher.dispatch('toast', {
+        message: emptyMessage,
+        type: 'warning',
+      });
     } catch (e) {
-      aiLogger.rag.indexError(bookHash, (e as Error).message);
+      const message = (e as Error).message;
+      aiLogger.rag.indexError(bookHash, message);
+      setIndexNotice({ type: 'error', message });
+      void eventDispatcher.dispatch('toast', {
+        message: _('Indexing failed: {{message}}', { message }),
+        type: 'error',
+      });
     } finally {
       setIsIndexing(false);
       setIndexProgress(null);
@@ -360,6 +404,17 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
             {_('Enable AI search and chat for this book')}
           </p>
         </div>
+        {indexNotice && (
+          <div
+            className={`w-full rounded-lg border px-3 py-2 text-left text-xs ${
+              indexNotice.type === 'error'
+                ? 'border-error/20 bg-error/10 text-base-content'
+                : 'border-warning/20 bg-warning/10 text-base-content'
+            }`}
+          >
+            {indexNotice.message}
+          </div>
+        )}
         <Button onClick={handleIndex} size='sm' className='h-8 text-xs'>
           <BookOpenIcon className='mr-1.5 size-3.5' />
           {_('Start Indexing')}

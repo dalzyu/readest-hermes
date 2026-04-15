@@ -4,6 +4,10 @@ import type { LookupPlugin } from './types';
 import { HAN_REGEX } from '../utils';
 import { getReadingRomaji, isTokenizerReady, initJapaneseTokenizer } from './jpTokenizer';
 
+export { isTokenizerReady };
+
+export type PhoneticResult = { value: string };
+
 // Pre-warm the tokenizer so it is ready when the user first selects text.
 // This is a no-op if the tokenizer is already loading / loaded.
 if (typeof window !== 'undefined') {
@@ -27,22 +31,20 @@ function containsKanji(text: string): boolean {
  * Strategy:
  * 1. If text is kana-only → wanakana (instant, no dict needed)
  * 2. If text contains kanji AND kuromoji is ready → kuromoji (accurate)
- * 3. If text contains kanji AND kuromoji NOT ready → return '' (graceful skip)
+ * 3. If text contains kanji AND kuromoji NOT ready → return empty
  *
  * The LLM is NEVER used as the source of truth for phonetics.
  */
-function safeRomaji(text: string): string {
+function safeRomaji(text: string): PhoneticResult {
   if (containsKanji(text)) {
-    // kuromoji provides deterministic, context-aware readings for kanji
     if (isTokenizerReady()) {
-      return getReadingRomaji(text);
+      return { value: getReadingRomaji(text) };
     }
-    return ''; // tokenizer not ready yet — skip gracefully
+    return { value: '' }; // tokenizer warming up
   }
   const romaji = toRomaji(text).trim();
-  // Guard: if toRomaji returned the input unchanged, there was nothing to convert
-  if (romaji === text) return '';
-  return romaji;
+  if (romaji === text) return { value: '' };
+  return { value: romaji };
 }
 
 function buildExampleAnnotations(
@@ -53,8 +55,8 @@ function buildExampleAnnotations(
   const annotations = Object.fromEntries(
     examples
       .map((example) => {
-        const romaji = safeRomaji(example[key]);
-        return romaji ? [example.exampleId, { phonetic: romaji }] : null;
+        const result = safeRomaji(example[key]);
+        return result.value ? [example.exampleId, { phonetic: result.value }] : null;
       })
       .filter((entry): entry is [string, { phonetic: string }] => entry !== null),
   );
@@ -68,9 +70,9 @@ export const jaPlugin: LookupPlugin = {
     _fields: Record<string, string>,
     selectedText: string,
   ): LookupAnnotations | undefined {
-    const romaji = safeRomaji(selectedText);
-    if (!romaji) return undefined;
-    return { phonetic: romaji };
+    const result = safeRomaji(selectedText);
+    if (!result.value) return undefined;
+    return { phonetic: result.value };
   },
   enrichExampleAnnotations(examples, slot) {
     return buildExampleAnnotations(examples, slot);

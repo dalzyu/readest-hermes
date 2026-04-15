@@ -18,7 +18,7 @@ import {
   updateSeriesVolume,
 } from '@/services/contextTranslation/seriesService';
 
-import { indexSeriesVolumes } from './SeriesCard';
+import { buildSeriesIndexMessage, indexSeriesVolumes } from './SeriesCard';
 
 const SeriesModal: React.FC = () => {
   const _ = useTranslation();
@@ -141,8 +141,14 @@ const SeriesModal: React.FC = () => {
     if (!currentSeries) return;
     setIsIndexingAll(true);
     try {
-      await indexSeriesVolumes(currentSeries, library, appService, settings.aiSettings);
+      const summary = await indexSeriesVolumes(
+        currentSeries,
+        library,
+        appService,
+        settings.aiSettings,
+      );
       await loadIndexStates(currentSeries);
+      void eventDispatcher.dispatch('toast', buildSeriesIndexMessage(summary, _));
     } finally {
       setIsIndexingAll(false);
     }

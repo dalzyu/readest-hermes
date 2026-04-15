@@ -1,6 +1,7 @@
 import { createGateway } from 'ai';
 import type { LanguageModel, EmbeddingModel } from 'ai';
 import type { AIProvider, ProviderConfig, InferenceParams } from '../types';
+import { resolveEmbeddingModelId } from '../constants';
 import { aiLogger } from '../logger';
 import { GATEWAY_MODELS } from '../constants';
 import { AI_TIMEOUTS } from '../utils/retry';
@@ -26,13 +27,30 @@ export class AIGatewayProvider implements AIProvider {
     aiLogger.provider.init(config.id, config.model || GATEWAY_MODELS.GEMINI_FLASH_LITE);
   }
 
+  private async getRequestHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+    try {
+      const { getAccessToken } = await import('@/utils/access');
+      const token = await getAccessToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch (error) {
+      aiLogger.provider.error(this.id, `getRequestHeaders: getAccessToken failed: ${error}`);
+      // Leave auth header unset; the request will fail if the user is not authenticated.
+    }
+
+    return headers;
+  }
+
   getModel(_params?: InferenceParams): LanguageModel {
     const modelId = this.config.model || GATEWAY_MODELS.GEMINI_FLASH_LITE;
     return this.gateway(modelId);
   }
 
   getEmbeddingModel(): EmbeddingModel {
-    const embedModel = this.config.embeddingModel || 'openai/text-embedding-3-small';
+    const embedModel = resolveEmbeddingModelId(this.config) || 'openai/text-embedding-3-small';
 
     if (typeof window !== 'undefined') {
       return createProxiedEmbeddingModel({
@@ -48,16 +66,16 @@ export class AIGatewayProvider implements AIProvider {
     return !!this.config.apiKey;
   }
 
-  async healthCheck(): Promise<boolean> {
+  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
     if (!this.config.apiKey) return false;
 
     try {
       const modelId = this.config.model || GATEWAY_MODELS.GEMINI_FLASH_LITE;
-      aiLogger.provider.init(this.id, `healthCheck starting with model: ${modelId}`);
+      const headers = await this.getRequestHeaders();
 
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           messages: [{ role: 'user', content: 'hi' }],
           apiKey: this.config.apiKey,
@@ -66,13 +84,26 @@ export class AIGatewayProvider implements AIProvider {
         signal: AbortSignal.timeout(AI_TIMEOUTS.HEALTH_CHECK),
       });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(error.error || `Health check failed: ${response.status}`);
-      }
+      if (!response.ok) return false;
 
-      aiLogger.provider.init(this.id, 'healthCheck success');
-      return true;
+      if (!options?.requireEmbedding) return true;
+
+      const embeddingModel = resolveEmbeddingModelId(this.config);
+      if (!embeddingModel) return false;
+
+      const embeddingResponse = await fetch('/api/ai/embed', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          texts: ['health check'],
+          single: true,
+          apiKey: this.config.apiKey,
+          model: embeddingModel,
+        }),
+        signal: AbortSignal.timeout(AI_TIMEOUTS.HEALTH_CHECK),
+      });
+
+      return embeddingResponse.ok;
     } catch (e) {
       const error = e as Error;
       aiLogger.provider.error(this.id, `healthCheck failed: ${error.message}`);

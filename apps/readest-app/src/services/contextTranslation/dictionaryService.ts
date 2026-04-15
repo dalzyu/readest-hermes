@@ -5,6 +5,11 @@ import { extractFromZip } from './dictionaryParser';
 import { parseDictionary, detectFormat } from './parsers/formatRouter';
 import { getDictionaryForm, isTokenizerReady } from './plugins/jpTokenizer';
 
+export {
+  SUPPORTED_DICTIONARY_IMPORT_EXTENSIONS,
+  SUPPORTED_DICTIONARY_IMPORT_FORMATS,
+} from './parsers/formatRouter';
+
 const DICTIONARY_STORE = 'dictionaryData';
 
 /** Manifest of dictionaries bundled with the app. */
@@ -30,6 +35,29 @@ export const BUNDLED_DICTIONARIES: BUNDLED_DICT[] = [
 
 /** In-memory cache: dictionary id -> entries */
 const memoryCache = new Map<string, DictionaryEntry[]>();
+
+let bundledDictsInitialized = false;
+let bundledDictsInitPromise: Promise<void> | null = null;
+
+export async function ensureBundledDictsInitialized(): Promise<void> {
+  if (bundledDictsInitialized) return;
+  if (bundledDictsInitPromise) return bundledDictsInitPromise;
+  bundledDictsInitPromise = initBundledDictionaries()
+    .then(() => {
+      bundledDictsInitialized = true;
+    })
+    .catch((error) => {
+      bundledDictsInitPromise = null; // allow retry next call
+      throw error;
+    });
+  return bundledDictsInitPromise;
+}
+
+export function isBundledPairSupported(sourceLang: string, targetLang: string): boolean {
+  return BUNDLED_DICTIONARIES.some(
+    (d) => d.language === sourceLang && d.targetLanguage === targetLang,
+  );
+}
 
 /** Levenshtein distance via classic DP O(mn) table. */
 function levenshtein(a: string, b: string): number {
@@ -179,6 +207,16 @@ async function dictionaryDataRecord(id: string): Promise<{
   } | null>;
 }
 
+function getDictionaryImportErrorMessage(filename: string, error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return `Failed to import ${filename}: ${error.message}`;
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return `Failed to import ${filename}: ${error}`;
+  }
+  return `Failed to import ${filename}: unknown error`;
+}
+
 /** Load entries for a dictionary from IndexedDB (or memory cache). */
 async function loadDictionaryEntries(id: string): Promise<DictionaryEntry[]> {
   if (memoryCache.has(id)) return memoryCache.get(id)!;
@@ -216,17 +254,21 @@ export async function previewDictionaryZip(
 ): Promise<{ name: string; wordcount: number }> {
   const buffer = zipFile instanceof File ? new Uint8Array(await zipFile.arrayBuffer()) : zipFile;
   const filename = zipFile instanceof File ? zipFile.name : 'dictionary.zip';
-  const format = detectFormat(filename, buffer);
+  try {
+    const format = detectFormat(filename, buffer);
 
-  if (format === 'stardict') {
-    const { ifo } = await extractFromZip(buffer);
-    const ifoResult = (await import('./dictionaryParser')).parseIfo(ifo);
-    return { name: ifoResult.name, wordcount: ifoResult.wordcount };
+    if (format === 'stardict') {
+      const { ifo } = await extractFromZip(buffer);
+      const ifoResult = (await import('./dictionaryParser')).parseIfo(ifo);
+      return { name: ifoResult.name, wordcount: ifoResult.wordcount };
+    }
+
+    // For non-StarDict formats, do a full parse to get the count
+    const { entries, name } = await parseDictionary(filename, buffer);
+    return { name, wordcount: entries.length };
+  } catch (error) {
+    throw new Error(getDictionaryImportErrorMessage(filename, error));
   }
-
-  // For non-StarDict formats, do a full parse to get the count
-  const { entries, name } = await parseDictionary(filename, buffer);
-  return { name, wordcount: entries.length };
 }
 
 /**
@@ -244,36 +286,40 @@ export async function importUserDictionary(
   const buffer = zipFile instanceof File ? new Uint8Array(await zipFile.arrayBuffer()) : zipFile;
   const filename = zipFile instanceof File ? zipFile.name : 'dictionary.zip';
 
-  const { entries } = await parseDictionary(filename, buffer);
-  if (entries.length === 0) {
-    throw new Error('Dictionary has 0 entries');
+  try {
+    const { entries } = await parseDictionary(filename, buffer);
+    if (entries.length === 0) {
+      throw new Error('Dictionary has 0 entries');
+    }
+
+    const id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const jsonBytes = new TextEncoder().encode(JSON.stringify(entries));
+    const compressed = await compressGzip(jsonBytes);
+
+    const userMeta: UserDictionary = {
+      id,
+      name: meta.name,
+      language: meta.language,
+      targetLanguage: meta.targetLanguage,
+      entryCount: entries.length,
+      source: 'user',
+      importedAt: Date.now(),
+    };
+
+    await aiStore.putRecord(DICTIONARY_STORE, { id, meta: userMeta, blob: compressed });
+
+    // Update settings
+    const allMeta = await getUserDictionaryMeta();
+    allMeta.push(userMeta);
+    await saveUserDictionaryMeta(allMeta);
+
+    // Cache entries
+    memoryCache.set(id, entries);
+
+    return userMeta;
+  } catch (error) {
+    throw new Error(getDictionaryImportErrorMessage(filename, error));
   }
-
-  const id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const jsonBytes = new TextEncoder().encode(JSON.stringify(entries));
-  const compressed = await compressGzip(jsonBytes);
-
-  const userMeta: UserDictionary = {
-    id,
-    name: meta.name,
-    language: meta.language,
-    targetLanguage: meta.targetLanguage,
-    entryCount: entries.length,
-    source: 'user',
-    importedAt: Date.now(),
-  };
-
-  await aiStore.putRecord(DICTIONARY_STORE, { id, meta: userMeta, blob: compressed });
-
-  // Update settings
-  const allMeta = await getUserDictionaryMeta();
-  allMeta.push(userMeta);
-  await saveUserDictionaryMeta(allMeta);
-
-  // Cache entries
-  memoryCache.set(id, entries);
-
-  return userMeta;
 }
 
 /**
@@ -358,27 +404,54 @@ export async function initBundledDictionaries(): Promise<void> {
 
 /** Ranking helpers */
 type RankedEntry = {
-  entry: DictionaryEntry;
   dictionaryId: string;
+  sourceName: string;
   category: 1 | 2; // 1 = bilingual, 2 = monolingual
   isUser: boolean;
   importedAt: number;
 };
 
-function rankEntries(
-  entries: DictionaryEntry[],
+function rankEntry(
   dictionaryId: string,
+  sourceName: string,
   isUser: boolean,
   importedAt: number,
   isMonolingual: boolean,
 ): RankedEntry {
   return {
-    entry: entries[0]!, // Caller ensures at least 1 entry per call
     dictionaryId,
+    sourceName,
     category: isMonolingual ? 2 : 1,
     isUser,
     importedAt,
   };
+}
+
+const BUNDLED_DICT_DISPLAY_NAMES: Record<string, string> = {
+  'bundled-zh-en': 'CC-CEDICT',
+  'bundled-ja-en': 'JMdict',
+  'bundled-de-en': 'Dict.cc DE-EN',
+  'bundled-fr-en': 'Dict.cc FR-EN',
+  'bundled-es-en': 'Dict.cc ES-EN',
+  'bundled-pt-en': 'Dict.cc PT-EN',
+  'bundled-it-en': 'Dict.cc IT-EN',
+  'bundled-ru-en': 'Dict.cc RU-EN',
+  'bundled-ar-en': 'Dict.cc AR-EN',
+  'bundled-ko-en': 'Dict.cc KO-EN',
+};
+
+function getBundledDictionaryMeta(): UserDictionary[] {
+  return BUNDLED_DICTIONARIES.map((dictionary) => ({
+    id: dictionary.id,
+    name: BUNDLED_DICT_DISPLAY_NAMES[dictionary.id] ?? dictionary.id,
+    language: dictionary.language,
+    targetLanguage: dictionary.targetLanguage,
+    entryCount: 0,
+    source: 'bundled' as const,
+    importedAt: 0,
+    bundledVersion: dictionary.bundledVersion,
+    enabled: true,
+  }));
 }
 
 /**
@@ -394,9 +467,10 @@ export async function lookupDefinitions(
   text: string,
   sourceLang: string,
   targetLang: string,
-  disabledBundledDicts: string[] = [],
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
+
+  await ensureBundledDictsInitialized();
 
   // For Japanese, deconjugate to dictionary form and search both surface + base form
   const isJapanese = sourceLang === 'ja';
@@ -405,40 +479,28 @@ export async function lookupDefinitions(
 
   const MAX_RESULTS = 3;
 
-  const allBundled: UserDictionary[] = BUNDLED_DICTIONARIES.map((b) => ({
-    id: b.id,
-    name: b.id,
-    language: b.language,
-    targetLanguage: b.targetLanguage,
-    entryCount: 0,
-    source: 'bundled' as const,
-    importedAt: 0,
-    bundledVersion: b.bundledVersion,
-    enabled: !disabledBundledDicts.includes(b.id),
-  }));
-
-  const allUser = await getUserDictionaryMeta();
-
-  const allDicts: UserDictionary[] = [...allBundled, ...allUser].filter((d) => d.enabled !== false);
-
-  // Filter to matching dictionaries
-  const matching = allDicts.filter((d) => {
-    const sourceMatch = d.language === sourceLang;
-    const targetMatch = d.targetLanguage === targetLang;
-    const monolingual = d.language === d.targetLanguage;
+  const allBundled = getBundledDictionaryMeta();
+  const allUser = (await getUserDictionaryMeta()).filter(
+    (dictionary) => dictionary.enabled !== false,
+  );
+  const matching = [...allBundled, ...allUser].filter((dictionary) => {
+    const sourceMatch = dictionary.language === sourceLang;
+    const targetMatch = dictionary.targetLanguage === targetLang;
+    const monolingual = dictionary.language === dictionary.targetLanguage;
     return (sourceMatch && targetMatch) || (sourceMatch && monolingual);
   });
 
   // Rank them
   const ranked: RankedEntry[] = [];
   for (const dict of matching) {
-    const isUser = dict.source === 'user';
     const entries = await loadDictionaryEntries(dict.id);
     if (entries.length === 0) continue;
 
     // Determine if monolingual
     const isMonolingual = dict.language === dict.targetLanguage;
-    ranked.push(rankEntries(entries, dict.id, isUser, dict.importedAt, isMonolingual));
+    ranked.push(
+      rankEntry(dict.id, dict.name, dict.source === 'user', dict.importedAt, isMonolingual),
+    );
   }
 
   // Sort: category 1 > 2, then user > bundled, then higher importedAt
@@ -469,7 +531,7 @@ export async function lookupDefinitions(
       if (results.length >= MAX_RESULTS) break;
       if (seenHeadwords.has(match.headword)) continue;
       seenHeadwords.add(match.headword);
-      results.push({ ...match, source: rankedEntry.dictionaryId });
+      results.push({ ...match, source: rankedEntry.sourceName });
     }
   }
 

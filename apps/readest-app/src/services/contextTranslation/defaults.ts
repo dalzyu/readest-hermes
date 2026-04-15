@@ -16,6 +16,7 @@ export const DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS: ContextTranslationHar
   maxRepairAttempts: 1,
   perFieldRescueEnabled: true,
   maxPerFieldRepairAttempts: 1,
+  maxTotalLLMCalls: 3,
   detectContamination: true,
   sanitizeOutput: true,
   extractChannelTail: true,
@@ -58,6 +59,7 @@ export function resolveContextTranslationHarnessSettings(
   return {
     ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
     ...harness,
+    flow: 'production',
     contaminationMarkers:
       harness?.contaminationMarkers ??
       DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.contaminationMarkers,
@@ -84,6 +86,7 @@ export const CONTEXT_TRANSLATION_HARNESS_PRESETS = {
 export const DEFAULT_CONTEXT_TRANSLATION_SETTINGS: ContextTranslationSettings = {
   enabled: false,
   targetLanguage: 'en',
+  referenceDictionaryEnabled: true,
   recentContextPages: 3,
   lookAheadWords: 80,
   sameBookRagEnabled: true,

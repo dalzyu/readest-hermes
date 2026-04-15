@@ -122,9 +122,12 @@ export async function finalizeTranslationWithContext(
   seed?: FinalizeTranslationSeed,
 ): Promise<FinalizedTranslation> {
   const harness = resolveContextTranslationHarnessSettings(request.harness);
+  const maxCalls = harness.maxTotalLLMCalls ?? 3;
+  let totalCalls = 0;
   const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
   let latestRawText =
     seed?.initialRawText ?? (await callLLM(systemPrompt, userPrompt, model!, abortSignal)) ?? '';
+  totalCalls++;
   let parsed = sanitizeTranslationResult(
     seed?.initialFields ?? parseTranslationResponse(latestRawText, request.outputFields),
     harness,
@@ -133,6 +136,7 @@ export async function finalizeTranslationWithContext(
 
   let repairAttempts = 0;
   while (
+    totalCalls < maxCalls &&
     repairAttempts < harness.maxRepairAttempts &&
     shouldRunRepair(parsed, request, responseContaminated, harness)
   ) {
@@ -147,6 +151,7 @@ export async function finalizeTranslationWithContext(
     );
     latestRawText =
       (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
+    totalCalls++;
     parsed = sanitizeTranslationResult(
       parseTranslationResponse(latestRawText, request.outputFields),
       harness,
@@ -155,7 +160,6 @@ export async function finalizeTranslationWithContext(
   }
 
   if (
-    harness.flow === 'production' &&
     harness.perFieldRescueEnabled &&
     (!hasUsablePrimaryField(parsed, request) || responseContaminated)
   ) {
@@ -165,13 +169,16 @@ export async function finalizeTranslationWithContext(
       .sort((a, b) => a.order - b.order);
 
     for (const field of enabledFields) {
+      if (totalCalls >= maxCalls) break;
       const perField = buildPerFieldPrompt(field, request);
       let fieldValue =
         (await callLLM(perField.systemPrompt, perField.userPrompt, model!, abortSignal)) ?? '';
+      totalCalls++;
       let sanitizedFieldValue = sanitizeFieldContent(field.id, fieldValue, harness);
 
       let perFieldRepairAttempts = 0;
       while (
+        totalCalls < maxCalls &&
         perFieldRepairAttempts < harness.maxPerFieldRepairAttempts &&
         (responseLooksContaminated(fieldValue, harness) || !sanitizedFieldValue.trim())
       ) {
@@ -184,6 +191,7 @@ export async function finalizeTranslationWithContext(
         );
         fieldValue =
           (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
+        totalCalls++;
         sanitizedFieldValue = sanitizeFieldContent(field.id, fieldValue, harness);
       }
 

@@ -6,6 +6,7 @@ import { GoogleProvider } from './GoogleProvider';
 import { OpenRouterProvider } from './OpenRouterProvider';
 import { GenericSdkProvider } from './GenericSdkProvider';
 import type { AIProvider, AISettings, ProviderConfig, AITaskType, InferenceParams } from '../types';
+import { providerConfigCanServeEmbeddings, providerTypeSupportsEmbeddings } from '../constants';
 import { TASK_INFERENCE_DEFAULTS } from '../types';
 
 export {
@@ -70,6 +71,23 @@ function resolveProviderConfig(settings: AISettings, task?: AITaskType): Provide
   return providers[0]!;
 }
 
+function assertProviderSupportsTask(config: ProviderConfig, task: AITaskType): void {
+  if (task !== 'embedding') return;
+
+  const providerName = config.name || config.providerType;
+  if (providerConfigCanServeEmbeddings(config)) return;
+
+  if (!providerTypeSupportsEmbeddings(config.providerType)) {
+    throw new Error(
+      `${providerName} does not support embeddings. Assign an embedding-capable provider in Settings -> AI.`,
+    );
+  }
+
+  throw new Error(
+    `${providerName} is missing an embedding model. Configure an embedding model in Settings -> AI.`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -78,14 +96,15 @@ function resolveProviderConfig(settings: AISettings, task?: AITaskType): Provide
 export function getProviderForTask(
   settings: AISettings,
   task: AITaskType,
-): { provider: AIProvider; inferenceParams: InferenceParams } {
+): { provider: AIProvider; inferenceParams: InferenceParams; config: ProviderConfig } {
   const config = resolveProviderConfig(settings, task);
+  assertProviderSupportsTask(config, task);
   const provider = createProviderFromConfig(config);
   const inferenceParams: InferenceParams = {
     ...TASK_INFERENCE_DEFAULTS[task],
     ...config.inferenceParams,
   };
-  return { provider, inferenceParams };
+  return { provider, inferenceParams, config };
 }
 
 /** Backward-compatible: returns the active provider (translation task). */

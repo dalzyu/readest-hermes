@@ -111,7 +111,11 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
             settings.targetLanguage,
           )
         : [];
-  const sourceCJKLang = getCJKLanguage(selectedText, popupContext?.localPastContext ?? '');
+  const sourceCJKLang = getCJKLanguage(
+    selectedText,
+    popupContext?.localPastContext ?? '',
+    bookLanguage,
+  );
   const selectedTextPinyin =
     annotations?.source?.phonetic ??
     (popupContext !== null && sourceCJKLang === 'chinese'
@@ -255,10 +259,12 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
                     const sourceLang = getCJKLanguage(
                       example.sourceText,
                       popupContext?.localPastContext ?? '',
+                      bookLanguage,
                     );
                     const targetLang = getCJKLanguage(
                       example.targetText,
                       popupContext?.localPastContext ?? '',
+                      bookLanguage,
                     );
 
                     return (

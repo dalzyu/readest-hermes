@@ -141,6 +141,8 @@ export function useContextLookup({
         const detectedLanguage = detectLookupLanguage(lookupText, bookLanguage);
 
         // Launch bundle building (with prefetch check) and dictionary lookup in parallel
+        const dictEnabled = requestSnapshot.settings.referenceDictionaryEnabled !== false;
+
         const [bundle, rawDictEntries] = await Promise.all([
           consumePrefetch(bookHash, requestSnapshot.currentPage, lookupText).then(
             (prefetched) =>
@@ -154,12 +156,13 @@ export function useContextLookup({
                 aiSettings: requestSnapshot.aiSettings,
               }),
           ),
-          lookupDefinitions(
-            lookupText,
-            detectedLanguage.language,
-            requestSnapshot.settings.targetLanguage,
-            requestSnapshot.settings.disabledBundledDicts ?? [],
-          ).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>),
+          dictEnabled
+            ? lookupDefinitions(
+                lookupText,
+                detectedLanguage.language,
+                requestSnapshot.settings.targetLanguage,
+              ).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>)
+            : Promise.resolve([] as Awaited<ReturnType<typeof lookupDefinitions>>),
         ]);
 
         // Build string entries for LLM prompt + structured results for display
@@ -189,7 +192,6 @@ export function useContextLookup({
             sourceLanguage: detectedLanguage.language,
             targetLanguage: requestSnapshot.settings.targetLanguage,
             outputFields: requestSnapshot.settings.outputFields,
-            disabledBundledDicts: requestSnapshot.settings.disabledBundledDicts ?? [],
           };
           const lookupResult = await runSimpleLookup(simpleLookupRequest, source);
           if (cancelled) return;
@@ -359,7 +361,14 @@ export function useContextLookup({
         }
       } catch (err) {
         if (!cancelled && (err as Error).name !== 'AbortError') {
-          setError(err instanceof Error ? err.message : String(err));
+          const message = err instanceof Error ? err.message : String(err);
+          const isFetchFailure =
+            err instanceof Error && (err.name === 'TypeError' || /fetch/i.test(message));
+          if (isFetchFailure) {
+            setAiUnavailable(true);
+          } else {
+            setError(message);
+          }
         }
       } finally {
         if (!cancelled) {

@@ -90,7 +90,7 @@ export interface AIProvider {
   getEmbeddingModel(): EmbeddingModel;
 
   isAvailable(): Promise<boolean>;
-  healthCheck(): Promise<boolean>;
+  healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,6 +146,15 @@ export interface EmbeddingProgress {
   current: number;
   total: number;
   phase: 'chunking' | 'embedding' | 'indexing';
+}
+
+export interface IndexResult {
+  status: 'complete' | 'empty' | 'partial' | 'already-indexed';
+  chunksProcessed: number;
+  totalSections: number;
+  skippedSections: number;
+  errorMessages: string[];
+  durationMs: number;
 }
 
 // stored AI conversation for a book
