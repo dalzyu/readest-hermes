@@ -72,7 +72,14 @@ export class OllamaProvider implements AIProvider {
       const data = (await response.json()) as { models?: Array<{ name: string }> };
       const models = data.models ?? [];
       const hasChatModel = this.hasModel(models, this.config.model || 'llama3.2');
-      if (!hasChatModel) return false;
+      if (!hasChatModel) {
+        const available = models.map((m) => m.name).join(', ');
+        aiLogger.provider.error(
+          this.id,
+          `Model "${this.config.model}" not found. Available: ${available || '(none)'}`,
+        );
+        return false;
+      }
       if (!options?.requireEmbedding) return true;
 
       const embeddingModelName = resolveEmbeddingModelId(this.config);
