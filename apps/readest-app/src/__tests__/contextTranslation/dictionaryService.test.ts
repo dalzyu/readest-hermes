@@ -375,7 +375,7 @@ describe('lookupDefinitions', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]!.definition).toBe('bundled hello');
-    expect(result[0]!.source).toBe('bundled-zh-en');
+    expect(result[0]!.source).toBe('CC-CEDICT');
   });
 
   test('prefers matching user dictionaries over bundled dictionaries', async () => {

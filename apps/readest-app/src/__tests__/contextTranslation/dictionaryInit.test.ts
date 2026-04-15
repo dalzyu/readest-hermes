@@ -82,6 +82,12 @@ describe('ensureBundledDictsInitialized', () => {
     // No additional fetch calls after the singleton resolved
     expect(fetchSpy).toHaveBeenCalledTimes(firstCallCount);
 
+    // Confirm the module-level flag is truly set — extra calls generate no fetches
+    const countBefore = fetchSpy.mock.calls.length;
+    await ensureBundledDictsInitialized();
+    await ensureBundledDictsInitialized();
+    expect(fetchSpy.mock.calls.length).toBe(countBefore); // no new fetches
+
     fetchSpy.mockRestore();
   });
 });

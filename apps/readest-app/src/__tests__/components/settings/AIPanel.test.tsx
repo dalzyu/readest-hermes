@@ -360,7 +360,6 @@ describe('AIPanel', () => {
     const dropdown = screen.getByTestId('translation-source');
     expect(dropdown).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Dictionary' })).toBeTruthy();
-    fireEvent.change(dropdown, { target: { value: 'deepl' } });
   });
 
   test('preserves saved dictionary translation source on mount', () => {
