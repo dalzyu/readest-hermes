@@ -36,7 +36,8 @@ export class AIGatewayProvider implements AIProvider {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-    } catch {
+    } catch (error) {
+      aiLogger.provider.error(this.id, `getRequestHeaders: getAccessToken failed: ${error}`);
       // Leave auth header unset; the request will fail if the user is not authenticated.
     }
 
