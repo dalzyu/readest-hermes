@@ -20,7 +20,7 @@ const { stableSettings } = vi.hoisted(() => {
       providers: [
         {
           id: 'ollama-default',
-          name: 'Ollama (Local)',
+          name: 'Ollama',
           providerType: 'ollama',
           baseUrl: 'http://127.0.0.1:11434',
           model: 'llama3.2',
@@ -211,10 +211,6 @@ vi.mock('@/store/settingsStore', () => {
 });
 
 vi.mock('@/services/contextTranslation/dictionaryService', () => ({
-  BUNDLED_DICTIONARIES: [
-    { id: 'bundled-zh-en', language: 'zh', targetLanguage: 'en', bundledVersion: '1.0.0' },
-    { id: 'bundled-ja-en', language: 'ja', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  ],
   SUPPORTED_DICTIONARY_IMPORT_EXTENSIONS: [
     '.zip',
     '.dsl',
@@ -227,7 +223,6 @@ vi.mock('@/services/contextTranslation/dictionaryService', () => ({
   ],
   SUPPORTED_DICTIONARY_IMPORT_FORMATS:
     'StarDict (.zip), DSL (.dsl/.dz), CSV (.csv), TSV (.tsv), plain text (.txt), JSON (.json/.jsonl)',
-  initBundledDictionaries: vi.fn().mockReturnValue(Promise.resolve()),
   previewDictionaryZip: vi.fn().mockResolvedValue({ name: 'TestDict', wordcount: 100 }),
   importUserDictionary: vi.fn().mockResolvedValue({}),
   deleteUserDictionary: vi.fn().mockResolvedValue(undefined),
@@ -254,19 +249,46 @@ describe('AIPanel', () => {
     expect(screen.getByText('Use prior-volume memory')).toBeTruthy();
   });
 
-  test('locks context translation harness to production only', () => {
-    render(<AITranslatePanel />);
-
-    expect(screen.getByText('Production only')).toBeTruthy();
-    expect(screen.queryByText('Single pass')).toBeNull();
-  });
-
   test('renders provider list with configured providers', () => {
     render(<AIPanel />);
 
     expect(screen.getByText('Providers')).toBeTruthy();
     // The default Ollama provider should be listed
-    expect(screen.getAllByText('Ollama (Local)').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Ollama').length).toBeGreaterThan(0);
+  });
+
+  test('exposes editable inference params in the provider form', async () => {
+    render(<AIPanel />);
+
+    fireEvent.click(screen.getByTitle('Edit'));
+    fireEvent.click(screen.getByText('Advanced inference'));
+
+    fireEvent.change(screen.getByLabelText('Temperature'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Max tokens'), { target: { value: '512' } });
+    fireEvent.change(screen.getByLabelText('Top-p'), { target: { value: '0.75' } });
+    fireEvent.change(screen.getByLabelText('Top K'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('Frequency penalty'), { target: { value: '0.1' } });
+    fireEvent.change(screen.getByLabelText('Presence penalty'), { target: { value: '0.2' } });
+    fireEvent.change(screen.getByLabelText('Seed'), { target: { value: '123' } });
+    fireEvent.change(screen.getByLabelText('Stop sequences'), {
+      target: { value: 'END\n<|end|>' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(saveSettingsMock).toHaveBeenCalled());
+
+    const savedSettings = saveSettingsMock.mock.calls.at(-1)?.[1] as typeof stableSettings;
+    expect(savedSettings.aiSettings.providers[0].inferenceParams).toMatchObject({
+      temperature: 0.4,
+      maxTokens: 512,
+      topP: 0.75,
+      topK: 40,
+      frequencyPenalty: 0.1,
+      presencePenalty: 0.2,
+      seed: 123,
+      stopSequences: ['END', '<|end|>'],
+    });
   });
 
   test('uses the full shared translator language list for context translation targets', () => {
@@ -374,85 +396,20 @@ describe('AIPanel', () => {
     expect(saveSettingsMock).not.toHaveBeenCalled();
   });
 
-  test('renders harness controls and applies advanced harness JSON overrides', () => {
+  test('does not render the old harness controls', () => {
     render(<AITranslatePanel />);
 
-    const summary = screen.getByTestId('advanced-harness-summary');
-    fireEvent.click(summary);
-
-    const textarea = screen.getByTestId('harness-json-textarea') as HTMLTextAreaElement;
-    fireEvent.change(textarea, {
-      target: {
-        value: JSON.stringify(
-          {
-            flow: 'production',
-            repairEnabled: true,
-            repairOnContamination: true,
-            repairOnMissingPrimary: true,
-            repairOnLowCompletion: true,
-            completionThreshold: 0.75,
-            maxRepairAttempts: 2,
-            perFieldRescueEnabled: true,
-            maxPerFieldRepairAttempts: 2,
-            detectContamination: true,
-            sanitizeOutput: true,
-            extractChannelTail: true,
-            extractNestedTags: true,
-            stripReasoning: true,
-            translationMaxWords: 12,
-            contaminationMarkers: ['Thinking Process', 'Internal note'],
-            reasoningMarkers: ['Thinking Process', 'The user wants me', 'Internal note'],
-          },
-          null,
-          2,
-        ),
-      },
-    });
-
-    fireEvent.click(screen.getByTestId('apply-harness-json'));
-
-    expect(setSettingsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        globalReadSettings: expect.objectContaining({
-          contextTranslation: expect.objectContaining({
-            harness: expect.objectContaining({
-              completionThreshold: 0.75,
-              maxRepairAttempts: 2,
-              translationMaxWords: 12,
-              contaminationMarkers: ['Thinking Process', 'Internal note'],
-            }),
-          }),
-        }),
-      }),
-    );
-    expect(saveSettingsMock).toHaveBeenCalled();
+    expect(screen.queryByText('Production only')).toBeNull();
+    expect(screen.queryByTestId('advanced-harness-summary')).toBeNull();
+    expect(screen.queryByTestId('harness-json-textarea')).toBeNull();
   });
 
-  test('loads built-in harness presets and exports the current harness JSON', async () => {
+  test('old harness preset actions are no longer rendered', async () => {
     render(<AITranslatePanel />);
 
-    fireEvent.click(screen.getByTestId('advanced-harness-summary'));
-    fireEvent.change(screen.getByTestId('harness-preset-select'), {
-      target: { value: 'lenientQwen' },
-    });
-    fireEvent.click(screen.getByTestId('load-harness-preset'));
-
-    expect(setSettingsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        globalReadSettings: expect.objectContaining({
-          contextTranslation: expect.objectContaining({
-            harness: expect.objectContaining({
-              translationMaxWords: 12,
-              repairOnLowCompletion: false,
-            }),
-          }),
-        }),
-      }),
-    );
-
-    fireEvent.click(screen.getByTestId('export-harness-json'));
-    await waitFor(() => expect(writeClipboardMock).toHaveBeenCalledTimes(1));
-    expect(writeClipboardMock.mock.calls[0]?.[0]).toContain('"translationMaxWords": 12');
+    expect(screen.queryByTestId('load-harness-preset')).toBeNull();
+    expect(screen.queryByTestId('export-harness-json')).toBeNull();
+    expect(screen.queryByTestId('harness-preset-select')).toBeNull();
   });
 });
 

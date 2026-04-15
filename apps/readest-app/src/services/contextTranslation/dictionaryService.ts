@@ -12,52 +12,8 @@ export {
 
 const DICTIONARY_STORE = 'dictionaryData';
 
-/** Manifest of dictionaries bundled with the app. */
-export interface BUNDLED_DICT {
-  id: string;
-  language: string;
-  targetLanguage: string;
-  bundledVersion: string;
-}
-
-export const BUNDLED_DICTIONARIES: BUNDLED_DICT[] = [
-  { id: 'bundled-zh-en', language: 'zh', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  { id: 'bundled-ja-en', language: 'ja', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  { id: 'bundled-de-en', language: 'de', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  { id: 'bundled-fr-en', language: 'fr', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  { id: 'bundled-es-en', language: 'es', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  { id: 'bundled-pt-en', language: 'pt', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  { id: 'bundled-it-en', language: 'it', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  { id: 'bundled-ru-en', language: 'ru', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  { id: 'bundled-ar-en', language: 'ar', targetLanguage: 'en', bundledVersion: '1.0.0' },
-  { id: 'bundled-ko-en', language: 'ko', targetLanguage: 'en', bundledVersion: '1.0.0' },
-];
-
 /** In-memory cache: dictionary id -> entries */
 const memoryCache = new Map<string, DictionaryEntry[]>();
-
-let bundledDictsInitialized = false;
-let bundledDictsInitPromise: Promise<void> | null = null;
-
-export async function ensureBundledDictsInitialized(): Promise<void> {
-  if (bundledDictsInitialized) return;
-  if (bundledDictsInitPromise) return bundledDictsInitPromise;
-  bundledDictsInitPromise = initBundledDictionaries()
-    .then(() => {
-      bundledDictsInitialized = true;
-    })
-    .catch((error) => {
-      bundledDictsInitPromise = null; // allow retry next call
-      throw error;
-    });
-  return bundledDictsInitPromise;
-}
-
-export function isBundledPairSupported(sourceLang: string, targetLang: string): boolean {
-  return BUNDLED_DICTIONARIES.some(
-    (d) => d.language === sourceLang && d.targetLanguage === targetLang,
-  );
-}
 
 /** Levenshtein distance via classic DP O(mn) table. */
 function levenshtein(a: string, b: string): number {
@@ -336,85 +292,17 @@ export async function deleteUserDictionary(id: string): Promise<void> {
   await saveUserDictionaryMeta(filtered);
 }
 
-/**
- * Initialize bundled dictionaries.
- * - Check IndexedDB for each BUNDLED_DICTIONARIES entry
- * - For missing: fetch public/dictionaries/[id].json.gz (catch and log, no crash)
- * - For stale version: re-fetch and replace
- * - Mark as ready
- */
-export async function initBundledDictionaries(): Promise<void> {
-  for (const bundled of BUNDLED_DICTIONARIES) {
-    const existing = await dictionaryDataRecord(bundled.id);
-    const needsInit =
-      !existing ||
-      (existing.meta.source === 'bundled' &&
-        existing.meta.bundledVersion !== bundled.bundledVersion);
-
-    if (needsInit) {
-      try {
-        const url = `/dictionaries/${bundled.id}.json.gz`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          // Bundled dict not yet built — expected during development
-          console.warn(`[dictionaryService] Bundled dictionary not found: ${url}`);
-          continue;
-        }
-        const blob = new Uint8Array(await response.arrayBuffer());
-
-        // Decompress and parse to validate
-        const { decompress } = await import('fflate');
-        const decompressed: Uint8Array = await new Promise((resolve, reject) => {
-          decompress(blob, (err, result) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            resolve(result!);
-          });
-        });
-        const entries = JSON.parse(
-          new TextDecoder('utf-8').decode(decompressed),
-        ) as DictionaryEntry[];
-
-        const bundledMeta: UserDictionary = {
-          id: bundled.id,
-          name: bundled.id,
-          language: bundled.language,
-          targetLanguage: bundled.targetLanguage,
-          entryCount: entries.length,
-          source: 'bundled',
-          importedAt: 0,
-          bundledVersion: bundled.bundledVersion,
-        };
-
-        await aiStore.putRecord(DICTIONARY_STORE, { id: bundled.id, meta: bundledMeta, blob });
-        memoryCache.set(bundled.id, entries);
-      } catch (err) {
-        // Catch all errors — logging and continuing per spec
-        console.error(`[dictionaryService] Failed to init bundled dictionary ${bundled.id}:`, err);
-      }
-    } else if (existing) {
-      // Pre-load into memory cache
-      const entries = await loadDictionaryEntries(bundled.id);
-      memoryCache.set(bundled.id, entries);
-    }
-  }
-}
-
 /** Ranking helpers */
 type RankedEntry = {
   dictionaryId: string;
   sourceName: string;
   category: 1 | 2; // 1 = bilingual, 2 = monolingual
-  isUser: boolean;
   importedAt: number;
 };
 
 function rankEntry(
   dictionaryId: string,
   sourceName: string,
-  isUser: boolean,
   importedAt: number,
   isMonolingual: boolean,
 ): RankedEntry {
@@ -422,44 +310,16 @@ function rankEntry(
     dictionaryId,
     sourceName,
     category: isMonolingual ? 2 : 1,
-    isUser,
     importedAt,
   };
-}
-
-const BUNDLED_DICT_DISPLAY_NAMES: Record<string, string> = {
-  'bundled-zh-en': 'CC-CEDICT',
-  'bundled-ja-en': 'JMdict',
-  'bundled-de-en': 'Dict.cc DE-EN',
-  'bundled-fr-en': 'Dict.cc FR-EN',
-  'bundled-es-en': 'Dict.cc ES-EN',
-  'bundled-pt-en': 'Dict.cc PT-EN',
-  'bundled-it-en': 'Dict.cc IT-EN',
-  'bundled-ru-en': 'Dict.cc RU-EN',
-  'bundled-ar-en': 'Dict.cc AR-EN',
-  'bundled-ko-en': 'Dict.cc KO-EN',
-};
-
-function getBundledDictionaryMeta(): UserDictionary[] {
-  return BUNDLED_DICTIONARIES.map((dictionary) => ({
-    id: dictionary.id,
-    name: BUNDLED_DICT_DISPLAY_NAMES[dictionary.id] ?? dictionary.id,
-    language: dictionary.language,
-    targetLanguage: dictionary.targetLanguage,
-    entryCount: 0,
-    source: 'bundled' as const,
-    importedAt: 0,
-    bundledVersion: dictionary.bundledVersion,
-    enabled: true,
-  }));
 }
 
 /**
  * Lookup definitions across all matching dictionaries.
  *
- * - Load matching dictionaries from IndexedDB (or memory cache)
+ * - Load matching user dictionaries from IndexedDB (or memory cache)
  * - Filter to: (sourceLang matches AND targetLang matches) OR (sourceLang matches AND monolingual)
- * - Rank: category 1 > category 2; within same: user > bundled; within user: higher importedAt
+ * - Rank: category 1 > category 2; within same category, newer imports first
  * - Call findMatches on each, take up to 1 result per dictionary
  * - Deduplicate by headword, cap at 3 total
  */
@@ -470,8 +330,6 @@ export async function lookupDefinitions(
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
 
-  await ensureBundledDictsInitialized();
-
   // For Japanese, deconjugate to dictionary form and search both surface + base form
   const isJapanese = sourceLang === 'ja';
   const baseForm = isJapanese && isTokenizerReady() ? getDictionaryForm(text) : null;
@@ -479,11 +337,10 @@ export async function lookupDefinitions(
 
   const MAX_RESULTS = 3;
 
-  const allBundled = getBundledDictionaryMeta();
   const allUser = (await getUserDictionaryMeta()).filter(
-    (dictionary) => dictionary.enabled !== false,
+    (dictionary) => dictionary.enabled !== false && dictionary.source === 'user',
   );
-  const matching = [...allBundled, ...allUser].filter((dictionary) => {
+  const matching = allUser.filter((dictionary) => {
     const sourceMatch = dictionary.language === sourceLang;
     const targetMatch = dictionary.targetLanguage === targetLang;
     const monolingual = dictionary.language === dictionary.targetLanguage;
@@ -498,15 +355,12 @@ export async function lookupDefinitions(
 
     // Determine if monolingual
     const isMonolingual = dict.language === dict.targetLanguage;
-    ranked.push(
-      rankEntry(dict.id, dict.name, dict.source === 'user', dict.importedAt, isMonolingual),
-    );
+    ranked.push(rankEntry(dict.id, dict.name, dict.importedAt, isMonolingual));
   }
 
-  // Sort: category 1 > 2, then user > bundled, then higher importedAt
+  // Sort: category 1 > 2, then higher importedAt
   ranked.sort((a, b) => {
     if (a.category !== b.category) return a.category - b.category; // 1 before 2
-    if (a.isUser !== b.isUser) return a.isUser ? -1 : 1; // user before bundled
     return b.importedAt - a.importedAt; // higher importedAt first
   });
 

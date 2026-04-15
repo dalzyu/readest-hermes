@@ -35,6 +35,10 @@ export interface InferenceParams {
   maxTokens?: number;
   topP?: number;
   frequencyPenalty?: number;
+  presencePenalty?: number;
+  topK?: number;
+  seed?: number;
+  stopSequences?: string[];
 }
 
 /** Per-task default overrides. */

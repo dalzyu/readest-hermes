@@ -1,5 +1,13 @@
 {
   "releases": {
+    "0.2.4": {
+      "date": "2026-04-15",
+      "notes": [
+        "Expanded AI provider advanced inference settings with top K, presence penalty, seed, and stop sequences",
+        "Translation, dictionary lookup, and chat paths now forward the full merged inference settings end to end",
+        "Chat model instantiation now reuses the task-specific inference settings for consistency across reader features"
+      ]
+    },
     "0.2.3": {
       "date": "2026-04-15",
       "notes": [

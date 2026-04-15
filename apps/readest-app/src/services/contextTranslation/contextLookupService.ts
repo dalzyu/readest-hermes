@@ -4,6 +4,7 @@ import type {
   ContextDictionarySettings,
   LookupAnnotationSlots,
   LookupExample,
+  InferenceParams,
   TranslationOutputField,
   PopupContextBundle,
 } from './types';
@@ -38,6 +39,7 @@ export interface ContextLookupRequest {
 
   model?: LanguageModel;
   abortSignal?: AbortSignal;
+  inferenceParams?: InferenceParams;
   /**
    * When provided, the LLM call is skipped and these pre-normalized fields are used
    * directly for validation/repair/enrichment. Used for post-streaming repair.
@@ -212,7 +214,13 @@ export async function runContextLookup(
   ) => {
     const raw =
       overrideRaw ??
-      (await callLLM(system, user, request.model as LanguageModel, request.abortSignal));
+      (await callLLM(
+        system,
+        user,
+        request.model as LanguageModel,
+        request.abortSignal,
+        request.inferenceParams,
+      ));
     const normalized = overrideFields ?? normalizeLookupResponse(raw, request.mode);
     const fields =
       request.mode === 'translation'

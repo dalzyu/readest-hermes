@@ -18,6 +18,10 @@ export async function callLLM(
     ...(params?.maxTokens != null && { maxTokens: params.maxTokens }),
     ...(params?.topP != null && { topP: params.topP }),
     ...(params?.frequencyPenalty != null && { frequencyPenalty: params.frequencyPenalty }),
+    ...(params?.presencePenalty != null && { presencePenalty: params.presencePenalty }),
+    ...(params?.topK != null && { topK: params.topK }),
+    ...(params?.seed != null && { seed: params.seed }),
+    ...(params?.stopSequences != null && { stopSequences: params.stopSequences }),
   });
   return text;
 }
@@ -38,6 +42,10 @@ export async function* streamLLM(
     ...(params?.maxTokens != null && { maxTokens: params.maxTokens }),
     ...(params?.topP != null && { topP: params.topP }),
     ...(params?.frequencyPenalty != null && { frequencyPenalty: params.frequencyPenalty }),
+    ...(params?.presencePenalty != null && { presencePenalty: params.presencePenalty }),
+    ...(params?.topK != null && { topK: params.topK }),
+    ...(params?.seed != null && { seed: params.seed }),
+    ...(params?.stopSequences != null && { stopSequences: params.stopSequences }),
   });
 
   for await (const chunk of result.textStream) {

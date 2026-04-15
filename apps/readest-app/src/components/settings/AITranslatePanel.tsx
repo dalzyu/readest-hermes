@@ -16,16 +16,12 @@ import {
 import { getTranslatorLanguageOptions } from '@/services/translatorLanguages';
 import type {
   ContextDictionarySettings,
-  ContextTranslationHarnessSettings,
   ContextTranslationSettings,
   UserDictionary,
 } from '@/services/contextTranslation/types';
 import {
-  CONTEXT_TRANSLATION_HARNESS_PRESETS,
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
-  DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
-  resolveContextTranslationHarnessSettings,
 } from '@/services/contextTranslation/defaults';
 
 const DEFAULT_BY_ID: Record<string, string> = Object.fromEntries(
@@ -33,11 +29,6 @@ const DEFAULT_BY_ID: Record<string, string> = Object.fromEntries(
 );
 
 type TranslationSource = 'ai' | 'dictionary' | 'azure' | 'deepl' | 'google' | 'yandex';
-type HarnessPresetId = keyof typeof CONTEXT_TRANSLATION_HARNESS_PRESETS;
-
-function formatHarnessJson(harness: ContextTranslationHarnessSettings): string {
-  return JSON.stringify(harness, null, 2);
-}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -83,14 +74,6 @@ const AITranslatePanel: React.FC = () => {
   const [ctxAutoExpand, setCtxAutoExpand] = useState(
     ctxTransSettings.autoExpandSelection !== false,
   );
-  const [ctxHarness, setCtxHarness] = useState<ContextTranslationHarnessSettings>(
-    resolveContextTranslationHarnessSettings(ctxTransSettings.harness),
-  );
-  const [ctxHarnessDraft, setCtxHarnessDraft] = useState(
-    formatHarnessJson(resolveContextTranslationHarnessSettings(ctxTransSettings.harness)),
-  );
-  const [ctxHarnessError, setCtxHarnessError] = useState<string | null>(null);
-  const [ctxHarnessPreset, setCtxHarnessPreset] = useState<HarnessPresetId>('balanced');
 
   const [ctxDictEnabled, setCtxDictEnabled] = useState(ctxDictSettings.enabled);
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
@@ -114,13 +97,6 @@ const AITranslatePanel: React.FC = () => {
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
-
-  useEffect(() => {
-    const resolvedHarness = resolveContextTranslationHarnessSettings(ctxTransSettings.harness);
-    setCtxHarness(resolvedHarness);
-    setCtxHarnessDraft(formatHarnessJson(resolvedHarness));
-    setCtxHarnessError(null);
-  }, [ctxTransSettings.harness]);
 
   const saveCtxTransSetting = useCallback(
     (patch: Partial<ContextTranslationSettings>) => {
@@ -187,56 +163,6 @@ const AITranslatePanel: React.FC = () => {
     },
     [updatePrompt],
   );
-
-  const saveCtxHarness = useCallback(
-    (patch: Partial<ContextTranslationHarnessSettings>) => {
-      const next = resolveContextTranslationHarnessSettings({ ...ctxHarness, ...patch });
-      setCtxHarness(next);
-      setCtxHarnessDraft(formatHarnessJson(next));
-      setCtxHarnessError(null);
-      saveCtxTransSetting({ harness: next });
-    },
-    [ctxHarness, saveCtxTransSetting],
-  );
-
-  const applyHarnessDraft = useCallback(() => {
-    try {
-      const parsed = JSON.parse(ctxHarnessDraft) as Partial<ContextTranslationHarnessSettings>;
-      const next = resolveContextTranslationHarnessSettings(parsed);
-      setCtxHarness(next);
-      setCtxHarnessDraft(formatHarnessJson(next));
-      setCtxHarnessError(null);
-      saveCtxTransSetting({ harness: next });
-    } catch {
-      setCtxHarnessError(_('Harness JSON is invalid'));
-    }
-  }, [_, ctxHarnessDraft, saveCtxTransSetting]);
-
-  const resetHarnessDefaults = useCallback(() => {
-    setCtxHarness(DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS);
-    setCtxHarnessDraft(formatHarnessJson(DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS));
-    setCtxHarnessError(null);
-    saveCtxTransSetting({ harness: DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS });
-  }, [saveCtxTransSetting]);
-
-  const loadHarnessPreset = useCallback(() => {
-    const preset = CONTEXT_TRANSLATION_HARNESS_PRESETS[ctxHarnessPreset];
-    setCtxHarness(preset);
-    setCtxHarnessDraft(formatHarnessJson(preset));
-    setCtxHarnessError(null);
-    saveCtxTransSetting({ harness: preset });
-  }, [ctxHarnessPreset, saveCtxTransSetting]);
-
-  const exportHarnessJson = useCallback(async () => {
-    const payload = formatHarnessJson(ctxHarness);
-    setCtxHarnessDraft(payload);
-    setCtxHarnessError(null);
-    try {
-      await navigator.clipboard.writeText(payload);
-    } catch {
-      // Leave the JSON in the textarea as a manual copy fallback.
-    }
-  }, [ctxHarness]);
 
   // Sync userDictionaries from settings
   useEffect(() => {
@@ -556,12 +482,6 @@ const AITranslatePanel: React.FC = () => {
                     }}
                   />
                 </div>
-                <div className='config-item mt-2 !px-0'>
-                  <span className='text-sm'>{_('Harness flow')}</span>
-                  <span className='text-base-content/60 text-xs font-medium'>
-                    {_('Production only')}
-                  </span>
-                </div>
                 {ctxFieldStrategy === 'multi' && (
                   <p className='text-warning mt-1 text-xs'>
                     {_('Parallel mode uses one API call per field — costs 3-4× more per lookup.')}
@@ -581,215 +501,6 @@ const AITranslatePanel: React.FC = () => {
                     }}
                   />
                 </div>
-                <div className='config-item mt-2 !px-0'>
-                  <span className='text-sm'>{_('Repair pass')}</span>
-                  <input
-                    type='checkbox'
-                    className='toggle toggle-sm'
-                    checked={ctxHarness.repairEnabled}
-                    disabled={!ctxEnabled || !isAiSource}
-                    onChange={() => saveCtxHarness({ repairEnabled: !ctxHarness.repairEnabled })}
-                  />
-                </div>
-                <div className='config-item mt-2 !px-0'>
-                  <span className='text-sm'>{_('Per-field rescue')}</span>
-                  <input
-                    type='checkbox'
-                    className='toggle toggle-sm'
-                    checked={ctxHarness.perFieldRescueEnabled}
-                    disabled={!ctxEnabled || !isAiSource}
-                    onChange={() =>
-                      saveCtxHarness({ perFieldRescueEnabled: !ctxHarness.perFieldRescueEnabled })
-                    }
-                  />
-                </div>
-                <div className='config-item mt-2 !px-0'>
-                  <span className='text-sm'>{_('Completion threshold')}</span>
-                  <input
-                    type='number'
-                    className='input input-bordered input-xs w-20 text-right'
-                    min={0}
-                    max={100}
-                    value={Math.round(ctxHarness.completionThreshold * 100)}
-                    disabled={!ctxEnabled || !isAiSource}
-                    onChange={(e) => {
-                      const percent = Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0));
-                      saveCtxHarness({ completionThreshold: percent / 100 });
-                    }}
-                  />
-                </div>
-                <div className='config-item mt-2 !px-0'>
-                  <span className='text-sm'>{_('Translation max words')}</span>
-                  <input
-                    type='number'
-                    className='input input-bordered input-xs w-20 text-right'
-                    min={1}
-                    max={30}
-                    value={ctxHarness.translationMaxWords}
-                    disabled={!ctxEnabled || !isAiSource}
-                    onChange={(e) => {
-                      const value = Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 1));
-                      saveCtxHarness({ translationMaxWords: value });
-                    }}
-                  />
-                </div>
-                <details className='mt-2'>
-                  <summary
-                    data-testid='advanced-harness-summary'
-                    className={clsx(
-                      'text-base-content/60 cursor-pointer text-sm',
-                      !isAiSource && 'pointer-events-none opacity-50',
-                    )}
-                  >
-                    {_('Advanced harness')}
-                  </summary>
-                  <div className='space-y-2 pl-4 pt-2'>
-                    <div className='grid gap-2 md:grid-cols-2'>
-                      <label className='config-item !px-0'>
-                        <span className='text-sm'>{_('Detect contamination')}</span>
-                        <input
-                          type='checkbox'
-                          className='toggle toggle-sm'
-                          checked={ctxHarness.detectContamination}
-                          onChange={() =>
-                            saveCtxHarness({ detectContamination: !ctxHarness.detectContamination })
-                          }
-                        />
-                      </label>
-                      <label className='config-item !px-0'>
-                        <span className='text-sm'>{_('Sanitize output')}</span>
-                        <input
-                          type='checkbox'
-                          className='toggle toggle-sm'
-                          checked={ctxHarness.sanitizeOutput}
-                          onChange={() =>
-                            saveCtxHarness({ sanitizeOutput: !ctxHarness.sanitizeOutput })
-                          }
-                        />
-                      </label>
-                      <label className='config-item !px-0'>
-                        <span className='text-sm'>{_('Extract channel tail')}</span>
-                        <input
-                          type='checkbox'
-                          className='toggle toggle-sm'
-                          checked={ctxHarness.extractChannelTail}
-                          onChange={() =>
-                            saveCtxHarness({ extractChannelTail: !ctxHarness.extractChannelTail })
-                          }
-                        />
-                      </label>
-                      <label className='config-item !px-0'>
-                        <span className='text-sm'>{_('Extract nested tags')}</span>
-                        <input
-                          type='checkbox'
-                          className='toggle toggle-sm'
-                          checked={ctxHarness.extractNestedTags}
-                          onChange={() =>
-                            saveCtxHarness({ extractNestedTags: !ctxHarness.extractNestedTags })
-                          }
-                        />
-                      </label>
-                      <label className='config-item !px-0'>
-                        <span className='text-sm'>{_('Strip reasoning')}</span>
-                        <input
-                          type='checkbox'
-                          className='toggle toggle-sm'
-                          checked={ctxHarness.stripReasoning}
-                          onChange={() =>
-                            saveCtxHarness({ stripReasoning: !ctxHarness.stripReasoning })
-                          }
-                        />
-                      </label>
-                      <label className='config-item !px-0'>
-                        <span className='text-sm'>{_('Repair attempts')}</span>
-                        <input
-                          type='number'
-                          className='input input-bordered input-xs w-20 text-right'
-                          min={0}
-                          max={5}
-                          value={ctxHarness.maxRepairAttempts}
-                          onChange={(e) => {
-                            const value = Math.max(
-                              0,
-                              Math.min(5, parseInt(e.target.value, 10) || 0),
-                            );
-                            saveCtxHarness({ maxRepairAttempts: value });
-                          }}
-                        />
-                      </label>
-                      <label className='config-item !px-0'>
-                        <span className='text-sm'>{_('Per-field retries')}</span>
-                        <input
-                          type='number'
-                          className='input input-bordered input-xs w-20 text-right'
-                          min={0}
-                          max={5}
-                          value={ctxHarness.maxPerFieldRepairAttempts}
-                          onChange={(e) => {
-                            const value = Math.max(
-                              0,
-                              Math.min(5, parseInt(e.target.value, 10) || 0),
-                            );
-                            saveCtxHarness({ maxPerFieldRepairAttempts: value });
-                          }}
-                        />
-                      </label>
-                    </div>
-                    <div className='flex flex-wrap items-center gap-2'>
-                      <label className='text-sm'>{_('Preset')}</label>
-                      <select
-                        data-testid='harness-preset-select'
-                        className='select select-bordered select-xs'
-                        value={ctxHarnessPreset}
-                        onChange={(e) => setCtxHarnessPreset(e.target.value as HarnessPresetId)}
-                      >
-                        <option value='balanced'>{_('Balanced')}</option>
-                        <option value='strictGemma'>{_('Strict Gemma')}</option>
-                        <option value='lenientQwen'>{_('Lenient Qwen')}</option>
-                      </select>
-                      <button
-                        data-testid='load-harness-preset'
-                        className='btn btn-ghost btn-sm'
-                        onClick={loadHarnessPreset}
-                      >
-                        {_('Load preset')}
-                      </button>
-                      <button
-                        data-testid='export-harness-json'
-                        className='btn btn-ghost btn-sm'
-                        onClick={() => {
-                          void exportHarnessJson();
-                        }}
-                      >
-                        {_('Export JSON')}
-                      </button>
-                    </div>
-                    <label className='text-sm'>{_('Harness JSON')}</label>
-                    <textarea
-                      data-testid='harness-json-textarea'
-                      className='textarea textarea-bordered w-full font-mono text-xs'
-                      rows={12}
-                      value={ctxHarnessDraft}
-                      onChange={(e) => {
-                        setCtxHarnessDraft(e.target.value);
-                        setCtxHarnessError(null);
-                      }}
-                    />
-                    {ctxHarnessError && <p className='text-error text-xs'>{ctxHarnessError}</p>}
-                    <div className='flex gap-2'>
-                      <button
-                        data-testid='apply-harness-json'
-                        className='btn btn-sm btn-primary'
-                        onClick={applyHarnessDraft}
-                      >
-                        {_('Apply')}
-                      </button>
-                      <button className='btn btn-ghost btn-sm' onClick={resetHarnessDefaults}>
-                        {_('Reset harness defaults')}
-                      </button>
-                    </div>
-                  </div>
-                </details>
               </div>
               {ctxOutputFields
                 .slice()

@@ -164,7 +164,12 @@ describe('OpenAICompatibleProvider', () => {
 
 describe('getAIProvider', () => {
   test('should return OllamaProvider for ollama settings', () => {
-    const settings: AISettings = { ...DEFAULT_AI_SETTINGS, enabled: true };
+    const settings: AISettings = {
+      ...DEFAULT_AI_SETTINGS,
+      enabled: true,
+      providers: [DEFAULT_OLLAMA_CONFIG],
+      activeProviderId: DEFAULT_OLLAMA_CONFIG.id,
+    };
     const provider = getAIProvider(settings);
 
     expect(provider.id).toBe('ollama-default');

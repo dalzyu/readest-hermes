@@ -126,7 +126,9 @@ export async function finalizeTranslationWithContext(
   let totalCalls = 0;
   const { systemPrompt, userPrompt } = buildTranslationPrompt(request);
   let latestRawText =
-    seed?.initialRawText ?? (await callLLM(systemPrompt, userPrompt, model!, abortSignal)) ?? '';
+    seed?.initialRawText ??
+    (await callLLM(systemPrompt, userPrompt, model!, abortSignal, request.inferenceParams)) ??
+    '';
   totalCalls++;
   let parsed = sanitizeTranslationResult(
     seed?.initialFields ?? parseTranslationResponse(latestRawText, request.outputFields),
@@ -150,7 +152,13 @@ export async function finalizeTranslationWithContext(
         .map((field) => field.id),
     );
     latestRawText =
-      (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
+      (await callLLM(
+        repair.systemPrompt,
+        repair.userPrompt,
+        model!,
+        abortSignal,
+        request.inferenceParams,
+      )) ?? '';
     totalCalls++;
     parsed = sanitizeTranslationResult(
       parseTranslationResponse(latestRawText, request.outputFields),
@@ -172,7 +180,13 @@ export async function finalizeTranslationWithContext(
       if (totalCalls >= maxCalls) break;
       const perField = buildPerFieldPrompt(field, request);
       let fieldValue =
-        (await callLLM(perField.systemPrompt, perField.userPrompt, model!, abortSignal)) ?? '';
+        (await callLLM(
+          perField.systemPrompt,
+          perField.userPrompt,
+          model!,
+          abortSignal,
+          request.inferenceParams,
+        )) ?? '';
       totalCalls++;
       let sanitizedFieldValue = sanitizeFieldContent(field.id, fieldValue, harness);
 
@@ -190,7 +204,13 @@ export async function finalizeTranslationWithContext(
           perField.userPrompt,
         );
         fieldValue =
-          (await callLLM(repair.systemPrompt, repair.userPrompt, model!, abortSignal)) ?? '';
+          (await callLLM(
+            repair.systemPrompt,
+            repair.userPrompt,
+            model!,
+            abortSignal,
+            request.inferenceParams,
+          )) ?? '';
         totalCalls++;
         sanitizedFieldValue = sanitizeFieldContent(field.id, fieldValue, harness);
       }
@@ -233,7 +253,13 @@ export async function* streamTranslationWithContext(
   let rawText = '';
   const parser = new StreamingParser();
 
-  for await (const chunk of streamLLM(systemPrompt, userPrompt, model, abortSignal)) {
+  for await (const chunk of streamLLM(
+    systemPrompt,
+    userPrompt,
+    model,
+    abortSignal,
+    request.inferenceParams,
+  )) {
     rawText += chunk;
     const parsed = parser.parse(rawText, request.outputFields);
     yield {
@@ -287,7 +313,13 @@ export async function* streamLookupWithContext(
   let rawText = '';
   const parser = new StreamingParser();
 
-  for await (const chunk of streamLLM(systemPrompt, userPrompt, model, abortSignal)) {
+  for await (const chunk of streamLLM(
+    systemPrompt,
+    userPrompt,
+    model,
+    abortSignal,
+    request.inferenceParams,
+  )) {
     rawText += chunk;
     const parsed = parser.parse(rawText, streamFields);
     yield {
@@ -334,7 +366,13 @@ export async function* streamPerFieldTranslation(
     const { systemPrompt, userPrompt } = buildPerFieldPrompt(field, request);
     let fieldText = '';
 
-    for await (const chunk of streamLLM(systemPrompt, userPrompt, model, abortSignal)) {
+    for await (const chunk of streamLLM(
+      systemPrompt,
+      userPrompt,
+      model,
+      abortSignal,
+      request.inferenceParams,
+    )) {
       fieldText += chunk;
       merged[field.id] = fieldText.trim();
       latestActiveFieldId = field.id;

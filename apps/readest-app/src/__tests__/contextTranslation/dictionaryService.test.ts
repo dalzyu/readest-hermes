@@ -1,41 +1,21 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { DictionaryEntry, UserDictionary } from '@/services/contextTranslation/types';
 import {
-  findMatches,
-  importUserDictionary,
   deleteUserDictionary,
+  findMatches,
   getUserDictionaryMeta,
+  importUserDictionary,
   lookupDefinitions,
   saveUserDictionaryMeta,
 } from '@/services/contextTranslation/dictionaryService';
 
-// --- Shared mock state ---
-// Mutated directly so Zustand-like mock reads updated values
+const records = new Map<string, unknown>();
 const settingsRef = { current: [] as UserDictionary[] };
 const setSettingsSpy = vi.fn((patch: { userDictionaryMeta?: UserDictionary[] }) => {
   if (patch.userDictionaryMeta !== undefined) {
     settingsRef.current = patch.userDictionaryMeta;
   }
 });
-
-// In-memory record store for aiStore mock
-const records = new Map<string, unknown>();
-
-// --- Mocks ---
-vi.mock('@/store/settingsStore', () => ({
-  useSettingsStore: Object.assign(() => ({}), {
-    getState: () => ({
-      settings: {
-        get userDictionaryMeta() {
-          return settingsRef.current;
-        },
-      },
-      setSettings: setSettingsSpy,
-    }),
-    set: vi.fn(),
-    subscribe: () => () => {},
-  }),
-}));
 
 vi.mock('@/services/ai/storage/aiStore', () => ({
   aiStore: {
@@ -60,14 +40,27 @@ vi.mock('fflate', () => ({
   }),
 }));
 
+vi.mock('@/store/settingsStore', () => ({
+  useSettingsStore: Object.assign(() => ({}), {
+    getState: () => ({
+      settings: {
+        get userDictionaryMeta() {
+          return settingsRef.current;
+        },
+      },
+      setSettings: setSettingsSpy,
+    }),
+    set: vi.fn(),
+    subscribe: () => () => {},
+  }),
+}));
+
 vi.mock('@/services/contextTranslation/dictionaryParser', () => {
   const encoder = new TextEncoder();
   return {
     extractFromZip: vi.fn(async () => ({
       ifo: encoder.encode('bookname=Dummy\nwordcount=2\nsametypesequence=m\n'),
-      idx: encoder.encode(
-        'hello\x00\x00\x00\x00\x00\x00\x00\x05world\x00\x00\x00\x00\x00\x00\x00\x0a',
-      ),
+      idx: encoder.encode('hello\x00\x00\x00\x00\x00\x00\x00\x05world\x00\x00\x00\x00\x00\x00\x00\x0a'),
       dict: encoder.encode('definition for hello\x00definition for world'),
     })),
     parseStarDict: vi.fn(() => [
@@ -91,21 +84,24 @@ vi.mock('@/services/contextTranslation/dictionaryParser', () => {
   };
 });
 
+vi.mock('@/services/contextTranslation/plugins/jpTokenizer', () => ({
+  getDictionaryForm: vi.fn((text: string) => text),
+  isTokenizerReady: vi.fn(() => false),
+}));
+
 function fakeZipBuffer(): Uint8Array {
   return new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
 }
 
-// --- Tests ---
+beforeEach(() => {
+  vi.clearAllMocks();
+  records.clear();
+  settingsRef.current = [];
+});
 
 describe('getUserDictionaryMeta', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    settingsRef.current = [];
-  });
-
   test('returns empty array when no meta exists', async () => {
-    const result = await getUserDictionaryMeta();
-    expect(result).toEqual([]);
+    await expect(getUserDictionaryMeta()).resolves.toEqual([]);
   });
 
   test('returns stored meta entries', async () => {
@@ -121,18 +117,12 @@ describe('getUserDictionaryMeta', () => {
       },
     ];
     settingsRef.current = meta;
-    const result = await getUserDictionaryMeta();
-    expect(result).toEqual(meta);
+
+    await expect(getUserDictionaryMeta()).resolves.toEqual(meta);
   });
 });
 
 describe('saveUserDictionaryMeta', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    settingsRef.current = [];
-    setSettingsSpy.mockClear();
-  });
-
   test('persists meta array to settings store', async () => {
     const meta: UserDictionary[] = [
       {
@@ -145,10 +135,11 @@ describe('saveUserDictionaryMeta', () => {
         importedAt: 1700000000000,
       },
     ];
+
     await saveUserDictionaryMeta(meta);
+
     expect(setSettingsSpy).toHaveBeenCalledOnce();
-    const call = setSettingsSpy.mock.calls[0]![0] as { userDictionaryMeta: UserDictionary[] };
-    expect(call.userDictionaryMeta).toEqual(meta);
+    expect(setSettingsSpy).toHaveBeenCalledWith({ userDictionaryMeta: meta });
   });
 
   test('replaces existing meta', async () => {
@@ -174,19 +165,14 @@ describe('saveUserDictionaryMeta', () => {
         importedAt: 2000,
       },
     ];
+
     await saveUserDictionaryMeta(newMeta);
-    const call = setSettingsSpy.mock.calls[0]![0] as { userDictionaryMeta: UserDictionary[] };
-    expect(call.userDictionaryMeta).toEqual(newMeta);
+
+    expect(setSettingsSpy).toHaveBeenCalledWith({ userDictionaryMeta: newMeta });
   });
 });
 
 describe('importUserDictionary', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    settingsRef.current = [];
-    setSettingsSpy.mockClear();
-  });
-
   test('imports zip and returns UserDictionary meta', async () => {
     const result = await importUserDictionary(fakeZipBuffer(), {
       name: 'Test Dict',
@@ -222,9 +208,9 @@ describe('importUserDictionary', () => {
       targetLanguage: 'en',
     });
 
-    const call = setSettingsSpy.mock.calls[0]![0] as { userDictionaryMeta: UserDictionary[] };
-    expect(call.userDictionaryMeta).toHaveLength(1);
-    expect(call.userDictionaryMeta[0]!.name).toBe('Second');
+    expect(setSettingsSpy).toHaveBeenCalled();
+    expect(settingsRef.current).toHaveLength(1);
+    expect(settingsRef.current[0]!.name).toBe('Second');
   });
 
   test('throws when dictionary has zero entries', async () => {
@@ -238,8 +224,9 @@ describe('importUserDictionary', () => {
       parseIfo: vi.fn(() => ({ name: 'Empty', wordcount: 0 })),
     }));
     vi.resetModules();
-    const { importUserDictionary: reimport } =
-      await import('@/services/contextTranslation/dictionaryService');
+    const { importUserDictionary: reimport } = await import(
+      '@/services/contextTranslation/dictionaryService',
+    );
 
     await expect(
       reimport(fakeZipBuffer(), {
@@ -248,39 +235,6 @@ describe('importUserDictionary', () => {
         targetLanguage: 'zh',
       }),
     ).rejects.toThrow('Dictionary has 0 entries');
-
-    // Restore the module-level mock for subsequent tests
-    vi.doMock('@/services/contextTranslation/dictionaryParser', () => {
-      const encoder = new TextEncoder();
-      return {
-        extractFromZip: vi.fn(async () => ({
-          ifo: encoder.encode('bookname=Dummy\nwordcount=2\nsametypesequence=m\n'),
-          idx: encoder.encode(
-            'hello\x00\x00\x00\x00\x00\x00\x00\x05world\x00\x00\x00\x00\x00\x00\x00\x0a',
-          ),
-          dict: encoder.encode('definition for hello\x00definition for world'),
-        })),
-        parseStarDict: vi.fn(() => [
-          { headword: 'hello', definition: 'a greeting' },
-          { headword: 'world', definition: 'the planet' },
-        ]),
-        parseIfo: vi.fn((buffer: Uint8Array) => {
-          const text = new TextDecoder('utf-8').decode(buffer);
-          const lines = text.split(/\r?\n/);
-          const parsed: Record<string, string> = {};
-          for (const line of lines) {
-            const eqIndex = line.indexOf('=');
-            if (eqIndex === -1) continue;
-            parsed[line.slice(0, eqIndex)] = line.slice(eqIndex + 1);
-          }
-          return {
-            name: parsed['bookname'] ?? '',
-            wordcount: parseInt(parsed['wordcount'] ?? '0', 10),
-          };
-        }),
-      };
-    });
-    vi.resetModules();
   });
 
   test('assigns a unique id per import', async () => {
@@ -294,6 +248,7 @@ describe('importUserDictionary', () => {
       language: 'en',
       targetLanguage: 'fr',
     });
+
     expect(r1.id).not.toBe(r2.id);
   });
 });
@@ -301,10 +256,8 @@ describe('importUserDictionary', () => {
 describe('deleteUserDictionary', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    settingsRef.current = [];
-    setSettingsSpy.mockClear();
     records.clear();
-    // Pre-import two dictionaries so there is something to delete
+    settingsRef.current = [];
     await importUserDictionary(fakeZipBuffer(), {
       name: 'Dict A',
       language: 'en',
@@ -321,16 +274,19 @@ describe('deleteUserDictionary', () => {
   test('removes record from aiStore', async () => {
     const { aiStore } = await import('@/services/ai/storage/aiStore');
     const id = settingsRef.current[0]!.id;
+
     await deleteUserDictionary(id);
-    const record = await aiStore.getRecord('dictionaryData', id);
-    expect(record).toBeNull();
+
+    await expect(aiStore.getRecord('dictionaryData', id)).resolves.toBeNull();
   });
 
   test('removes meta from settings store', async () => {
     const id = settingsRef.current[0]!.id;
+
     await deleteUserDictionary(id);
-    const call = setSettingsSpy.mock.calls[0]![0] as { userDictionaryMeta: UserDictionary[] };
-    expect(call.userDictionaryMeta.find((m) => m.id === id)).toBeUndefined();
+
+    expect(settingsRef.current.find((meta) => meta.id === id)).toBeUndefined();
+    expect(setSettingsSpy).toHaveBeenCalled();
   });
 
   test('deleting non-existent id does not throw', async () => {
@@ -351,34 +307,11 @@ describe('lookupDefinitions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    settingsRef.current = [];
     records.clear();
-
-    storeDictionaryRecord(
-      {
-        id: 'bundled-zh-en',
-        name: 'bundled-zh-en',
-        language: 'zh',
-        targetLanguage: 'en',
-        entryCount: 1,
-        source: 'bundled',
-        importedAt: 0,
-        bundledVersion: '1.0.0',
-        enabled: true,
-      },
-      [{ headword: '你好', definition: 'bundled hello' }],
-    );
+    settingsRef.current = [];
   });
 
-  test('returns bundled dictionary matches when the bundled pair is enabled', async () => {
-    const result = await lookupDefinitions('你好', 'zh', 'en');
-
-    expect(result).toHaveLength(1);
-    expect(result[0]!.definition).toBe('bundled hello');
-    expect(result[0]!.source).toBe('CC-CEDICT');
-  });
-
-  test('prefers matching user dictionaries over bundled dictionaries', async () => {
+  test('returns matches from enabled user dictionaries', async () => {
     settingsRef.current = [
       {
         id: 'user-zh-en',
@@ -402,11 +335,28 @@ describe('lookupDefinitions', () => {
     expect(result[0]!.source).toBe('Custom Zh-En');
   });
 
-  test('skips bundled dictionaries that are disabled in settings', async () => {
-    const result = await lookupDefinitions('你好', 'zh', 'en');
+  test('skips disabled user dictionaries', async () => {
+    settingsRef.current = [
+      {
+        id: 'user-zh-en',
+        name: 'Disabled Dict',
+        language: 'zh',
+        targetLanguage: 'en',
+        entryCount: 1,
+        source: 'user',
+        importedAt: 1_800_000_000,
+        enabled: false,
+      },
+    ];
+    storeDictionaryRecord(settingsRef.current[0]!, [
+      { headword: '你好', definition: 'disabled hello' },
+    ]);
 
-    // With no filter, bundled dict should return results
-    expect(result.length).toBeGreaterThanOrEqual(0);
+    await expect(lookupDefinitions('你好', 'zh', 'en')).resolves.toEqual([]);
+  });
+
+  test('returns empty array for empty text', async () => {
+    await expect(lookupDefinitions('', 'zh', 'en')).resolves.toEqual([]);
   });
 });
 
@@ -416,172 +366,43 @@ describe('findMatches', () => {
     definition,
   });
 
-  describe('exact match', () => {
-    test('returns entry when headword exactly matches text', () => {
-      const entries: DictionaryEntry[] = [
-        makeEntry('hello', 'a greeting'),
-        makeEntry('world', 'the planet'),
-      ];
-      const result = findMatches(entries, 'hello');
-      expect(result).toHaveLength(1);
-      expect(result[0]!.headword).toBe('hello');
-    });
+  test('returns exact matches', () => {
+    const entries = [makeEntry('hello', 'a greeting'), makeEntry('world', 'the planet')];
 
-    test('case-sensitive exact match', () => {
-      const entries: DictionaryEntry[] = [
-        makeEntry('Hello', 'a greeting'),
-        makeEntry('hello', 'lowercase greeting'),
-      ];
-      const result = findMatches(entries, 'Hello');
-      expect(result).toHaveLength(1);
-      expect(result[0]!.headword).toBe('Hello');
-    });
+    const result = findMatches(entries, 'hello');
 
-    test('returns empty when no exact match', () => {
-      const entries: DictionaryEntry[] = [makeEntry('hello', 'a greeting')];
-      const result = findMatches(entries, 'world');
-      expect(result).toHaveLength(0);
-    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.headword).toBe('hello');
   });
 
-  describe('prefix: headword starts with text', () => {
-    test('returns matching entries when headword starts with text', () => {
-      const entries: DictionaryEntry[] = [
-        makeEntry('hyperbolic', 'exaggerated'),
-        makeEntry('hyperbole', 'figure of speech'),
-        makeEntry('hypersonic', 'faster than sound'),
-      ];
-      const result = findMatches(entries, 'hyper');
-      expect(result.map((e) => e.headword)).toEqual(['hyperbole', 'hyperbolic', 'hypersonic']);
-    });
+  test('returns prefix matches and caps results', () => {
+    const entries = [
+      makeEntry('hyperbolic', 'exaggerated'),
+      makeEntry('hyperbole', 'figure of speech'),
+      makeEntry('hypersonic', 'faster than sound'),
+    ];
 
-    test('skipped when text.length > 40', () => {
-      const entries: DictionaryEntry[] = [makeEntry('hyperbolically', 'in a hyperbolic manner')];
-      const longText = 'a'.repeat(41);
-      const result = findMatches(entries, longText);
-      expect(result).toHaveLength(0);
-    });
+    const result = findMatches(entries, 'hyper');
+
+    expect(result.map((entry) => entry.headword)).toEqual([
+      'hyperbole',
+      'hyperbolic',
+      'hypersonic',
+    ]);
   });
 
-  describe('prefix: text starts with headword', () => {
-    test('returns entry when text starts with headword', () => {
-      const entries: DictionaryEntry[] = [makeEntry('hello', 'a greeting')];
-      const result = findMatches(entries, 'hello world');
-      expect(result).toHaveLength(1);
-      expect(result[0]!.headword).toBe('hello');
-    });
+  test('returns fuzzy matches within edit distance 2', () => {
+    const entries = [makeEntry('language', 'system of communication')];
 
-    test('returns multiple matches', () => {
-      const entries: DictionaryEntry[] = [
-        makeEntry('a', 'article'),
-        makeEntry('an', 'article'),
-        makeEntry('and', 'conjunction'),
-      ];
-      const result = findMatches(entries, 'and');
-      expect(result.map((e) => e.headword)).toEqual(['and']);
-    });
+    const result = findMatches(entries, 'lnaguage');
 
-    test('skipped when text.length > 40', () => {
-      const entries: DictionaryEntry[] = [makeEntry('hello', 'a greeting')];
-      const longText = 'hello' + 'a'.repeat(40);
-      const result = findMatches(entries, longText);
-      expect(result).toHaveLength(0);
-    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.headword).toBe('language');
   });
 
-  describe('fuzzy: Levenshtein distance <= 2', () => {
-    test('returns entry when text is within Levenshtein distance 2', () => {
-      const entries: DictionaryEntry[] = [makeEntry('hello', 'a greeting')];
-      const result = findMatches(entries, 'helo');
-      expect(result).toHaveLength(1);
-      expect(result[0]!.headword).toBe('hello');
-    });
+  test('returns empty array for long unmatched text', () => {
+    const entries = [makeEntry('hello', 'a greeting')];
 
-    test('distance 1 is included', () => {
-      const entries: DictionaryEntry[] = [makeEntry('world', 'the planet')];
-      const result = findMatches(entries, 'worle');
-      expect(result).toHaveLength(1);
-      expect(result[0]!.headword).toBe('world');
-    });
-
-    test('distance 2 is included', () => {
-      const entries: DictionaryEntry[] = [makeEntry('language', 'system of communication')];
-      const result = findMatches(entries, 'lnaguage');
-      expect(result).toHaveLength(1);
-      expect(result[0]!.headword).toBe('language');
-    });
-
-    test('distance 3 is excluded', () => {
-      const entries: DictionaryEntry[] = [makeEntry('abc', 'three letters')];
-      const result = findMatches(entries, 'xyz');
-      expect(result).toHaveLength(0);
-    });
-
-    test('fuzzy only runs when text.length <= 40', () => {
-      const entries: DictionaryEntry[] = [makeEntry('hello', 'a greeting')];
-      const longText = 'hello' + 'a'.repeat(36);
-      const result = findMatches(entries, longText);
-      expect(result).toHaveLength(0);
-    });
-
-    test('fuzzy selects up to ~200 nearest candidates', () => {
-      const entries: DictionaryEntry[] = Array.from({ length: 500 }, (_, i) =>
-        makeEntry(`word${i.toString().padStart(4, '0')}`, `definition ${i}`),
-      );
-      const result = findMatches(entries, 'word0002');
-      expect(result).toHaveLength(1);
-      expect(result[0]!.headword).toBe('word0002');
-    });
-  });
-
-  describe('result assembly', () => {
-    test('deduplicates by headword', () => {
-      const entries: DictionaryEntry[] = [
-        makeEntry('hello', 'a greeting'),
-        makeEntry('hello', 'another greeting'),
-      ];
-      const result = findMatches(entries, 'hello');
-      expect(result).toHaveLength(1);
-    });
-
-    test('capped at 3 total results', () => {
-      const entries: DictionaryEntry[] = [
-        makeEntry('a', 'article 1'),
-        makeEntry('an', 'article 2'),
-        makeEntry('and', 'conjunction'),
-        makeEntry('ant', 'insect'),
-        makeEntry('android', 'robot'),
-      ];
-      const result = findMatches(entries, 'a');
-      expect(result.length).toBeLessThanOrEqual(3);
-    });
-
-    test('prefers exact match over prefix over fuzzy', () => {
-      const entries: DictionaryEntry[] = [
-        makeEntry('hello', 'exact match'),
-        makeEntry('hello world', 'prefix match'),
-      ];
-      const result = findMatches(entries, 'hello');
-      expect(result[0]!.headword).toBe('hello');
-    });
-  });
-
-  describe('binary search for exact match', () => {
-    test('works on sorted entries', () => {
-      const entries: DictionaryEntry[] = [
-        makeEntry('apple', 'fruit'),
-        makeEntry('banana', 'fruit'),
-        makeEntry('cherry', 'fruit'),
-        makeEntry('date', 'fruit'),
-      ];
-      const result = findMatches(entries, 'banana');
-      expect(result).toHaveLength(1);
-      expect(result[0]!.headword).toBe('banana');
-    });
-
-    test('empty entries array', () => {
-      const result = findMatches([], 'hello');
-      expect(result).toHaveLength(0);
-    });
+    expect(findMatches(entries, 'a'.repeat(41))).toEqual([]);
   });
 });

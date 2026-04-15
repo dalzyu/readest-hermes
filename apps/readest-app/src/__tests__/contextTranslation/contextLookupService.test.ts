@@ -42,9 +42,26 @@ describe('runContextLookup', () => {
       popupContext,
       targetLanguage: 'en',
       outputFields: DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields,
+      inferenceParams: {
+        topP: 0.9,
+        frequencyPenalty: 0.1,
+        topK: 30,
+        presencePenalty: 0.2,
+        seed: 77,
+        stopSequences: ['</lookup_json>'],
+      },
     });
+    const [, , , , inferenceParams] = vi.mocked(callLLM).mock.calls[0]!;
     expect(result.fields['translation']).toBe('close friend');
     expect(result.validationDecision).toBe('accept');
+    expect(inferenceParams).toMatchObject({
+      topP: 0.9,
+      frequencyPenalty: 0.1,
+      topK: 30,
+      presencePenalty: 0.2,
+      seed: 77,
+      stopSequences: ['</lookup_json>'],
+    });
   });
 
   test('includes detected source language info', async () => {

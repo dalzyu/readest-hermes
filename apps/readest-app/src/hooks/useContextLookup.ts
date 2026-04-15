@@ -231,6 +231,7 @@ export function useContextLookup({
             sourceLanguage: detectedLanguage.language,
             targetLanguage: requestSnapshot.settings.targetLanguage,
             outputFields: requestSnapshot.settings.outputFields,
+            inferenceParams,
           };
 
           let finalRawText = '';
@@ -290,6 +291,7 @@ export function useContextLookup({
             model,
             abortSignal: abortController.signal,
             preDictionaryEntries: dictionaryEntries,
+            inferenceParams,
             ...(hasStreamingResult
               ? { preNormalizedFields: finalizedFields, rawResponse: finalizedRawText }
               : {}),
@@ -312,6 +314,7 @@ export function useContextLookup({
             targetLanguage: requestSnapshot.settings.targetLanguage,
             outputFields: requestSnapshot.settings.outputFields,
             dictionarySettings: requestSnapshot.dictionarySettings,
+            inferenceParams,
           } as TranslationRequest & { dictionarySettings?: ContextDictionarySettings };
 
           let finalRawText = '';
@@ -347,6 +350,7 @@ export function useContextLookup({
             model,
             abortSignal: abortController.signal,
             preDictionaryEntries: dictionaryEntries,
+            inferenceParams,
             ...(hasStreamingResult
               ? { preNormalizedFields: finalFields, rawResponse: finalRawText }
               : {}),

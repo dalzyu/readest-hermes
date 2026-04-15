@@ -41,10 +41,10 @@ export const DEFAULT_OPENAI_COMPATIBLE_CONFIG: ProviderConfig = {
   embeddingModel: '',
 };
 
-/** Built-in provider preset for AI Gateway (Cloud). */
+/** Built-in provider preset for AI Gateway. */
 export const DEFAULT_AI_GATEWAY_CONFIG: ProviderConfig = {
   id: 'ai-gateway-default',
-  name: 'AI Gateway (Cloud)',
+  name: 'AI Gateway',
   providerType: 'ai-gateway',
   baseUrl: '',
   model: GATEWAY_MODELS.GEMINI_FLASH_LITE,
@@ -94,8 +94,8 @@ export function providerConfigCanServeEmbeddings(
 
 export const DEFAULT_AI_SETTINGS: AISettings = {
   enabled: false,
-  providers: [DEFAULT_OLLAMA_CONFIG],
-  activeProviderId: 'ollama-default',
+  providers: [],
+  activeProviderId: '',
   modelAssignments: {},
 
   spoilerProtection: true,

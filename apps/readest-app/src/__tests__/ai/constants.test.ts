@@ -54,9 +54,9 @@ describe('DEFAULT_AI_SETTINGS', () => {
     expect(DEFAULT_AI_SETTINGS.enabled).toBe(false);
   });
 
-  test('should have ollama as default active provider', () => {
-    expect(DEFAULT_AI_SETTINGS.activeProviderId).toBe('ollama-default');
-    expect(DEFAULT_AI_SETTINGS.providers[0]!.providerType).toBe('ollama');
+  test('should not seed providers by default', () => {
+    expect(DEFAULT_AI_SETTINGS.activeProviderId).toBe('');
+    expect(DEFAULT_AI_SETTINGS.providers).toHaveLength(0);
   });
 
   test('should have valid ollama defaults in the default provider config', () => {
@@ -86,6 +86,8 @@ describe('AISettings Type', () => {
     const settings: AISettings = {
       ...DEFAULT_AI_SETTINGS,
       enabled: true,
+      providers: [DEFAULT_OLLAMA_CONFIG],
+      activeProviderId: DEFAULT_OLLAMA_CONFIG.id,
       spoilerProtection: false,
       maxContextChunks: 10,
       indexingMode: 'background',

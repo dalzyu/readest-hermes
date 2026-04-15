@@ -1,3 +1,5 @@
+import type { InferenceParams } from '@/services/ai/types';
+
 /** A single configurable output field shown in the translation popup */
 export interface TranslationOutputField {
   id: string;
@@ -72,6 +74,8 @@ export interface TranslationRequest {
   outputFields: TranslationOutputField[];
   /** Optional runtime controls for repair / rescue / sanitization. */
   harness?: Partial<ContextTranslationHarnessSettings>;
+  /** Optional generation overrides for the active AI provider. */
+  inferenceParams?: InferenceParams;
 }
 
 /** Schema version for VocabularyEntry persistence format */

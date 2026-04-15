@@ -26,12 +26,13 @@ import type {
   AIProviderApiStyle,
   ProviderConfig,
   AITaskType,
+  InferenceParams,
 } from '@/services/ai/types';
 
 type ConnectionStatus = 'idle' | 'testing' | 'success' | 'error';
 
 const PROVIDER_TYPE_LABELS: Record<AIProviderType, string> = {
-  ollama: 'Ollama (Local)',
+  ollama: 'Ollama',
   openai: 'OpenAI',
   'openai-compatible': 'OpenAI-Compatible',
   anthropic: 'Anthropic',
@@ -44,7 +45,7 @@ const PROVIDER_TYPE_LABELS: Record<AIProviderType, string> = {
   cohere: 'Cohere',
   fireworks: 'Fireworks',
   togetherai: 'Together AI',
-  'ai-gateway': 'AI Gateway (Cloud)',
+  'ai-gateway': 'AI Gateway',
 };
 
 const PROVIDER_TYPES_ORDERED: AIProviderType[] = [
@@ -90,6 +91,44 @@ const TASK_LABELS: Record<AITaskType, string> = {
 
 function generateProviderId(): string {
   return `provider-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatOptionalNumber(value?: number): string {
+  return value === undefined || value === null ? '' : String(value);
+}
+
+function parseOptionalNumber(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseOptionalInteger(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : undefined;
+}
+
+function formatOptionalList(value?: string[]): string {
+  return value?.filter((item) => item.trim().length > 0).join('\n') ?? '';
+}
+
+function parseOptionalList(value: string): string[] | undefined {
+  const items = value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return items.length > 0 ? items : undefined;
+}
+
+function pruneInferenceParams(params: Partial<InferenceParams>): InferenceParams | undefined {
+  const cleaned = Object.fromEntries(
+    Object.entries(params).filter(([, value]) => {
+      if (value === undefined || value === null) return false;
+      return !(Array.isArray(value) && value.length === 0);
+    }),
+  );
+  return Object.keys(cleaned).length > 0 ? (cleaned as InferenceParams) : undefined;
 }
 
 function emptyConfig(providerType: AIProviderType): ProviderConfig {
@@ -163,6 +202,12 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
       setFetchingModels(false);
     }
   }, [config.baseUrl]);
+
+  const inferenceParams = config.inferenceParams ?? {};
+
+  const updateInferenceParams = (patch: Partial<InferenceParams>) => {
+    update({ inferenceParams: pruneInferenceParams({ ...inferenceParams, ...patch }) });
+  };
 
   useEffect(() => {
     if (config.providerType === 'ollama' && config.baseUrl) {
@@ -290,6 +335,120 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
             </select>
           </div>
         )}
+
+        <details className='px-4 py-3'>
+          <summary className='cursor-pointer font-medium'>{_('Advanced inference')}</summary>
+          <div className='mt-3 grid gap-3 sm:grid-cols-2'>
+            <label className='flex flex-col gap-2'>
+              <span>{_('Temperature')}</span>
+              <input
+                type='number'
+                step='0.1'
+                min='0'
+                max='2'
+                className='input input-bordered input-sm w-full'
+                value={formatOptionalNumber(inferenceParams.temperature)}
+                onChange={(e) => updateInferenceParams({ temperature: parseOptionalNumber(e.target.value) })}
+                aria-label={_('Temperature')}
+              />
+            </label>
+            <label className='flex flex-col gap-2'>
+              <span>{_('Max tokens')}</span>
+              <input
+                type='number'
+                step='1'
+                min='1'
+                className='input input-bordered input-sm w-full'
+                value={formatOptionalNumber(inferenceParams.maxTokens)}
+                onChange={(e) => updateInferenceParams({ maxTokens: parseOptionalNumber(e.target.value) })}
+                aria-label={_('Max tokens')}
+              />
+            </label>
+            <label className='flex flex-col gap-2'>
+              <span>{_('Top-p')}</span>
+              <input
+                type='number'
+                step='0.05'
+                min='0'
+                max='1'
+                className='input input-bordered input-sm w-full'
+                value={formatOptionalNumber(inferenceParams.topP)}
+                onChange={(e) => updateInferenceParams({ topP: parseOptionalNumber(e.target.value) })}
+                aria-label={_('Top-p')}
+              />
+            </label>
+            <label className='flex flex-col gap-2'>
+              <span>{_('Top K')}</span>
+              <input
+                type='number'
+                step='1'
+                min='1'
+                className='input input-bordered input-sm w-full'
+                value={formatOptionalNumber(inferenceParams.topK)}
+                onChange={(e) => updateInferenceParams({ topK: parseOptionalInteger(e.target.value) })}
+                aria-label={_('Top K')}
+              />
+            </label>
+            <label className='flex flex-col gap-2'>
+              <span>{_('Frequency penalty')}</span>
+              <input
+                type='number'
+                step='0.1'
+                min='-2'
+                max='2'
+                className='input input-bordered input-sm w-full'
+                value={formatOptionalNumber(inferenceParams.frequencyPenalty)}
+                onChange={(e) =>
+                  updateInferenceParams({ frequencyPenalty: parseOptionalNumber(e.target.value) })
+                }
+                aria-label={_('Frequency penalty')}
+              />
+            </label>
+            <label className='flex flex-col gap-2'>
+              <span>{_('Presence penalty')}</span>
+              <input
+                type='number'
+                step='0.1'
+                min='-2'
+                max='2'
+                className='input input-bordered input-sm w-full'
+                value={formatOptionalNumber(inferenceParams.presencePenalty)}
+                onChange={(e) =>
+                  updateInferenceParams({ presencePenalty: parseOptionalNumber(e.target.value) })
+                }
+                aria-label={_('Presence penalty')}
+              />
+            </label>
+            <label className='flex flex-col gap-2'>
+              <span>{_('Seed')}</span>
+              <input
+                type='number'
+                step='1'
+                min='0'
+                className='input input-bordered input-sm w-full'
+                value={formatOptionalNumber(inferenceParams.seed)}
+                onChange={(e) => updateInferenceParams({ seed: parseOptionalInteger(e.target.value) })}
+                aria-label={_('Seed')}
+              />
+            </label>
+            <label className='flex flex-col gap-2 sm:col-span-2'>
+              <span>{_('Stop sequences')}</span>
+              <textarea
+                rows={3}
+                className='textarea textarea-bordered textarea-sm w-full'
+                value={formatOptionalList(inferenceParams.stopSequences)}
+                onChange={(e) =>
+                  updateInferenceParams({ stopSequences: parseOptionalList(e.target.value) })
+                }
+                aria-label={_('Stop sequences')}
+                placeholder={_('One sequence per line')}
+              />
+            </label>
+          </div>
+          <p className='text-base-content/50 mt-3 text-xs'>
+            {_('Leave a field blank to use the task default.')}
+          </p>
+        </details>
 
         {/* Model */}
         <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>

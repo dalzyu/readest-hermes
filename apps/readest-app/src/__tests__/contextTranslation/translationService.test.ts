@@ -80,13 +80,31 @@ describe('translateWithContext', () => {
       '<translation>close friend</translation>\n<contextualMeaning>A soulmate who truly understands you.</contextualMeaning>',
     );
 
-    const result = await translateWithContext(baseRequest);
+    const result = await translateWithContext({
+      ...baseRequest,
+      inferenceParams: {
+        temperature: 0.25,
+        maxTokens: 256,
+        topK: 40,
+        presencePenalty: 0.2,
+        seed: 123,
+        stopSequences: ['END', '<|end|>'],
+      },
+    });
 
     expect(mockCallLLM).toHaveBeenCalledOnce();
-    const [systemPrompt, userPrompt] = mockCallLLM.mock.calls[0]!;
+    const [systemPrompt, userPrompt, , , inferenceParams] = mockCallLLM.mock.calls[0]!;
     expect(systemPrompt).toContain('English');
     expect(userPrompt).toContain('知己');
     expect(userPrompt).toContain('Earlier in the same volume');
+    expect(inferenceParams).toMatchObject({
+      temperature: 0.25,
+      maxTokens: 256,
+      topK: 40,
+      presencePenalty: 0.2,
+      seed: 123,
+      stopSequences: ['END', '<|end|>'],
+    });
 
     expect(result['translation']).toBe('close friend');
     expect(result['contextualMeaning']).toBe('A soulmate who truly understands you.');
@@ -364,10 +382,28 @@ describe('streamTranslationWithContext', () => {
 
     const updates = [];
 
-    for await (const update of streamTranslationWithContext(baseRequest, 'mock-model' as never)) {
+    for await (const update of streamTranslationWithContext(
+      {
+        ...baseRequest,
+        inferenceParams: {
+          topK: 20,
+          presencePenalty: 0.15,
+          seed: 9,
+          stopSequences: ['END'],
+        },
+      },
+      'mock-model' as never,
+    )) {
       updates.push(update);
     }
 
+    const [, , , , inferenceParams] = mockStreamLLM.mock.calls[0]!;
+    expect(inferenceParams).toMatchObject({
+      topK: 20,
+      presencePenalty: 0.15,
+      seed: 9,
+      stopSequences: ['END'],
+    });
     expect(updates[0]!.fields['translation']).toBe('close');
     expect(updates[1]!.fields['translation']).toBe('close friend');
     expect(updates[1]!.fields['contextualMeaning']).toBe('trusted ally');
@@ -385,12 +421,28 @@ describe('streamTranslationWithContext', () => {
     const updates: { fields: Record<string, string>; activeFieldId: string | null }[] = [];
 
     for await (const chunk of streamLookupWithContext(
-      { ...baseRequest, mode: 'dictionary' as ContextLookupMode },
+      {
+        ...baseRequest,
+        mode: 'dictionary' as ContextLookupMode,
+        inferenceParams: {
+          topK: 12,
+          presencePenalty: 0.25,
+          seed: 99,
+          stopSequences: ['</lookup_json>'],
+        },
+      },
       'mock-model' as never,
     )) {
       updates.push(chunk);
     }
 
+    const [, , , , inferenceParams] = mockStreamLLM.mock.calls[0]!;
+    expect(inferenceParams).toMatchObject({
+      topK: 12,
+      presencePenalty: 0.25,
+      seed: 99,
+      stopSequences: ['</lookup_json>'],
+    });
     expect(updates[0]!.fields['simpleDefinition']).toBe('A close confidant');
     expect(updates[0]!.activeFieldId).toBe('simpleDefinition');
     const finalUpdate = updates.at(-2)!;

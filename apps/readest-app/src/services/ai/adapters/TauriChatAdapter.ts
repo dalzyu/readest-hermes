@@ -151,6 +151,7 @@ export function createTauriAdapter(getOptions: () => TauriAdapterOptions): ChatM
             system: systemPrompt,
             messages: aiMessages,
             abortSignal,
+            ...inferenceParams,
           });
 
           for await (const chunk of result.textStream) {

@@ -60,10 +60,7 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
         bookLanguage,
       );
 
-      const text = await callLLM(systemPrompt, userPrompt, model, undefined, {
-        maxTokens: 2048,
-        temperature: 0.7,
-      });
+      const text = await callLLM(systemPrompt, userPrompt, model, undefined, inferenceParams);
 
       const parsed = parseComprehensionResponse(text);
       if (parsed.length === 0) {
