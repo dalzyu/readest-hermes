@@ -76,7 +76,7 @@ describe('runContextLookup', () => {
     expect(result.detectedLanguage.language).toBeDefined();
   });
 
-  test('dictionary mode validates dictionary fields instead of translation fields', async () => {
+  test('dictionary mode validates only the AI-sourced dictionary fields', async () => {
     vi.mocked(callLLM).mockResolvedValueOnce(
       '<lookup_json>{"simpleDefinition":"知己とは、深く理解し合える友のこと。","contextualMeaning":"この場面では、主人公が心を許せる相手を指す。","sourceExamples":"1. 彼は学生時代の知己だ。"}</lookup_json>',
     );
@@ -92,7 +92,8 @@ describe('runContextLookup', () => {
     });
 
     expect(result.validationDecision).toBe('accept');
-    expect(result.fields['simpleDefinition']).toContain('知己');
+    expect(result.fields['simpleDefinition']).toBeUndefined();
+    expect(result.fields['contextualMeaning']).toContain('主人公');
     expect(callLLM).toHaveBeenCalled();
   });
 });

@@ -25,6 +25,10 @@ function getExampleField(result: TranslationResult): 'examples' | 'sourceExample
   return null;
 }
 
+interface ParseStructuredExamplesOptions {
+  allowIncomplete?: boolean;
+}
+
 function shouldFormatChineseExamples(request: FormatRequest, result: TranslationResult): boolean {
   const field = getExampleField(result);
   if (!field) return false;
@@ -208,7 +212,12 @@ function stripLabel(value: string): string {
   return value.replace(ENGLISH_LINE_REGEX, '').replace(CHINESE_LINE_REGEX, '').trim();
 }
 
-export function parseStructuredExamples(value: string): LookupExample[] {
+export function parseStructuredExamples(
+  value: string,
+  options: ParseStructuredExamplesOptions = {},
+): LookupExample[] {
+  const allowIncomplete = options.allowIncomplete ?? false;
+
   return value
     .split(/\n{2,}/)
     .map((item) =>
@@ -237,7 +246,26 @@ export function parseStructuredExamples(value: string): LookupExample[] {
         targetText,
       };
     })
-    .filter((example) => example.sourceText.length > 0 && example.targetText.length > 0);
+    .filter(
+      (example) =>
+        example.sourceText.length > 0 && (allowIncomplete || example.targetText.length > 0),
+    );
+}
+
+export function parseRenderableExampleField(
+  result: TranslationResult,
+  selectedText: string,
+  targetLanguage?: string,
+  options: ParseStructuredExamplesOptions = {},
+): LookupExample[] {
+  const field = getExampleField(result);
+  if (!field) return [];
+
+  return filterRenderableExamples(
+    parseStructuredExamples(result[field]!, options),
+    selectedText,
+    targetLanguage,
+  );
 }
 
 /**

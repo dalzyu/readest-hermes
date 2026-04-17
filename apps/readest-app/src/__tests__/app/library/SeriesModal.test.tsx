@@ -75,6 +75,14 @@ vi.mock('@/services/contextTranslation/seriesService', () => ({
 vi.mock('@/services/ai/storage/aiStore', () => ({
   aiStore: {
     isIndexed: (...args: unknown[]) => mockIsIndexed(...args),
+    getIndexedStateMap: async (bookHashes: string[]) => {
+      const entries = await Promise.all(
+        (bookHashes as string[]).map(
+          async (hash) => [hash, await mockIsIndexed(hash)] as [string, boolean],
+        ),
+      );
+      return Object.fromEntries(entries);
+    },
   },
 }));
 

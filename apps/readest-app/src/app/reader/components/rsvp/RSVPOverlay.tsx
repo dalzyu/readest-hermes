@@ -30,9 +30,9 @@ interface FlatChapter {
 const FONT_SIZE_OPTIONS = [1.25, 1.5, 1.875, 2.25, 3, 3.75, 4.25, 5, 6, 8];
 const DEFAULT_FONT_SIZE_INDEX = 4;
 const ORP_COLOR_OPTIONS = ['', '#EF4444', '#3B82F6', '#22C55E', '#F97316', '#A855F7'];
-const STORAGE_KEY_FONT_SIZE = 'readest_rsvp_fontsize';
-const STORAGE_KEY_ORP_COLOR = 'readest_rsvp_orp_color';
-const STORAGE_KEY_CONTEXT = 'readest_rsvp_context';
+const STORAGE_KEY_FONT_SIZE = 'hermes_rsvp_fontsize';
+const STORAGE_KEY_ORP_COLOR = 'hermes_rsvp_orp_color';
+const STORAGE_KEY_CONTEXT = 'hermes_rsvp_context';
 
 interface RSVPOverlayProps {
   gridInsets: Insets;

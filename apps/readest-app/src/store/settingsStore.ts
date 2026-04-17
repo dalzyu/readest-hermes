@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { SystemSettings } from '@/types/settings';
 import { EnvConfigType } from '@/services/environment';
 import { initDayjs } from '@/utils/time';
+import { DEFAULT_AI_PROFILE } from '@/services/ai/constants';
 
 export type FontPanelView = 'main-fonts' | 'custom-fonts';
 
@@ -24,6 +25,34 @@ interface SettingsState {
   applyUILanguage: (uiLanguage?: string) => void;
 }
 
+function normalizeSettings(settings: SystemSettings): SystemSettings {
+  const aiSettings = settings.aiSettings;
+  if (!aiSettings) return settings;
+  if ((aiSettings.profiles ?? []).length > 0) return settings;
+  const legacyAssignments = (
+    aiSettings as typeof aiSettings & {
+      modelAssignments?: Record<string, string>;
+    }
+  ).modelAssignments;
+  const profileAssignments = Object.fromEntries(
+    Object.entries(legacyAssignments ?? {}).map(([task, providerId]) => [task, { providerId }]),
+  );
+
+  return {
+    ...settings,
+    aiSettings: {
+      ...aiSettings,
+      profiles: [
+        {
+          ...DEFAULT_AI_PROFILE,
+          modelAssignments: profileAssignments,
+        },
+      ],
+      activeProfileId: DEFAULT_AI_PROFILE.id,
+    },
+  };
+}
+
 export const useSettingsStore = create<SettingsState>((set) => ({
   settings: {} as SystemSettings,
   settingsDialogBookKey: '',
@@ -31,7 +60,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   isSettingsGlobal: true,
   fontPanelView: 'main-fonts',
   activeSettingsItemId: null,
-  setSettings: (settings) => set({ settings }),
+  setSettings: (settings) => set({ settings: normalizeSettings(settings) }),
   saveSettings: async (envConfig: EnvConfigType, settings: SystemSettings) => {
     const appService = await envConfig.getAppService();
     await appService.saveSettings(settings);

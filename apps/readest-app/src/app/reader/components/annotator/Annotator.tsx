@@ -36,8 +36,6 @@ import { getHighlightColorHex } from '../../utils/annotatorUtil';
 import { annotationToolButtons } from './AnnotationTools';
 import AnnotationRangeEditor from './AnnotationRangeEditor';
 import AnnotationPopup from './AnnotationPopup';
-import WiktionaryPopup from './WiktionaryPopup';
-import WikipediaPopup from './WikipediaPopup';
 import ContextTranslationPopup from './ContextTranslationPopup';
 import ContextDictionaryPopup from './ContextDictionaryPopup';
 import useShortcuts from '@/hooks/useShortcuts';
@@ -70,14 +68,12 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   const [selection, setSelection] = useState<TextSelection | null>(null);
   const [showAnnotPopup, setShowAnnotPopup] = useState(false);
-  const [showWiktionaryPopup, setShowWiktionaryPopup] = useState(false);
-  const [showWikipediaPopup, setShowWikipediaPopup] = useState(false);
   const [showProofreadPopup, setShowProofreadPopup] = useState(false);
   const [showContextTranslationPopup, setShowContextTranslationPopup] = useState(false);
   const [showContextDictionaryPopup, setShowContextDictionaryPopup] = useState(false);
   const [trianglePosition, setTrianglePosition] = useState<Position>();
   const [annotPopupPosition, setAnnotPopupPosition] = useState<Position>();
-  const [dictPopupPosition, setDictPopupPosition] = useState<Position>();
+  const [, setDictPopupPosition] = useState<Position>();
   const [proofreadPopupPosition, setProofreadPopupPosition] = useState<Position>();
   const [contextTranslationPopupPosition, setContextTranslationPopupPosition] =
     useState<Position>();
@@ -103,8 +99,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   const showingPopup =
     showAnnotPopup ||
-    showWiktionaryPopup ||
-    showWikipediaPopup ||
     showProofreadPopup ||
     showContextTranslationPopup ||
     showContextDictionaryPopup;
@@ -210,19 +204,21 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     [primaryLang, transformCtx],
   );
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleDismissPopup = useCallback(
-    throttle(() => {
-      setSelection(null);
-      setShowAnnotPopup(false);
-      setShowWiktionaryPopup(false);
-      setShowWikipediaPopup(false);
-      setShowProofreadPopup(false);
-      setShowContextTranslationPopup(false);
-      setShowContextDictionaryPopup(false);
-      setEditingAnnotation(null);
-    }, 500),
-    [],
+  const handleDismissPopup = useMemo(
+    () =>
+      throttle(() => {
+        const dismissingLookupPopup = showContextTranslationPopup || showContextDictionaryPopup;
+        if (dismissingLookupPopup) {
+          eventDispatcher.dispatch('tts-stop', { bookKey });
+        }
+        setSelection(null);
+        setShowAnnotPopup(false);
+        setShowProofreadPopup(false);
+        setShowContextTranslationPopup(false);
+        setShowContextDictionaryPopup(false);
+        setEditingAnnotation(null);
+      }, 500),
+    [bookKey, showContextTranslationPopup, showContextDictionaryPopup],
   );
 
   const {
@@ -320,11 +316,9 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
                 cfi: view?.getCFI(index, range),
                 page: index + 1,
               });
-              // Show context translation popup for PDF right-click
+              // Show unified context translation popup for PDF right-click
               setShowAnnotPopup(false);
               setShowContextTranslationPopup(true);
-              setShowWiktionaryPopup(false);
-              setShowWikipediaPopup(false);
             }
           }
         } catch (err) {
@@ -614,8 +608,12 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           aiSettings: settings.aiSettings ?? {
             enabled: false,
             providers: [],
-            activeProviderId: '',
-            modelAssignments: {},
+            profiles: [],
+            activeProfileId: '',
+            developerMode: false,
+            spoilerProtection: true,
+            maxContextChunks: 10,
+            indexingMode: 'on-demand',
           },
         });
       }
@@ -668,8 +666,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       containerRef.current?.focus();
     }
     setShowAnnotPopup(true);
-    setShowWiktionaryPopup(false);
-    setShowWikipediaPopup(false);
   };
 
   const handleCopy = (dismissPopup = true) => {
@@ -798,30 +794,15 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   };
 
   const handleDictionary = () => {
-    if (!selection || !selection.text) return;
-    setShowAnnotPopup(false);
-    setShowWiktionaryPopup(true);
+    handleDictionaryLookup();
   };
 
   const handleWikipedia = () => {
-    if (!selection || !selection.text) return;
-    setShowAnnotPopup(false);
-    setShowWikipediaPopup(true);
+    handleContextTranslation();
   };
 
   const handleTranslation = () => {
-    if (!selection || !selection.text) return;
-    if (!settings.globalReadSettings.contextTranslation?.enabled) {
-      eventDispatcher.dispatch('toast', {
-        type: 'info',
-        message: _('Enable Context-Aware Translation in Settings → AI Translate.'),
-        timeout: 3000,
-      });
-      handleDismissPopup();
-      return;
-    }
-    setShowAnnotPopup(false);
-    setShowContextTranslationPopup(true);
+    handleContextTranslation();
   };
 
   const handleContextTranslation = () => {
@@ -999,11 +980,11 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           onClick: handleSearch,
         };
       case 'dictionary':
-        return { tooltipText: _(label), Icon, onClick: handleDictionary };
+        return { tooltipText: _('AI Dictionary'), Icon, onClick: handleDictionary };
       case 'wikipedia':
-        return { tooltipText: _(label), Icon, onClick: handleWikipedia };
+        return { tooltipText: _('AI Translate'), Icon, onClick: handleWikipedia };
       case 'translate':
-        return { tooltipText: _(label), Icon, onClick: handleTranslation };
+        return { tooltipText: _('AI Translate'), Icon, onClick: handleTranslation };
       case 'tts':
         return {
           tooltipText: _(label),
@@ -1038,28 +1019,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   return (
     <div ref={containerRef} role='toolbar' tabIndex={-1}>
-      {showWiktionaryPopup && trianglePosition && dictPopupPosition && (
-        <WiktionaryPopup
-          word={selection?.text as string}
-          lang={bookData.bookDoc?.metadata.language as string}
-          position={dictPopupPosition}
-          trianglePosition={trianglePosition}
-          popupWidth={dictPopupWidth}
-          popupHeight={dictPopupHeight}
-          onDismiss={handleDismissPopupAndSelection}
-        />
-      )}
-      {showWikipediaPopup && trianglePosition && dictPopupPosition && (
-        <WikipediaPopup
-          text={selection?.text as string}
-          lang={bookData.bookDoc?.metadata.language as string}
-          position={dictPopupPosition}
-          trianglePosition={trianglePosition}
-          popupWidth={dictPopupWidth}
-          popupHeight={dictPopupHeight}
-          onDismiss={handleDismissPopupAndSelection}
-        />
-      )}
       {showAnnotPopup && trianglePosition && annotPopupPosition && (
         <AnnotationPopup
           bookKey={bookKey}

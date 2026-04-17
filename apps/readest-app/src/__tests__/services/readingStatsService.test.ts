@@ -50,7 +50,7 @@ describe('ReadingStatsService', () => {
 
       expect(result).toBe(true);
       expect(mockStorage.setItem).toHaveBeenCalled();
-      const saved = JSON.parse(mockStorage._getStore()['readest:reading-sessions:v1']!);
+      const saved = JSON.parse(mockStorage._getStore()['hermes:reading-sessions:v1']!);
       expect(saved).toHaveLength(1);
       expect(saved[0]!.bookHash).toBe('abc123');
       expect(saved[0]!.calendarDate).toBe('2024-01-15');
@@ -69,7 +69,7 @@ describe('ReadingStatsService', () => {
 
       service.recordSession(raw);
 
-      const saved = JSON.parse(mockStorage._getStore()['readest:reading-sessions:v1']!);
+      const saved = JSON.parse(mockStorage._getStore()['hermes:reading-sessions:v1']!);
       expect(saved[0]!.calendarDate).toBe('2024-01-20');
     });
 
@@ -131,7 +131,7 @@ describe('ReadingStatsService', () => {
 
       service.recordSession(raw);
 
-      const saved = JSON.parse(mockStorage._getStore()['readest:reading-sessions:v1']!);
+      const saved = JSON.parse(mockStorage._getStore()['hermes:reading-sessions:v1']!);
       expect(saved[0]!.pageDelta).toBe(0);
     });
 
@@ -164,7 +164,7 @@ describe('ReadingStatsService', () => {
       const updated = service.setGoals({ timeGoalMinutes: 45 });
 
       expect(updated).toEqual({ timeGoalMinutes: 45, pageGoal: 20 });
-      expect(JSON.parse(mockStorage._getStore()['readest:reading-goals:v1']!)).toEqual(updated);
+      expect(JSON.parse(mockStorage._getStore()['hermes:reading-goals:v1']!)).toEqual(updated);
       expect(new ReadingStatsService().getGoals()).toEqual(updated);
     });
 
@@ -174,7 +174,7 @@ describe('ReadingStatsService', () => {
       const updated = service.setGoals({ pageGoal: -5 });
 
       expect(updated).toEqual({ timeGoalMinutes: 30, pageGoal: 0 });
-      expect(JSON.parse(mockStorage._getStore()['readest:reading-goals:v1']!)).toEqual(updated);
+      expect(JSON.parse(mockStorage._getStore()['hermes:reading-goals:v1']!)).toEqual(updated);
     });
   });
 
@@ -245,7 +245,7 @@ describe('ReadingStatsService', () => {
           calendarDate: '2024-01-20',
         },
       ];
-      store['readest:reading-sessions:v1'] = JSON.stringify(sessions);
+      store['hermes:reading-sessions:v1'] = JSON.stringify(sessions);
 
       const service = new ReadingStatsService();
       const result = service.getAllSessions();
@@ -262,7 +262,7 @@ describe('ReadingStatsService', () => {
 
     test('filters out malformed entries from storage', () => {
       const store = mockStorage._getStore();
-      store['readest:reading-sessions:v1'] = JSON.stringify([
+      store['hermes:reading-sessions:v1'] = JSON.stringify([
         {
           bookHash: 'valid',
           startedAt: 1000,
@@ -292,7 +292,7 @@ describe('ReadingStatsService', () => {
   describe('getSessionsByBook', () => {
     test('returns only sessions for the specified book', () => {
       const store = mockStorage._getStore();
-      store['readest:reading-sessions:v1'] = JSON.stringify([
+      store['hermes:reading-sessions:v1'] = JSON.stringify([
         {
           bookHash: 'abc',
           startedAt: 1000,
@@ -328,7 +328,7 @@ describe('ReadingStatsService', () => {
 
     test('returns empty array for unknown book', () => {
       const store = mockStorage._getStore();
-      store['readest:reading-sessions:v1'] = JSON.stringify([
+      store['hermes:reading-sessions:v1'] = JSON.stringify([
         {
           bookHash: 'abc',
           startedAt: 1000,
@@ -349,7 +349,7 @@ describe('ReadingStatsService', () => {
   describe('getDailyStats', () => {
     test('aggregates sessions by calendarDate', () => {
       const store = mockStorage._getStore();
-      store['readest:reading-sessions:v1'] = JSON.stringify([
+      store['hermes:reading-sessions:v1'] = JSON.stringify([
         {
           bookHash: 'a',
           startedAt: 1000,
@@ -393,7 +393,7 @@ describe('ReadingStatsService', () => {
 
     test('does not produce bogus positive totals from negative page deltas', () => {
       const store = mockStorage._getStore();
-      store['readest:reading-sessions:v1'] = JSON.stringify([
+      store['hermes:reading-sessions:v1'] = JSON.stringify([
         {
           bookHash: 'a',
           startedAt: 1000,
@@ -428,7 +428,7 @@ describe('ReadingStatsService', () => {
 
     test('returns stats sorted newest date first', () => {
       const store = mockStorage._getStore();
-      store['readest:reading-sessions:v1'] = JSON.stringify([
+      store['hermes:reading-sessions:v1'] = JSON.stringify([
         {
           bookHash: 'a',
           startedAt: 1000,
@@ -458,7 +458,7 @@ describe('ReadingStatsService', () => {
   describe('clearAll', () => {
     test('removes all sessions from storage', () => {
       const store = mockStorage._getStore();
-      store['readest:reading-sessions:v1'] = JSON.stringify([
+      store['hermes:reading-sessions:v1'] = JSON.stringify([
         {
           bookHash: 'a',
           startedAt: 1000,
@@ -472,7 +472,7 @@ describe('ReadingStatsService', () => {
       const service = new ReadingStatsService();
       service.clearAll();
 
-      expect(mockStorage.removeItem).toHaveBeenCalledWith('readest:reading-sessions:v1');
+      expect(mockStorage.removeItem).toHaveBeenCalledWith('hermes:reading-sessions:v1');
     });
   });
 

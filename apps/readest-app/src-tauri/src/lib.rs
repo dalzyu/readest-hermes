@@ -329,16 +329,16 @@ pub fn run() {
             let is_appimage = false;
 
             #[cfg(desktop)]
-            let updater_disabled = std::env::var("READEST_DISABLE_UPDATER").is_ok();
+            let updater_disabled = std::env::var("HERMES_DISABLE_UPDATER").is_ok();
             #[cfg(not(desktop))]
             let updater_disabled = false;
 
             let init_script = format!(
                 r#"
-                    if ({is_eink}) window.__READEST_IS_EINK = true;
-                    if ({cli_access}) window.__READEST_CLI_ACCESS = true;
-                    if ({is_appimage}) window.__READEST_IS_APPIMAGE = true;
-                    if ({updater_disabled}) window.__READEST_UPDATER_DISABLED = true;
+                    if ({is_eink}) window.__HERMES_IS_EINK = true;
+                    if ({cli_access}) window.__HERMES_CLI_ACCESS = true;
+                    if ({is_appimage}) window.__HERMES_IS_APPIMAGE = true;
+                    if ({updater_disabled}) window.__HERMES_UPDATER_DISABLED = true;
                     window.addEventListener('DOMContentLoaded', function() {{
                         document.documentElement.classList.add('edge-to-edge');
                         const isTauriLocal = window.location.protocol === 'tauri:' ||

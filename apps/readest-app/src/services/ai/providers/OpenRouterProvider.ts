@@ -22,15 +22,16 @@ export class OpenRouterProvider implements AIProvider {
     }
     this.client = createOpenRouter({
       apiKey: config.apiKey,
+      baseURL: config.baseUrl || undefined,
     });
-    aiLogger.provider.init(config.id, config.model);
+    aiLogger.provider.init(config.id, config.models[0]?.id || '(unset)');
   }
 
-  getModel(_params?: InferenceParams): LanguageModel {
-    return this.client.chat(this.config.model);
+  getModel(modelId: string, _params?: InferenceParams): LanguageModel {
+    return this.client.chat(modelId);
   }
 
-  getEmbeddingModel(): EmbeddingModel {
+  getEmbeddingModel(_modelId: string): EmbeddingModel {
     throw new Error(
       'OpenRouter does not support embeddings. Configure a separate embedding provider.',
     );
@@ -40,18 +41,25 @@ export class OpenRouterProvider implements AIProvider {
     return !!this.config.apiKey;
   }
 
-  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
+  async healthCheck(options?: {
+    requireEmbedding?: boolean;
+    modelId?: string;
+    embeddingModelId?: string;
+  }): Promise<boolean> {
     if (options?.requireEmbedding) return false;
-    if (!this.config.apiKey) return false;
+    if (!this.config.apiKey || !options?.modelId) return false;
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: { Authorization: `Bearer ${this.config.apiKey}` },
-        signal: AbortSignal.timeout(AI_TIMEOUTS.HEALTH_CHECK),
-      });
+      const response = await fetch(
+        `${this.config.baseUrl || 'https://openrouter.ai/api/v1'}/models`,
+        {
+          headers: { Authorization: `Bearer ${this.config.apiKey}` },
+          signal: AbortSignal.timeout(AI_TIMEOUTS.HEALTH_CHECK),
+        },
+      );
       if (!response.ok) return false;
       const data = (await response.json()) as { data?: { id: string }[] };
       const models = data.data ?? [];
-      return models.some((m) => m.id === this.config.model);
+      return models.some((m) => m.id === options.modelId);
     } catch (e) {
       aiLogger.provider.error(this.id, (e as Error).message);
       return false;

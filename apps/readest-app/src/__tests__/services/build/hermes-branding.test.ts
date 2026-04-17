@@ -19,7 +19,7 @@ describe('Hermes branding copy', () => {
     const exportMarkdown = readRepoFile(
       'apps/readest-app/src/app/reader/components/annotator/ExportMarkdownDialog.tsx',
     );
-    const aiTranslatePanel = readRepoFile('apps/readest-app/src/components/settings/AITranslatePanel.tsx');
+    const _aiTranslatePanel = readRepoFile('apps/readest-app/src/components/settings/AITranslatePanel.tsx');
     const koSyncSettings = readRepoFile('apps/readest-app/src/app/reader/components/KOSyncSettings.tsx');
     const commandRegistry = readRepoFile('apps/readest-app/src/services/commandRegistry.ts');
     const nav = readRepoFile('apps/readest-app/src/utils/nav.ts');
@@ -41,7 +41,6 @@ describe('Hermes branding copy', () => {
     expect(updaterWindow).toContain("Hermes {{newVersion}} is available");
     expect(updaterWindow).toContain('"What\'s New in Hermes"');
     expect(exportMarkdown).toContain('Exported from Hermes');
-expect(aiTranslatePanel).toContain('DeepL requires your own API key.');
     expect(koSyncSettings).toContain('Hermes (');
     expect(commandRegistry).toContain("About Hermes");
     expect(commandRegistry).toContain("Help improve Hermes");
@@ -61,8 +60,9 @@ expect(aiTranslatePanel).toContain('DeepL requires your own API key.');
     expect(supportLinks).toContain('Get help from the original project community');
     expect(errorPage).toContain('Contact the original project support team');
     expect(subscriptionSuccess).toContain(
-      'Need help? Contact the original project support team at support@readest.com',
+      'Need help? Contact the original project support team',
     );
+    expect(subscriptionSuccess).toContain('via GitHub Issues');
     expect(opdsCatalog).toContain('proxied through the original project servers');
     expect(opdsCatalog).toContain('If I do not trust the original project with these credentials');
   });

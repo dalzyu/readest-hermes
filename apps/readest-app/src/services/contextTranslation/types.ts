@@ -162,9 +162,18 @@ export interface PopupContextBundle {
 }
 
 /** Settings for the source-language dictionary lookup feature */
+export type ContextDictionaryFieldSource = 'ai' | 'dictionary';
+
+export interface ContextDictionaryFieldSources {
+  simpleDefinition?: ContextDictionaryFieldSource;
+  contextualMeaning?: ContextDictionaryFieldSource;
+  sourceExamples?: ContextDictionaryFieldSource;
+}
+
 export interface ContextDictionarySettings {
   enabled: boolean;
   sourceExamples: boolean;
+  fieldSources?: ContextDictionaryFieldSources;
   /** Lookup backend: 'ai' uses the LLM (default); 'dictionary' uses bundled/user dictionaries. */
   source?: 'ai' | 'dictionary';
   /** Custom prompt instructions keyed by field id (e.g. 'simpleDefinition'). Overrides defaults. */
@@ -186,7 +195,7 @@ export interface ContextTranslationSettings {
   outputFields: TranslationOutputField[];
 
   /** Translation source to use when looking up selected text. Defaults to 'ai'. */
-  source?: 'ai' | 'dictionary' | 'azure' | 'deepl' | 'google' | 'yandex';
+  source?: 'ai' | 'dictionary';
   /**
    * Field strategy:
    * - 'single' (default) = one LLM call with all fields in a single prompt

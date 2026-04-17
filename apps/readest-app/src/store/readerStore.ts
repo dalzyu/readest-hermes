@@ -47,6 +47,12 @@ interface ViewState {
   sessionStartPage: number | null;
 }
 
+export interface ReaderIndexProgress {
+  current: number;
+  total: number;
+  phase: 'chunking' | 'embedding' | 'indexing';
+}
+
 interface ReaderStore {
   viewStates: { [key: string]: ViewState };
   bookKeys: string[];
@@ -88,6 +94,11 @@ interface ReaderStore {
   setViewInited: (key: string, inited: boolean) => void;
   recreateViewer: (envConfig: EnvConfigType, key: string) => void;
   recordSession: (key: string) => boolean;
+  indexingProgress: Record<string, ReaderIndexProgress>;
+  startIndexing: (key: string) => void;
+  updateIndexingProgress: (key: string, progress: ReaderIndexProgress) => void;
+  finishIndexing: (key: string) => void;
+  cancelIndexing: (key: string) => void;
 }
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
@@ -95,6 +106,30 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   bookKeys: [],
   hoveredBookKey: null,
   setBookKeys: (keys: string[]) => set({ bookKeys: keys }),
+  indexingProgress: {},
+  startIndexing: (key: string) =>
+    set((state) => ({
+      indexingProgress: {
+        ...state.indexingProgress,
+        [key]: { current: 0, total: 1, phase: 'chunking' },
+      },
+    })),
+  updateIndexingProgress: (key: string, progress: ReaderIndexProgress) =>
+    set((state) => ({
+      indexingProgress: { ...state.indexingProgress, [key]: progress },
+    })),
+  finishIndexing: (key: string) =>
+    set((state) => {
+      const indexingProgress = { ...state.indexingProgress };
+      delete indexingProgress[key];
+      return { indexingProgress };
+    }),
+  cancelIndexing: (key: string) =>
+    set((state) => {
+      const indexingProgress = { ...state.indexingProgress };
+      delete indexingProgress[key];
+      return { indexingProgress };
+    }),
   setHoveredBookKey: (key: string | null) => set({ hoveredBookKey: key }),
   getView: (key: string | null) => (key && get().viewStates[key]?.view) || null,
   setView: (key: string, view) =>

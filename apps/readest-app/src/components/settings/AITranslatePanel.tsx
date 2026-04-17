@@ -1,11 +1,11 @@
 import clsx from 'clsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PiSpinner, PiTrash } from 'react-icons/pi';
+import HelpTip from '@/components/primitives/HelpTip';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
-import { useAuth } from '@/context/AuthContext';
 import {
   previewDictionaryZip,
   importUserDictionary,
@@ -28,8 +28,13 @@ const DEFAULT_BY_ID: Record<string, string> = Object.fromEntries(
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields.map((f) => [f.id, f.promptInstruction]),
 );
 
-type TranslationSource = 'ai' | 'dictionary' | 'azure' | 'deepl' | 'google' | 'yandex';
+type TranslationSource = 'ai' | 'dictionary';
 
+function normalizeTranslationSource(
+  source: ContextTranslationSettings['source'],
+): TranslationSource {
+  return source === 'dictionary' ? 'dictionary' : 'ai';
+}
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message;
   if (typeof error === 'string' && error.trim()) return error;
@@ -39,7 +44,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 const AITranslatePanel: React.FC = () => {
   const _ = useTranslation();
   const { envConfig } = useEnv();
-  const { token } = useAuth();
   const { settings, setSettings, saveSettings } = useSettingsStore();
 
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
@@ -67,7 +71,9 @@ const AITranslatePanel: React.FC = () => {
     ctxTransSettings.priorVolumeChunkCount,
   );
   const [ctxOutputFields, setCtxOutputFields] = useState(ctxTransSettings.outputFields);
-  const [ctxSource, setCtxSource] = useState<TranslationSource>(ctxTransSettings.source ?? 'ai');
+  const [ctxSource, setCtxSource] = useState<TranslationSource>(
+    normalizeTranslationSource(ctxTransSettings.source),
+  );
   const [ctxFieldStrategy, setCtxFieldStrategy] = useState<'single' | 'multi'>(
     ctxTransSettings.fieldStrategy ?? 'single',
   );
@@ -129,6 +135,23 @@ const AITranslatePanel: React.FC = () => {
         globalReadSettings: {
           ...currentSettings.globalReadSettings,
           contextDictionary: { ...current, ...patch },
+        },
+      };
+      setSettings(newSettings);
+      saveSettings(envConfig, newSettings).catch(console.error);
+    },
+    [envConfig, setSettings, saveSettings],
+  );
+
+  const saveGlobalReadSetting = useCallback(
+    (patch: Partial<typeof settings.globalReadSettings>) => {
+      const currentSettings = settingsRef.current;
+      if (!currentSettings) return;
+      const newSettings = {
+        ...currentSettings,
+        globalReadSettings: {
+          ...currentSettings.globalReadSettings,
+          ...patch,
         },
       };
       setSettings(newSettings);
@@ -264,7 +287,6 @@ const AITranslatePanel: React.FC = () => {
   // Derived helpers
   const isAiSource = ctxSource === 'ai';
   const aiOnlyDisabled = !ctxEnabled || !isAiSource || !aiEnabled;
-  const deeplNeedsLogin = ctxSource === 'deepl' && !token;
 
   return (
     <div className='my-4 w-full space-y-6'>
@@ -289,7 +311,14 @@ const AITranslatePanel: React.FC = () => {
           <div className='divide-base-200 divide-y'>
             {/* Enable toggle */}
             <div className='config-item'>
-              <span>{_('Enable Context-Aware Translation')}</span>
+              <span className='flex items-center gap-1'>
+                {_('Enable Context-Aware Translation')}
+                <HelpTip
+                  tip={_(
+                    'When enabled, selecting text sends surrounding page context to the AI for a richer, context-aware result.',
+                  )}
+                />
+              </span>
               <input
                 type='checkbox'
                 className='toggle'
@@ -309,7 +338,10 @@ const AITranslatePanel: React.FC = () => {
                 !ctxEnabled && 'pointer-events-none select-none opacity-50',
               )}
             >
-              <span>{_('Target Language')}</span>
+              <span className='flex items-center gap-1'>
+                {_('Target Language')}
+                <HelpTip tip={_('The language the AI will translate into.')} />
+              </span>
               <select
                 className='select select-bordered select-sm bg-base-100 text-base-content w-full'
                 value={ctxTargetLang}
@@ -373,6 +405,32 @@ const AITranslatePanel: React.FC = () => {
               />
             </div>
 
+            <div
+              className={clsx(
+                'config-item',
+                aiOnlyDisabled && 'pointer-events-none select-none opacity-50',
+              )}
+            >
+              <label className='flex items-center gap-2' htmlFor='ctx-auto-index-on-open-toggle'>
+                <span className='flex items-center gap-1'>
+                  {_('Auto-index on open')}
+                  <HelpTip
+                    tip={_(
+                      'Automatically indexes each book the first time you open it, enabling same-book and cross-volume context retrieval.',
+                    )}
+                  />
+                </span>
+              </label>
+              <input
+                id='ctx-auto-index-on-open-toggle'
+                type='checkbox'
+                className='toggle'
+                checked={settings?.globalReadSettings?.autoIndexOnOpen ?? false}
+                disabled={aiOnlyDisabled}
+                onChange={(e) => saveGlobalReadSetting({ autoIndexOnOpen: e.target.checked })}
+              />
+            </div>
+
             {/* Memory settings — AI only */}
             <div
               className={clsx(
@@ -381,7 +439,14 @@ const AITranslatePanel: React.FC = () => {
               )}
             >
               <label className='flex items-center gap-2' htmlFor='ctx-same-book-memory-toggle'>
-                <span>{_('Use same-book memory')}</span>
+                <span className='flex items-center gap-1'>
+                  {_('Use same-book memory')}
+                  <HelpTip
+                    tip={_(
+                      'Finds relevant passages from the current book to give the AI additional context for each lookup.',
+                    )}
+                  />
+                </span>
               </label>
               <input
                 id='ctx-same-book-memory-toggle'
@@ -426,7 +491,14 @@ const AITranslatePanel: React.FC = () => {
               )}
             >
               <label className='flex items-center gap-2' htmlFor='ctx-prior-volume-memory-toggle'>
-                <span>{_('Use prior-volume memory')}</span>
+                <span className='flex items-center gap-1'>
+                  {_('Use prior-volume memory')}
+                  <HelpTip
+                    tip={_(
+                      'Allows the AI to reference passages from earlier volumes in a series for context.',
+                    )}
+                  />
+                </span>
               </label>
               <input
                 id='ctx-prior-volume-memory-toggle'
@@ -541,17 +613,8 @@ const AITranslatePanel: React.FC = () => {
                               {!aiEnabled ? ` (${_('Enable AI first')})` : ''}
                             </option>
                             <option value='dictionary'>{_('Dictionary')}</option>
-                            <option value='azure'>{_('Azure')}</option>
-                            <option value='deepl'>{_('DeepL')}</option>
-                            <option value='google'>{_('Google')}</option>
-                            <option value='yandex'>{_('Yandex')}</option>
                           </select>
                         </div>
-                        {deeplNeedsLogin && (
-                          <p className='text-warning mt-1 text-xs'>
-                            {_('DeepL requires your own API key.')}
-                          </p>
-                        )}
                       </div>
                     )}
 

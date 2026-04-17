@@ -33,6 +33,7 @@ import Notebook from './notebook/Notebook';
 import BooksGrid from './BooksGrid';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 
+import { cancelBookIndexing, indexBook, isBookIndexed } from '@/services/ai/ragService';
 const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ ids, settings }) => {
   const _ = useTranslation();
   const router = useRouter();
@@ -42,11 +43,21 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
   const { sideBarBookKey, setSideBarBookKey } = useSidebarStore();
   const { saveSettings } = useSettingsStore();
   const { getConfig, getBookData, saveConfig } = useBookDataStore();
-  const { getView, setBookKeys, getViewSettings, setViewSettings } = useReaderStore();
-  const { initViewState, getViewState, clearViewState, recordSession } = useReaderStore();
+  const { getView, setBookKeys, getViewSettings } = useReaderStore();
+  const {
+    initViewState,
+    getViewState,
+    clearViewState,
+    recordSession,
+    startIndexing,
+    updateIndexingProgress,
+    finishIndexing,
+    cancelIndexing,
+  } = useReaderStore();
   const { isSettingsDialogOpen, settingsDialogBookKey } = useSettingsStore();
   const [showDetailsBook, setShowDetailsBook] = useState<Book | null>(null);
   const isInitiating = useRef(false);
+  const autoIndexAttempted = useRef<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [errorLoading, setErrorLoading] = useState(false);
 
@@ -208,6 +219,68 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
     }
   };
 
+  useEffect(() => {
+    if (!settings.globalReadSettings.autoIndexOnOpen) return;
+    const primaryBookKey = bookKeys[0];
+    if (!primaryBookKey) return;
+    const currentBookData = getBookData(primaryBookKey);
+    const hash = currentBookData?.book?.hash;
+    if (!hash || !currentBookData?.bookDoc) return;
+    if (autoIndexAttempted.current.has(hash)) return;
+    autoIndexAttempted.current.add(hash);
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const indexed = await isBookIndexed(hash);
+        if (cancelled || indexed) {
+          finishIndexing(primaryBookKey);
+          return;
+        }
+        startIndexing(primaryBookKey);
+        await indexBook(
+          currentBookData.bookDoc as Parameters<typeof indexBook>[0],
+          hash,
+          settings.aiSettings,
+          (progress) => {
+            if (!cancelled) updateIndexingProgress(primaryBookKey, progress);
+          },
+        );
+        if (!cancelled) finishIndexing(primaryBookKey);
+      } catch {
+        if (!cancelled) cancelIndexing(primaryBookKey);
+      }
+    };
+
+    const idleHandle =
+      typeof window !== 'undefined' && 'requestIdleCallback' in window
+        ? window.requestIdleCallback(() => {
+            void run();
+          })
+        : window.setTimeout(() => {
+            void run();
+          }, 0);
+
+    return () => {
+      cancelled = true;
+      cancelBookIndexing(hash);
+      if (typeof idleHandle === 'number') {
+        clearTimeout(idleHandle);
+      } else if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleHandle);
+      }
+    };
+  }, [
+    bookKeys,
+    getBookData,
+    settings.aiSettings,
+    settings.globalReadSettings.autoIndexOnOpen,
+    startIndexing,
+    updateIndexingProgress,
+    finishIndexing,
+    cancelIndexing,
+  ]);
+
   if (!bookKeys || bookKeys.length === 0) return null;
   const bookData = getBookData(bookKeys[0]!);
   const viewSettings = getViewSettings(bookKeys[0]!);
@@ -223,12 +296,6 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
     );
   }
   const chromeSuppressed = !!viewSettings.focusMode;
-
-  const exitFocusMode = () => {
-    if (!bookKeys?.[0]) return;
-    setViewSettings(bookKeys[0], { ...viewSettings, focusMode: false });
-  };
-
   return (
     <div className='reader-content full-height flex'>
       {!chromeSuppressed && <SideBar />}

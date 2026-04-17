@@ -1,4 +1,4 @@
-﻿import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import {
   buildTranslationPrompt,
@@ -235,11 +235,16 @@ describe('buildLookupPrompt', () => {
     expect(systemPrompt).toMatch(/do not include pinyin|without pinyin|no pinyin/i);
   });
 
-  test('dictionary prompt requests source-language simplification fields', () => {
+  test('dictionary prompt requests source-language simplification fields when both are AI-sourced', () => {
     const { systemPrompt } = buildLookupPrompt({
       mode: 'dictionary',
       ...baseRequest,
       targetLanguage: 'fr',
+      dictionarySettings: {
+        enabled: true,
+        sourceExamples: true,
+        fieldSources: { simpleDefinition: 'ai', contextualMeaning: 'ai', sourceExamples: 'ai' },
+      },
     });
 
     expect(systemPrompt).toContain('source language');

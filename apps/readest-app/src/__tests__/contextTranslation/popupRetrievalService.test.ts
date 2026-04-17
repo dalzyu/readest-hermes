@@ -39,7 +39,10 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
 import type { AISettings, ScoredChunk } from '@/services/ai/types';
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
-import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
+import {
+  buildPopupContextBundle,
+  invalidatePageCache,
+} from '@/services/contextTranslation/popupRetrievalService';
 
 function makeChunk(bookHash: string, text: string, score = 0.9): ScoredChunk {
   return {
@@ -59,6 +62,7 @@ describe('buildPopupContextBundle', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    invalidatePageCache();
     mockGetPopupLocalContext.mockResolvedValue({
       localPastContext: 'Past context ending at the selected text.',
       localFutureBuffer: 'A few words ahead.',
@@ -145,5 +149,31 @@ describe('buildPopupContextBundle', () => {
       DEFAULT_CONTEXT_TRANSLATION_SETTINGS.sameBookChunkCount,
       { maxPage: 3 },
     );
+  });
+
+  test('filters the current sentence out of same-book retrieval chunks', async () => {
+    mockIsIndexed.mockResolvedValue(true);
+    mockGetPopupLocalContext.mockResolvedValue({
+      localPastContext: 'Earlier setup. He remained by his side',
+      localFutureBuffer: ' through the night. Another sentence.',
+      windowStartPage: 4,
+    });
+    mockBoundedHybridSearch.mockResolvedValue([
+      makeChunk('vol-3', 'He remained by his side through the night.'),
+      makeChunk('vol-3', 'Later, the guard stepped away.'),
+    ]);
+
+    const bundle = await buildPopupContextBundle({
+      bookKey: 'vol-3-hash',
+      bookHash: 'vol-3',
+      currentPage: 6,
+      selectedText: 'side',
+      settings: DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+      aiSettings,
+    });
+
+    expect(bundle.sameBookChunks).toHaveLength(1);
+    expect(bundle.sameBookChunks[0]).toContain('Later, the guard stepped away.');
+    expect(bundle.sameBookChunks[0]).not.toContain('He remained by his side through the night.');
   });
 });

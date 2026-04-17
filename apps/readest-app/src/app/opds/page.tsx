@@ -37,7 +37,7 @@ import {
   probeFilename,
 } from './utils/opdsReq';
 import { ImportError } from '@/services/errors';
-import { READEST_OPDS_USER_AGENT } from '@/services/constants';
+import { HERMES_OPDS_USER_AGENT } from '@/services/constants';
 import { FeedView } from './components/FeedView';
 import { PublicationView } from './components/PublicationView';
 import { SearchView } from './components/SearchView';
@@ -431,7 +431,7 @@ export default function BrowserPage() {
           const useProxy = needsProxy(url);
           let downloadUrl = useProxy ? getProxiedURL(url, '', true, customHeaders) : url;
           const headers: Record<string, string> = {
-            'User-Agent': READEST_OPDS_USER_AGENT,
+            'User-Agent': HERMES_OPDS_USER_AGENT,
             Accept: '*/*',
             ...(!useProxy ? customHeaders : {}),
           };

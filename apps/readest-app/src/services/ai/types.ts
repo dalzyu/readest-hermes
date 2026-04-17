@@ -1,5 +1,7 @@
 import type { LanguageModel, EmbeddingModel } from 'ai';
 
+import type { ContextTranslationHarnessSettings } from '@/services/contextTranslation/types';
+
 // ---------------------------------------------------------------------------
 // Provider type taxonomy
 // ---------------------------------------------------------------------------
@@ -8,7 +10,6 @@ import type { LanguageModel, EmbeddingModel } from 'ai';
 export type AIProviderType =
   | 'ollama'
   | 'openai'
-  | 'openai-compatible'
   | 'anthropic'
   | 'google'
   | 'openrouter'
@@ -24,7 +25,7 @@ export type AIProviderType =
 /** @deprecated Use AIProviderType. Kept for migration convenience. */
 export type AIProviderName = AIProviderType;
 
-export type AIProviderApiStyle = 'chat-completions' | 'responses';
+export type AIProviderApiStandard = 'chat-completions' | 'responses';
 
 // ---------------------------------------------------------------------------
 // Inference parameters
@@ -39,7 +40,27 @@ export interface InferenceParams {
   topK?: number;
   seed?: number;
   stopSequences?: string[];
+  reasoningEffort?: 'low' | 'medium' | 'high';
 }
+
+// ---------------------------------------------------------------------------
+// Task routing
+// ---------------------------------------------------------------------------
+
+export type AITaskType = 'translation' | 'dictionary' | 'chat' | 'embedding';
+
+export interface ModelEntry {
+  id: string;
+  label?: string;
+  kind: 'chat' | 'embedding';
+}
+
+export interface TaskModelSelection {
+  providerId?: string;
+  modelId?: string;
+}
+
+export type ModelAssignments = Partial<Record<AITaskType, TaskModelSelection>>;
 
 /** Per-task default overrides. */
 export const TASK_INFERENCE_DEFAULTS: Record<AITaskType, InferenceParams> = {
@@ -48,6 +69,14 @@ export const TASK_INFERENCE_DEFAULTS: Record<AITaskType, InferenceParams> = {
   chat: { temperature: 0.7, maxTokens: 2048 },
   embedding: {},
 };
+
+export interface AIProfile {
+  id: string;
+  name: string;
+  modelAssignments: ModelAssignments;
+  inferenceParamsByTask: Partial<Record<AITaskType, InferenceParams>>;
+  harness?: Partial<ContextTranslationHarnessSettings>;
+}
 
 // ---------------------------------------------------------------------------
 // Provider configuration (one entry per user-configured provider)
@@ -58,26 +87,9 @@ export interface ProviderConfig {
   name: string;
   providerType: AIProviderType;
   baseUrl: string;
-  model: string;
   apiKey?: string;
-  embeddingBaseUrl?: string;
-  embeddingModel?: string;
-  embeddingApiKey?: string;
-  apiStyle?: AIProviderApiStyle;
-  inferenceParams?: InferenceParams;
-}
-
-// ---------------------------------------------------------------------------
-// Task routing
-// ---------------------------------------------------------------------------
-
-export type AITaskType = 'translation' | 'dictionary' | 'chat' | 'embedding';
-
-export interface ModelAssignments {
-  translation?: string; // provider config id
-  dictionary?: string;
-  chat?: string;
-  embedding?: string;
+  models: ModelEntry[];
+  apiStandard?: AIProviderApiStandard;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,11 +102,15 @@ export interface AIProvider {
   providerType: AIProviderType;
   requiresAuth: boolean;
 
-  getModel(params?: InferenceParams): LanguageModel;
-  getEmbeddingModel(): EmbeddingModel;
+  getModel(modelId: string, params?: InferenceParams): LanguageModel;
+  getEmbeddingModel(modelId: string): EmbeddingModel;
 
   isAvailable(): Promise<boolean>;
-  healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean>;
+  healthCheck(options?: {
+    requireEmbedding?: boolean;
+    modelId?: string;
+    embeddingModelId?: string;
+  }): Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,8 +120,9 @@ export interface AIProvider {
 export interface AISettings {
   enabled: boolean;
   providers: ProviderConfig[];
-  activeProviderId: string;
-  modelAssignments: ModelAssignments;
+  profiles: AIProfile[];
+  activeProfileId: string;
+  developerMode: boolean;
 
   spoilerProtection: boolean;
   maxContextChunks: number;

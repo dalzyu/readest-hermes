@@ -1,18 +1,30 @@
 import { OllamaProvider } from './OllamaProvider';
 import { AIGatewayProvider } from './AIGatewayProvider';
-import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
+import { OpenAIProvider } from './OpenAIProvider';
 import { AnthropicProvider } from './AnthropicProvider';
 import { GoogleProvider } from './GoogleProvider';
 import { OpenRouterProvider } from './OpenRouterProvider';
 import { GenericSdkProvider } from './GenericSdkProvider';
-import type { AIProvider, AISettings, ProviderConfig, AITaskType, InferenceParams } from '../types';
-import { providerConfigCanServeEmbeddings, providerTypeSupportsEmbeddings } from '../constants';
+import type {
+  AIProvider,
+  AISettings,
+  ProviderConfig,
+  AITaskType,
+  InferenceParams,
+  ModelEntry,
+  TaskModelSelection,
+} from '../types';
+import {
+  providerConfigCanServeEmbeddings,
+  providerTypeSupportsEmbeddings,
+  findProfileOrDefault,
+} from '../constants';
 import { TASK_INFERENCE_DEFAULTS } from '../types';
 
 export {
   OllamaProvider,
   AIGatewayProvider,
-  OpenAICompatibleProvider,
+  OpenAIProvider,
   AnthropicProvider,
   GoogleProvider,
   OpenRouterProvider,
@@ -30,8 +42,7 @@ export function createProviderFromConfig(config: ProviderConfig): AIProvider {
     case 'ai-gateway':
       return new AIGatewayProvider(config);
     case 'openai':
-    case 'openai-compatible':
-      return new OpenAICompatibleProvider(config);
+      return new OpenAIProvider(config);
     case 'anthropic':
       return new AnthropicProvider(config);
     case 'google':
@@ -46,29 +57,58 @@ export function createProviderFromConfig(config: ProviderConfig): AIProvider {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Resolve which ProviderConfig applies for a given task
-// ---------------------------------------------------------------------------
+function getTaskModelKind(task: AITaskType): ModelEntry['kind'] {
+  return task === 'embedding' ? 'embedding' : 'chat';
+}
 
-function resolveProviderConfig(settings: AISettings, task?: AITaskType): ProviderConfig {
-  const { providers, activeProviderId, modelAssignments } = settings;
+function findProviderModel(
+  config: ProviderConfig,
+  task: AITaskType,
+  selectedModelId?: string,
+): string | undefined {
+  const kind = getTaskModelKind(task);
+  const models = config.models ?? [];
+  if (selectedModelId) {
+    const selected = models.find((model) => model.id === selectedModelId && model.kind === kind);
+    if (selected) return selected.id;
+  }
+  return models.find((model) => model.kind === kind)?.id;
+}
+
+function resolveTaskSelection(
+  settings: AISettings,
+  task: AITaskType,
+): {
+  config: ProviderConfig;
+  modelId: string;
+  selection?: TaskModelSelection;
+} {
+  const { providers } = settings;
   if (!providers.length) {
     throw new Error('No AI providers configured');
   }
 
-  // Check task-specific assignment first
-  const assignedId = task ? modelAssignments[task] : undefined;
-  if (assignedId) {
-    const assigned = providers.find((p) => p.id === assignedId);
-    if (assigned) return assigned;
+  const profile = findProfileOrDefault(settings);
+  const selection = profile.modelAssignments[task];
+
+  if (selection?.providerId) {
+    const assignedProvider = providers.find((provider) => provider.id === selection.providerId);
+    if (assignedProvider) {
+      const assignedModelId = findProviderModel(assignedProvider, task, selection.modelId);
+      if (assignedModelId) {
+        return { config: assignedProvider, modelId: assignedModelId, selection };
+      }
+    }
   }
 
-  // Fall back to the active provider
-  const active = providers.find((p) => p.id === activeProviderId);
-  if (active) return active;
+  for (const provider of providers) {
+    const modelId = findProviderModel(provider, task);
+    if (modelId) {
+      return { config: provider, modelId, selection };
+    }
+  }
 
-  // Last resort: first in list
-  return providers[0]!;
+  throw new Error(`No configured ${getTaskModelKind(task)} model found for task: ${task}`);
 }
 
 function assertProviderSupportsTask(config: ProviderConfig, task: AITaskType): void {
@@ -92,23 +132,28 @@ function assertProviderSupportsTask(config: ProviderConfig, task: AITaskType): v
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Get the provider for a specific task, with merged inference params. */
+/** Get the provider for a specific task, with model id and merged inference params. */
 export function getProviderForTask(
   settings: AISettings,
   task: AITaskType,
-): { provider: AIProvider; inferenceParams: InferenceParams; config: ProviderConfig } {
-  const config = resolveProviderConfig(settings, task);
+): {
+  provider: AIProvider;
+  modelId: string;
+  inferenceParams: InferenceParams;
+  config: ProviderConfig;
+} {
+  const { config, modelId } = resolveTaskSelection(settings, task);
   assertProviderSupportsTask(config, task);
   const provider = createProviderFromConfig(config);
+  const profile = findProfileOrDefault(settings);
   const inferenceParams: InferenceParams = {
     ...TASK_INFERENCE_DEFAULTS[task],
-    ...config.inferenceParams,
+    ...profile.inferenceParamsByTask[task],
   };
-  return { provider, inferenceParams, config };
+  return { provider, modelId, inferenceParams, config };
 }
 
-/** Backward-compatible: returns the active provider (translation task). */
+/** Backward-compatible helper: returns the provider selected for chat. */
 export function getAIProvider(settings: AISettings): AIProvider {
-  const config = resolveProviderConfig(settings);
-  return createProviderFromConfig(config);
+  return getProviderForTask(settings, 'chat').provider;
 }

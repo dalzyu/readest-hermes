@@ -1,5 +1,5 @@
 import React from 'react';
-import { PiInfo, PiLightbulb } from 'react-icons/pi';
+import { PiArrowLeft, PiArrowRight, PiInfo, PiLightbulb } from 'react-icons/pi';
 import { RiBookmarkFill, RiBookmarkLine, RiVolumeUpLine } from 'react-icons/ri';
 
 import Popup from '@/components/Popup';
@@ -23,6 +23,10 @@ export interface ContextLookupPopupProps {
   saveEnabled: boolean;
   saved: boolean;
   onSave: () => void;
+  canNavigateBack?: boolean;
+  canNavigateForward?: boolean;
+  onNavigateBack?: () => void;
+  onNavigateForward?: () => void;
   position: Position;
   trianglePosition: Position;
   popupWidth: number;
@@ -47,6 +51,10 @@ const ContextLookupPopup: React.FC<ContextLookupPopupProps> = ({
   saveEnabled,
   saved,
   onSave,
+  canNavigateBack,
+  canNavigateForward,
+  onNavigateBack,
+  onNavigateForward,
   position,
   trianglePosition,
   popupWidth,
@@ -73,6 +81,30 @@ const ContextLookupPopup: React.FC<ContextLookupPopupProps> = ({
         <div className='flex items-center justify-between border-b border-gray-500/30 px-4 py-3'>
           <div className='flex min-w-0 flex-col gap-2'>
             <span className='not-eink:text-yellow-300 flex min-w-0 select-text items-center gap-2 font-medium'>
+              {(canNavigateBack || canNavigateForward) && (
+                <span className='flex items-center gap-1'>
+                  <button
+                    type='button'
+                    onClick={onNavigateBack}
+                    title={_('Back')}
+                    aria-label={_('Back')}
+                    disabled={!canNavigateBack}
+                    className='flex-shrink-0 text-cyan-200/80 transition-colors hover:text-cyan-100 disabled:opacity-30'
+                  >
+                    <PiArrowLeft size={14} />
+                  </button>
+                  <button
+                    type='button'
+                    onClick={onNavigateForward}
+                    title={_('Forward')}
+                    aria-label={_('Forward')}
+                    disabled={!canNavigateForward}
+                    className='flex-shrink-0 text-cyan-200/80 transition-colors hover:text-cyan-100 disabled:opacity-30'
+                  >
+                    <PiArrowRight size={14} />
+                  </button>
+                </span>
+              )}
               <button
                 type='button'
                 onClick={onSpeakSelectedText}

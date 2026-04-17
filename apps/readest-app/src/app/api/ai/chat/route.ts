@@ -1,3 +1,4 @@
+import type { InferenceParams } from '@/services/ai/types';
 import { validateUserAndToken } from '@/utils/access';
 import { streamText, createGateway } from 'ai';
 import type { ModelMessage } from 'ai';
@@ -9,7 +10,13 @@ export async function POST(req: Request): Promise<Response> {
       return Response.json({ error: 'Not authenticated' }, { status: 403 });
     }
 
-    const { messages, system, apiKey, model } = await req.json();
+    const { messages, system, apiKey, model, inferenceParams } = (await req.json()) as {
+      messages: unknown;
+      system?: string;
+      apiKey?: string;
+      model?: string;
+      inferenceParams?: InferenceParams;
+    };
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: 'Messages required' }), {
@@ -33,6 +40,13 @@ export async function POST(req: Request): Promise<Response> {
       model: languageModel,
       system: system || 'You are a helpful assistant.',
       messages: messages as ModelMessage[],
+      ...(inferenceParams ?? {}),
+      providerOptions: inferenceParams?.reasoningEffort
+        ? {
+            openai: { reasoningEffort: inferenceParams.reasoningEffort },
+            openrouter: { reasoningEffort: inferenceParams.reasoningEffort },
+          }
+        : undefined,
     });
 
     return result.toTextStreamResponse();

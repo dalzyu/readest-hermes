@@ -18,8 +18,8 @@ interface PageCacheEntry {
 const pageCache = new Map<string, PageCacheEntry>();
 let pageCacheBookHash = '';
 
-function getPageCacheKey(bookHash: string, page: number): string {
-  return `${bookHash}:${page}`;
+function getPageCacheKey(bookHash: string, page: number, currentSentenceHash: string): string {
+  return `${bookHash}:${page}:${currentSentenceHash}`;
 }
 
 /** Invalidate page cache on book change or navigation. */
@@ -48,10 +48,65 @@ function buildRetrievalQuery(
   selectedText: string,
   localPastContext: string,
   localFutureBuffer: string,
+  currentSentence: string,
 ): string {
   const tailContext = localPastContext.slice(-240);
   const headFuture = localFutureBuffer.slice(0, 120);
-  return [selectedText, tailContext, headFuture].filter(Boolean).join('\n');
+  return [selectedText, currentSentence, tailContext, headFuture].filter(Boolean).join('\n');
+}
+
+function isSentenceBoundary(char: string): boolean {
+  return /[.!?。！？\n]/u.test(char);
+}
+
+function extractCurrentSentence(
+  localPastContext: string,
+  localFutureBuffer: string,
+  selectedText: string,
+): string {
+  const combined = `${localPastContext}${localFutureBuffer}`.trim();
+  if (!combined || !selectedText) return '';
+
+  const selectionStart = localPastContext.lastIndexOf(selectedText);
+  const fallbackStart = selectionStart === -1 ? combined.indexOf(selectedText) : selectionStart;
+  if (fallbackStart === -1) return '';
+
+  let sentenceStart = fallbackStart;
+  while (sentenceStart > 0 && !isSentenceBoundary(combined[sentenceStart - 1]!)) {
+    sentenceStart -= 1;
+  }
+
+  let sentenceEnd = fallbackStart + selectedText.length;
+  while (sentenceEnd < combined.length && !isSentenceBoundary(combined[sentenceEnd]!)) {
+    sentenceEnd += 1;
+  }
+  if (sentenceEnd < combined.length) {
+    sentenceEnd += 1;
+  }
+
+  return combined.slice(sentenceStart, sentenceEnd).trim();
+}
+
+function hashSentence(sentence: string): string {
+  const normalized = sentence.replace(/\s+/gu, ' ').trim().toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < normalized.length; i += 1) {
+    hash = (hash * 31 + normalized.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(16);
+}
+
+function splitChunkIntoSentences(text: string): string[] {
+  return (text.match(/[^.!?。！？\n]+[.!?。！？]?/gu) ?? [text])
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function chunkMatchesSentence(chunk: ScoredChunk, sentenceHash: string): boolean {
+  if (!sentenceHash) return false;
+  return splitChunkIntoSentences(chunk.text).some(
+    (sentence) => hashSentence(sentence) === sentenceHash,
+  );
 }
 
 export async function buildPopupContextBundle({
@@ -102,14 +157,21 @@ export async function buildPopupContextBundle({
     };
   }
 
+  const currentSentence = extractCurrentSentence(
+    localContext.localPastContext,
+    localContext.localFutureBuffer,
+    selectedText,
+  );
+  const currentSentenceHash = currentSentence ? hashSentence(currentSentence) : '';
   const query = buildRetrievalQuery(
     selectedText,
     localContext.localPastContext,
     localContext.localFutureBuffer,
+    currentSentence,
   );
 
   // Check page-level cache
-  const pageCacheKey = getPageCacheKey(bookHash, currentPage);
+  const pageCacheKey = getPageCacheKey(bookHash, currentPage, currentSentenceHash);
   if (bookHash !== pageCacheBookHash) {
     invalidatePageCache(bookHash);
   }
@@ -128,7 +190,11 @@ export async function buildPopupContextBundle({
       settings.sameBookRagEnabled && localContext.windowStartPage > 1
         ? boundedHybridSearch(bookHash, query, aiSettings, settings.sameBookChunkCount, {
             maxPage: localContext.windowStartPage - 1,
-          }).then((chunks) => chunks.map((chunk) => formatChunk(chunk)))
+          }).then((chunks) =>
+            chunks
+              .filter((chunk) => !chunkMatchesSentence(chunk, currentSentenceHash))
+              .map((chunk) => formatChunk(chunk)),
+          )
         : Promise.resolve([] as string[]);
 
     missingPriorVolumes = [];

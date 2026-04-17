@@ -97,6 +97,7 @@ describe('readerStore', () => {
       viewStates: {},
       bookKeys: [],
       hoveredBookKey: null,
+      indexingProgress: {},
     });
     useBookDataStore.setState({ booksData: {} });
     mockReadingStatsRecordSession.mockReset();
@@ -370,6 +371,27 @@ describe('readerStore', () => {
 
       expect(recorded).toBe(false);
       expect(mockReadingStatsRecordSession).not.toHaveBeenCalled();
+    });
+  });
+  describe('indexing progress', () => {
+    test('tracks and clears indexing progress per book key', () => {
+      const store = useReaderStore.getState();
+      store.startIndexing('book-1');
+      expect(useReaderStore.getState().indexingProgress['book-1']).toEqual({
+        current: 0,
+        total: 1,
+        phase: 'chunking',
+      });
+
+      store.updateIndexingProgress('book-1', { current: 2, total: 4, phase: 'embedding' });
+      expect(useReaderStore.getState().indexingProgress['book-1']).toEqual({
+        current: 2,
+        total: 4,
+        phase: 'embedding',
+      });
+
+      store.finishIndexing('book-1');
+      expect(useReaderStore.getState().indexingProgress['book-1']).toBeUndefined();
     });
   });
 });

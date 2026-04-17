@@ -30,7 +30,7 @@ import { stubTranslation as _ } from '@/utils/misc';
 import { DEFAULT_AI_SETTINGS } from './ai/constants';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from './contextTranslation/defaults';
 
-export const DATA_SUBDIR = 'Readest';
+export const DATA_SUBDIR = 'Hermes';
 export const LOCAL_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
 export const CLOUD_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
 export const LOCAL_FONTS_SUBDIR = `${DATA_SUBDIR}/Fonts`;
@@ -161,6 +161,7 @@ export const DEFAULT_READSETTINGS: ReadSettings = {
   defaultHighlightLabels: {},
   customTtsHighlightColors: [],
   contextTranslation: DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+  autoIndexOnOpen: false,
 };
 
 export const DEFAULT_MOBILE_READSETTINGS: Partial<ReadSettings> = {
@@ -711,19 +712,19 @@ export const CLOUD_ENABLED = false;
 
 export const DOWNLOAD_READEST_URL = 'https://github.com/dalzyu/readest-hermes/releases/latest';
 
-export const READEST_WEB_BASE_URL = 'https://web.readest.com';
-export const READEST_NODE_BASE_URL = 'https://node.readest.com';
+export const HERMES_WEB_BASE_URL = 'https://web.readest.com';
+export const HERMES_NODE_BASE_URL = 'https://node.readest.com';
 
 const LATEST_DOWNLOAD_BASE_URL =
   'https://github.com/dalzyu/readest-hermes/releases/latest/download';
 
-export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
+export const HERMES_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 
-export const READEST_CHANGELOG_FILE = `${LATEST_DOWNLOAD_BASE_URL}/release-notes.json`;
+export const HERMES_CHANGELOG_FILE = `${LATEST_DOWNLOAD_BASE_URL}/release-notes.json`;
 
-export const READEST_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';
+export const HERMES_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';
 
-export const READEST_OPDS_USER_AGENT = 'Hermes/0.1 (OPDS Browser)';
+export const HERMES_OPDS_USER_AGENT = 'Hermes/0.1 (OPDS Browser)';
 
 export const SYNC_PROGRESS_INTERVAL_SEC = 3;
 export const SYNC_NOTES_INTERVAL_SEC = 5;

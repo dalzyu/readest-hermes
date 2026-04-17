@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, test, vi, afterEach } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { LookupAnnotationSlots } from '@/services/contextTranslation/types';
 import { eventDispatcher } from '@/utils/event';
 import ContextDictionaryPopup from '@/app/reader/components/annotator/ContextDictionaryPopup';
@@ -96,6 +96,10 @@ function mockResult(overrides: Partial<ReturnType<typeof mockUseContextDictionar
 describe('ContextDictionaryPopup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   test('renders TTS button, Ask About This, and save buttons in header', () => {
@@ -218,5 +222,69 @@ describe('ContextDictionaryPopup', () => {
     render(<ContextDictionaryPopup {...defaultProps} />);
 
     expect(screen.getByText('a friend')).toBeTruthy();
+  });
+
+  test('follows dictionary links with back and forward history', () => {
+    mockUseContextDictionary.mockImplementation(({ selectedText }: { selectedText: string }) =>
+      selectedText === '伙伴'
+        ? mockResult({
+            result: {
+              simpleDefinition: 'a partner in hardship',
+              contextualMeaning: 'someone who stands beside you',
+            },
+            popupContext: {
+              localPastContext: 'later context',
+              localFutureBuffer: '',
+              sameBookChunks: [],
+              priorVolumeChunks: [],
+              retrievalStatus: 'local-only' as const,
+              retrievalHints: {
+                currentVolumeIndexed: false,
+                missingLocalIndex: true,
+                missingPriorVolumes: [],
+                missingSeriesAssignment: false,
+              },
+              dictionaryResults: [
+                {
+                  headword: '伙伴',
+                  definition: 'Trusted ally.',
+                  source: 'Wiktionary',
+                },
+              ],
+            },
+          })
+        : mockResult({
+            popupContext: {
+              localPastContext: 'past context',
+              localFutureBuffer: '',
+              sameBookChunks: [],
+              priorVolumeChunks: [],
+              retrievalStatus: 'local-only' as const,
+              retrievalHints: {
+                currentVolumeIndexed: false,
+                missingLocalIndex: true,
+                missingPriorVolumes: [],
+                missingSeriesAssignment: false,
+              },
+              dictionaryResults: [
+                {
+                  headword: '知己',
+                  definition: 'See <a rel="mw:WikiLink" title="伙伴">伙伴</a>.',
+                  source: 'Wiktionary',
+                },
+              ],
+            },
+          }),
+    );
+
+    render(<ContextDictionaryPopup {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('Dictionary'));
+    fireEvent.click(screen.getByText('伙伴'));
+    expect(screen.getByText('a partner in hardship')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByText('a trusted companion')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Forward' }));
+    expect(screen.getByText('a partner in hardship')).toBeTruthy();
   });
 });

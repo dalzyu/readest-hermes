@@ -432,7 +432,12 @@ const SuccessPageWithSearchParams = () => {
 
         {/* Additional Info */}
         <div className='mt-8 text-xs text-gray-500'>
-          <p>{_('Need help? Contact the original project support team at support@readest.com')}</p>
+          <p>
+            {_('Need help? Contact the original project support team')}{' '}
+            <a href='https://github.com/dalzyu/readest-hermes/issues' className='link link-primary'>
+              {_('via GitHub Issues')}
+            </a>
+          </p>
         </div>
       </div>
     </div>

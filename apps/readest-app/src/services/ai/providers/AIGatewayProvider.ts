@@ -24,7 +24,7 @@ export class AIGatewayProvider implements AIProvider {
       throw new Error('AI Gateway API key required');
     }
     this.gateway = createGateway({ apiKey: config.apiKey });
-    aiLogger.provider.init(config.id, config.model || GATEWAY_MODELS.GEMINI_FLASH_LITE);
+    aiLogger.provider.init(config.id, config.models[0]?.id || GATEWAY_MODELS.GEMINI_FLASH_LITE);
   }
 
   private async getRequestHeaders(): Promise<Record<string, string>> {
@@ -38,39 +38,38 @@ export class AIGatewayProvider implements AIProvider {
       }
     } catch (error) {
       aiLogger.provider.error(this.id, `getRequestHeaders: getAccessToken failed: ${error}`);
-      // Leave auth header unset; the request will fail if the user is not authenticated.
     }
 
     return headers;
   }
 
-  getModel(_params?: InferenceParams): LanguageModel {
-    const modelId = this.config.model || GATEWAY_MODELS.GEMINI_FLASH_LITE;
-    return this.gateway(modelId);
+  getModel(modelId: string, _params?: InferenceParams): LanguageModel {
+    return this.gateway(modelId || GATEWAY_MODELS.GEMINI_FLASH_LITE);
   }
 
-  getEmbeddingModel(): EmbeddingModel {
-    const embedModel = resolveEmbeddingModelId(this.config) || 'openai/text-embedding-3-small';
-
+  getEmbeddingModel(modelId: string): EmbeddingModel {
     if (typeof window !== 'undefined') {
       return createProxiedEmbeddingModel({
         apiKey: this.config.apiKey!,
-        model: embedModel,
+        model: modelId,
       });
     }
 
-    return this.gateway.embeddingModel(embedModel);
+    return this.gateway.embeddingModel(modelId);
   }
 
   async isAvailable(): Promise<boolean> {
     return !!this.config.apiKey;
   }
 
-  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
-    if (!this.config.apiKey) return false;
+  async healthCheck(options?: {
+    requireEmbedding?: boolean;
+    modelId?: string;
+    embeddingModelId?: string;
+  }): Promise<boolean> {
+    if (!this.config.apiKey || !options?.modelId) return false;
 
     try {
-      const modelId = this.config.model || GATEWAY_MODELS.GEMINI_FLASH_LITE;
       const headers = await this.getRequestHeaders();
 
       const response = await fetch('/api/ai/chat', {
@@ -79,7 +78,7 @@ export class AIGatewayProvider implements AIProvider {
         body: JSON.stringify({
           messages: [{ role: 'user', content: 'hi' }],
           apiKey: this.config.apiKey,
-          model: modelId,
+          model: options.modelId,
         }),
         signal: AbortSignal.timeout(AI_TIMEOUTS.HEALTH_CHECK),
       });
@@ -88,7 +87,7 @@ export class AIGatewayProvider implements AIProvider {
 
       if (!options?.requireEmbedding) return true;
 
-      const embeddingModel = resolveEmbeddingModelId(this.config);
+      const embeddingModel = options.embeddingModelId || resolveEmbeddingModelId(this.config);
       if (!embeddingModel) return false;
 
       const embeddingResponse = await fetch('/api/ai/embed', {

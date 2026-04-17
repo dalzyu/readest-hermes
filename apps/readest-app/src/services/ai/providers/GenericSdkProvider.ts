@@ -3,7 +3,7 @@ import { createMistral } from '@ai-sdk/mistral';
 import { createGroq } from '@ai-sdk/groq';
 import type { LanguageModel, EmbeddingModel } from 'ai';
 import type { AIProvider, ProviderConfig, AIProviderType, InferenceParams } from '../types';
-import { providerTypeSupportsEmbeddings, resolveEmbeddingModelId } from '../constants';
+import { providerTypeSupportsEmbeddings } from '../constants';
 import { aiLogger } from '../logger';
 import { AI_TIMEOUTS } from '../utils/retry';
 
@@ -43,34 +43,33 @@ export class GenericSdkProvider implements AIProvider {
       apiKey: config.apiKey,
       ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
     });
-    aiLogger.provider.init(config.id, config.model);
+    aiLogger.provider.init(config.id, config.models[0]?.id || '(unset)');
   }
 
-  getModel(_params?: InferenceParams): LanguageModel {
-    return this.client(this.config.model);
+  getModel(modelId: string, _params?: InferenceParams): LanguageModel {
+    return this.client(modelId);
   }
 
-  getEmbeddingModel(): EmbeddingModel {
+  getEmbeddingModel(modelId: string): EmbeddingModel {
     if (!providerTypeSupportsEmbeddings(this.providerType) || !this.client.textEmbeddingModel) {
       throw new Error(
         `${this.providerType} does not support embeddings. Configure a separate embedding provider.`,
       );
     }
-    const embeddingModel = resolveEmbeddingModelId(this.config);
-    if (!embeddingModel) {
-      throw new Error(`Configure an embedding model for ${this.providerType}.`);
-    }
-    return this.client.textEmbeddingModel(embeddingModel);
+    return this.client.textEmbeddingModel(modelId);
   }
 
   async isAvailable(): Promise<boolean> {
     return !!this.config.apiKey;
   }
 
-  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
-    if (!this.config.apiKey) return false;
+  async healthCheck(options?: {
+    requireEmbedding?: boolean;
+    modelId?: string;
+    embeddingModelId?: string;
+  }): Promise<boolean> {
+    if (!this.config.apiKey || !options?.modelId) return false;
     try {
-      // Most providers expose an OpenAI-compatible /v1/models endpoint
       const baseUrl = this.config.baseUrl || this.getDefaultBaseUrl();
       const response = await fetch(`${baseUrl}/v1/models`, {
         headers: { Authorization: `Bearer ${this.config.apiKey}` },
@@ -79,12 +78,11 @@ export class GenericSdkProvider implements AIProvider {
       if (!response.ok) return false;
       const data = (await response.json()) as { data?: Array<{ id: string }> };
       const models = (data.data ?? []).map((model) => model.id);
-      if (!models.includes(this.config.model)) return false;
+      if (!models.includes(options.modelId)) return false;
       if (!options?.requireEmbedding) return true;
-      if (!providerTypeSupportsEmbeddings(this.providerType)) return false;
-
-      const embeddingModel = resolveEmbeddingModelId(this.config);
-      return !!embeddingModel && models.includes(embeddingModel);
+      if (!providerTypeSupportsEmbeddings(this.providerType) || !options.embeddingModelId)
+        return false;
+      return models.includes(options.embeddingModelId);
     } catch (e) {
       aiLogger.provider.error(this.id, (e as Error).message);
       return false;

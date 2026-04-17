@@ -45,8 +45,8 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
 
     try {
       const aiSettings = settings?.aiSettings ?? DEFAULT_AI_SETTINGS;
-      const { provider, inferenceParams } = getProviderForTask(aiSettings, 'chat');
-      const model = provider.getModel(inferenceParams);
+      const { provider, modelId, inferenceParams } = getProviderForTask(aiSettings, 'chat');
+      const model = provider.getModel(modelId, inferenceParams);
 
       // Get local context around current reading position (up to 10 pages back)
       const currentPage = progress?.page ?? 0;

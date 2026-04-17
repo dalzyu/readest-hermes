@@ -24,14 +24,14 @@ export class AnthropicProvider implements AIProvider {
       apiKey: config.apiKey,
       ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
     });
-    aiLogger.provider.init(config.id, config.model);
+    aiLogger.provider.init(config.id, config.models[0]?.id || '(unset)');
   }
 
-  getModel(_params?: InferenceParams): LanguageModel {
-    return this.client(this.config.model);
+  getModel(modelId: string, _params?: InferenceParams): LanguageModel {
+    return this.client(modelId);
   }
 
-  getEmbeddingModel(): EmbeddingModel {
+  getEmbeddingModel(_modelId: string): EmbeddingModel {
     throw new Error(
       'Anthropic does not support embeddings. Configure a separate embedding provider.',
     );
@@ -41,9 +41,15 @@ export class AnthropicProvider implements AIProvider {
     return !!this.config.apiKey;
   }
 
-  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
+  async healthCheck(options?: {
+    requireEmbedding?: boolean;
+    modelId?: string;
+    embeddingModelId?: string;
+  }): Promise<boolean> {
     if (!this.config.apiKey) return false;
     if (options?.requireEmbedding) return false;
+    if (!options?.modelId) return false;
+
     try {
       const baseUrl = this.config.baseUrl || 'https://api.anthropic.com';
       const response = await fetch(`${baseUrl}/v1/messages`, {
@@ -54,7 +60,7 @@ export class AnthropicProvider implements AIProvider {
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: this.config.model,
+          model: options.modelId,
           max_tokens: 1,
           messages: [{ role: 'user', content: 'hi' }],
         }),

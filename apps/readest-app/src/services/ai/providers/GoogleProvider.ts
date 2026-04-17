@@ -1,7 +1,6 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { LanguageModel, EmbeddingModel } from 'ai';
 import type { AIProvider, ProviderConfig, InferenceParams } from '../types';
-import { resolveEmbeddingModelId } from '../constants';
 import { aiLogger } from '../logger';
 import { AI_TIMEOUTS } from '../utils/retry';
 
@@ -25,7 +24,7 @@ export class GoogleProvider implements AIProvider {
       apiKey: config.apiKey,
       ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
     });
-    aiLogger.provider.init(config.id, config.model);
+    aiLogger.provider.init(config.id, config.models[0]?.id || '(unset)');
   }
 
   private getBaseUrl(): string {
@@ -42,27 +41,30 @@ export class GoogleProvider implements AIProvider {
     return response.ok;
   }
 
-  getModel(_params?: InferenceParams): LanguageModel {
-    return this.client(this.config.model);
+  getModel(modelId: string, _params?: InferenceParams): LanguageModel {
+    return this.client(modelId);
   }
 
-  getEmbeddingModel(): EmbeddingModel {
-    const embedModel = resolveEmbeddingModelId(this.config) || 'gemini-embedding-001';
-    return this.client.textEmbeddingModel(embedModel);
+  getEmbeddingModel(modelId: string): EmbeddingModel {
+    return this.client.textEmbeddingModel(modelId);
   }
 
   async isAvailable(): Promise<boolean> {
     return !!this.config.apiKey;
   }
 
-  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
+  async healthCheck(options?: {
+    requireEmbedding?: boolean;
+    modelId?: string;
+    embeddingModelId?: string;
+  }): Promise<boolean> {
     if (!this.config.apiKey) return false;
+    if (!options?.modelId) return false;
     try {
-      if (!(await this.checkModel(this.config.model))) return false;
+      if (!(await this.checkModel(options.modelId))) return false;
       if (!options?.requireEmbedding) return true;
-
-      const embeddingModel = resolveEmbeddingModelId(this.config);
-      return !!embeddingModel && (await this.checkModel(embeddingModel));
+      if (!options.embeddingModelId) return false;
+      return await this.checkModel(options.embeddingModelId);
     } catch (e) {
       aiLogger.provider.error(this.id, (e as Error).message);
       return false;

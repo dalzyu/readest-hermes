@@ -29,6 +29,14 @@ vi.mock('@/app/reader/hooks/useOpenAIInNotebook', () => ({
   }),
 }));
 
+const popupSettings = vi.hoisted(() => ({
+  settings: { aiSettings: { enabled: true, developerMode: false } },
+}));
+
+vi.mock('@/store/settingsStore', () => ({
+  useSettingsStore: () => popupSettings,
+}));
+
 const mockUseContextTranslation = vi.fn();
 
 vi.mock('@/hooks/useContextTranslation', () => ({
@@ -88,6 +96,7 @@ describe('ContextTranslationPopup', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    popupSettings.settings.aiSettings.developerMode = false;
   });
 
   test('renders header pinyin, retrieval status, and ruby usage examples with highlighted selected text', () => {
@@ -123,7 +132,19 @@ describe('ContextTranslationPopup', () => {
           missingSeriesAssignment: false,
         },
       },
-      examples: [],
+      examples: [
+        {
+          exampleId: '1',
+          sourceText:
+            '程博挥手，招呼侍卫带自己离开，卡特犹豫了一下，还是跟上队伍，走在四王子身侧。',
+          targetText: 'Carter walked beside the prince.',
+        },
+        {
+          exampleId: '2',
+          sourceText: '他始终守在身侧，不敢退后。',
+          targetText: 'He remained by his side without stepping back.',
+        },
+      ],
       annotations: {},
       saveToVocabulary: vi.fn(),
     });
@@ -176,6 +197,34 @@ describe('ContextTranslationPopup', () => {
     });
   });
 
+  test('stops popup-owned TTS when the popup unmounts', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: { translation: 'by his side' },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: false,
+        missingLocalIndex: true,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      examples: [],
+      annotations: {},
+      saveToVocabulary: vi.fn(),
+    });
+
+    const { unmount } = render(<ContextTranslationPopup {...defaultProps} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Speak' })[0]!);
+    unmount();
+
+    expect(mockDispatch).toHaveBeenCalledWith('tts-stop', { bookKey: 'book-key-1' });
+  });
   test('uses a secondary highlight color for spacing-variant example matches and omits invalid examples', () => {
     mockUseContextTranslation.mockReturnValue({
       result: {
@@ -240,7 +289,13 @@ describe('ContextTranslationPopup', () => {
         missingSeriesAssignment: false,
       },
       popupContext: null,
-      examples: [],
+      examples: [
+        {
+          exampleId: '1',
+          sourceText: '知己难逢',
+          targetText: 'True friends are hard to find.',
+        },
+      ],
       annotations: {},
       saveToVocabulary: vi.fn(),
     });
@@ -435,6 +490,132 @@ describe('ContextTranslationPopup', () => {
     expect(popup.style.maxWidth).toBe('600px');
   });
 
+  test('renders a debug section when developer mode is enabled', () => {
+    popupSettings.settings.aiSettings.developerMode = true;
+    mockUseContextTranslation.mockReturnValue({
+      result: { translation: 'by his side' },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      examples: [],
+      annotations: {},
+      debugInfo: {
+        systemPrompt: 'system prompt',
+        userPrompt: 'user prompt',
+        rawStream: 'raw output',
+        parsedResult: { translation: 'by his side' },
+      },
+      saveToVocabulary: vi.fn(),
+    });
+
+    render(<ContextTranslationPopup {...defaultProps} />);
+
+    expect(screen.getByTestId('lookup-debug-section')).toBeTruthy();
+    expect(screen.getByText('system prompt')).toBeTruthy();
+    expect(screen.getByText('user prompt')).toBeTruthy();
+    expect(screen.getByText('raw output')).toBeTruthy();
+    expect(screen.getByText(/"translation": "by his side"/)).toBeTruthy();
+  });
+
+  test('follows dictionary links with back and forward history', () => {
+    mockUseContextTranslation.mockImplementation(({ selectedText }: { selectedText: string }) =>
+      selectedText === '伙伴'
+        ? {
+            result: { translation: 'ally' },
+            partialResult: null,
+            loading: false,
+            streaming: false,
+            activeFieldId: null,
+            error: null,
+            retrievalStatus: 'local-only',
+            retrievalHints: {
+              currentVolumeIndexed: true,
+              missingLocalIndex: false,
+              missingPriorVolumes: [],
+              missingSeriesAssignment: false,
+            },
+            popupContext: {
+              localPastContext: 'later context',
+              localFutureBuffer: '',
+              sameBookChunks: [],
+              priorVolumeChunks: [],
+              retrievalStatus: 'local-only',
+              retrievalHints: {
+                currentVolumeIndexed: true,
+                missingLocalIndex: false,
+                missingPriorVolumes: [],
+                missingSeriesAssignment: false,
+              },
+              dictionaryResults: [
+                { headword: '伙伴', definition: 'Trusted ally.', source: 'Wiktionary' },
+              ],
+            },
+            examples: [],
+            annotations: {},
+            debugInfo: null,
+            saveToVocabulary: vi.fn(),
+          }
+        : {
+            result: { translation: 'close friend' },
+            partialResult: null,
+            loading: false,
+            streaming: false,
+            activeFieldId: null,
+            error: null,
+            retrievalStatus: 'local-only',
+            retrievalHints: {
+              currentVolumeIndexed: true,
+              missingLocalIndex: false,
+              missingPriorVolumes: [],
+              missingSeriesAssignment: false,
+            },
+            popupContext: {
+              localPastContext: 'past',
+              localFutureBuffer: '',
+              sameBookChunks: [],
+              priorVolumeChunks: [],
+              retrievalStatus: 'local-only',
+              retrievalHints: {
+                currentVolumeIndexed: true,
+                missingLocalIndex: false,
+                missingPriorVolumes: [],
+                missingSeriesAssignment: false,
+              },
+              dictionaryResults: [
+                {
+                  headword: '知己',
+                  definition: 'See <a rel="mw:WikiLink" title="伙伴">伙伴</a>.',
+                  source: 'Wiktionary',
+                },
+              ],
+            },
+            examples: [],
+            annotations: {},
+            debugInfo: null,
+            saveToVocabulary: vi.fn(),
+          },
+    );
+
+    render(<ContextTranslationPopup {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('Dictionary'));
+    fireEvent.click(screen.getByText('伙伴'));
+    expect(screen.getByText('ally')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByText('close friend')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Forward' }));
+    expect(screen.getByText('ally')).toBeTruthy();
+  });
   test('renders english-to-chinese examples with grouped english highlights and chinese ruby translation', () => {
     mockUseContextTranslation.mockReturnValue({
       result: {
@@ -467,7 +648,13 @@ describe('ContextTranslationPopup', () => {
           missingSeriesAssignment: false,
         },
       },
-      examples: [],
+      examples: [
+        {
+          exampleId: '1',
+          sourceText: 'Mr. Dursley worked at Grunnings, a company that manufactured drills.',
+          targetText: '杜斯礼先生在一家生产钻机的格林尼斯公司工作。',
+        },
+      ],
       annotations: {},
       saveToVocabulary: vi.fn(),
     });

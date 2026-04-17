@@ -5,7 +5,7 @@ import { aiLogger } from '../logger';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const lunr = require('lunr') as typeof import('lunr');
 
-const DB_NAME = 'readest-ai';
+const DB_NAME = 'hermes-ai';
 const DB_VERSION = 6;
 const CHUNKS_STORE = 'chunks';
 const META_STORE = 'bookMeta';
@@ -222,6 +222,46 @@ class AIStore {
   async isIndexed(bookHash: string): Promise<boolean> {
     const meta = await this.getMeta(bookHash);
     return meta !== null && meta.totalChunks > 0;
+  }
+
+  async getIndexedStateMap(bookHashes: string[]): Promise<Record<string, boolean>> {
+    const uniqueBookHashes = [...new Set(bookHashes.filter(Boolean))];
+    if (uniqueBookHashes.length === 0) return {};
+
+    const result: Record<string, boolean> = {};
+    const pending: string[] = [];
+
+    for (const bookHash of uniqueBookHashes) {
+      const cachedMeta = this.metaCache.get(bookHash);
+      if (cachedMeta) {
+        result[bookHash] = cachedMeta.totalChunks > 0;
+      } else {
+        pending.push(bookHash);
+      }
+    }
+
+    if (pending.length === 0) return result;
+
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(META_STORE, 'readonly');
+      const store = tx.objectStore(META_STORE);
+      let remaining = pending.length;
+
+      for (const bookHash of pending) {
+        const req = store.get(bookHash);
+        req.onsuccess = () => {
+          const meta = req.result as BookIndexMeta | undefined;
+          if (meta) this.metaCache.set(bookHash, meta);
+          result[bookHash] = meta !== undefined && meta.totalChunks > 0;
+          remaining -= 1;
+          if (remaining === 0) resolve(result);
+        };
+        req.onerror = () => reject(req.error);
+      }
+
+      tx.onerror = () => reject(tx.error);
+    });
   }
 
   async saveChunks(chunks: TextChunk[]): Promise<void> {

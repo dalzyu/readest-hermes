@@ -424,6 +424,11 @@ describe('streamTranslationWithContext', () => {
       {
         ...baseRequest,
         mode: 'dictionary' as ContextLookupMode,
+        dictionarySettings: {
+          enabled: true,
+          sourceExamples: false,
+          fieldSources: { simpleDefinition: 'ai', contextualMeaning: 'ai', sourceExamples: 'ai' },
+        },
         inferenceParams: {
           topK: 12,
           presencePenalty: 0.25,

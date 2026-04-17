@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
-
+import {
+  DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+  getContextDictionaryOutputFields,
+} from '@/services/contextTranslation/defaults';
 import { getProviderForTask } from '@/services/ai/providers';
+import { setAIDebugEnabled } from '@/services/ai/logger';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { consumePrefetch } from '@/services/contextTranslation/prefetchService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
@@ -15,6 +19,11 @@ import {
   streamPerFieldTranslation,
 } from '@/services/contextTranslation/translationService';
 import { lookupDefinitions } from '@/services/contextTranslation/dictionaryService';
+import {
+  buildLookupPrompt,
+  buildPerFieldPrompt,
+  buildTranslationPrompt,
+} from '@/services/contextTranslation/promptBuilder';
 import type { ContextLookupMode } from '@/services/contextTranslation/modes';
 import type { TranslationRequest } from '@/services/contextTranslation/types';
 import type {
@@ -27,6 +36,7 @@ import type {
   RetrievalStatus,
   TranslationResult,
 } from '@/services/contextTranslation/types';
+import { parseRenderableExampleField } from '@/services/contextTranslation/exampleFormatter';
 import { saveVocabularyEntry } from '@/services/contextTranslation/vocabularyService';
 import { saveLookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
 import { detectLookupLanguage } from '@/services/contextTranslation/languagePolicy';
@@ -47,6 +57,13 @@ export interface UseContextLookupInput {
   bookLanguage?: string;
 }
 
+export interface LookupDebugInfo {
+  systemPrompt: string;
+  userPrompt: string;
+  rawStream: string;
+  parsedResult: TranslationResult | null;
+}
+
 export interface UseContextLookupResult {
   result: Record<string, string> | null;
   partialResult: Record<string, string> | null;
@@ -63,7 +80,29 @@ export interface UseContextLookupResult {
   popupContext: PopupContextBundle | null;
   examples: LookupExample[];
   annotations: LookupAnnotationSlots | null;
+  debugInfo: LookupDebugInfo | null;
   saveToVocabulary: () => Promise<void>;
+}
+
+function buildTranslationDebugPrompts(request: TranslationRequest, useMultiField: boolean) {
+  if (!useMultiField) {
+    return buildTranslationPrompt(request);
+  }
+
+  const enabledFields = request.outputFields
+    .filter((field) => field.enabled)
+    .sort((a, b) => a.order - b.order);
+  const prompts = enabledFields.map((field) => ({
+    fieldId: field.id,
+    ...buildPerFieldPrompt(field, request),
+  }));
+
+  return {
+    systemPrompt: prompts
+      .map((prompt) => `### ${prompt.fieldId}\n${prompt.systemPrompt}`)
+      .join('\n\n'),
+    userPrompt: prompts.map((prompt) => `### ${prompt.fieldId}\n${prompt.userPrompt}`).join('\n\n'),
+  };
 }
 
 const EMPTY_RETRIEVAL_HINTS: PopupRetrievalHints = {
@@ -84,6 +123,7 @@ export function useContextLookup({
   bookLanguage,
 }: UseContextLookupInput): UseContextLookupResult {
   const { settings: appSettings } = useSettingsStore();
+  const developerMode = appSettings?.aiSettings?.developerMode ?? false;
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [partialResult, setPartialResult] = useState<TranslationResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -96,6 +136,7 @@ export function useContextLookup({
   const [examples, setExamples] = useState<LookupExample[]>([]);
   const [annotations, setAnnotations] = useState<LookupAnnotationSlots | null>(null);
   const [validationDecision, setValidationDecision] = useState<ValidationDecision | null>(null);
+  const [debugInfo, setDebugInfo] = useState<LookupDebugInfo | null>(null);
   const contextRef = useRef<string>('');
   const lookupHistoryKeyRef = useRef<string | null>(null);
 
@@ -108,6 +149,10 @@ export function useContextLookup({
     }),
     [bookHash, selectedText, currentPage, settings, dictionarySettings, appSettings?.aiSettings],
   );
+
+  useEffect(() => {
+    setAIDebugEnabled(developerMode);
+  }, [developerMode]);
 
   useEffect(() => {
     if (!selectedText.trim()) return;
@@ -127,6 +172,7 @@ export function useContextLookup({
     setExamples([]);
     setAnnotations(null);
     setValidationDecision(null);
+    setDebugInfo(null);
 
     const run = async () => {
       try {
@@ -206,9 +252,10 @@ export function useContextLookup({
         const taskType =
           mode === 'translation' ? ('translation' as const) : ('dictionary' as const);
         let provider: ReturnType<typeof getProviderForTask>['provider'];
+        let modelId: string;
         let inferenceParams: ReturnType<typeof getProviderForTask>['inferenceParams'];
         try {
-          ({ provider, inferenceParams } = getProviderForTask(
+          ({ provider, modelId, inferenceParams } = getProviderForTask(
             requestSnapshot.aiSettings,
             taskType,
           ));
@@ -219,7 +266,16 @@ export function useContextLookup({
           setLoading(false);
           return;
         }
-        const model = provider.getModel(inferenceParams);
+        const model = provider.getModel(modelId, inferenceParams);
+        const hasDictionaryAiFields =
+          mode !== 'dictionary' ||
+          getContextDictionaryOutputFields(
+            requestSnapshot.dictionarySettings ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+          ).some((field) => field.enabled);
+        if (!hasDictionaryAiFields) {
+          setLoading(false);
+          return;
+        }
 
         if (mode === 'translation') {
           // Streaming path for translation mode — real-time UI updates + post-stream repair/enrichment
@@ -242,13 +298,40 @@ export function useContextLookup({
           const streamer = useMultiField
             ? streamPerFieldTranslation(translationRequest, model, abortController.signal)
             : streamTranslationWithContext(translationRequest, model, abortController.signal);
+          const debugPrompts = developerMode
+            ? buildTranslationDebugPrompts(translationRequest, useMultiField)
+            : null;
+          if (debugPrompts) {
+            setDebugInfo({
+              systemPrompt: debugPrompts.systemPrompt,
+              userPrompt: debugPrompts.userPrompt,
+              rawStream: '',
+              parsedResult: null,
+            });
+          }
 
           for await (const chunk of streamer) {
             if (cancelled) return;
             finalRawText = chunk.rawText;
             finalFields = chunk.fields;
             setPartialResult(chunk.fields);
+            setExamples(
+              parseRenderableExampleField(
+                chunk.fields,
+                lookupText,
+                requestSnapshot.settings.targetLanguage,
+                { allowIncomplete: true },
+              ),
+            );
             setActiveFieldId(chunk.activeFieldId);
+            if (debugPrompts) {
+              setDebugInfo({
+                systemPrompt: debugPrompts.systemPrompt,
+                userPrompt: debugPrompts.userPrompt,
+                rawStream: finalRawText,
+                parsedResult: chunk.fields,
+              });
+            }
           }
 
           if (cancelled) return;
@@ -303,6 +386,14 @@ export function useContextLookup({
           setExamples(lookupResult.examples ?? []);
           setAnnotations(lookupResult.annotations ?? {});
           setValidationDecision(lookupResult.validationDecision);
+          if (debugPrompts) {
+            setDebugInfo({
+              systemPrompt: debugPrompts.systemPrompt,
+              userPrompt: debugPrompts.userPrompt,
+              rawStream: finalizedRawText,
+              parsedResult: lookupResult.fields,
+            });
+          }
         } else {
           // Dictionary mode — streaming with real-time partial results + post-stream repair/enrichment
           setStreaming(true);
@@ -316,6 +407,21 @@ export function useContextLookup({
             dictionarySettings: requestSnapshot.dictionarySettings,
             inferenceParams,
           } as TranslationRequest & { dictionarySettings?: ContextDictionarySettings };
+          const debugPrompts = developerMode
+            ? buildLookupPrompt({
+                ...dictionaryRequest,
+                mode: 'dictionary' as ContextLookupMode,
+                popupContext: bundle,
+              })
+            : null;
+          if (debugPrompts) {
+            setDebugInfo({
+              systemPrompt: debugPrompts.systemPrompt,
+              userPrompt: debugPrompts.userPrompt,
+              rawStream: '',
+              parsedResult: null,
+            });
+          }
 
           let finalRawText = '';
           let finalFields: TranslationResult = {};
@@ -329,7 +435,23 @@ export function useContextLookup({
             finalRawText = chunk.rawText;
             finalFields = chunk.fields;
             setPartialResult(chunk.fields);
+            setExamples(
+              parseRenderableExampleField(
+                chunk.fields,
+                lookupText,
+                requestSnapshot.settings.targetLanguage,
+                { allowIncomplete: true },
+              ),
+            );
             setActiveFieldId(chunk.activeFieldId);
+            if (debugPrompts) {
+              setDebugInfo({
+                systemPrompt: debugPrompts.systemPrompt,
+                userPrompt: debugPrompts.userPrompt,
+                rawStream: finalRawText,
+                parsedResult: chunk.fields,
+              });
+            }
           }
 
           if (cancelled) return;
@@ -362,6 +484,14 @@ export function useContextLookup({
           setExamples(lookupResult.examples ?? []);
           setAnnotations(lookupResult.annotations ?? {});
           setValidationDecision(lookupResult.validationDecision);
+          if (debugPrompts) {
+            setDebugInfo({
+              systemPrompt: debugPrompts.systemPrompt,
+              userPrompt: debugPrompts.userPrompt,
+              rawStream: finalRawText,
+              parsedResult: lookupResult.fields,
+            });
+          }
         }
       } catch (err) {
         if (!cancelled && (err as Error).name !== 'AbortError') {
@@ -455,6 +585,7 @@ export function useContextLookup({
     popupContext,
     examples,
     annotations,
+    debugInfo,
     saveToVocabulary,
   };
 }

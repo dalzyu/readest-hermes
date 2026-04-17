@@ -1,6 +1,6 @@
 import type { TranslationResult } from '@/services/contextTranslation/types';
 
-const STORAGE_KEY = 'readest:lookup-history:v1';
+const STORAGE_KEY = 'hermes:lookup-history:v1';
 const MAX_HISTORY_ENTRIES = 50;
 
 export interface LookupHistoryEntry {

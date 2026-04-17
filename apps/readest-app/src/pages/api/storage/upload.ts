@@ -7,7 +7,7 @@ import {
   STORAGE_QUOTA_GRACE_BYTES,
 } from '@/utils/access';
 import { getDownloadSignedUrl, getUploadSignedUrl } from '@/utils/object';
-import { READEST_PUBLIC_STORAGE_BASE_URL } from '@/services/constants';
+import { HERMES_PUBLIC_STORAGE_BASE_URL } from '@/services/constants';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await runMiddleware(req, res, corsAllMethods);
@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const uploadUrl = await getUploadSignedUrl(fileKey, fileSize, 1800, bucketName);
       const downloadUrl = await getDownloadSignedUrl(fileKey, 3 * 86400, bucketName);
       const pathname = new URL(downloadUrl).pathname;
-      const publicBaseUrl = READEST_PUBLIC_STORAGE_BASE_URL;
+      const publicBaseUrl = HERMES_PUBLIC_STORAGE_BASE_URL;
       const publicDownloadUrl = `${publicBaseUrl}${pathname.replace(`/${bucketName}`, '')}`;
       return res.status(200).json({
         uploadUrl,

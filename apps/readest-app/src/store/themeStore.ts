@@ -10,7 +10,7 @@ import { Insets } from '@/types/misc';
 
 declare global {
   interface Window {
-    __READEST_IS_EINK?: boolean;
+    __HERMES_IS_EINK?: boolean;
   }
 }
 
@@ -52,7 +52,7 @@ const getInitialThemeMode = (): ThemeMode => {
 
 const getInitialThemeColor = (): string => {
   if (typeof window !== 'undefined' && localStorage) {
-    const defaultColor = window.__READEST_IS_EINK ? 'contrast' : 'default';
+    const defaultColor = window.__HERMES_IS_EINK ? 'contrast' : 'default';
     return localStorage.getItem('themeColor') || defaultColor;
   }
   return 'default';

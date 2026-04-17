@@ -1,8 +1,11 @@
 import React from 'react';
 import ContextLookupPopup from '@/components/ContextLookupPopup';
-import { eventDispatcher } from '@/utils/event';
 import { useContextDictionary } from '@/hooks/useContextDictionary';
 import { useOpenAIInNotebook } from '@/app/reader/hooks/useOpenAIInNotebook';
+import { usePopupOwnedTTS } from './usePopupOwnedTTS';
+import { usePopupTermHistory } from './usePopupTermHistory';
+import LookupDebugSection from './LookupDebugSection';
+import LookupDictionaryResults from './LookupDictionaryResults';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import {
@@ -20,10 +23,6 @@ import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
 } from '@/services/contextTranslation/types';
-import {
-  filterRenderableExamples,
-  parseStructuredExamples,
-} from '@/services/contextTranslation/exampleFormatter';
 import { getJapaneseGrammarHint } from '@/services/contextTranslation/grammarHints';
 import { getFrequencyBadge } from '@/services/contextTranslation/frequencyService';
 import { Position } from '@/utils/sel';
@@ -59,8 +58,11 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
 }) => {
   const _ = useTranslation();
   const { openAIInNotebook } = useOpenAIInNotebook();
+  const { currentTerm, canGoBack, canGoForward, goBack, goForward, pushTerm } =
+    usePopupTermHistory(selectedText);
   const { settings: appSettings } = useSettingsStore();
   const aiEnabled = appSettings?.aiSettings?.enabled ?? false;
+  const developerMode = appSettings?.aiSettings?.developerMode ?? false;
   const [saved, setSaved] = React.useState(false);
 
   const {
@@ -76,11 +78,12 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
     popupContext,
     examples,
     annotations,
+    debugInfo,
     saveToVocabulary,
   } = useContextDictionary({
     bookKey,
     bookHash,
-    selectedText,
+    selectedText: currentTerm,
     currentPage,
     translationSettings,
     dictionarySettings,
@@ -89,51 +92,42 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
 
   const displayedResult = result ?? partialResult ?? {};
   const hasDisplayedResult = Object.keys(displayedResult).length > 0;
-  // Only show examples when streaming is complete (result is finalized with plugin annotations)
-  const displayedExamples =
-    result !== null && examples.length > 0
-      ? examples
-      : displayedResult['sourceExamples'] && !streaming
-        ? filterRenderableExamples(
-            parseStructuredExamples(displayedResult['sourceExamples']),
-            selectedText,
-            translationSettings.targetLanguage,
-          )
-        : [];
+  const displayedExamples = examples;
+
+  React.useEffect(() => {
+    setSaved(false);
+  }, [currentTerm]);
 
   const sourceCJKLang = getCJKLanguage(
-    selectedText,
+    currentTerm,
     popupContext?.localPastContext ?? '',
     bookLanguage,
   );
   const selectedTextPinyin =
     annotations?.source?.phonetic ??
     (popupContext !== null && sourceCJKLang === 'chinese'
-      ? getPinyinLabel(selectedText)
+      ? getPinyinLabel(currentTerm)
       : popupContext !== null && sourceCJKLang === 'japanese'
-        ? getRomajiLabel(selectedText)
+        ? getRomajiLabel(currentTerm)
         : '');
   const retrievalStatusMeta = getRetrievalStatusMeta(retrievalStatus);
   const retrievalInfoText = buildRetrievalInfoText(retrievalStatus, retrievalHints);
 
-  // Deterministic grammar hint for Japanese (kuromoji POS analysis)
   const japaneseGrammarHint =
-    sourceCJKLang === 'japanese' ? getJapaneseGrammarHint(selectedText) : null;
-
-  // Frequency / proficiency level badge
+    sourceCJKLang === 'japanese' ? getJapaneseGrammarHint(currentTerm) : null;
   const detectedLang =
     sourceCJKLang === 'chinese'
       ? 'zh'
       : sourceCJKLang === 'japanese'
         ? 'ja'
         : (bookLanguage ?? 'en');
-  const frequencyBadge = getFrequencyBadge(selectedText, detectedLang);
+  const frequencyBadge = getFrequencyBadge(currentTerm, detectedLang);
+
+  const { speakOwnedText, stopOwnedSpeech } = usePopupOwnedTTS(bookKey);
 
   const handleSpeak = () => {
-    eventDispatcher.dispatch('tts-speak', {
-      bookKey,
-      text: selectedText,
-      oneTime: true,
+    speakOwnedText({
+      text: currentTerm,
       ...(bookLanguage ? { lang: bookLanguage } : {}),
     });
   };
@@ -148,8 +142,8 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
 
     await openAIInNotebook({
       bookHash,
-      newConversationTitle: `Ask about ${selectedText}`,
-      firstMessageContent: buildAskAboutThisMessage(selectedText, result, popupContext),
+      newConversationTitle: `Ask about ${currentTerm}`,
+      firstMessageContent: buildAskAboutThisMessage(currentTerm, result, popupContext),
     });
   };
 
@@ -157,9 +151,14 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
   const contextualMeaning = displayedResult['contextualMeaning'] ?? null;
   const sourceExamples = displayedResult['sourceExamples'] ?? null;
 
+  const handleDismiss = () => {
+    stopOwnedSpeech();
+    onDismiss?.();
+  };
+
   return (
     <ContextLookupPopup
-      selectedText={selectedText}
+      selectedText={currentTerm}
       selectedTextPinyin={selectedTextPinyin}
       retrievalStatusMeta={retrievalStatusMeta}
       retrievalInfoText={retrievalInfoText}
@@ -172,11 +171,15 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
       saveEnabled={Boolean(result && !streaming && !saved)}
       saved={saved}
       onSave={handleSave}
+      canNavigateBack={canGoBack}
+      canNavigateForward={canGoForward}
+      onNavigateBack={goBack}
+      onNavigateForward={goForward}
       position={position}
       trianglePosition={trianglePosition}
       popupWidth={popupWidth}
       popupHeight={popupHeight}
-      onDismiss={onDismiss}
+      onDismiss={handleDismiss}
     >
       {loading && !hasDisplayedResult && (
         <p className='text-sm italic text-gray-400'>{_('Looking up...')}</p>
@@ -203,22 +206,11 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
         <p className='mb-1 text-xs text-gray-400/90'>{japaneseGrammarHint.explanation}</p>
       )}
       {popupContext?.dictionaryResults && popupContext.dictionaryResults.length > 0 && (
-        <details className='mb-2'>
-          <summary className='cursor-pointer text-xs font-medium uppercase tracking-wide text-gray-400'>
-            {_('Dictionary')}
-          </summary>
-          <div className='mt-1 space-y-1 pl-2'>
-            {popupContext.dictionaryResults.map((entry, i) => (
-              <div key={i} className='text-sm'>
-                <span className='not-eink:text-white/95 font-medium'>{entry.headword}</span>
-                <span className='not-eink:text-white/70 ml-1'>{entry.definition}</span>
-                {entry.source && (
-                  <span className='ml-1 text-xs text-gray-500'>({entry.source})</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </details>
+        <LookupDictionaryResults
+          dictionaryResults={popupContext.dictionaryResults}
+          selectedText={currentTerm}
+          onNavigateTerm={pushTerm}
+        />
       )}
       {!error && (hasDisplayedResult || !loading) && (
         <>
@@ -264,13 +256,13 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
                           {sourceCJKLang === 'chinese' ? (
                             <RubyText
                               text={example.sourceText}
-                              highlightText={selectedText}
+                              highlightText={currentTerm}
                               className='not-eink:text-white/95'
                             />
                           ) : (
                             <HighlightedText
                               text={example.sourceText}
-                              highlightText={selectedText}
+                              highlightText={currentTerm}
                               className='not-eink:text-white/95'
                             />
                           )}
@@ -299,6 +291,7 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
           ) : null}
         </>
       )}
+      {developerMode && debugInfo && <LookupDebugSection debugInfo={debugInfo} />}
     </ContextLookupPopup>
   );
 };

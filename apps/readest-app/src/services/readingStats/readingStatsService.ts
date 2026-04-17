@@ -1,5 +1,5 @@
-const STORAGE_KEY = 'readest:reading-sessions:v1';
-const GOALS_KEY = 'readest:reading-goals:v1';
+const STORAGE_KEY = 'hermes:reading-sessions:v1';
+const GOALS_KEY = 'hermes:reading-goals:v1';
 
 /** Formats a Date as YYYY-MM-DD in the user's local timezone. */
 function formatLocalDate(date: Date): string {

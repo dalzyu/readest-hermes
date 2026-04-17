@@ -14,11 +14,7 @@ import type { ValidationDecision } from './validator';
 import { captureEvent } from '@/utils/telemetry';
 import { detectLookupLanguage } from './languagePolicy';
 import { resolveLookupPlugins } from './plugins/registry';
-import {
-  filterRenderableExamples,
-  formatTranslationResult,
-  parseStructuredExamples,
-} from './exampleFormatter';
+import { formatTranslationResult, parseRenderableExampleField } from './exampleFormatter';
 
 import { buildLookupPrompt } from './promptBuilder';
 import { buildRepairPrompt } from './repairPromptBuilder';
@@ -222,6 +218,9 @@ export async function runContextLookup(
         request.inferenceParams,
       ));
     const normalized = overrideFields ?? normalizeLookupResponse(raw, request.mode);
+    const enabledFieldIds = new Set(
+      effectiveOutputFields.filter((field) => field.enabled).map((field) => field.id),
+    );
     const fields =
       request.mode === 'translation'
         ? formatTranslationResult(normalized, {
@@ -231,7 +230,9 @@ export async function runContextLookup(
             outputFields: effectiveOutputFields,
             pageContext: request.popupContext.localPastContext,
           })
-        : normalized;
+        : Object.fromEntries(
+            Object.entries(normalized).filter(([fieldId]) => enabledFieldIds.has(fieldId)),
+          );
     const validation = validateLookupResult(
       fields,
       primaryField,
@@ -285,13 +286,11 @@ export async function runContextLookup(
     }),
   );
 
-  const parsedExamples = attempt.fields['examples']
-    ? filterRenderableExamples(
-        parseStructuredExamples(attempt.fields['examples']),
-        request.selectedText,
-        request.targetLanguage,
-      )
-    : [];
+  const parsedExamples = parseRenderableExampleField(
+    attempt.fields,
+    request.selectedText,
+    request.targetLanguage,
+  );
   const sourceAnnotations = plugins.source.enrichSourceAnnotations?.(
     attempt.fields,
     request.selectedText,

@@ -138,7 +138,7 @@ describe('TransferManager', () => {
         transfers: { 'persisted-1': item },
         isQueuePaused: true,
       };
-      localStorage.setItem('readest_transfer_queue', JSON.stringify(data));
+      localStorage.setItem('hermes_transfer_queue', JSON.stringify(data));
 
       const appService = makeAppService();
       await transferManager.initialize(appService as never, () => [], vi.fn(), translationFn);
@@ -370,7 +370,7 @@ describe('TransferManager', () => {
       const id = transferManager.queueUpload(makeBook())!;
       transferManager.cancelTransfer(id);
 
-      const stored = localStorage.getItem('readest_transfer_queue');
+      const stored = localStorage.getItem('hermes_transfer_queue');
       expect(stored).toBeTruthy();
       const data = JSON.parse(stored!);
       expect(data.transfers[id].status).toBe('cancelled');
@@ -448,7 +448,7 @@ describe('TransferManager', () => {
       await transferManager.initialize(appService as never, () => [], vi.fn(), translationFn);
 
       transferManager.pauseQueue();
-      const stored = JSON.parse(localStorage.getItem('readest_transfer_queue')!);
+      const stored = JSON.parse(localStorage.getItem('hermes_transfer_queue')!);
       expect(stored.isQueuePaused).toBe(true);
     });
   });
@@ -641,7 +641,7 @@ describe('TransferManager', () => {
 
       transferManager.queueUpload(makeBook());
 
-      const stored = localStorage.getItem('readest_transfer_queue');
+      const stored = localStorage.getItem('hermes_transfer_queue');
       expect(stored).toBeTruthy();
       const data = JSON.parse(stored!);
       expect(Object.keys(data.transfers).length).toBeGreaterThan(0);
@@ -662,7 +662,7 @@ describe('TransferManager', () => {
     });
 
     test('handles corrupted localStorage data gracefully', async () => {
-      localStorage.setItem('readest_transfer_queue', 'invalid-json{{{');
+      localStorage.setItem('hermes_transfer_queue', 'invalid-json{{{');
 
       const appService = makeAppService();
       // Should not throw

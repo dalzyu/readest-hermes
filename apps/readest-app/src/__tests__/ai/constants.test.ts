@@ -55,14 +55,20 @@ describe('DEFAULT_AI_SETTINGS', () => {
   });
 
   test('should not seed providers by default', () => {
-    expect(DEFAULT_AI_SETTINGS.activeProviderId).toBe('');
     expect(DEFAULT_AI_SETTINGS.providers).toHaveLength(0);
+  });
+
+  test('should have a default profile with empty model assignments', () => {
+    expect(DEFAULT_AI_SETTINGS.profiles).toHaveLength(1);
+    expect(DEFAULT_AI_SETTINGS.activeProfileId).toBe('default');
   });
 
   test('should have valid ollama defaults in the default provider config', () => {
     expect(DEFAULT_OLLAMA_CONFIG.baseUrl).toBe('http://127.0.0.1:11434');
-    expect(DEFAULT_OLLAMA_CONFIG.model).toBe('llama3.2');
-    expect(DEFAULT_OLLAMA_CONFIG.embeddingModel).toBe('nomic-embed-text');
+    const chatModel = DEFAULT_OLLAMA_CONFIG.models.find((m) => m.kind === 'chat');
+    const embedModel = DEFAULT_OLLAMA_CONFIG.models.find((m) => m.kind === 'embedding');
+    expect(chatModel?.id).toBe('llama3.2');
+    expect(embedModel?.id).toBe('nomic-embed-text');
   });
 
   test('should have spoiler protection enabled by default', () => {
@@ -87,7 +93,6 @@ describe('AISettings Type', () => {
       ...DEFAULT_AI_SETTINGS,
       enabled: true,
       providers: [DEFAULT_OLLAMA_CONFIG],
-      activeProviderId: DEFAULT_OLLAMA_CONFIG.id,
       spoilerProtection: false,
       maxContextChunks: 10,
       indexingMode: 'background',
@@ -108,41 +113,39 @@ describe('AISettings Type', () => {
           name: 'AI Gateway',
           providerType: 'ai-gateway',
           baseUrl: '',
-          model: 'openai/gpt-5.2',
+          models: [{ id: 'openai/gpt-5.2', kind: 'chat' }],
           apiKey: 'test-key',
-          embeddingModel: 'openai/text-embedding-3-small',
         },
       ],
-      activeProviderId: 'gw-1',
     };
 
     expect(settings.providers[0]!.providerType).toBe('ai-gateway');
     expect(settings.providers[0]!.apiKey).toBe('test-key');
   });
 
-  test('should support openai-compatible provider with api style and separate embedding config', () => {
+  test('should support openai provider config with chat-completions apiStandard', () => {
     const settings: AISettings = {
       ...DEFAULT_AI_SETTINGS,
       enabled: true,
       providers: [
         {
           id: 'oc-1',
-          name: 'OpenAI-Compatible',
-          providerType: 'openai-compatible',
+          name: 'OpenAI',
+          providerType: 'openai',
           baseUrl: 'http://127.0.0.1:8080',
-          model: 'gemma-3-4b',
+          models: [
+            { id: 'gemma-3-4b', kind: 'chat' },
+            { id: 'embedding-model', kind: 'embedding' },
+          ],
           apiKey: 'text-key',
-          apiStyle: 'chat-completions',
-          embeddingBaseUrl: 'http://127.0.0.1:8081',
-          embeddingModel: 'embeddinggemma',
-          embeddingApiKey: 'embed-key',
+          apiStandard: 'chat-completions',
         },
       ],
-      activeProviderId: 'oc-1',
     };
 
-    expect(settings.providers[0]!.providerType).toBe('openai-compatible');
-    expect(settings.providers[0]!.apiStyle).toBe('chat-completions');
-    expect(settings.providers[0]!.embeddingApiKey).toBe('embed-key');
+    expect(settings.providers[0]!.providerType).toBe('openai');
+    expect(settings.providers[0]!.apiStandard).toBe('chat-completions');
+    const embedModel = settings.providers[0]!.models.find((m) => m.kind === 'embedding');
+    expect(embedModel?.id).toBe('embedding-model');
   });
 });

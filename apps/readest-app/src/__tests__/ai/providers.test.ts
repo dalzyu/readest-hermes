@@ -36,7 +36,7 @@ vi.mock('@ai-sdk/openai', () => ({
 
 import { OllamaProvider } from '@/services/ai/providers/OllamaProvider';
 import { AIGatewayProvider } from '@/services/ai/providers/AIGatewayProvider';
-import { OpenAICompatibleProvider } from '@/services/ai/providers/OpenAICompatibleProvider';
+import { OpenAIProvider } from '@/services/ai/providers/OpenAIProvider';
 import { getAIProvider, getProviderForTask } from '@/services/ai/providers';
 import type { AISettings, ProviderConfig } from '@/services/ai/types';
 import { DEFAULT_AI_SETTINGS, DEFAULT_OLLAMA_CONFIG } from '@/services/ai/constants';
@@ -71,7 +71,13 @@ describe('OllamaProvider', () => {
     });
     const provider = new OllamaProvider(DEFAULT_OLLAMA_CONFIG);
 
-    await expect(provider.healthCheck({ requireEmbedding: true })).resolves.toBe(true);
+    await expect(
+      provider.healthCheck({
+        requireEmbedding: true,
+        modelId: 'llama3.2',
+        embeddingModelId: 'nomic-embed-text',
+      }),
+    ).resolves.toBe(true);
   });
 
   test('healthCheck rejects substring model matches', async () => {
@@ -102,61 +108,53 @@ describe('AIGatewayProvider', () => {
   });
 });
 
-describe('OpenAICompatibleProvider', () => {
+describe('OpenAIProvider', () => {
   const baseConfig: ProviderConfig = {
     id: 'oc-test',
     name: 'OpenAI-Compatible',
-    providerType: 'openai-compatible',
+    providerType: 'openai',
     baseUrl: 'http://127.0.0.1:8080',
-    model: 'gemma-3-4b',
+    models: [
+      { id: 'gemma-3-4b', kind: 'chat' },
+      { id: 'embeddinggemma', kind: 'embedding' },
+    ],
     apiKey: 'text-key',
-    apiStyle: 'chat-completions',
-    embeddingBaseUrl: 'http://127.0.0.1:8081',
-    embeddingModel: 'embeddinggemma',
-    embeddingApiKey: 'embed-key',
+    apiStandard: 'chat-completions',
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  test('uses chat completions when api style is chat-completions', () => {
-    const provider = new OpenAICompatibleProvider(baseConfig);
+  test('uses chat completions when apiStandard is chat-completions', () => {
+    const provider = new OpenAIProvider(baseConfig);
 
     expect(provider.id).toBe('oc-test');
-    expect(provider.getModel()).toBe('chat-model');
+    expect(provider.getModel('gemma-3-4b')).toBe('chat-model');
     expect(mockChatModel).toHaveBeenCalledWith('gemma-3-4b');
     expect(mockResponsesModel).not.toHaveBeenCalled();
   });
 
-  test('uses responses when api style is responses', () => {
-    const provider = new OpenAICompatibleProvider({
+  test('uses responses when apiStandard is responses', () => {
+    const provider = new OpenAIProvider({
       ...baseConfig,
-      apiStyle: 'responses',
+      apiStandard: 'responses',
     });
 
-    expect(provider.getModel()).toBe('responses-model');
+    expect(provider.getModel('gemma-3-4b')).toBe('responses-model');
     expect(mockResponsesModel).toHaveBeenCalledWith('gemma-3-4b');
     expect(mockChatModel).not.toHaveBeenCalled();
   });
 
-  test('uses separate embedding client settings', () => {
-    const provider = new OpenAICompatibleProvider(baseConfig);
+  test('uses embedding model from models array', () => {
+    const provider = new OpenAIProvider(baseConfig);
 
-    expect(provider.getEmbeddingModel()).toBe('embedding-model');
+    expect(provider.getEmbeddingModel('embeddinggemma')).toBe('embedding-model');
     expect(mockEmbeddingModel).toHaveBeenCalledWith('embeddinggemma');
-    expect(mockCreateOpenAI).toHaveBeenNthCalledWith(
-      1,
+    expect(mockCreateOpenAI).toHaveBeenCalledWith(
       expect.objectContaining({
-        baseURL: 'http://127.0.0.1:8080/v1',
+        baseURL: expect.stringContaining('http://127.0.0.1:8080'),
         apiKey: 'text-key',
-      }),
-    );
-    expect(mockCreateOpenAI).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        baseURL: 'http://127.0.0.1:8081/v1',
-        apiKey: 'embed-key',
       }),
     );
   });
@@ -185,33 +183,32 @@ describe('getAIProvider', () => {
           name: 'AI Gateway',
           providerType: 'ai-gateway',
           baseUrl: '',
-          model: 'openai/gpt-5.2',
+          models: [{ id: 'openai/gpt-5.2', kind: 'chat' }],
           apiKey: 'test-key',
         },
       ],
-      activeProviderId: 'gw-1',
     };
     const provider = getAIProvider(settings);
 
     expect(provider.id).toBe('gw-1');
   });
 
-  test('should return OpenAICompatibleProvider for openai-compatible settings', () => {
+  test('should return OpenAIProvider for openai settings', () => {
     const settings: AISettings = {
       ...DEFAULT_AI_SETTINGS,
       enabled: true,
       providers: [
         {
           id: 'oc-1',
-          name: 'OpenAI-Compatible',
-          providerType: 'openai-compatible',
+          name: 'OpenAI',
+          providerType: 'openai',
           baseUrl: 'http://127.0.0.1:8080',
-          model: 'gemma-3-4b',
-          embeddingBaseUrl: 'http://127.0.0.1:8081',
-          embeddingModel: 'embeddinggemma',
+          models: [
+            { id: 'gemma-3-4b', kind: 'chat' },
+            { id: 'embeddinggemma', kind: 'embedding' },
+          ],
         },
       ],
-      activeProviderId: 'oc-1',
     };
     const provider = getAIProvider(settings);
 
@@ -228,18 +225,24 @@ describe('getAIProvider', () => {
           name: 'Anthropic',
           providerType: 'anthropic',
           baseUrl: '',
-          model: 'claude-3-5-sonnet',
+          models: [{ id: 'claude-3-5-sonnet', kind: 'chat' }],
           apiKey: 'test-key',
         },
       ],
-      activeProviderId: 'anthropic-1',
-      modelAssignments: {
-        embedding: 'anthropic-1',
-      },
+      profiles: [
+        {
+          id: 'default',
+          name: 'Default',
+          modelAssignments: {
+            embedding: { providerId: 'anthropic-1', modelId: 'claude-3-5-sonnet' },
+          },
+          inferenceParamsByTask: {},
+        },
+      ],
     };
 
     expect(() => getProviderForTask(settings, 'embedding')).toThrow(
-      'Anthropic does not support embeddings.',
+      'No configured embedding model found for task: embedding',
     );
   });
 
@@ -250,20 +253,24 @@ describe('getAIProvider', () => {
       providers: [
         {
           id: 'oc-1',
-          name: 'OpenAI-Compatible',
-          providerType: 'openai-compatible',
+          name: 'OpenAI',
+          providerType: 'openai',
           baseUrl: 'http://127.0.0.1:8080',
-          model: 'gemma-3-4b',
+          models: [{ id: 'gemma-3-4b', kind: 'chat' }],
         },
       ],
-      activeProviderId: 'oc-1',
-      modelAssignments: {
-        embedding: 'oc-1',
-      },
+      profiles: [
+        {
+          id: 'default',
+          name: 'Default',
+          modelAssignments: { embedding: { providerId: 'oc-1', modelId: 'gemma-3-4b' } },
+          inferenceParamsByTask: {},
+        },
+      ],
     };
 
     expect(() => getProviderForTask(settings, 'embedding')).toThrow(
-      'OpenAI-Compatible is missing an embedding model.',
+      'No configured embedding model found for task: embedding',
     );
   });
 });

@@ -159,4 +159,26 @@ describe('getContextDictionaryOutputFields', () => {
     expect(fieldsOn.find((f) => f.id === 'sourceExamples')!.enabled).toBe(true);
     expect(fieldsOff.find((f) => f.id === 'sourceExamples')!.enabled).toBe(false);
   });
+
+  test('routes simpleDefinition through dictionary by default while keeping contextualMeaning on AI', () => {
+    const fields = getContextDictionaryOutputFields(DEFAULT_CONTEXT_DICTIONARY_SETTINGS);
+    expect(fields.find((f) => f.id === 'simpleDefinition')!.enabled).toBe(false);
+    expect(fields.find((f) => f.id === 'contextualMeaning')!.enabled).toBe(true);
+    expect(fields.find((f) => f.id === 'sourceExamples')!.enabled).toBe(true);
+  });
+
+  test('enables only the AI-sourced fields after per-field source overrides', () => {
+    const fields = getContextDictionaryOutputFields({
+      ...DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+      fieldSources: {
+        simpleDefinition: 'ai',
+        contextualMeaning: 'dictionary',
+        sourceExamples: 'dictionary',
+      },
+    });
+
+    expect(fields.find((f) => f.id === 'simpleDefinition')!.enabled).toBe(true);
+    expect(fields.find((f) => f.id === 'contextualMeaning')!.enabled).toBe(false);
+    expect(fields.find((f) => f.id === 'sourceExamples')!.enabled).toBe(false);
+  });
 });

@@ -28,6 +28,36 @@ describe('normalizeLookupResponse — sentinel JSON path', () => {
   });
 });
 
+describe('normalizeLookupResponse — plain JSON fallback', () => {
+  test('parses a plain JSON object without sentinel tags', () => {
+    const result = normalizeLookupResponse(
+      '{"translation":"close friend","contextualMeaning":"a trusted companion"}',
+      'translation',
+    );
+    expect(result['translation']).toBe('close friend');
+    expect(result['contextualMeaning']).toBe('a trusted companion');
+  });
+
+  test('parses fenced JSON blocks', () => {
+    const result = normalizeLookupResponse(
+      '```json\n{"translation":"知己","sourceExamples":["知己难逢", "得一知己足矣"]}\n```',
+      'dictionary',
+    );
+    expect(result['translation']).toBe('知己');
+    expect(result['sourceExamples']).toContain('知己难逢');
+    expect(result['sourceExamples']).toContain('得一知己足矣');
+  });
+
+  test('extracts JSON object wrapped in prose', () => {
+    const result = normalizeLookupResponse(
+      'Here is the result: {"translation":"ally","contextualMeaning":"trusted helper"} Thanks.',
+      'translation',
+    );
+    expect(result['translation']).toBe('ally');
+    expect(result['contextualMeaning']).toBe('trusted helper');
+  });
+});
+
 describe('normalizeLookupResponse — XML tag fallback', () => {
   test('falls back from tagged text into the same model', () => {
     const result = normalizeLookupResponse('<translation>bonjour</translation>', 'translation');

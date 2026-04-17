@@ -61,6 +61,7 @@ export interface ReadSettings {
 
   contextTranslation?: ContextTranslationSettings;
   contextDictionary?: ContextDictionarySettings;
+  autoIndexOnOpen?: boolean;
 }
 
 export interface KOSyncSettings {

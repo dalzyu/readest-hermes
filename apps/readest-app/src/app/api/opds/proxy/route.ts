@@ -1,4 +1,4 @@
-import { READEST_OPDS_USER_AGENT } from '@/services/constants';
+import { HERMES_OPDS_USER_AGENT } from '@/services/constants';
 import { NextRequest, NextResponse } from 'next/server';
 import { deserializeOPDSCustomHeaders } from '@/app/opds/utils/customHeaders';
 
@@ -42,7 +42,7 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
     const headers = new Headers({
-      'User-Agent': READEST_OPDS_USER_AGENT,
+      'User-Agent': HERMES_OPDS_USER_AGENT,
       Accept: 'application/atom+xml, application/xml, text/xml, application/json, */*',
     });
 

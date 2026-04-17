@@ -5,7 +5,7 @@ import { TranslationFunc } from '@/hooks/useTranslation';
 import { ProgressPayload } from '@/utils/transfer';
 import { eventDispatcher } from '@/utils/event';
 
-const TRANSFER_QUEUE_KEY = 'readest_transfer_queue';
+const TRANSFER_QUEUE_KEY = 'hermes_transfer_queue';
 const RETRY_DELAY_BASE_MS = 2000;
 
 interface PersistedQueueData {

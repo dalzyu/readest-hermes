@@ -24,6 +24,7 @@ import HintInfo from './HintInfo';
 import ReadingRuler from './ReadingRuler';
 import DoubleBorder from './DoubleBorder';
 
+import IndexingProgressBar from './IndexingProgressBar';
 interface BooksGridProps {
   bookKeys: string[];
   onCloseBook: (bookKey: string) => void;
@@ -34,7 +35,7 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
   const _ = useTranslation();
   const { appService } = useEnv();
   const { getConfig, getBookData } = useBookDataStore();
-  const { getProgress, getViewState, getViewSettings } = useReaderStore();
+  const { getProgress, getViewState, getViewSettings, indexingProgress } = useReaderStore();
   const { setGridInsets, hoveredBookKey } = useReaderStore();
   const { sideBarBookKey } = useSidebarStore();
   const [dropdownOpenBook, setDropdownOpenBook] = useState<string>('');
@@ -237,6 +238,12 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
                 pageinfo={pageinfo}
                 isHoveredAnim={false}
                 gridInsets={gridInsets}
+              />
+            )}
+            {indexingProgress[bookKey] && (
+              <IndexingProgressBar
+                current={indexingProgress[bookKey]!.current}
+                total={indexingProgress[bookKey]!.total}
               />
             )}
           </div>

@@ -7,7 +7,8 @@ import type {
   RetrievalStatus,
   TranslationResult,
 } from '@/services/contextTranslation/types';
-import { useContextLookup } from './useContextLookup';
+
+import { useContextLookup, type UseContextLookupResult } from './useContextLookup';
 
 interface UseContextTranslationOptions {
   bookKey: string;
@@ -31,6 +32,7 @@ interface UseContextTranslationResult {
   popupContext: PopupContextBundle | null;
   examples: LookupExample[];
   annotations: LookupAnnotationSlots | null;
+  debugInfo: UseContextLookupResult['debugInfo'];
   saveToVocabulary: () => Promise<void>;
 }
 
@@ -55,6 +57,7 @@ export function useContextTranslation({
     popupContext,
     examples,
     annotations,
+    debugInfo,
     saveToVocabulary,
   } = useContextLookup({
     mode: 'translation',
@@ -79,6 +82,7 @@ export function useContextTranslation({
     popupContext,
     examples,
     annotations,
+    debugInfo,
     saveToVocabulary,
   };
 }

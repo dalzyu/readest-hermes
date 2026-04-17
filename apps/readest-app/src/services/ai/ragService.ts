@@ -48,6 +48,17 @@ export interface BookDocType {
 }
 
 const indexingStates = new Map<string, IndexingState>();
+const cancelledBookIndexes = new Set<string>();
+
+function assertIndexingNotCancelled(bookHash: string): void {
+  if (!cancelledBookIndexes.has(bookHash)) return;
+  cancelledBookIndexes.delete(bookHash);
+  throw new Error('Indexing cancelled');
+}
+
+export function cancelBookIndexing(bookHash: string): void {
+  cancelledBookIndexes.add(bookHash);
+}
 
 export async function isBookIndexed(bookHash: string): Promise<boolean> {
   const indexed = await aiStore.isIndexed(bookHash);
@@ -88,6 +99,7 @@ export async function indexBook(
 ): Promise<IndexResult> {
   const startTime = Date.now();
   const title = extractTitle(bookDoc.metadata);
+  cancelledBookIndexes.delete(bookHash);
 
   if (await aiStore.isIndexed(bookHash)) {
     aiLogger.rag.isIndexed(bookHash, true);
@@ -102,7 +114,7 @@ export async function indexBook(
   }
 
   aiLogger.rag.indexStart(bookHash, title);
-  const { provider, config } = getProviderForTask(settings, 'embedding');
+  const { provider, modelId, config } = getProviderForTask(settings, 'embedding');
   const sections = bookDoc.sections || [];
   const toc = bookDoc.toc || [];
 
@@ -126,12 +138,14 @@ export async function indexBook(
 
   try {
     onProgress?.({ current: 0, total: 1, phase: 'chunking' });
+    assertIndexingNotCancelled(bookHash);
     aiLogger.rag.indexProgress('chunking', 0, sections.length);
     const allChunks: TextChunk[] = [];
     let skippedCount = 0;
     const errorMessages: string[] = [];
 
     for (let i = 0; i < sections.length; i++) {
+      assertIndexingNotCancelled(bookHash);
       const section = sections[i]!;
       try {
         const doc = await section.createDocument();
@@ -178,13 +192,14 @@ export async function indexBook(
     const embeddingModelName = resolveEmbeddingModelId(config) || 'unknown';
     aiLogger.embedding.start(embeddingModelName, allChunks.length);
 
-    const embeddingModel = provider.getEmbeddingModel();
+    const embeddingModel = provider.getEmbeddingModel(modelId);
     const texts = allChunks.map((c) => c.text);
     const batchSize = getEmbeddingBatchSize(embeddingModel);
     try {
       let embeddedCount = 0;
       let embeddingDimensions = 0;
 
+      assertIndexingNotCancelled(bookHash);
       for (let batchStart = 0; batchStart < texts.length; batchStart += batchSize) {
         const batchTexts = texts.slice(batchStart, batchStart + batchSize);
         const { embeddings } = await withRetryAndTimeout(
@@ -216,6 +231,7 @@ export async function indexBook(
       throw e;
     }
 
+    assertIndexingNotCancelled(bookHash);
     onProgress?.({ current: 0, total: 2, phase: 'indexing' });
     aiLogger.store.saveChunks(bookHash, allChunks.length);
     await aiStore.saveChunks(allChunks);
@@ -250,6 +266,7 @@ export async function indexBook(
       errorMessages,
       durationMs,
     };
+    cancelledBookIndexes.delete(bookHash);
   } catch (error) {
     state.status = 'error';
     state.error = (error as Error).message;
@@ -273,7 +290,7 @@ export async function hybridSearch(
 // ---------------------------------------------------------------------------
 const EMBEDDING_CACHE_MAX = 500;
 const embeddingCache = new Map<string, number[]>();
-let embeddingCacheProviderId = '';
+let embeddingCacheProviderModelKey = '';
 
 function getCachedEmbedding(query: string): number[] | undefined {
   const value = embeddingCache.get(query);
@@ -285,11 +302,11 @@ function getCachedEmbedding(query: string): number[] | undefined {
   return value;
 }
 
-function setCachedEmbedding(query: string, embedding: number[], providerId: string): void {
-  // Invalidate cache on provider change
-  if (providerId !== embeddingCacheProviderId) {
+function setCachedEmbedding(query: string, embedding: number[], providerModelKey: string): void {
+  // Invalidate cache on provider/model change
+  if (providerModelKey !== embeddingCacheProviderModelKey) {
     embeddingCache.clear();
-    embeddingCacheProviderId = providerId;
+    embeddingCacheProviderModelKey = providerModelKey;
   }
   if (embeddingCache.size >= EMBEDDING_CACHE_MAX) {
     // Evict oldest entry (first key)
@@ -308,7 +325,7 @@ export async function boundedHybridSearch(
 ): Promise<ScoredChunk[]> {
   const normalizedBounds = typeof bounds === 'number' ? { maxPage: bounds } : bounds;
   aiLogger.search.query(query, normalizedBounds?.maxPage);
-  const { provider } = getProviderForTask(settings, 'embedding');
+  const { provider, modelId } = getProviderForTask(settings, 'embedding');
   let queryEmbedding: number[] | null = null;
 
   try {
@@ -320,14 +337,14 @@ export async function boundedHybridSearch(
       const { embedding } = await withRetryAndTimeout(
         () =>
           embed({
-            model: provider.getEmbeddingModel(),
+            model: provider.getEmbeddingModel(modelId),
             value: query,
           }),
         AI_TIMEOUTS.EMBEDDING_SINGLE,
         AI_RETRY_CONFIGS.EMBEDDING,
       );
       queryEmbedding = embedding;
-      setCachedEmbedding(query, embedding, provider.id);
+      setCachedEmbedding(query, embedding, `${provider.id}:${modelId}`);
     }
   } catch {
     // bm25 only fallback

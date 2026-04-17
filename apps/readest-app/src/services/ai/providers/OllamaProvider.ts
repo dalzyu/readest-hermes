@@ -1,7 +1,6 @@
 import { createOllama } from 'ai-sdk-ollama';
 import type { LanguageModel, EmbeddingModel } from 'ai';
 import type { AIProvider, ProviderConfig, InferenceParams } from '../types';
-import { resolveEmbeddingModelId } from '../constants';
 import { aiLogger } from '../logger';
 import { AI_TIMEOUTS } from '../utils/retry';
 
@@ -21,7 +20,7 @@ export class OllamaProvider implements AIProvider {
     this.ollama = createOllama({
       baseURL: config.baseUrl || 'http://127.0.0.1:11434',
     });
-    aiLogger.provider.init(config.id, config.model || 'llama3.2');
+    aiLogger.provider.init(config.id, config.models[0]?.id || '(unset)');
   }
 
   private getBaseUrl(): string {
@@ -38,12 +37,12 @@ export class OllamaProvider implements AIProvider {
     return models.some((model) => this.normalizeModelName(model.name) === normalizedRequested);
   }
 
-  getModel(_params?: InferenceParams): LanguageModel {
-    return this.ollama(this.config.model || 'llama3.2');
+  getModel(modelId: string, _params?: InferenceParams): LanguageModel {
+    return this.ollama(modelId);
   }
 
-  getEmbeddingModel(): EmbeddingModel {
-    return this.ollama.embeddingModel(resolveEmbeddingModelId(this.config) || 'nomic-embed-text');
+  getEmbeddingModel(modelId: string): EmbeddingModel {
+    return this.ollama.embeddingModel(modelId);
   }
 
   async isAvailable(): Promise<boolean> {
@@ -60,7 +59,12 @@ export class OllamaProvider implements AIProvider {
     }
   }
 
-  async healthCheck(options?: { requireEmbedding?: boolean }): Promise<boolean> {
+  async healthCheck(options?: {
+    requireEmbedding?: boolean;
+    modelId?: string;
+    embeddingModelId?: string;
+  }): Promise<boolean> {
+    if (!options?.modelId) return false;
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), AI_TIMEOUTS.HEALTH_CHECK);
@@ -71,19 +75,18 @@ export class OllamaProvider implements AIProvider {
       if (!response.ok) return false;
       const data = (await response.json()) as { models?: Array<{ name: string }> };
       const models = data.models ?? [];
-      const hasChatModel = this.hasModel(models, this.config.model || 'llama3.2');
+      const hasChatModel = this.hasModel(models, options.modelId);
       if (!hasChatModel) {
         const available = models.map((m) => m.name).join(', ');
         aiLogger.provider.error(
           this.id,
-          `Model "${this.config.model}" not found. Available: ${available || '(none)'}`,
+          `Model "${options.modelId}" not found. Available: ${available || '(none)'}`,
         );
         return false;
       }
       if (!options?.requireEmbedding) return true;
-
-      const embeddingModelName = resolveEmbeddingModelId(this.config);
-      return !!embeddingModelName && this.hasModel(models, embeddingModelName);
+      if (!options.embeddingModelId) return false;
+      return this.hasModel(models, options.embeddingModelId);
     } catch (e) {
       aiLogger.provider.error(this.id, (e as Error).message);
       return false;

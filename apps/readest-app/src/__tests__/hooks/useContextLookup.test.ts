@@ -61,6 +61,7 @@ vi.mock('@/services/contextTranslation/translationService', () => ({
   }),
 }));
 
+import { useSettingsStore } from '@/store/settingsStore';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
 import { saveLookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
@@ -95,6 +96,7 @@ const defaultProps = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(useSettingsStore).mockReturnValue({ settings: null } as never);
   vi.mocked(buildPopupContextBundle).mockResolvedValue(popupContextBundle);
   vi.mocked(runContextLookup).mockResolvedValue({
     fields: { translation: 'close friend' },
@@ -169,6 +171,20 @@ describe('useContextLookup', () => {
     );
   });
 
+  test('captures debug info when developer mode is enabled', async () => {
+    vi.mocked(useSettingsStore).mockReturnValue({
+      settings: { aiSettings: { developerMode: true } },
+    } as never);
+
+    const { result } = renderHook(() => useContextLookup(defaultProps));
+
+    await waitFor(() =>
+      expect(result.current.debugInfo?.parsedResult).toEqual({ translation: 'close friend' }),
+    );
+    expect(result.current.debugInfo?.rawStream).toBe('<translation>close friend</translation>');
+    expect(result.current.debugInfo?.systemPrompt).toContain('literary translation assistant');
+    expect(result.current.debugInfo?.userPrompt).toContain('<selected_text>知己</selected_text>');
+  });
   test('does not record blank selections or incomplete results', async () => {
     vi.mocked(runContextLookup).mockResolvedValueOnce({
       fields: {},

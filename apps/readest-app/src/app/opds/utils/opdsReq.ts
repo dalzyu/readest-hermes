@@ -6,7 +6,7 @@ import {
   isWebAppPlatform,
 } from '@/services/environment';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
-import { READEST_OPDS_USER_AGENT } from '@/services/constants';
+import { HERMES_OPDS_USER_AGENT } from '@/services/constants';
 import {
   OPDSCustomHeaders,
   normalizeOPDSCustomHeaders,
@@ -226,7 +226,7 @@ export const probeAuth = async (
     ? getProxiedURL(cleanUrl, '', false, normalizedCustomHeaders)
     : cleanUrl;
   const headers: Record<string, string> = {
-    'User-Agent': READEST_OPDS_USER_AGENT,
+    'User-Agent': HERMES_OPDS_USER_AGENT,
     Accept: 'application/atom+xml, application/xml, text/xml, */*',
     ...(!useProxy ? normalizedCustomHeaders : {}),
   };
@@ -335,7 +335,7 @@ export const fetchWithAuth = async (
     ? getProxiedURL(cleanUrl, '', false, normalizedCustomHeaders)
     : cleanUrl;
   const headers: Record<string, string> = {
-    'User-Agent': READEST_OPDS_USER_AGENT,
+    'User-Agent': HERMES_OPDS_USER_AGENT,
     Accept: 'application/atom+xml, application/xml, text/xml, */*',
     ...(!useProxy ? normalizedCustomHeaders : {}),
     ...(options.headers as Record<string, string>),

@@ -1,5 +1,5 @@
 {
-  "name": "@readest/readest-app",
+  "name": "@hermes/app",
   "version": "0.2.4",
   "private": true,
   "type": "module",
@@ -30,8 +30,8 @@
     "tauri:dev:test": "dotenv -e .env.tauri -- tauri dev --features webdriver",
     "tauri:build:test": "dotenv -e .env.tauri -- node scripts/tauri-local.mjs build --debug --features webdriver",
     "tauri": "node scripts/tauri-local.mjs",
-    "fmt:check": "cargo fmt -p Readest --check",
-    "clippy:check": "cargo clippy -p Readest --no-deps -- -D warnings",
+    "fmt:check": "cargo fmt -p Hermes --check",
+    "clippy:check": "cargo clippy -p Hermes --no-deps -- -D warnings",
     "format": "corepack pnpm -w format",
     "format:check": "corepack pnpm -w format:check",
     "prepare-public-vendor": "mkdirp ./public/vendor/pdfjs ./public/vendor/simplecc ./public/vendor/kuromoji",

@@ -1,4 +1,5 @@
 import type {
+  ContextDictionaryFieldSources,
   ContextDictionarySettings,
   ContextTranslationHarnessSettings,
   ContextTranslationSettings,
@@ -68,21 +69,6 @@ export function resolveContextTranslationHarnessSettings(
   };
 }
 
-export const CONTEXT_TRANSLATION_HARNESS_PRESETS = {
-  balanced: resolveContextTranslationHarnessSettings(),
-  strictGemma: resolveContextTranslationHarnessSettings({
-    completionThreshold: 0.67,
-    maxRepairAttempts: 2,
-    maxPerFieldRepairAttempts: 2,
-    translationMaxWords: 6,
-  }),
-  lenientQwen: resolveContextTranslationHarnessSettings({
-    completionThreshold: 0.34,
-    translationMaxWords: 12,
-    repairOnLowCompletion: false,
-  }),
-} as const;
-
 export const DEFAULT_CONTEXT_TRANSLATION_SETTINGS: ContextTranslationSettings = {
   enabled: false,
   targetLanguage: 'en',
@@ -130,9 +116,25 @@ export const DEFAULT_CONTEXT_TRANSLATION_SETTINGS: ContextTranslationSettings = 
   ],
 };
 
+export const DEFAULT_CONTEXT_DICTIONARY_FIELD_SOURCES: Required<ContextDictionaryFieldSources> = {
+  simpleDefinition: 'dictionary',
+  contextualMeaning: 'ai',
+  sourceExamples: 'ai',
+};
+
+export function resolveContextDictionaryFieldSources(
+  settings?: ContextDictionarySettings,
+): Required<ContextDictionaryFieldSources> {
+  return {
+    ...DEFAULT_CONTEXT_DICTIONARY_FIELD_SOURCES,
+    ...settings?.fieldSources,
+  };
+}
+
 export const DEFAULT_CONTEXT_DICTIONARY_SETTINGS: ContextDictionarySettings = {
   enabled: false,
   sourceExamples: true,
+  fieldSources: DEFAULT_CONTEXT_DICTIONARY_FIELD_SOURCES,
 };
 
 export const DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS: ReadonlyArray<TranslationOutputField> = [
@@ -166,9 +168,20 @@ export function getContextDictionaryOutputFields(
   settings: ContextDictionarySettings,
 ): TranslationOutputField[] {
   const custom = settings.promptInstructions ?? {};
-  return DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS.map((field) => ({
-    ...field,
-    enabled: field.id === 'sourceExamples' ? settings.sourceExamples : field.enabled,
-    promptInstruction: custom[field.id] ?? field.promptInstruction,
-  }));
+  const fieldSources = resolveContextDictionaryFieldSources(settings);
+
+  return DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS.map((field) => {
+    const enabled =
+      field.id === 'simpleDefinition'
+        ? fieldSources.simpleDefinition === 'ai'
+        : field.id === 'contextualMeaning'
+          ? fieldSources.contextualMeaning === 'ai'
+          : settings.sourceExamples && fieldSources.sourceExamples === 'ai';
+
+    return {
+      ...field,
+      enabled,
+      promptInstruction: custom[field.id] ?? field.promptInstruction,
+    };
+  });
 }

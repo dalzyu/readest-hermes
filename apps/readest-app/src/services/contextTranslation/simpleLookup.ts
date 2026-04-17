@@ -1,8 +1,7 @@
 import { lookupDefinitions } from './dictionaryService';
-import { getTranslators } from '@/services/translators';
 import type { ContextLookupRequest, ContextLookupResult } from './contextLookupService';
 
-export type TranslationSource = 'ai' | 'dictionary' | 'azure' | 'deepl' | 'google' | 'yandex';
+export type TranslationSource = 'ai' | 'dictionary';
 
 function buildSimpleResult(
   translationContent: string,
@@ -23,33 +22,10 @@ function buildSimpleResult(
 
 export async function runSimpleLookup(
   request: ContextLookupRequest,
-  source: Exclude<TranslationSource, 'ai'>,
+  _source: Exclude<TranslationSource, 'ai'>,
 ): Promise<ContextLookupResult> {
   const srcLang = request.sourceLanguage ?? 'en';
-
-  if (source === 'dictionary') {
-    const entries = await lookupDefinitions(
-      request.selectedText,
-      srcLang,
-      request.targetLanguage,
-    );
-    const content = entries.map((e) => `${e.headword}: ${e.definition}`).join('\n');
-    return buildSimpleResult(content, srcLang);
-  }
-
-  // Service translators — getTranslators() is SYNCHRONOUS
-  const allTranslators = getTranslators();
-  const translator = allTranslators.find((t) => t.name.toLowerCase() === source.toLowerCase());
-  if (!translator) {
-    throw new Error(`${source} translator not found. Configure it in Settings → Language.`);
-  }
-
-  // translate(texts, sourceLang, targetLang, token?, useCache?) => Promise<string[]>
-  const results = await translator.translate(
-    [request.selectedText],
-    srcLang,
-    request.targetLanguage,
-  );
-
-  return buildSimpleResult(results[0] ?? '', srcLang);
+  const entries = await lookupDefinitions(request.selectedText, srcLang, request.targetLanguage);
+  const content = entries.map((e) => `${e.headword}: ${e.definition}`).join('\n');
+  return buildSimpleResult(content, srcLang);
 }

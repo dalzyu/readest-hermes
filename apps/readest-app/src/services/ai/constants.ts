@@ -1,4 +1,11 @@
-import type { AISettings, ProviderConfig, AIProviderType } from './types';
+import type {
+  AISettings,
+  AIProfile,
+  AITaskType,
+  AIProviderType,
+  ModelEntry,
+  ProviderConfig,
+} from './types';
 
 // cheapest popular models as of 2025
 export const GATEWAY_MODELS = {
@@ -25,20 +32,23 @@ export const DEFAULT_OLLAMA_CONFIG: ProviderConfig = {
   name: 'Ollama (Local)',
   providerType: 'ollama',
   baseUrl: 'http://127.0.0.1:11434',
-  model: 'llama3.2',
-  embeddingModel: 'nomic-embed-text',
+  models: [
+    { id: 'llama3.2', kind: 'chat' },
+    { id: 'nomic-embed-text', kind: 'embedding' },
+  ],
 };
 
-/** Built-in provider preset for OpenAI-compatible local server. */
-export const DEFAULT_OPENAI_COMPATIBLE_CONFIG: ProviderConfig = {
-  id: 'openai-compat-default',
-  name: 'OpenAI-Compatible (Local)',
-  providerType: 'openai-compatible',
-  baseUrl: 'http://127.0.0.1:8080',
-  model: '',
-  apiStyle: 'chat-completions',
-  embeddingBaseUrl: 'http://127.0.0.1:8081',
-  embeddingModel: '',
+/** Built-in provider preset for OpenAI-compatible servers and OpenAI API. */
+export const DEFAULT_OPENAI_CONFIG: ProviderConfig = {
+  id: 'openai-default',
+  name: 'OpenAI',
+  providerType: 'openai',
+  baseUrl: 'https://api.openai.com',
+  models: [
+    { id: 'gpt-4o-mini', kind: 'chat' },
+    { id: 'text-embedding-3-small', kind: 'embedding' },
+  ],
+  apiStandard: 'chat-completions',
 };
 
 /** Built-in provider preset for AI Gateway. */
@@ -47,14 +57,15 @@ export const DEFAULT_AI_GATEWAY_CONFIG: ProviderConfig = {
   name: 'AI Gateway',
   providerType: 'ai-gateway',
   baseUrl: '',
-  model: GATEWAY_MODELS.GEMINI_FLASH_LITE,
-  embeddingModel: 'openai/text-embedding-3-small',
+  models: [
+    { id: GATEWAY_MODELS.GEMINI_FLASH_LITE, kind: 'chat' },
+    { id: 'openai/text-embedding-3-small', kind: 'embedding' },
+  ],
 };
 
 export const EMBEDDING_CAPABLE_PROVIDER_TYPES: ReadonlySet<AIProviderType> = new Set([
   'ollama',
   'openai',
-  'openai-compatible',
   'google',
   'mistral',
   'ai-gateway',
@@ -64,41 +75,60 @@ export function providerTypeSupportsEmbeddings(providerType: AIProviderType): bo
   return EMBEDDING_CAPABLE_PROVIDER_TYPES.has(providerType);
 }
 
-export function resolveEmbeddingModelId(
-  config: Pick<ProviderConfig, 'providerType' | 'embeddingModel'>,
+function findModelByKind(
+  models: ModelEntry[] | undefined,
+  kind: ModelEntry['kind'],
 ): string | undefined {
-  const configuredModel = config.embeddingModel?.trim();
-  if (configuredModel) return configuredModel;
+  return models?.find((model) => model.kind === kind)?.id?.trim() || undefined;
+}
 
-  switch (config.providerType) {
-    case 'ollama':
-      return 'nomic-embed-text';
-    case 'openai':
-      return 'text-embedding-3-small';
-    case 'google':
-      return 'gemini-embedding-001';
-    case 'mistral':
-      return 'mistral-embed';
-    case 'ai-gateway':
-      return 'openai/text-embedding-3-small';
-    default:
-      return undefined;
-  }
+export function resolveChatModelId(config: Pick<ProviderConfig, 'models'>): string | undefined {
+  return findModelByKind(config.models, 'chat');
+}
+
+export function resolveEmbeddingModelId(
+  config: Pick<ProviderConfig, 'models'>,
+): string | undefined {
+  return findModelByKind(config.models, 'embedding');
 }
 
 export function providerConfigCanServeEmbeddings(
-  config: Pick<ProviderConfig, 'providerType' | 'embeddingModel'>,
+  config: Pick<ProviderConfig, 'providerType' | 'models'>,
 ): boolean {
   return providerTypeSupportsEmbeddings(config.providerType) && !!resolveEmbeddingModelId(config);
+}
+
+export const DEFAULT_AI_PROFILE: AIProfile = {
+  id: 'default',
+  name: 'Default',
+  modelAssignments: {},
+  inferenceParamsByTask: {},
+};
+
+export function getDefaultTaskSelection(providerId?: string, modelId?: string) {
+  if (!providerId || !modelId) return undefined;
+  return { providerId, modelId };
 }
 
 export const DEFAULT_AI_SETTINGS: AISettings = {
   enabled: false,
   providers: [],
-  activeProviderId: '',
-  modelAssignments: {},
+  profiles: [DEFAULT_AI_PROFILE],
+  activeProfileId: DEFAULT_AI_PROFILE.id,
+  developerMode: false,
 
   spoilerProtection: true,
   maxContextChunks: 10,
   indexingMode: 'on-demand',
 };
+
+export function findProfileOrDefault(settings: AISettings): AIProfile {
+  return (
+    settings.profiles.find((profile) => profile.id === settings.activeProfileId) ??
+    settings.profiles[0]!
+  );
+}
+
+export function getAssignmentForTask(settings: AISettings, task: AITaskType) {
+  return findProfileOrDefault(settings).modelAssignments[task];
+}

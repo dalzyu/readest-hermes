@@ -257,22 +257,14 @@ describe('AIPanel', () => {
     expect(screen.getAllByText('Ollama').length).toBeGreaterThan(0);
   });
 
-  test('exposes editable inference params in the provider form', async () => {
+  test('edits provider display name and model entries', async () => {
     render(<AIPanel />);
 
     fireEvent.click(screen.getByTitle('Edit'));
-    fireEvent.click(screen.getByText('Advanced inference'));
 
-    fireEvent.change(screen.getByLabelText('Temperature'), { target: { value: '0.4' } });
-    fireEvent.change(screen.getByLabelText('Max tokens'), { target: { value: '512' } });
-    fireEvent.change(screen.getByLabelText('Top-p'), { target: { value: '0.75' } });
-    fireEvent.change(screen.getByLabelText('Top K'), { target: { value: '40' } });
-    fireEvent.change(screen.getByLabelText('Frequency penalty'), { target: { value: '0.1' } });
-    fireEvent.change(screen.getByLabelText('Presence penalty'), { target: { value: '0.2' } });
-    fireEvent.change(screen.getByLabelText('Seed'), { target: { value: '123' } });
-    fireEvent.change(screen.getByLabelText('Stop sequences'), {
-      target: { value: 'END\n<|end|>' },
-    });
+    fireEvent.change(screen.getByPlaceholderText('Ollama'), { target: { value: 'Local Ollama' } });
+    fireEvent.change(screen.getByDisplayValue('llama3.2'), { target: { value: 'llama3.3' } });
+    fireEvent.change(screen.getByDisplayValue('nomic-embed-text'), { target: { value: 'bge-m3' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -280,18 +272,17 @@ describe('AIPanel', () => {
 
     const savedSettings = saveSettingsMock.mock.calls.at(-1)?.[1] as typeof stableSettings;
     const savedProvider = savedSettings.aiSettings.providers[0] as {
-      inferenceParams?: Record<string, unknown>;
+      name: string;
+      models?: Array<{ id: string; kind: 'chat' | 'embedding' }>;
     };
-    expect(savedProvider.inferenceParams).toMatchObject({
-      temperature: 0.4,
-      maxTokens: 512,
-      topP: 0.75,
-      topK: 40,
-      frequencyPenalty: 0.1,
-      presencePenalty: 0.2,
-      seed: 123,
-      stopSequences: ['END', '<|end|>'],
-    });
+
+    expect(savedProvider.name).toBe('Local Ollama');
+    expect(savedProvider.models).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'llama3.3', kind: 'chat' }),
+        expect.objectContaining({ id: 'bge-m3', kind: 'embedding' }),
+      ]),
+    );
   });
 
   test('uses the full shared translator language list for context translation targets', () => {

@@ -11,10 +11,10 @@ const WPM_STEP = 50;
 const DEFAULT_PUNCTUATION_PAUSE_MS = 100;
 const PUNCTUATION_PAUSE_OPTIONS = [25, 50, 75, 100, 125, 150, 175, 200];
 const DEFAULT_SPLIT_HYPHENS = false;
-const STORAGE_KEY_PREFIX = 'readest_rsvp_wpm_';
-const PUNCTUATION_PAUSE_KEY_PREFIX = 'readest_rsvp_pause_';
-const POSITION_KEY_PREFIX = 'readest_rsvp_pos_';
-const SPLIT_HYPHENS_KEY = 'readest_rsvp_split_hyphens';
+const STORAGE_KEY_PREFIX = 'hermes_rsvp_wpm_';
+const PUNCTUATION_PAUSE_KEY_PREFIX = 'hermes_rsvp_pause_';
+const POSITION_KEY_PREFIX = 'hermes_rsvp_pos_';
+const SPLIT_HYPHENS_KEY = 'hermes_rsvp_split_hyphens';
 
 export class RSVPController extends EventTarget {
   private view: FoliateView;

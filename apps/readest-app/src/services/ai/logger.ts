@@ -1,4 +1,4 @@
-const DEBUG = true;
+let DEBUG = false;
 const PREFIX = '[AI]';
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
@@ -35,6 +35,10 @@ function log(level: LogLevel, module: string, message: string, data?: unknown) {
       console.log(`%c${prefix} ${formatted}`, 'color: #81c784');
       break;
   }
+}
+
+export function setAIDebugEnabled(enabled: boolean) {
+  DEBUG = enabled;
 }
 
 export const aiLogger = {

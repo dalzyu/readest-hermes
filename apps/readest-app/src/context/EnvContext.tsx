@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { runHermesMigration } from '@/services/migration/hermesMigration';
 import { EnvConfigType } from '../services/environment';
 import { AppService } from '@/types/system';
 import env from '../services/environment';
@@ -17,7 +18,12 @@ export const EnvProvider = ({ children }: { children: ReactNode }) => {
   const [appService, setAppService] = useState<AppService | null>(null);
 
   React.useEffect(() => {
-    envConfig.getAppService().then((service) => setAppService(service));
+    const init = async () => {
+      await runHermesMigration();
+      const service = await envConfig.getAppService();
+      setAppService(service);
+    };
+    void init();
     window.addEventListener('error', (e) => {
       if (e.message === 'ResizeObserver loop limit exceeded') {
         e.stopImmediatePropagation();

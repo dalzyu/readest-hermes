@@ -2,10 +2,8 @@ import { IconType } from 'react-icons';
 import { FiSearch } from 'react-icons/fi';
 import { FiCopy } from 'react-icons/fi';
 import { PiHighlighterFill } from 'react-icons/pi';
-import { FaWikipediaW } from 'react-icons/fa';
 import { BsPencilSquare } from 'react-icons/bs';
-import { BsTranslate } from 'react-icons/bs';
-import { TbHexagonLetterD, TbHexagonLetterA } from 'react-icons/tb';
+import { TbHexagonLetterA } from 'react-icons/tb';
 import { FaHeadphones } from 'react-icons/fa6';
 import { IoIosBuild } from 'react-icons/io';
 import { RiTranslate2 } from 'react-icons/ri';
@@ -56,27 +54,6 @@ export const annotationToolButtons = createAnnotationToolButtons([
     label: _('Search'),
     tooltip: _('Search text after selection'),
     Icon: FiSearch,
-    quickAction: true,
-  },
-  {
-    type: 'dictionary',
-    label: _('Dictionary'),
-    tooltip: _('Look up text in dictionary after selection'),
-    Icon: TbHexagonLetterD,
-    quickAction: true,
-  },
-  {
-    type: 'wikipedia',
-    label: _('Wikipedia'),
-    tooltip: _('Look up text in Wikipedia after selection'),
-    Icon: FaWikipediaW,
-    quickAction: true,
-  },
-  {
-    type: 'translate',
-    label: _('Translate'),
-    tooltip: _('Translate text after selection'),
-    Icon: BsTranslate,
     quickAction: true,
   },
   {

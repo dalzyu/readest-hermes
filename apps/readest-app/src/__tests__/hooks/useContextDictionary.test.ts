@@ -55,6 +55,7 @@ const lookupResult: UseContextLookupResult = {
   popupContext: popupContextBundle,
   examples: lookupExamples,
   annotations: lookupAnnotations,
+  debugInfo: null,
   saveToVocabulary: vi.fn(async () => {}),
 };
 
@@ -99,6 +100,53 @@ describe('useContextDictionary', () => {
       settings: defaultProps.translationSettings,
       dictionarySettings: defaultProps.dictionarySettings,
     });
-    expect(result).toBe(lookupResult);
+    expect(result.popupContext).toBe(popupContextBundle);
+    expect(result.result).toBeNull();
+    expect(result.examples).toEqual(lookupExamples);
+  });
+
+  test('merges dictionary-backed fields over AI results when configured', () => {
+    vi.mocked(useContextLookup).mockReturnValue({
+      ...lookupResult,
+      result: {
+        simpleDefinition: 'ai definition',
+        contextualMeaning: 'ai contextual meaning',
+        sourceExamples: 'ai examples',
+      },
+      partialResult: {
+        simpleDefinition: 'streaming ai definition',
+        contextualMeaning: 'streaming ai contextual meaning',
+        sourceExamples: 'streaming ai examples',
+      },
+      popupContext: {
+        ...popupContextBundle,
+        dictionaryResults: [{ headword: '知己', definition: '辞書定義', source: 'Test Dict' }],
+      },
+      examples: [
+        { exampleId: '1', sourceText: '彼は知己だ。', targetText: 'He is a close friend.' },
+      ],
+    });
+
+    const result = useContextDictionary({
+      ...defaultProps,
+      dictionarySettings: {
+        ...defaultProps.dictionarySettings,
+        fieldSources: {
+          simpleDefinition: 'dictionary',
+          contextualMeaning: 'ai',
+          sourceExamples: 'dictionary',
+        },
+      },
+    });
+
+    expect(result.result).toEqual({
+      simpleDefinition: '辞書定義',
+      contextualMeaning: 'ai contextual meaning',
+    });
+    expect(result.partialResult).toEqual({
+      simpleDefinition: '辞書定義',
+      contextualMeaning: 'streaming ai contextual meaning',
+    });
+    expect(result.examples).toEqual([]);
   });
 });

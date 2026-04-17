@@ -49,8 +49,8 @@ vi.mock('@/utils/version', () => ({
 
 vi.mock('@/services/constants', () => ({
   CHECK_UPDATE_INTERVAL_SEC: 86400,
-  READEST_UPDATER_FILE: 'https://example.com/latest.json',
-  READEST_CHANGELOG_FILE: 'https://example.com/release-notes.json',
+  HERMES_UPDATER_FILE: 'https://example.com/latest.json',
+  HERMES_CHANGELOG_FILE: 'https://example.com/release-notes.json',
 }));
 
 import {

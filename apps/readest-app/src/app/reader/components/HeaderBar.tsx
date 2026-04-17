@@ -28,6 +28,9 @@ import NotebookToggler from './NotebookToggler';
 import SettingsToggler from './SettingsToggler';
 import TranslationToggler from './TranslationToggler';
 import ViewMenu from './ViewMenu';
+import ProfileSwitcher from './header/ProfileSwitcher';
+import IndexBookButton from './header/IndexBookButton';
+import ContextScopeBadge from './header/ContextScopeBadge';
 
 interface HeaderBarProps {
   bookKey: string;
@@ -272,6 +275,9 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
         </div>
 
         <div className='header-tools-end bg-base-100 z-20 ms-auto flex h-full min-w-max items-center gap-x-4 ps-2 max-[350px]:gap-x-2'>
+          {!isHeaderCompact && <ProfileSwitcher />}
+          {!isHeaderCompact && <IndexBookButton bookKey={bookKey} />}
+          {!isHeaderCompact && <ContextScopeBadge bookKey={bookKey} />}
           {!isHeaderCompact && <SettingsToggler bookKey={bookKey} />}
           <NotebookToggler bookKey={bookKey} />
           <Dropdown
@@ -281,7 +287,15 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             toggleButton={<PiDotsThreeVerticalBold size={iconSize16} />}
             onToggle={handleToggleDropdown}
           >
-            <ViewMenu bookKey={bookKey} />
+            {isHeaderCompact && (
+              <div className='border-base-200 flex items-center gap-2 border-b px-3 py-2'>
+                <ProfileSwitcher />
+                <IndexBookButton bookKey={bookKey} />
+                <ContextScopeBadge bookKey={bookKey} />
+                <SettingsToggler bookKey={bookKey} />
+              </div>
+            )}
+            <ViewMenu bookKey={bookKey} setIsDropdownOpen={handleToggleDropdown} />
           </Dropdown>
           <WindowButtons
             className='window-buttons flex items-center'

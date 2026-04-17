@@ -60,14 +60,12 @@ export function buildSeriesIndexMessage(
 }
 
 export async function loadSeriesIndexStates(series: BookSeries): Promise<Record<string, boolean>> {
-  const entries = await Promise.all(
-    series.volumes.map(async (volume) => [
-      volume.bookHash,
-      await aiStore.isIndexed(volume.bookHash),
-    ]),
+  const stateMap = await aiStore.getIndexedStateMap(
+    series.volumes.map((volume) => volume.bookHash),
   );
-
-  return Object.fromEntries(entries);
+  return Object.fromEntries(
+    series.volumes.map((volume) => [volume.bookHash, stateMap[volume.bookHash] ?? false]),
+  );
 }
 
 export async function indexSeriesVolumes(
@@ -84,11 +82,12 @@ export async function indexSeriesVolumes(
   let warnings = 0;
 
   const orderedVolumes = [...series.volumes].sort((a, b) => a.volumeIndex - b.volumeIndex);
+  const initialStates = await loadSeriesIndexStates(series);
   for (const volume of orderedVolumes) {
     const book = libraryBooks.find((item) => item.hash === volume.bookHash);
     if (!book) continue;
 
-    if (await aiStore.isIndexed(volume.bookHash)) {
+    if (initialStates[volume.bookHash]) {
       skipped++;
       continue;
     }
