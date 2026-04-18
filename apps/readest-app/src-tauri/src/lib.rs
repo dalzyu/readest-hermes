@@ -189,9 +189,12 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_sharekit::init())
-        .plugin(tauri_plugin_device_info::init())
         .plugin(tauri_plugin_native_bridge::init())
         .plugin(tauri_plugin_native_tts::init());
+
+#[cfg(not(all(target_os = "windows", target_arch = "x86")))]
+let builder = builder.plugin(tauri_plugin_device_info::init());
+
 
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_turso::init());

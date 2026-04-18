@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import React, { useState, isValidElement, ReactElement, ReactNode, useRef, useId } from 'react';
+import React, { useState, isValidElement, ReactNode, useRef, useId } from 'react';
 import { useDropdownContext } from '@/context/DropdownContext';
 import { Overlay } from './Overlay';
 import MenuItem from './MenuItem';
@@ -11,11 +11,7 @@ interface DropdownProps {
   buttonClassName?: string;
   containerClassName?: string;
   toggleButton: React.ReactNode;
-  children: ReactElement<{
-    setIsDropdownOpen: (isOpen: boolean) => void;
-    menuClassName?: string;
-    children: ReactNode;
-  }>;
+  children: ReactNode;
   disabled?: boolean;
   onToggle?: (isOpen: boolean) => void;
   showTooltip?: boolean;
@@ -23,6 +19,12 @@ interface DropdownProps {
 
 type MenuItemProps = {
   setIsDropdownOpen?: (open: boolean) => void;
+};
+
+type DropdownChildProps = {
+  setIsDropdownOpen?: (isOpen: boolean) => void;
+  menuClassName?: string;
+  children?: ReactNode;
 };
 
 const enhanceMenuItems = (
@@ -108,7 +110,7 @@ const Dropdown: React.FC<DropdownProps> = ({
     }
   };
 
-  const childrenWithToggle = isValidElement(children)
+  const childrenWithToggle = isValidElement<DropdownChildProps>(children)
     ? React.cloneElement(children, {
         ...(typeof children.type !== 'string' && {
           setIsDropdownOpen,

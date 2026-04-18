@@ -18,23 +18,7 @@ type AnnotationToolButton = {
   quickAction?: boolean;
 };
 
-function createAnnotationToolButtons<T extends AnnotationToolType>(
-  buttons: AnnotationToolType extends T
-    ? {
-        [K in T]: {
-          type: K;
-          label: string;
-          tooltip: string;
-          Icon: IconType;
-          quickAction?: boolean;
-        };
-      }[T][]
-    : never,
-): AnnotationToolButton[] {
-  return buttons;
-}
-
-export const annotationToolButtons = createAnnotationToolButtons([
+export const annotationToolButtons: AnnotationToolButton[] = [
   { type: 'copy', label: _('Copy'), tooltip: _('Copy text after selection'), Icon: FiCopy },
   {
     type: 'highlight',
@@ -82,7 +66,7 @@ export const annotationToolButtons = createAnnotationToolButtons([
     tooltip: _('Context-aware AI dictionary lookup after selection'),
     Icon: TbHexagonLetterA,
   },
-]);
+];
 
 export const annotationToolQuickActions = annotationToolButtons.filter(
   (button) => button.quickAction,

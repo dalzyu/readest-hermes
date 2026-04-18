@@ -43,7 +43,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
   const { sideBarBookKey, setSideBarBookKey } = useSidebarStore();
   const { saveSettings } = useSettingsStore();
   const { getConfig, getBookData, saveConfig } = useBookDataStore();
-  const { getView, setBookKeys, getViewSettings } = useReaderStore();
+  const { getView, setBookKeys, getViewSettings, setViewSettings } = useReaderStore();
   const {
     initViewState,
     getViewState,
@@ -177,6 +177,14 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
     navigateBackToLibrary();
   };
 
+  const exitFocusMode = () => {
+    const primaryBookKey = bookKeys[0];
+    if (!primaryBookKey) return;
+    const primaryViewSettings = getViewSettings(primaryBookKey);
+    if (!primaryViewSettings?.focusMode) return;
+    setViewSettings(primaryBookKey, { ...primaryViewSettings, focusMode: false });
+  };
+
   const handleCloseBooks = throttle(async () => {
     const settings = useSettingsStore.getState().settings;
     await Promise.all(bookKeys.map(async (key) => await saveConfigAndCloseBook(key)));
@@ -252,22 +260,31 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
       }
     };
 
-    const idleHandle =
-      typeof window !== 'undefined' && 'requestIdleCallback' in window
-        ? window.requestIdleCallback(() => {
-            void run();
-          })
-        : window.setTimeout(() => {
-            void run();
-          }, 0);
+    let timeoutHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
+    let idleCallbackHandle: number | null = null;
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleCallbackHandle = window.requestIdleCallback(() => {
+        void run();
+      });
+    } else {
+      timeoutHandle = globalThis.setTimeout(() => {
+        void run();
+      }, 0);
+    }
 
     return () => {
       cancelled = true;
       cancelBookIndexing(hash);
-      if (typeof idleHandle === 'number') {
-        clearTimeout(idleHandle);
-      } else if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
-        window.cancelIdleCallback(idleHandle);
+      if (timeoutHandle !== null) {
+        clearTimeout(timeoutHandle);
+      }
+      if (
+        idleCallbackHandle !== null &&
+        typeof window !== 'undefined' &&
+        'cancelIdleCallback' in window
+      ) {
+        window.cancelIdleCallback(idleCallbackHandle);
       }
     };
   }, [

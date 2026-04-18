@@ -191,7 +191,6 @@
     "haptics:allow-selection-feedback",
     "deep-link:default",
     "sharekit:default",
-    "device-info:default",
     "native-tts:default",
     "native-bridge:default"
   ]

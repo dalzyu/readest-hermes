@@ -173,12 +173,13 @@ function normalizeProviderConfig(
   ) {
     models.push({ id: legacy.embeddingModel.trim(), kind: 'embedding' });
   }
+  const legacyProviderType = (config as { providerType?: string }).providerType;
+  const normalizedProviderType =
+    legacyProviderType === 'openai-compatible' ? 'openai' : config.providerType;
   return {
     id: config.id,
     name: config.name ?? '',
-    providerType: (legacy.providerType === 'openai-compatible'
-      ? 'openai'
-      : config.providerType) as AIProviderType,
+    providerType: normalizedProviderType as AIProviderType,
     baseUrl: config.baseUrl ?? '',
     apiKey: config.apiKey,
     models,

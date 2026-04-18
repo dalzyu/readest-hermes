@@ -49,23 +49,23 @@ function mergeDictionaryFields(
   const merged = { ...(fields ?? {}) };
 
   if (fieldSources.sourceExamples === 'dictionary') {
-    delete merged.sourceExamples;
+    delete merged['sourceExamples'];
   }
 
   const dictionaryFields = buildDictionaryFieldValue(dictionarySettings, result);
   if (fieldSources.simpleDefinition === 'dictionary') {
     if (dictionaryFields?.simpleDefinition) {
-      merged.simpleDefinition = dictionaryFields.simpleDefinition;
+      merged['simpleDefinition'] = dictionaryFields.simpleDefinition;
     } else {
-      delete merged.simpleDefinition;
+      delete merged['simpleDefinition'];
     }
   }
 
   if (fieldSources.contextualMeaning === 'dictionary') {
     if (dictionaryFields?.contextualMeaning) {
-      merged.contextualMeaning = dictionaryFields.contextualMeaning;
+      merged['contextualMeaning'] = dictionaryFields.contextualMeaning;
     } else {
-      delete merged.contextualMeaning;
+      delete merged['contextualMeaning'];
     }
   }
 

@@ -118,12 +118,13 @@ function migrateProviderConfigShape(provider: unknown): ProviderConfig | null {
     apiStyle?: 'chat-completions' | 'responses';
     providerType?: string;
   };
-  if (!legacy.id || !legacy.providerType) return null;
+  const legacyProviderType = (provider as { providerType?: string }).providerType;
+  if (!legacy.id || !legacyProviderType) return null;
 
   const providerType =
-    legacy.providerType === 'openai-compatible'
+    legacyProviderType === 'openai-compatible'
       ? 'openai'
-      : (legacy.providerType as ProviderConfig['providerType']);
+      : (legacyProviderType as ProviderConfig['providerType']);
   const existingModels = Array.isArray((legacy as ProviderConfig).models)
     ? (legacy as ProviderConfig).models.filter((model) => model?.id && model?.kind)
     : [];
