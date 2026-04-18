@@ -192,9 +192,8 @@ pub fn run() {
         .plugin(tauri_plugin_native_bridge::init())
         .plugin(tauri_plugin_native_tts::init());
 
-#[cfg(not(all(target_os = "windows", target_arch = "x86")))]
-let builder = builder.plugin(tauri_plugin_device_info::init());
-
+    #[cfg(not(all(target_os = "windows", target_arch = "x86")))]
+    let builder = builder.plugin(tauri_plugin_device_info::init());
 
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_turso::init());
@@ -218,7 +217,11 @@ let builder = builder.plugin(tauri_plugin_device_info::init());
                 } else {
                     log::warn!("Single-instance callback fired before main window was ready");
                     let app_handle = app.clone();
-                    let deferred_files = if !files.is_empty() { Some(files.clone()) } else { None };
+                    let deferred_files = if !files.is_empty() {
+                        Some(files.clone())
+                    } else {
+                        None
+                    };
                     app.once("window-ready", move |_| {
                         if let Some(files) = deferred_files {
                             set_window_open_with_files(&app_handle, files);
@@ -226,8 +229,8 @@ let builder = builder.plugin(tauri_plugin_device_info::init());
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.set_focus();
                         }
-                        if let Err(error) =
-                            app_handle.emit("single-instance", SingleInstancePayload { args: argv, cwd })
+                        if let Err(error) = app_handle
+                            .emit("single-instance", SingleInstancePayload { args: argv, cwd })
                         {
                             log::warn!("Failed to emit deferred single-instance payload: {error}");
                         }
