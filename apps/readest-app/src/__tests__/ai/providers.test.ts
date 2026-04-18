@@ -87,7 +87,10 @@ describe('OllamaProvider', () => {
     });
     const provider = new OllamaProvider({
       ...DEFAULT_OLLAMA_CONFIG,
-      model: 'llama3',
+      models: [
+        { id: 'llama3', kind: 'chat' },
+        { id: 'nomic-embed-text', kind: 'embedding' },
+      ],
     });
 
     await expect(provider.healthCheck()).resolves.toBe(false);
@@ -101,7 +104,7 @@ describe('AIGatewayProvider', () => {
       name: 'AI Gateway',
       providerType: 'ai-gateway',
       baseUrl: '',
-      model: 'openai/gpt-5.2',
+      models: [{ id: 'openai/gpt-5.2', kind: 'chat' }],
     };
 
     expect(() => new AIGatewayProvider(config)).toThrow('AI Gateway API key required');
@@ -166,7 +169,6 @@ describe('getAIProvider', () => {
       ...DEFAULT_AI_SETTINGS,
       enabled: true,
       providers: [DEFAULT_OLLAMA_CONFIG],
-      activeProviderId: DEFAULT_OLLAMA_CONFIG.id,
     };
     const provider = getAIProvider(settings);
 

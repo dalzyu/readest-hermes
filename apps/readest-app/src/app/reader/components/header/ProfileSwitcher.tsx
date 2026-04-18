@@ -16,8 +16,9 @@ const ProfileSwitcher: React.FC = () => {
 
   return (
     <select
-      className='select select-bordered select-xs bg-base-100 text-base-content h-7 min-h-7 max-w-36'
+      className='select select-bordered select-xs bg-base-100 text-base-content exclude-title-bar-mousedown h-7 min-h-7 max-w-36'
       value={activeProfileId}
+      onMouseDown={(event) => event.stopPropagation()}
       onChange={(event) => {
         const nextSettings = {
           ...settings,

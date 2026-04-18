@@ -65,9 +65,12 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { buildPopupContextBundle } from '@/services/contextTranslation/popupRetrievalService';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
 import { saveLookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
-import { finalizeTranslationWithContext } from '@/services/contextTranslation/translationService';
+import {
+  finalizeTranslationWithContext,
+  streamLookupWithContext,
+} from '@/services/contextTranslation/translationService';
 import { useContextLookup } from '@/hooks/useContextLookup';
-import type { PopupContextBundle } from '@/services/contextTranslation/types';
+import type { PopupContextBundle, TranslationResult } from '@/services/contextTranslation/types';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
 
 const popupContextBundle: PopupContextBundle = {
@@ -171,6 +174,45 @@ describe('useContextLookup', () => {
     );
   });
 
+  test('retains last non-empty dictionary stream fields when final chunk is empty', async () => {
+    vi.mocked(streamLookupWithContext).mockImplementationOnce(async function* () {
+      yield {
+        fields: { simpleDefinition: 'a trusted friend' },
+        activeFieldId: 'simpleDefinition',
+        rawText: '<simpleDefinition>a trusted friend</simpleDefinition>',
+        done: false,
+      };
+      yield {
+        fields: {} as TranslationResult,
+        activeFieldId: null,
+        rawText: '<lookup_json>{}</lookup_json>',
+        done: true,
+      };
+    });
+    vi.mocked(runContextLookup).mockResolvedValueOnce({
+      fields: { simpleDefinition: 'a trusted friend' },
+      examples: [],
+      annotations: {},
+      validationDecision: 'accept',
+      detectedLanguage: { language: 'zh', confidence: 0.9, mixed: false },
+    });
+
+    const { result } = renderHook(() =>
+      useContextLookup({
+        ...defaultProps,
+        mode: 'dictionary',
+      }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(vi.mocked(runContextLookup).mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        mode: 'dictionary',
+        preNormalizedFields: { simpleDefinition: 'a trusted friend' },
+      }),
+    );
+  });
+
   test('captures debug info when developer mode is enabled', async () => {
     vi.mocked(useSettingsStore).mockReturnValue({
       settings: { aiSettings: { developerMode: true } },
@@ -185,6 +227,32 @@ describe('useContextLookup', () => {
     expect(result.current.debugInfo?.systemPrompt).toContain('literary translation assistant');
     expect(result.current.debugInfo?.userPrompt).toContain('<selected_text>知己</selected_text>');
   });
+  test('rebuilds lookup using expanded text when surrounding context provides boundaries', async () => {
+    vi.mocked(buildPopupContextBundle).mockResolvedValue({
+      ...popupContextBundle,
+      localPastContext: 'Hello world',
+    });
+
+    const { result } = renderHook(() =>
+      useContextLookup({
+        ...defaultProps,
+        selectedText: 'ello',
+      }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.expandedText).toBe('Hello');
+
+    const bundleCallTerms = vi
+      .mocked(buildPopupContextBundle)
+      .mock.calls.map((call) => (call[0] as { selectedText: string }).selectedText);
+    expect(bundleCallTerms).toContain('ello');
+    expect(bundleCallTerms).toContain('Hello');
+    expect(vi.mocked(runContextLookup).mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({ selectedText: 'Hello' }),
+    );
+  });
+
   test('does not record blank selections or incomplete results', async () => {
     vi.mocked(runContextLookup).mockResolvedValueOnce({
       fields: {},

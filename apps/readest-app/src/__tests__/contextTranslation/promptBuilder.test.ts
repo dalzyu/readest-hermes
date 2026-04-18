@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
+  TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
   buildTranslationPrompt,
   buildLookupPrompt,
   buildPerFieldPrompt,
+  getMissingPromptTemplateVariables,
 } from '@/services/contextTranslation/promptBuilder';
 import type {
   TranslationOutputField,
@@ -211,6 +214,33 @@ describe('buildTranslationPrompt', () => {
     expect(systemPrompt).toContain('"The user wants me"');
     expect(systemPrompt).toContain('"Analyze the Request"');
   });
+
+  test('applies custom translation system prompt templates when required variables are present', () => {
+    const { systemPrompt } = buildTranslationPrompt({
+      ...baseRequest,
+      sourceLanguage: 'zh',
+      systemPromptTemplate: [
+        'Translate from {{sourceLang}} to {{targetLang}}.',
+        'Order: {{orderedFieldIds}}',
+        '{{fieldInstructions}}',
+        '{{responseTemplate}}',
+        '{{examplesLayoutInstruction}}{{referenceDictionaryInstruction}}{{pairHints}}{{sourceLangHint}}',
+      ].join('\n'),
+    });
+
+    expect(systemPrompt).toContain('Translate from zh to English.');
+    expect(systemPrompt).toContain('Order: translation, contextualMeaning');
+    expect(systemPrompt).toContain('<translation>...</translation>');
+  });
+
+  test('falls back to built-in translation prompt when template misses required variables', () => {
+    const { systemPrompt } = buildTranslationPrompt({
+      ...baseRequest,
+      systemPromptTemplate: 'Target: {{targetLang}} only',
+    });
+
+    expect(systemPrompt).toContain('You are a literary translation assistant.');
+  });
 });
 
 describe('buildLookupPrompt', () => {
@@ -276,6 +306,27 @@ describe('buildLookupPrompt', () => {
     };
     const { userPrompt } = buildTranslationPrompt(req);
     expect(userPrompt).not.toContain('reference_dictionary');
+  });
+});
+
+describe('getMissingPromptTemplateVariables', () => {
+  test('detects missing required translation template variables', () => {
+    const missing = getMissingPromptTemplateVariables(
+      'Translate {{sourceLang}} to {{targetLang}}',
+      TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
+    );
+
+    expect(missing).toContain('fieldInstructions');
+    expect(missing).toContain('responseTemplate');
+  });
+
+  test('returns empty when dictionary template contains all required variables', () => {
+    const missing = getMissingPromptTemplateVariables(
+      DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES.map((variable) => `{{${variable}}}`).join('\n'),
+      DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
+    );
+
+    expect(missing).toEqual([]);
   });
 });
 

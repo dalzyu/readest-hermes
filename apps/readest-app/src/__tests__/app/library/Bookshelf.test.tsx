@@ -1,10 +1,11 @@
 import React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Book } from '@/types/book';
 import Bookshelf from '@/app/library/components/Bookshelf';
 import { readingStatsService } from '@/services/readingStats/readingStatsService';
+import { navigateToLibrary } from '@/utils/nav';
 
 const searchParamsState = vi.hoisted(() => ({}) as Record<string, string>);
 
@@ -125,6 +126,7 @@ vi.mock('@/app/library/components/SetStatusAlert', () => ({
 }));
 
 const mockGetDailyStats = vi.mocked(readingStatsService.getDailyStats);
+const mockNavigateToLibrary = vi.mocked(navigateToLibrary);
 
 const makeBook = (overrides: Partial<Book> = {}): Book => ({
   hash: 'book-1',
@@ -222,5 +224,24 @@ describe('Bookshelf', () => {
 
     expect(screen.queryByRole('heading', { name: 'Reading stats' })).toBeNull();
     expect(screen.queryByText('From saved reading sessions')).toBeNull();
+  });
+  test('switching from My Series to My Books clears series-only params', () => {
+    renderBookshelf({ surface: 'series', groupBy: 'series', group: 'series-1' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'My Books' }));
+
+    expect(mockNavigateToLibrary).toHaveBeenCalled();
+    const latestQuery = mockNavigateToLibrary.mock.calls.at(-1)?.[1];
+    expect(latestQuery).toBe('surface=books');
+  });
+
+  test('switching from My Books to My Series sets explicit surface mode', () => {
+    renderBookshelf({ surface: 'books' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'My Series' }));
+
+    expect(mockNavigateToLibrary).toHaveBeenCalled();
+    const latestQuery = mockNavigateToLibrary.mock.calls.at(-1)?.[1];
+    expect(latestQuery).toBe('surface=series');
   });
 });

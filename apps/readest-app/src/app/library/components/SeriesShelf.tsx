@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
+import { eventDispatcher } from '@/utils/event';
 import { getAllSeries } from '@/services/contextTranslation/seriesService';
 import type { Book } from '@/types/book';
 import type { BookSeries } from '@/services/contextTranslation/types';
@@ -25,6 +26,15 @@ const SeriesShelf: React.FC<SeriesShelfProps> = ({ libraryBooks }) => {
     loadSeries();
   }, [loadSeries]);
 
+  useEffect(() => {
+    const handleSeriesUpdated = () => {
+      void loadSeries();
+    };
+    eventDispatcher.on('series-updated', handleSeriesUpdated);
+    return () => {
+      eventDispatcher.off('series-updated', handleSeriesUpdated);
+    };
+  }, [loadSeries]);
   if (seriesList.length === 0) {
     return (
       <div className='text-base-content/60 px-4 py-10 text-center text-sm'>

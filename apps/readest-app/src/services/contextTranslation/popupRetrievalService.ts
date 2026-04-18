@@ -44,14 +44,19 @@ function formatChunk(chunk: ScoredChunk, prefix?: string): string {
   return `[${header}] ${chunk.text}`;
 }
 
+const RETRIEVAL_QUERY_TAIL_CHARS = 480;
+const RETRIEVAL_QUERY_FUTURE_CHARS = 240;
+const SAME_BOOK_SEARCH_MULTIPLIER = 3;
+const PRIOR_VOLUME_SEARCH_MULTIPLIER = 2;
+
 function buildRetrievalQuery(
   selectedText: string,
   localPastContext: string,
   localFutureBuffer: string,
   currentSentence: string,
 ): string {
-  const tailContext = localPastContext.slice(-240);
-  const headFuture = localFutureBuffer.slice(0, 120);
+  const tailContext = localPastContext.slice(-RETRIEVAL_QUERY_TAIL_CHARS);
+  const headFuture = localFutureBuffer.slice(0, RETRIEVAL_QUERY_FUTURE_CHARS);
   return [selectedText, currentSentence, tailContext, headFuture].filter(Boolean).join('\n');
 }
 
@@ -107,6 +112,20 @@ function chunkMatchesSentence(chunk: ScoredChunk, sentenceHash: string): boolean
   return splitChunkIntoSentences(chunk.text).some(
     (sentence) => hashSentence(sentence) === sentenceHash,
   );
+}
+
+function dedupeByChunkText<T extends { text: string }>(chunks: T[]): T[] {
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const chunk of chunks) {
+    const key = chunk.text.replace(/\s+/gu, ' ').trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(chunk);
+  }
+
+  return deduped;
 }
 
 export async function buildPopupContextBundle({
@@ -186,13 +205,24 @@ export async function buildPopupContextBundle({
     priorVolumeChunks = cached.priorVolumeChunks;
     missingPriorVolumes = cached.missingPriorVolumes;
   } else {
+    const sameBookSearchTopK = Math.max(
+      settings.sameBookChunkCount,
+      settings.sameBookChunkCount * SAME_BOOK_SEARCH_MULTIPLIER,
+    );
+    const priorVolumeSearchTopK = Math.max(
+      settings.priorVolumeChunkCount,
+      settings.priorVolumeChunkCount * PRIOR_VOLUME_SEARCH_MULTIPLIER,
+    );
+
     const sameBookPromise =
       settings.sameBookRagEnabled && localContext.windowStartPage > 1
-        ? boundedHybridSearch(bookHash, query, aiSettings, settings.sameBookChunkCount, {
+        ? boundedHybridSearch(bookHash, query, aiSettings, sameBookSearchTopK, {
             maxPage: localContext.windowStartPage - 1,
           }).then((chunks) =>
-            chunks
-              .filter((chunk) => !chunkMatchesSentence(chunk, currentSentenceHash))
+            dedupeByChunkText(
+              chunks.filter((chunk) => !chunkMatchesSentence(chunk, currentSentenceHash)),
+            )
+              .slice(0, settings.sameBookChunkCount)
               .map((chunk) => formatChunk(chunk)),
           )
         : Promise.resolve([] as string[]);
@@ -212,7 +242,7 @@ export async function buildPopupContextBundle({
               volume.bookHash,
               query,
               aiSettings,
-              settings.priorVolumeChunkCount,
+              priorVolumeSearchTopK,
             );
             return results.map((chunk) => ({
               text: formatChunk(chunk, volume.label ?? `Vol. ${volume.volumeIndex}`),
@@ -230,9 +260,9 @@ export async function buildPopupContextBundle({
     ]);
 
     sameBookChunks = sameBookResult;
-    priorVolumeChunks = priorVolumeResultArrays
-      .flat()
-      .sort((a, b) => b.score - a.score)
+    priorVolumeChunks = dedupeByChunkText(
+      priorVolumeResultArrays.flat().sort((a, b) => b.score - a.score),
+    )
       .slice(0, settings.priorVolumeChunkCount)
       .map((chunk) => chunk.text);
 

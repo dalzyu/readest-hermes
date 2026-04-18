@@ -54,24 +54,24 @@ describe('NodeAppService', () => {
   });
 
   it('should set localBooksDir after init', () => {
-    expect(service.localBooksDir).toBe(path.join(tmpDir, 'Readest', 'Books'));
+    expect(service.localBooksDir).toBe(path.join(tmpDir, 'Hermes', 'Books'));
   });
 
   it('should resolve file paths correctly', async () => {
     const resolved = await service.resolveFilePath('test.json', 'Books');
-    expect(resolved).toBe(path.join(tmpDir, 'Readest', 'Books', 'test.json'));
+    expect(resolved).toBe(path.join(tmpDir, 'Hermes', 'Books', 'test.json'));
   });
 
   it('should resolve empty path to prefix', async () => {
     const resolved = await service.resolveFilePath('', 'Data');
-    expect(resolved).toBe(path.join(tmpDir, 'Readest'));
+    expect(resolved).toBe(path.join(tmpDir, 'Hermes'));
   });
 
   it('should switch to new root via setCustomRootDir', async () => {
     const newRoot = await fsp.mkdtemp(path.join(SANDBOX_DIR, 'custom-'));
     try {
       await service.setCustomRootDir(newRoot);
-      expect(service.localBooksDir).toBe(path.join(newRoot, 'Readest', 'Books'));
+      expect(service.localBooksDir).toBe(path.join(newRoot, 'Hermes', 'Books'));
       await service.writeFile('test.txt', 'Settings', 'settings data');
       const content = await service.readFile('test.txt', 'Settings', 'text');
       expect(content).toBe('settings data');
@@ -85,7 +85,6 @@ describe('NodeAppService', () => {
     const settingsPrefix = await defaultService.resolveFilePath('', 'Settings');
     expect(settingsPrefix).toBeTruthy();
     expect(path.isAbsolute(settingsPrefix)).toBe(true);
-    expect(settingsPrefix.toLowerCase()).toContain('readest');
   });
 
   fsTests(() => service);

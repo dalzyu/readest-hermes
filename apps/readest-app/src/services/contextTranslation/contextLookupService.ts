@@ -32,6 +32,7 @@ export interface ContextLookupRequest {
   sourceLanguage?: string;
   outputFields: TranslationOutputField[];
   dictionarySettings?: ContextDictionarySettings;
+  systemPromptTemplate?: string;
 
   model?: LanguageModel;
   abortSignal?: AbortSignal;
@@ -200,6 +201,7 @@ export async function runContextLookup(
     sourceLanguage,
     outputFields: effectiveOutputFields,
     dictionarySettings: request.dictionarySettings,
+    systemPromptTemplate: request.systemPromptTemplate,
   });
 
   const runAttempt = async (
@@ -290,6 +292,7 @@ export async function runContextLookup(
     attempt.fields,
     request.selectedText,
     request.targetLanguage,
+    request.mode === 'dictionary' ? { allowIncomplete: true } : undefined,
   );
   const sourceAnnotations = plugins.source.enrichSourceAnnotations?.(
     attempt.fields,

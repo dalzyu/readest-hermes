@@ -149,11 +149,19 @@ const Bookshelf: React.FC<BookshelfProps> = ({
 
   const handleSetSurfaceMode = useCallback(
     (mode: LibrarySurfaceModeType) => {
+      const currentGroupBy = searchParams?.get('groupBy');
+      const nextGroupBy =
+        mode === 'series'
+          ? null
+          : currentGroupBy === LibraryGroupByType.Series
+            ? null
+            : currentGroupBy || null;
+
       startTransition(() => {
         updateUrlParams({
-          surface: mode === 'series' ? 'series' : null,
+          surface: mode,
           group: null,
-          groupBy: mode === 'series' ? null : searchParams?.get('groupBy') || null,
+          groupBy: nextGroupBy,
         });
       });
     },
@@ -431,14 +439,17 @@ const Bookshelf: React.FC<BookshelfProps> = ({
     viewMode === 'grid' && shouldVirtualize && settings.libraryAutoColumns;
   const shouldVirtualizeList = viewMode === 'list' && shouldVirtualize;
   const showImportTile = viewMode === 'grid' && currentBookshelfItems.length > 0;
+  const usesVirtualizedSurface = shouldVirtualizeGrid || shouldVirtualizeList;
   const gridListClassName = clsx(
-    'grid grid-cols-3 gap-x-4 px-4 sm:gap-x-0 sm:px-2',
+    'grid auto-rows-max content-start grid-cols-3 gap-x-4 px-4 sm:gap-x-0 sm:px-2',
     'sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-12',
   );
 
   const renderImportTile = () => (
     <div
-      className={clsx('bookshelf-import-item mx-0 my-2 sm:mx-4 sm:my-4')}
+      className={clsx(
+        'book-item bookshelf-import-item mx-0 my-2 flex h-full flex-col justify-end sm:mx-4 sm:my-4',
+      )}
       style={
         coverFit === 'fit' && viewMode === 'grid'
           ? {
@@ -497,17 +508,18 @@ const Bookshelf: React.FC<BookshelfProps> = ({
             tabIndex={-1}
             className={clsx(
               'bookshelf-items transform-wrapper h-full focus:outline-none',
-              !shouldVirtualizeGrid &&
+              usesVirtualizedSurface && 'flex min-h-0 flex-col',
+              !usesVirtualizedSurface &&
                 viewMode === 'grid' &&
-                'grid flex-1 grid-cols-3 gap-x-4 px-4 sm:gap-x-0 sm:px-2',
-              !shouldVirtualizeGrid &&
+                'grid flex-1 auto-rows-max grid-cols-3 content-start gap-x-4 px-4 sm:gap-x-0 sm:px-2',
+              !usesVirtualizedSurface &&
                 viewMode === 'grid' &&
                 'sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-12',
-              !shouldVirtualizeList && viewMode === 'list' && 'flex flex-col',
+              !usesVirtualizedSurface && viewMode === 'list' && 'flex flex-col',
             )}
             style={{
               gridTemplateColumns:
-                !shouldVirtualizeGrid && viewMode === 'grid' && !settings.libraryAutoColumns
+                !usesVirtualizedSurface && viewMode === 'grid' && !settings.libraryAutoColumns
                   ? `repeat(${settings.libraryColumns}, minmax(0, 1fr))`
                   : undefined,
             }}
@@ -517,29 +529,33 @@ const Bookshelf: React.FC<BookshelfProps> = ({
             {showLibraryStatsCard && (
               <LibraryStatsCard
                 className={clsx(
-                  !shouldVirtualizeGrid && viewMode === 'grid' ? 'col-span-full' : 'mx-4',
+                  !usesVirtualizedSurface && viewMode === 'grid' ? 'col-span-full' : 'mx-4',
                   'mb-4',
                 )}
               />
             )}
-            {shouldVirtualizeGrid ? (
-              <VirtuosoGrid
-                style={{ height: '100%' }}
-                totalCount={sortedBookshelfItems.length + (showImportTile ? 1 : 0)}
-                listClassName={gridListClassName}
-                itemContent={(index) => {
-                  if (showImportTile && index === sortedBookshelfItems.length) {
-                    return renderImportTile();
-                  }
-                  return renderBookshelfItem(sortedBookshelfItems[index]!);
-                }}
-              />
-            ) : shouldVirtualizeList ? (
-              <Virtuoso
-                style={{ height: '100%' }}
-                totalCount={sortedBookshelfItems.length}
-                itemContent={(index) => renderBookshelfItem(sortedBookshelfItems[index]!)}
-              />
+            {usesVirtualizedSurface ? (
+              <div className='min-h-0 flex-1'>
+                {shouldVirtualizeGrid ? (
+                  <VirtuosoGrid
+                    style={{ height: '100%' }}
+                    totalCount={sortedBookshelfItems.length + (showImportTile ? 1 : 0)}
+                    listClassName={gridListClassName}
+                    itemContent={(index) => {
+                      if (showImportTile && index === sortedBookshelfItems.length) {
+                        return renderImportTile();
+                      }
+                      return renderBookshelfItem(sortedBookshelfItems[index]!);
+                    }}
+                  />
+                ) : (
+                  <Virtuoso
+                    style={{ height: '100%' }}
+                    totalCount={sortedBookshelfItems.length}
+                    itemContent={(index) => renderBookshelfItem(sortedBookshelfItems[index]!)}
+                  />
+                )}
+              </div>
             ) : (
               <>
                 {sortedBookshelfItems.map((item) =>

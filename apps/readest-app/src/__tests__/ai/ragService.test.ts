@@ -112,10 +112,12 @@ describe('ragService', () => {
       config: {
         id: 'oc-test',
         name: 'OpenAI-Compatible',
-        providerType: 'openai-compatible',
+        providerType: 'openai',
         baseUrl: 'http://127.0.0.1:8080',
-        model: 'test-llm',
-        embeddingModel: 'embeddinggemma',
+        models: [
+          { id: 'test-llm', kind: 'chat' },
+          { id: 'embeddinggemma', kind: 'embedding' },
+        ],
       },
     });
     mockEmbed.mockResolvedValue({ embedding: [0.1, 0.2] });
@@ -133,13 +135,14 @@ describe('ragService', () => {
         {
           id: 'oc-test',
           name: 'OpenAI-Compatible',
-          providerType: 'openai-compatible',
+          providerType: 'openai',
           baseUrl: 'http://127.0.0.1:8080',
-          model: 'test-llm',
-          embeddingModel: 'embeddinggemma',
+          models: [
+            { id: 'test-llm', kind: 'chat' },
+            { id: 'embeddinggemma', kind: 'embedding' },
+          ],
         },
       ],
-      activeProviderId: 'oc-test',
     };
     const bookDoc = {
       metadata: { title: 'Large Book', author: 'Tester' },
@@ -190,13 +193,14 @@ describe('ragService', () => {
         {
           id: 'oc-test',
           name: 'OpenAI-Compatible',
-          providerType: 'openai-compatible',
+          providerType: 'openai',
           baseUrl: 'http://127.0.0.1:8080',
-          model: 'test-llm',
-          embeddingModel: 'embeddinggemma',
+          models: [
+            { id: 'test-llm', kind: 'chat' },
+            { id: 'embeddinggemma', kind: 'embedding' },
+          ],
         },
       ],
-      activeProviderId: 'oc-test',
     };
     const bookDoc = {
       metadata: { title: 'Partially Broken Book', author: 'Tester' },

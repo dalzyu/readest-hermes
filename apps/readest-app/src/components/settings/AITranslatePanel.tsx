@@ -18,11 +18,20 @@ import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
   UserDictionary,
+  ContextDictionaryFieldSource,
 } from '@/services/contextTranslation/types';
 import {
+  DEFAULT_CONTEXT_DICTIONARY_FIELD_SOURCES,
+  DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS,
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+  resolveContextDictionaryFieldSources,
 } from '@/services/contextTranslation/defaults';
+import {
+  DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
+  TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
+  getMissingPromptTemplateVariables,
+} from '@/services/contextTranslation/promptBuilder';
 
 const DEFAULT_BY_ID: Record<string, string> = Object.fromEntries(
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields.map((f) => [f.id, f.promptInstruction]),
@@ -47,6 +56,7 @@ const AITranslatePanel: React.FC = () => {
   const { settings, setSettings, saveSettings } = useSettingsStore();
 
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
+  const developerMode = settings?.aiSettings?.developerMode === true;
 
   const ctxTransSettings: ContextTranslationSettings =
     settings?.globalReadSettings?.contextTranslation ?? DEFAULT_CONTEXT_TRANSLATION_SETTINGS;
@@ -85,6 +95,24 @@ const AITranslatePanel: React.FC = () => {
   const [ctxDictSourceExamples, setCtxDictSourceExamples] = useState(
     ctxDictSettings.sourceExamples,
   );
+  const [ctxDictFieldSources, setCtxDictFieldSources] = useState(
+    resolveContextDictionaryFieldSources(ctxDictSettings),
+  );
+  const [ctxDictPromptInstructions, setCtxDictPromptInstructions] = useState(
+    ctxDictSettings.promptInstructions ?? {},
+  );
+  const [ctxSystemPromptTemplate, setCtxSystemPromptTemplate] = useState(
+    ctxTransSettings.systemPromptTemplate ?? '',
+  );
+  const [ctxSystemPromptTemplateError, setCtxSystemPromptTemplateError] = useState<string | null>(
+    null,
+  );
+  const [ctxDictSystemPromptTemplate, setCtxDictSystemPromptTemplate] = useState(
+    ctxDictSettings.systemPromptTemplate ?? '',
+  );
+  const [ctxDictSystemPromptTemplateError, setCtxDictSystemPromptTemplateError] = useState<
+    string | null
+  >(null);
   const [userDictionaries, setUserDictionaries] = useState<UserDictionary[]>(
     settings?.userDictionaryMeta ?? [],
   );
@@ -160,6 +188,25 @@ const AITranslatePanel: React.FC = () => {
     [envConfig, setSettings, saveSettings],
   );
 
+  const resolvedDictFieldSources = {
+    ...DEFAULT_CONTEXT_DICTIONARY_FIELD_SOURCES,
+    ...ctxDictFieldSources,
+  };
+  const ctxDictOutputFields = DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS.map((field) => {
+    const source =
+      field.id === 'simpleDefinition'
+        ? resolvedDictFieldSources.simpleDefinition
+        : field.id === 'contextualMeaning'
+          ? resolvedDictFieldSources.contextualMeaning
+          : resolvedDictFieldSources.sourceExamples;
+    const enabled = source === 'ai' && (field.id !== 'sourceExamples' || ctxDictSourceExamples);
+    return {
+      ...field,
+      enabled,
+      promptInstruction: ctxDictPromptInstructions[field.id] ?? field.promptInstruction,
+    };
+  });
+
   const updateSource = useCallback(
     (source: TranslationSource) => {
       setCtxSource(source);
@@ -186,6 +233,94 @@ const AITranslatePanel: React.FC = () => {
     },
     [updatePrompt],
   );
+
+  const updateDictFieldSource = useCallback(
+    (fieldId: string, source: ContextDictionaryFieldSource) => {
+      if (!['simpleDefinition', 'contextualMeaning', 'sourceExamples'].includes(fieldId)) return;
+      const key = fieldId as keyof typeof DEFAULT_CONTEXT_DICTIONARY_FIELD_SOURCES;
+      const next = { ...resolvedDictFieldSources, [key]: source };
+      setCtxDictFieldSources(next);
+      saveCtxDictSetting({ fieldSources: next });
+    },
+    [resolvedDictFieldSources, saveCtxDictSetting],
+  );
+
+  const updateDictPrompt = useCallback(
+    (fieldId: string, instruction: string) => {
+      const next = { ...ctxDictPromptInstructions, [fieldId]: instruction };
+      setCtxDictPromptInstructions(next);
+      saveCtxDictSetting({ promptInstructions: next });
+    },
+    [ctxDictPromptInstructions, saveCtxDictSetting],
+  );
+
+  const resetDictPromptToDefault = useCallback(
+    (fieldId: string) => {
+      const next = { ...ctxDictPromptInstructions };
+      delete next[fieldId];
+      setCtxDictPromptInstructions(next);
+      saveCtxDictSetting({ promptInstructions: next });
+    },
+    [ctxDictPromptInstructions, saveCtxDictSetting],
+  );
+
+  const saveTranslationSystemPromptTemplate = useCallback(() => {
+    const template = ctxSystemPromptTemplate.trim();
+    if (!template) {
+      setCtxSystemPromptTemplateError(null);
+      saveCtxTransSetting({ systemPromptTemplate: undefined });
+      return;
+    }
+    const missing = getMissingPromptTemplateVariables(
+      template,
+      TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
+    );
+    if (missing.length > 0) {
+      setCtxSystemPromptTemplateError(
+        _('Missing required variables: {{vars}}', {
+          vars: missing.map((variable) => `{{${variable}}}`).join(', '),
+        }),
+      );
+      return;
+    }
+    setCtxSystemPromptTemplateError(null);
+    saveCtxTransSetting({ systemPromptTemplate: template });
+  }, [ctxSystemPromptTemplate, saveCtxTransSetting, _]);
+
+  const saveDictionarySystemPromptTemplate = useCallback(() => {
+    const template = ctxDictSystemPromptTemplate.trim();
+    if (!template) {
+      setCtxDictSystemPromptTemplateError(null);
+      saveCtxDictSetting({ systemPromptTemplate: undefined });
+      return;
+    }
+    const missing = getMissingPromptTemplateVariables(
+      template,
+      DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
+    );
+    if (missing.length > 0) {
+      setCtxDictSystemPromptTemplateError(
+        _('Missing required variables: {{vars}}', {
+          vars: missing.map((variable) => `{{${variable}}}`).join(', '),
+        }),
+      );
+      return;
+    }
+    setCtxDictSystemPromptTemplateError(null);
+    saveCtxDictSetting({ systemPromptTemplate: template });
+  }, [ctxDictSystemPromptTemplate, saveCtxDictSetting, _]);
+
+  const resetTranslationSystemPromptTemplate = useCallback(() => {
+    setCtxSystemPromptTemplate('');
+    setCtxSystemPromptTemplateError(null);
+    saveCtxTransSetting({ systemPromptTemplate: undefined });
+  }, [saveCtxTransSetting]);
+
+  const resetDictionarySystemPromptTemplate = useCallback(() => {
+    setCtxDictSystemPromptTemplate('');
+    setCtxDictSystemPromptTemplateError(null);
+    saveCtxDictSetting({ systemPromptTemplate: undefined });
+  }, [saveCtxDictSetting]);
 
   // Sync userDictionaries from settings
   useEffect(() => {
@@ -652,6 +787,53 @@ const AITranslatePanel: React.FC = () => {
                     )}
                   </div>
                 ))}
+              {developerMode && (
+                <div className='border-base-200 border-t px-4 py-3'>
+                  <div className='text-warning text-xs font-semibold'>
+                    {_(
+                      'Danger zone: invalid templates can break lookups. Keep all required variables.',
+                    )}
+                  </div>
+                  <p className='text-base-content/60 mt-2 text-xs'>
+                    {_('Template variables use Jinja syntax.')} <code>{'{{targetLang}}'}</code>,{' '}
+                    <code>{'{{sourceLang}}'}</code>.
+                  </p>
+                  <p className='text-base-content/60 mt-1 text-xs'>
+                    {_('Required variables')}:{' '}
+                    {TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES.map(
+                      (variable) => `{{${variable}}}`,
+                    ).join(', ')}
+                  </p>
+                  <textarea
+                    data-testid='translation-system-prompt-template'
+                    className='textarea textarea-bordered mt-2 w-full text-sm'
+                    rows={8}
+                    value={ctxSystemPromptTemplate}
+                    onChange={(event) => {
+                      setCtxSystemPromptTemplate(event.target.value);
+                      setCtxSystemPromptTemplateError(null);
+                    }}
+                    placeholder={_('Leave empty to use the built-in system prompt')}
+                  />
+                  {ctxSystemPromptTemplateError && (
+                    <p className='text-error mt-2 text-xs'>{ctxSystemPromptTemplateError}</p>
+                  )}
+                  <div className='mt-2 flex gap-2'>
+                    <button
+                      className='btn btn-primary btn-sm'
+                      onClick={saveTranslationSystemPromptTemplate}
+                    >
+                      {_('Save template')}
+                    </button>
+                    <button
+                      className='btn btn-ghost btn-sm'
+                      onClick={resetTranslationSystemPromptTemplate}
+                    >
+                      {_('Reset to built-in prompt')}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -704,6 +886,115 @@ const AITranslatePanel: React.FC = () => {
                 }}
               />
             </div>
+            {ctxDictOutputFields.map((field) => {
+              const source =
+                field.id === 'simpleDefinition'
+                  ? resolvedDictFieldSources.simpleDefinition
+                  : field.id === 'contextualMeaning'
+                    ? resolvedDictFieldSources.contextualMeaning
+                    : resolvedDictFieldSources.sourceExamples;
+              const aiSelected = source === 'ai';
+              const sourceControlDisabled =
+                !ctxDictEnabled || (field.id === 'sourceExamples' && !ctxDictSourceExamples);
+
+              return (
+                <div key={field.id} className='border-base-200 border-t px-4 py-2'>
+                  <div className='config-item !px-0'>
+                    <span className='text-sm'>{_(field.label)}</span>
+                    <select
+                      data-testid={`dictionary-source-${field.id}`}
+                      className='select select-bordered select-xs'
+                      value={source}
+                      disabled={sourceControlDisabled}
+                      onChange={(e) =>
+                        updateDictFieldSource(
+                          field.id,
+                          e.target.value as ContextDictionaryFieldSource,
+                        )
+                      }
+                    >
+                      <option value='dictionary'>{_('Dictionary')}</option>
+                      <option value='ai' disabled={!aiEnabled}>
+                        {_('AI')}
+                        {!aiEnabled ? ` (${_('Enable AI first')})` : ''}
+                      </option>
+                    </select>
+                  </div>
+
+                  {aiSelected && field.enabled && (
+                    <details>
+                      <summary className='text-base-content/60 cursor-pointer text-sm'>
+                        {_('Advanced')}
+                      </summary>
+                      <div className='space-y-2 pl-4 pt-2'>
+                        <label className='text-sm'>{_('Prompt instruction:')}</label>
+                        <textarea
+                          data-testid={`dictionary-prompt-textarea-${field.id}`}
+                          className='textarea textarea-bordered w-full text-sm'
+                          rows={3}
+                          value={field.promptInstruction}
+                          onChange={(e) => updateDictPrompt(field.id, e.target.value)}
+                        />
+                        <button
+                          data-testid={`dictionary-reset-prompt-${field.id}`}
+                          className='btn btn-ghost btn-sm'
+                          onClick={() => resetDictPromptToDefault(field.id)}
+                        >
+                          {_('Reset to defaults')}
+                        </button>
+                      </div>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
+            {developerMode && (
+              <div className='border-base-200 border-t px-4 py-3'>
+                <div className='text-warning text-xs font-semibold'>
+                  {_(
+                    'Danger zone: invalid templates can break dictionary lookups. Keep all required variables.',
+                  )}
+                </div>
+                <p className='text-base-content/60 mt-2 text-xs'>
+                  {_('Template variables use Jinja syntax.')} <code>{'{{sourceLang}}'}</code>,{' '}
+                  <code>{'{{fieldInstructions}}'}</code>.
+                </p>
+                <p className='text-base-content/60 mt-1 text-xs'>
+                  {_('Required variables')}:{' '}
+                  {DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES.map(
+                    (variable) => `{{${variable}}}`,
+                  ).join(', ')}
+                </p>
+                <textarea
+                  data-testid='dictionary-system-prompt-template'
+                  className='textarea textarea-bordered mt-2 w-full text-sm'
+                  rows={8}
+                  value={ctxDictSystemPromptTemplate}
+                  onChange={(event) => {
+                    setCtxDictSystemPromptTemplate(event.target.value);
+                    setCtxDictSystemPromptTemplateError(null);
+                  }}
+                  placeholder={_('Leave empty to use the built-in system prompt')}
+                />
+                {ctxDictSystemPromptTemplateError && (
+                  <p className='text-error mt-2 text-xs'>{ctxDictSystemPromptTemplateError}</p>
+                )}
+                <div className='mt-2 flex gap-2'>
+                  <button
+                    className='btn btn-primary btn-sm'
+                    onClick={saveDictionarySystemPromptTemplate}
+                  >
+                    {_('Save template')}
+                  </button>
+                  <button
+                    className='btn btn-ghost btn-sm'
+                    onClick={resetDictionarySystemPromptTemplate}
+                  >
+                    {_('Reset to built-in prompt')}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

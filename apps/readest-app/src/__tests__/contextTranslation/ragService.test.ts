@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { BookDocType } from '@/services/ai/ragService';
+import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 import type { AISettings, EmbeddingProgress } from '@/services/ai/types';
 
 // --- Mocks ---
@@ -97,6 +98,7 @@ function makeSection(id: string, text: string, size?: number) {
 }
 
 const baseSettings: AISettings = {
+  ...DEFAULT_AI_SETTINGS,
   enabled: true,
   providers: [
     {
@@ -104,12 +106,12 @@ const baseSettings: AISettings = {
       name: 'Test',
       providerType: 'openai',
       baseUrl: 'http://localhost',
-      model: 'gpt-4',
-      embeddingModel: 'text-embedding-3-small',
+      models: [
+        { id: 'gpt-4', kind: 'chat' },
+        { id: 'text-embedding-3-small', kind: 'embedding' },
+      ],
     },
   ],
-  activeProviderId: 'p1',
-  modelAssignments: {},
   spoilerProtection: false,
   maxContextChunks: 5,
   indexingMode: 'on-demand',

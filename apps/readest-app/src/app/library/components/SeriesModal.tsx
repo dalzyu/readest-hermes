@@ -93,6 +93,10 @@ const SeriesModal: React.FC = () => {
     }
   };
 
+  const notifySeriesUpdated = () => {
+    void eventDispatcher.dispatch('series-updated');
+  };
+
   const handleAddToSeries = async (seriesId: string) => {
     if (!bookHash) return;
 
@@ -102,12 +106,14 @@ const SeriesModal: React.FC = () => {
 
     await addBookToSeries(seriesId, bookHash);
     await refreshCurrentBook();
+    notifySeriesUpdated();
   };
 
   const handleRemoveFromSeries = async () => {
     if (!bookHash || !currentSeries) return;
     await removeBookFromSeries(currentSeries.id, bookHash);
     await refreshCurrentBook();
+    notifySeriesUpdated();
   };
 
   const handleCreateAndAdd = async () => {
@@ -116,11 +122,13 @@ const SeriesModal: React.FC = () => {
     setNewSeriesName('');
     setCreating(false);
     await refreshCurrentBook();
+    notifySeriesUpdated();
   };
 
   const handleDeleteSeries = async (id: string) => {
     await deleteSeries(id);
     await refreshCurrentBook();
+    notifySeriesUpdated();
   };
 
   const handleVolumeIndexBlur = async (targetBookHash: string, value: string) => {
@@ -129,12 +137,14 @@ const SeriesModal: React.FC = () => {
     if (!Number.isFinite(parsed) || parsed <= 0) return;
     await updateSeriesVolume(currentSeries.id, targetBookHash, { volumeIndex: parsed });
     await refreshCurrentBook();
+    notifySeriesUpdated();
   };
 
   const handleVolumeLabelBlur = async (targetBookHash: string, value: string) => {
     if (!currentSeries) return;
     await updateSeriesVolume(currentSeries.id, targetBookHash, { label: value });
     await refreshCurrentBook();
+    notifySeriesUpdated();
   };
 
   const handleIndexAll = async () => {
@@ -191,7 +201,7 @@ const SeriesModal: React.FC = () => {
                 return (
                   <li
                     key={volume.bookHash}
-                    className='border-base-300 grid grid-cols-[64px,1fr,auto] items-center gap-2 rounded-lg border px-2 py-2'
+                    className='border-base-300 grid grid-cols-[64px,minmax(0,1fr),auto] items-center gap-2 overflow-hidden rounded-lg border px-2 py-2'
                   >
                     <input
                       type='number'
@@ -203,7 +213,7 @@ const SeriesModal: React.FC = () => {
                       })}
                       onBlur={(event) => handleVolumeIndexBlur(volume.bookHash, event.target.value)}
                     />
-                    <div className='space-y-1'>
+                    <div className='min-w-0 space-y-1'>
                       <input
                         type='text'
                         className='input input-bordered input-xs w-full'
@@ -220,7 +230,7 @@ const SeriesModal: React.FC = () => {
                       </div>
                     </div>
                     <span
-                      className={`rounded-full px-2 py-1 text-xs ${
+                      className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs ${
                         indexed ? 'bg-success/15 text-success' : 'bg-base-300 text-base-content/60'
                       }`}
                     >

@@ -176,40 +176,52 @@ export function useContextLookup({
 
     const run = async () => {
       try {
-        // Optionally expand selection to word boundaries
         const autoExpand = requestSnapshot.settings.autoExpandSelection !== false;
-        const lookupText = autoExpand ? expandToWordBoundary(selectedText, '') : selectedText;
-        if (lookupText !== selectedText) {
-          setExpandedText(lookupText);
-        }
-
-        // Pre-detect language so dictionary lookup can start concurrently with RAG
-        const detectedLanguage = detectLookupLanguage(lookupText, bookLanguage);
-
-        // Launch bundle building (with prefetch check) and dictionary lookup in parallel
+        let lookupText = selectedText;
+        let detectedLanguage = detectLookupLanguage(lookupText, bookLanguage);
         const dictEnabled = requestSnapshot.settings.referenceDictionaryEnabled !== false;
 
-        const [bundle, rawDictEntries] = await Promise.all([
-          consumePrefetch(bookHash, requestSnapshot.currentPage, lookupText).then(
-            (prefetched) =>
-              prefetched ??
-              buildPopupContextBundle({
-                bookKey,
-                bookHash,
-                currentPage: requestSnapshot.currentPage,
-                selectedText: lookupText,
-                settings: requestSnapshot.settings,
-                aiSettings: requestSnapshot.aiSettings,
-              }),
-          ),
-          dictEnabled
-            ? lookupDefinitions(
-                lookupText,
-                detectedLanguage.language,
-                requestSnapshot.settings.targetLanguage,
-              ).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>)
-            : Promise.resolve([] as Awaited<ReturnType<typeof lookupDefinitions>>),
-        ]);
+        const fetchBundleAndDictionary = async (term: string, sourceLanguage: string) => {
+          const [nextBundle, nextRawDictEntries] = await Promise.all([
+            consumePrefetch(bookHash, requestSnapshot.currentPage, term).then(
+              (prefetched) =>
+                prefetched ??
+                buildPopupContextBundle({
+                  bookKey,
+                  bookHash,
+                  currentPage: requestSnapshot.currentPage,
+                  selectedText: term,
+                  settings: requestSnapshot.settings,
+                  aiSettings: requestSnapshot.aiSettings,
+                }),
+            ),
+            dictEnabled
+              ? lookupDefinitions(
+                  term,
+                  sourceLanguage,
+                  requestSnapshot.settings.targetLanguage,
+                ).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>)
+              : Promise.resolve([] as Awaited<ReturnType<typeof lookupDefinitions>>),
+          ]);
+          return { nextBundle, nextRawDictEntries };
+        };
+
+        let { nextBundle: bundle, nextRawDictEntries: rawDictEntries } =
+          await fetchBundleAndDictionary(lookupText, detectedLanguage.language);
+
+        if (autoExpand) {
+          const expansionContext = [bundle.localPastContext, lookupText, bundle.localFutureBuffer]
+            .filter(Boolean)
+            .join('\n');
+          const expanded = expandToWordBoundary(lookupText, expansionContext);
+          if (expanded !== lookupText) {
+            lookupText = expanded;
+            setExpandedText(expanded);
+            detectedLanguage = detectLookupLanguage(lookupText, bookLanguage);
+            ({ nextBundle: bundle, nextRawDictEntries: rawDictEntries } =
+              await fetchBundleAndDictionary(lookupText, detectedLanguage.language));
+          }
+        }
 
         // Build string entries for LLM prompt + structured results for display
         const dictionaryEntries = rawDictEntries.map((e) => `${e.headword}: ${e.definition}`);
@@ -288,6 +300,7 @@ export function useContextLookup({
             targetLanguage: requestSnapshot.settings.targetLanguage,
             outputFields: requestSnapshot.settings.outputFields,
             inferenceParams,
+            systemPromptTemplate: requestSnapshot.settings.systemPromptTemplate,
           };
 
           let finalRawText = '';
@@ -375,6 +388,7 @@ export function useContextLookup({
             abortSignal: abortController.signal,
             preDictionaryEntries: dictionaryEntries,
             inferenceParams,
+            systemPromptTemplate: requestSnapshot.settings.systemPromptTemplate,
             ...(hasStreamingResult
               ? { preNormalizedFields: finalizedFields, rawResponse: finalizedRawText }
               : {}),
@@ -406,6 +420,7 @@ export function useContextLookup({
             outputFields: requestSnapshot.settings.outputFields,
             dictionarySettings: requestSnapshot.dictionarySettings,
             inferenceParams,
+            systemPromptTemplate: requestSnapshot.dictionarySettings?.systemPromptTemplate,
           } as TranslationRequest & { dictionarySettings?: ContextDictionarySettings };
           const debugPrompts = developerMode
             ? buildLookupPrompt({
@@ -425,6 +440,7 @@ export function useContextLookup({
 
           let finalRawText = '';
           let finalFields: TranslationResult = {};
+          let finalFieldsHadContent = false;
 
           for await (const chunk of streamLookupWithContext(
             { ...dictionaryRequest, mode: 'dictionary' as ContextLookupMode },
@@ -433,24 +449,43 @@ export function useContextLookup({
           )) {
             if (cancelled) return;
             finalRawText = chunk.rawText;
-            finalFields = chunk.fields;
-            setPartialResult(chunk.fields);
-            setExamples(
-              parseRenderableExampleField(
-                chunk.fields,
-                lookupText,
-                requestSnapshot.settings.targetLanguage,
-                { allowIncomplete: true },
-              ),
+            const hasChunkFields = Object.values(chunk.fields).some(
+              (value) => value.trim().length > 0,
             );
+            if (hasChunkFields) {
+              finalFields = chunk.fields;
+              finalFieldsHadContent = true;
+              setPartialResult(chunk.fields);
+              setExamples(
+                parseRenderableExampleField(
+                  chunk.fields,
+                  lookupText,
+                  requestSnapshot.settings.targetLanguage,
+                  { allowIncomplete: true },
+                ),
+              );
+            }
             setActiveFieldId(chunk.activeFieldId);
             if (debugPrompts) {
-              setDebugInfo({
-                systemPrompt: debugPrompts.systemPrompt,
-                userPrompt: debugPrompts.userPrompt,
-                rawStream: finalRawText,
-                parsedResult: chunk.fields,
-              });
+              if (hasChunkFields) {
+                setDebugInfo({
+                  systemPrompt: debugPrompts.systemPrompt,
+                  userPrompt: debugPrompts.userPrompt,
+                  rawStream: finalRawText,
+                  parsedResult: chunk.fields,
+                });
+              } else {
+                setDebugInfo((previous) =>
+                  previous
+                    ? { ...previous, rawStream: finalRawText }
+                    : {
+                        systemPrompt: debugPrompts.systemPrompt,
+                        userPrompt: debugPrompts.userPrompt,
+                        rawStream: finalRawText,
+                        parsedResult: null,
+                      },
+                );
+              }
             }
           }
 
@@ -458,8 +493,7 @@ export function useContextLookup({
 
           setStreaming(false);
 
-          // If streaming yielded no fields, call without preNormalizedFields to force a fresh LLM request
-          const hasStreamingResult = Object.keys(finalFields).length > 0;
+          const hasStreamingResult = finalFieldsHadContent;
 
           const lookupResult = await runContextLookup({
             mode: 'dictionary',
@@ -473,6 +507,7 @@ export function useContextLookup({
             abortSignal: abortController.signal,
             preDictionaryEntries: dictionaryEntries,
             inferenceParams,
+            systemPromptTemplate: requestSnapshot.dictionarySettings?.systemPromptTemplate,
             ...(hasStreamingResult
               ? { preNormalizedFields: finalFields, rawResponse: finalRawText }
               : {}),

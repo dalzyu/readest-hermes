@@ -5,7 +5,7 @@ const MIGRATION_GUARD_KEY = 'hermes:migration';
 const MIGRATION_DONE_VALUE = 'v1done';
 const LEGACY_IDB_NAME = 'readest-ai';
 const HERMES_IDB_NAME = 'hermes-ai';
-const HERMES_IDB_VERSION = 6;
+const HERMES_IDB_VERSION = 7;
 const IDB_STORES = [
   'chunks',
   'bookMeta',
@@ -41,28 +41,38 @@ async function openDB(name: string, version?: number): Promise<IDBDatabase> {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
     req.onupgradeneeded = () => {
-      // Create missing stores in target DB using simple keyPaths matching aiStore schema
       const db = req.result;
-      const storeKeyPaths: Record<string, string | null> = {
-        chunks: 'id',
-        bookMeta: 'bookHash',
-        bm25Indices: 'bookHash',
-        conversations: 'id',
-        messages: 'id',
-        vocabulary: 'id',
-        bookSeries: 'id',
-        dictionaryData: 'id',
-      };
-      for (const store of IDB_STORES) {
-        if (!db.objectStoreNames.contains(store)) {
-          const keyPath = storeKeyPaths[store];
-          if (keyPath) {
-            db.createObjectStore(store, { keyPath });
-          } else {
-            db.createObjectStore(store);
-          }
+      const upgradeTx = req.transaction!;
+      const openOrCreateStore = (storeName: (typeof IDB_STORES)[number], keyPath: string) => {
+        if (!db.objectStoreNames.contains(storeName)) {
+          return db.createObjectStore(storeName, { keyPath });
         }
-      }
+        return upgradeTx.objectStore(storeName);
+      };
+      const ensureIndex = (store: IDBObjectStore, indexName: string, keyPath: string) => {
+        if (!store.indexNames.contains(indexName)) {
+          store.createIndex(indexName, keyPath, { unique: false });
+        }
+      };
+
+      openOrCreateStore('chunks', 'id');
+      openOrCreateStore('bookMeta', 'bookHash');
+      openOrCreateStore('bm25Indices', 'bookHash');
+
+      const conversationsStore = openOrCreateStore('conversations', 'id');
+      ensureIndex(conversationsStore, 'bookHash', 'bookHash');
+
+      const messagesStore = openOrCreateStore('messages', 'id');
+      ensureIndex(messagesStore, 'conversationId', 'conversationId');
+
+      const vocabularyStore = openOrCreateStore('vocabulary', 'id');
+      ensureIndex(vocabularyStore, 'bookHash', 'bookHash');
+      ensureIndex(vocabularyStore, 'term', 'term');
+      ensureIndex(vocabularyStore, 'addedAt', 'addedAt');
+      ensureIndex(vocabularyStore, 'dueAt', 'dueAt');
+
+      openOrCreateStore('bookSeries', 'id');
+      openOrCreateStore('dictionaryData', 'id');
     };
   });
 }

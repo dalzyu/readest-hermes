@@ -6,7 +6,7 @@ import { aiLogger } from '../logger';
 const lunr = require('lunr') as typeof import('lunr');
 
 const DB_NAME = 'hermes-ai';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 const CHUNKS_STORE = 'chunks';
 const META_STORE = 'bookMeta';
 const BM25_STORE = 'bm25Indices';
@@ -142,49 +142,39 @@ class AIStore {
           aiLogger.store.error('migration', 'Clearing old AI stores for re-indexing (v2)');
         }
 
-        if (!db.objectStoreNames.contains(CHUNKS_STORE)) {
-          const store = db.createObjectStore(CHUNKS_STORE, { keyPath: 'id' });
-          store.createIndex('bookHash', 'bookHash', { unique: false });
-        }
-        if (!db.objectStoreNames.contains(META_STORE))
-          db.createObjectStore(META_STORE, { keyPath: 'bookHash' });
-        if (!db.objectStoreNames.contains(BM25_STORE))
-          db.createObjectStore(BM25_STORE, { keyPath: 'bookHash' });
-
-        // v3: conversation history stores
-        if (!db.objectStoreNames.contains(CONVERSATIONS_STORE)) {
-          const convStore = db.createObjectStore(CONVERSATIONS_STORE, { keyPath: 'id' });
-          convStore.createIndex('bookHash', 'bookHash', { unique: false });
-        }
-        if (!db.objectStoreNames.contains(MESSAGES_STORE)) {
-          const msgStore = db.createObjectStore(MESSAGES_STORE, { keyPath: 'id' });
-          msgStore.createIndex('conversationId', 'conversationId', { unique: false });
-        }
-
-        // v4: vocabulary and book series stores
-        if (!db.objectStoreNames.contains(VOCAB_STORE)) {
-          const vocabStore = db.createObjectStore(VOCAB_STORE, { keyPath: 'id' });
-          vocabStore.createIndex('bookHash', 'bookHash', { unique: false });
-          vocabStore.createIndex('term', 'term', { unique: false });
-          vocabStore.createIndex('addedAt', 'addedAt', { unique: false });
-        }
-        if (!db.objectStoreNames.contains(SERIES_STORE)) {
-          db.createObjectStore(SERIES_STORE, { keyPath: 'id' });
-        }
-
-        // v5: user dictionary store
-        if (!db.objectStoreNames.contains(DICTIONARY_STORE)) {
-          db.createObjectStore(DICTIONARY_STORE, { keyPath: 'id' });
-        }
-
-        // v6: dueAt index on vocabulary for SM-2 review queue
-        if (db.objectStoreNames.contains(VOCAB_STORE)) {
-          const tx = (event.target as IDBOpenDBRequest).transaction!;
-          const vocabStore = tx.objectStore(VOCAB_STORE);
-          if (!vocabStore.indexNames.contains('dueAt')) {
-            vocabStore.createIndex('dueAt', 'dueAt', { unique: false });
+        const upgradeTx = (event.target as IDBOpenDBRequest).transaction!;
+        const openOrCreateStore = (storeName: string, keyPath: string): IDBObjectStore => {
+          if (!db.objectStoreNames.contains(storeName)) {
+            return db.createObjectStore(storeName, { keyPath });
           }
-        }
+          return upgradeTx.objectStore(storeName);
+        };
+        const ensureIndex = (store: IDBObjectStore, indexName: string, keyPath: string): void => {
+          if (!store.indexNames.contains(indexName)) {
+            store.createIndex(indexName, keyPath, { unique: false });
+          }
+        };
+
+        const chunksStore = openOrCreateStore(CHUNKS_STORE, 'id');
+        ensureIndex(chunksStore, 'bookHash', 'bookHash');
+
+        openOrCreateStore(META_STORE, 'bookHash');
+        openOrCreateStore(BM25_STORE, 'bookHash');
+
+        const conversationsStore = openOrCreateStore(CONVERSATIONS_STORE, 'id');
+        ensureIndex(conversationsStore, 'bookHash', 'bookHash');
+
+        const messagesStore = openOrCreateStore(MESSAGES_STORE, 'id');
+        ensureIndex(messagesStore, 'conversationId', 'conversationId');
+
+        const vocabularyStore = openOrCreateStore(VOCAB_STORE, 'id');
+        ensureIndex(vocabularyStore, 'bookHash', 'bookHash');
+        ensureIndex(vocabularyStore, 'term', 'term');
+        ensureIndex(vocabularyStore, 'addedAt', 'addedAt');
+        ensureIndex(vocabularyStore, 'dueAt', 'dueAt');
+
+        openOrCreateStore(SERIES_STORE, 'id');
+        openOrCreateStore(DICTIONARY_STORE, 'id');
       };
     });
   }

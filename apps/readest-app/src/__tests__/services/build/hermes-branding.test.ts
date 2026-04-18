@@ -19,7 +19,6 @@ describe('Hermes branding copy', () => {
     const exportMarkdown = readRepoFile(
       'apps/readest-app/src/app/reader/components/annotator/ExportMarkdownDialog.tsx',
     );
-    const _aiTranslatePanel = readRepoFile('apps/readest-app/src/components/settings/AITranslatePanel.tsx');
     const koSyncSettings = readRepoFile('apps/readest-app/src/app/reader/components/KOSyncSettings.tsx');
     const commandRegistry = readRepoFile('apps/readest-app/src/services/commandRegistry.ts');
     const nav = readRepoFile('apps/readest-app/src/utils/nav.ts');

@@ -375,7 +375,9 @@ describe('AIPanel', () => {
     render(<AITranslatePanel />);
     const dropdown = screen.getByTestId('translation-source');
     expect(dropdown).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Dictionary' })).toBeTruthy();
+    expect(
+      (dropdown as HTMLSelectElement).querySelector('option[value="dictionary"]'),
+    ).toBeTruthy();
   });
 
   test('preserves saved dictionary translation source on mount', () => {

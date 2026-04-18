@@ -35,6 +35,61 @@ function sanitizeContextText(text: string): string {
   return text.replace(/</g, '\u2039').replace(/>/g, '\u203a');
 }
 
+const JINJA_VARIABLE_REGEX = /{{\s*([A-Za-z_][A-Za-z0-9_]*)\s*}}/g;
+
+export const TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES = [
+  'sourceLang',
+  'sourceLangHint',
+  'targetLang',
+  'fieldInstructions',
+  'orderedFieldIds',
+  'responseTemplate',
+  'examplesLayoutInstruction',
+  'referenceDictionaryInstruction',
+  'pairHints',
+] as const;
+
+export const DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES = [
+  'sourceLang',
+  'fieldInstructions',
+  'orderedFieldIds',
+  'responseTemplate',
+  'examplesLayoutInstruction',
+  'pinyinProhibition',
+  'referenceDictionaryInstruction',
+] as const;
+
+export function getMissingPromptTemplateVariables(
+  template: string,
+  requiredVariables: readonly string[],
+): string[] {
+  const available = new Set<string>();
+  for (const match of template.matchAll(JINJA_VARIABLE_REGEX)) {
+    const variable = match[1];
+    if (variable) available.add(variable);
+  }
+  return requiredVariables.filter((variable) => !available.has(variable));
+}
+
+function renderPromptTemplate(template: string, variables: Record<string, string>): string {
+  return template.replace(JINJA_VARIABLE_REGEX, (match, variable: string) => {
+    if (!(variable in variables)) return match;
+    return variables[variable] ?? '';
+  });
+}
+
+function applySystemPromptTemplate(
+  template: string | undefined,
+  requiredVariables: readonly string[],
+  variables: Record<string, string>,
+  fallback: string,
+): string {
+  if (!template?.trim()) return fallback;
+  const missing = getMissingPromptTemplateVariables(template, requiredVariables);
+  if (missing.length > 0) return fallback;
+  return renderPromptTemplate(template, variables);
+}
+
 function buildContextSections(request: TranslationRequest): string {
   const sc = sanitizeContextText;
   const sections = [
@@ -70,9 +125,10 @@ export function buildTranslationPrompt(request: TranslationRequest): {
     .sort((a, b) => a.order - b.order);
 
   const targetLang = languageName(request.targetLanguage);
-  const sourceLangHint = request.sourceLanguage
-    ? ` The source language is ${languageName(request.sourceLanguage)}.`
-    : '';
+  const sourceLang = request.sourceLanguage
+    ? languageName(request.sourceLanguage)
+    : 'the source language';
+  const sourceLangHint = request.sourceLanguage ? ` The source language is ${sourceLang}.` : '';
   const orderedFieldIds = enabledFields.map((field) => field.id).join(', ');
   const responseTemplate = enabledFields
     .map((field) => `<${field.id}>...</${field.id}>`)
@@ -121,7 +177,7 @@ If a <reference_dictionary> block is present, use it as an authoritative referen
     ? getLanguagePairHints(request.sourceLanguage, request.targetLanguage)
     : '';
 
-  const systemPrompt = `You are a literary translation assistant. Translate and explain text for a reader learning a foreign language.${sourceLangHint}
+  const defaultSystemPrompt = `You are a literary translation assistant. Translate and explain text for a reader learning a foreign language.${sourceLangHint}
 
 Critical rules:
 - The selected text is always written in the source language — never mistake it for an English word due to visual or phonetic similarity.
@@ -140,6 +196,22 @@ Never leave a requested field empty. If context is limited, provide the shortest
 Use this exact output shape:
 ${responseTemplate}${examplesLayoutInstruction}${referenceDictionaryInstruction}${pairHints}`;
 
+  const systemPrompt = applySystemPromptTemplate(
+    request.systemPromptTemplate,
+    TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
+    {
+      sourceLang,
+      sourceLangHint,
+      targetLang,
+      fieldInstructions,
+      orderedFieldIds,
+      responseTemplate,
+      examplesLayoutInstruction,
+      referenceDictionaryInstruction,
+      pairHints,
+    },
+    defaultSystemPrompt,
+  );
   const userPrompt = `<selected_text>${request.selectedText}</selected_text>
 
 ${buildContextSections(request)}
@@ -166,6 +238,9 @@ function buildDictionaryPrompt(request: LookupPromptRequest): {
     ? languageName(request.sourceLanguage)
     : 'the source language';
   const orderedFieldIds = enabledFields.map((field) => field.id).join(', ');
+  const responseTemplate = enabledFields
+    .map((field) => `<${field.id}>...</${field.id}>`)
+    .join('\n');
 
   const fieldInstructions = enabledFields
     .map(
@@ -195,7 +270,7 @@ Do not include pinyin, English translation, or any other language — provide on
     ? '\n\nDo not include pinyin or any phonetic annotations in any field. The application will generate phonetic annotations separately.'
     : '';
 
-  const systemPrompt = `You are a literary dictionary assistant.
+  const defaultSystemPrompt = `You are a literary dictionary assistant.
 Explain the selected text in simpler terms using only the source language.
 The source language is ${sourceLanguage}. Do not translate the primary explanation into another language.
 
@@ -208,9 +283,25 @@ Provide the following fields:
 ${fieldInstructions}
 
 Emit fields in this exact order: ${orderedFieldIds}.
+Use this exact output shape:
+${responseTemplate}
 You MUST respond entirely in ${sourceLanguage} — every word in every field must be in ${sourceLanguage}.
 Respond with ONLY the tagged fields. Do not add any preamble or extra commentary outside the tags.${examplesLayoutInstruction}${pinyinProhibition}${referenceDictionaryInstruction}`;
 
+  const systemPrompt = applySystemPromptTemplate(
+    dictionarySettings.systemPromptTemplate ?? request.systemPromptTemplate,
+    DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
+    {
+      sourceLang: sourceLanguage,
+      fieldInstructions,
+      orderedFieldIds,
+      responseTemplate,
+      examplesLayoutInstruction,
+      pinyinProhibition,
+      referenceDictionaryInstruction,
+    },
+    defaultSystemPrompt,
+  );
   const userPrompt = `<selected_text>${request.selectedText}</selected_text>
 
 ${buildContextSections(request)}

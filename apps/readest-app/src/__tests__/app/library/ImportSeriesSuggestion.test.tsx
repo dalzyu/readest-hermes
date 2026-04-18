@@ -23,6 +23,7 @@ let libraryState: Book[] = [
 ];
 
 vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => ({ get: () => null, toString: () => '' }),
 }));
 

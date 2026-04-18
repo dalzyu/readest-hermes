@@ -423,13 +423,15 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   }, [searchParams]);
 
   useEffect(() => {
-    if (searchParams?.get('groupBy') === LibraryGroupByType.Series) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete('groupBy');
-      params.delete('group');
-      params.set('surface', 'series');
-      navigateToLibrary(router, params.toString());
-    }
+    const surface = searchParams?.get('surface');
+    if (surface) return;
+    if (searchParams?.get('groupBy') !== LibraryGroupByType.Series) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('groupBy');
+    params.delete('group');
+    params.set('surface', 'series');
+    navigateToLibrary(router, params.toString());
   }, [router, searchParams]);
 
   useEffect(() => {

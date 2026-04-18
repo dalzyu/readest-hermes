@@ -227,28 +227,28 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
     }
   };
 
+  const primaryBookKey = bookKeys[0];
+  const primaryBookData = primaryBookKey ? getBookData(primaryBookKey) : null;
+  const primaryBookHash = primaryBookData?.book?.hash;
+
   useEffect(() => {
     if (!settings.globalReadSettings.autoIndexOnOpen) return;
-    const primaryBookKey = bookKeys[0];
-    if (!primaryBookKey) return;
-    const currentBookData = getBookData(primaryBookKey);
-    const hash = currentBookData?.book?.hash;
-    if (!hash || !currentBookData?.bookDoc) return;
-    if (autoIndexAttempted.current.has(hash)) return;
-    autoIndexAttempted.current.add(hash);
+    if (!primaryBookKey || !primaryBookHash || !primaryBookData?.bookDoc) return;
+    if (autoIndexAttempted.current.has(primaryBookHash)) return;
+    autoIndexAttempted.current.add(primaryBookHash);
 
     let cancelled = false;
     const run = async () => {
       try {
-        const indexed = await isBookIndexed(hash);
+        const indexed = await isBookIndexed(primaryBookHash);
         if (cancelled || indexed) {
           finishIndexing(primaryBookKey);
           return;
         }
         startIndexing(primaryBookKey);
         await indexBook(
-          currentBookData.bookDoc as Parameters<typeof indexBook>[0],
-          hash,
+          primaryBookData.bookDoc as Parameters<typeof indexBook>[0],
+          primaryBookHash,
           settings.aiSettings,
           (progress) => {
             if (!cancelled) updateIndexingProgress(primaryBookKey, progress);
@@ -275,7 +275,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
 
     return () => {
       cancelled = true;
-      cancelBookIndexing(hash);
+      cancelBookIndexing(primaryBookHash);
       if (timeoutHandle !== null) {
         clearTimeout(timeoutHandle);
       }
@@ -288,8 +288,9 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
       }
     };
   }, [
-    bookKeys,
-    getBookData,
+    primaryBookKey,
+    primaryBookHash,
+    primaryBookData,
     settings.aiSettings,
     settings.globalReadSettings.autoIndexOnOpen,
     startIndexing,

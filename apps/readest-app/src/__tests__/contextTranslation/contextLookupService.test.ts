@@ -94,6 +94,8 @@ describe('runContextLookup', () => {
     expect(result.validationDecision).toBe('accept');
     expect(result.fields['simpleDefinition']).toBeUndefined();
     expect(result.fields['contextualMeaning']).toContain('主人公');
+    expect(result.examples).toHaveLength(1);
+    expect(result.examples[0]?.sourceText).toContain('彼は学生時代の知己だ');
     expect(callLLM).toHaveBeenCalled();
   });
 });

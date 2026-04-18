@@ -10,9 +10,14 @@ import { getPopupLocalContext } from '@/services/contextTranslation/pageContextS
 import { callLLM } from '@/services/contextTranslation/llmClient';
 import {
   buildComprehensionPrompt,
+  buildShortAnswerGradingPrompt,
   parseComprehensionResponse,
+  parseShortAnswerGradingResponse,
 } from '@/services/contextTranslation/comprehensionService';
-import type { ComprehensionQuestion } from '@/services/contextTranslation/comprehensionService';
+import type {
+  ComprehensionQuestion,
+  ShortAnswerGradeResult,
+} from '@/services/contextTranslation/comprehensionService';
 
 interface ComprehensionViewProps {
   bookKey: string;
@@ -34,6 +39,10 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
   const [answers, setAnswers] = useState<Record<string, number | string>>({});
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [score, setScore] = useState<{ correct: number; total: number } | null>(null);
+  const [checkingAnswers, setCheckingAnswers] = useState(false);
+  const [shortAnswerGrades, setShortAnswerGrades] = useState<
+    Record<string, ShortAnswerGradeResult>
+  >({});
 
   const generateQuestions = useCallback(async () => {
     setLoading(true);
@@ -42,6 +51,8 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
     setAnswers({});
     setRevealed(new Set());
     setScore(null);
+    setCheckingAnswers(false);
+    setShortAnswerGrades({});
 
     try {
       const aiSettings = settings?.aiSettings ?? DEFAULT_AI_SETTINGS;
@@ -84,27 +95,103 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
     setAnswers((prev) => ({ ...prev, [questionId]: text }));
   };
 
-  const handleCheckAnswers = () => {
-    const newRevealed = new Set<string>();
-    let correct = 0;
-    let total = 0;
+  const handleCheckAnswers = useCallback(async () => {
+    if (checkingAnswers) return;
+    setCheckingAnswers(true);
 
-    for (const q of questions) {
-      newRevealed.add(q.id);
-      if (q.type === 'multiple-choice' && q.correctIndex !== undefined) {
-        total++;
-        if (answers[q.id] === q.correctIndex) correct++;
-      } else if (q.type === 'short-answer') {
-        total++;
-        // Short answers are self-graded — always count as attempted
+    try {
+      const newRevealed = new Set<string>();
+      let correct = 0;
+      let total = 0;
+      let gradeMap: Record<string, ShortAnswerGradeResult> = {};
+
+      const shortAnswerQuestions = questions.filter((question) => question.type === 'short-answer');
+      if (shortAnswerQuestions.length > 0) {
+        const gradingItems = shortAnswerQuestions
+          .map((question) => ({
+            questionId: question.id,
+            question: question.question,
+            expectedAnswer: question.suggestedAnswer?.trim() ?? '',
+            userAnswer: String(answers[question.id] ?? '').trim(),
+          }))
+          .filter((item) => item.expectedAnswer && item.userAnswer);
+
+        if (gradingItems.length > 0) {
+          try {
+            const aiSettings = settings?.aiSettings ?? DEFAULT_AI_SETTINGS;
+            const { provider, modelId, inferenceParams } = getProviderForTask(aiSettings, 'chat');
+            const model = provider.getModel(modelId, inferenceParams);
+            const { systemPrompt, userPrompt } = buildShortAnswerGradingPrompt(
+              gradingItems,
+              bookLanguage,
+            );
+            const gradingRaw = await callLLM(
+              systemPrompt,
+              userPrompt,
+              model,
+              undefined,
+              inferenceParams,
+            );
+            gradeMap = Object.fromEntries(
+              parseShortAnswerGradingResponse(gradingRaw).map((grade) => [grade.questionId, grade]),
+            );
+          } catch {
+            // fall back below when grading fails
+          }
+        }
+
+        for (const question of shortAnswerQuestions) {
+          if (gradeMap[question.id]) continue;
+          const typedAnswer = String(answers[question.id] ?? '').trim();
+          if (!typedAnswer) {
+            gradeMap[question.id] = {
+              questionId: question.id,
+              verdict: 'incorrect',
+              feedback: _('No answer provided.'),
+            };
+            continue;
+          }
+          const expected = question.suggestedAnswer?.trim() ?? '';
+          const normalizedExpected = expected.toLowerCase();
+          const normalizedAnswer = typedAnswer.toLowerCase();
+          const verdict: ShortAnswerGradeResult['verdict'] =
+            normalizedExpected && normalizedAnswer === normalizedExpected ? 'correct' : 'partial';
+          gradeMap[question.id] = {
+            questionId: question.id,
+            verdict,
+            feedback:
+              verdict === 'correct'
+                ? _('Good answer. It matches the expected meaning.')
+                : _('Partially correct. Compare your answer with the suggested answer below.'),
+          };
+        }
       }
+
+      for (const question of questions) {
+        newRevealed.add(question.id);
+        total++;
+        if (question.type === 'multiple-choice' && question.correctIndex !== undefined) {
+          if (answers[question.id] === question.correctIndex) correct++;
+          continue;
+        }
+        if (question.type === 'short-answer' && gradeMap[question.id]?.verdict === 'correct') {
+          correct++;
+        }
+      }
+
+      setShortAnswerGrades(gradeMap);
+      setRevealed(newRevealed);
+      setScore({ correct, total });
+    } finally {
+      setCheckingAnswers(false);
     }
+  }, [answers, bookLanguage, checkingAnswers, questions, settings?.aiSettings, _]);
 
-    setRevealed(newRevealed);
-    setScore({ correct, total });
-  };
-
-  const allAnswered = questions.every((q) => answers[q.id] !== undefined);
+  const allAnswered = questions.every((question) =>
+    question.type === 'short-answer'
+      ? String(answers[question.id] ?? '').trim().length > 0
+      : answers[question.id] !== undefined,
+  );
 
   return (
     <div className='flex h-full flex-col'>
@@ -187,18 +274,30 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
                     })}
                   </div>
                 ) : q.type === 'short-answer' ? (
-                  <div>
-                    <input
-                      type='text'
-                      className='input input-bordered input-sm w-full'
+                  <div className='space-y-2'>
+                    <textarea
+                      className='textarea textarea-bordered textarea-sm min-h-20 w-full resize-y leading-5'
                       placeholder={_('Your answer...')}
                       value={(answers[q.id] as string) ?? ''}
                       onChange={(e) => handleShortAnswer(q.id, e.target.value)}
                       disabled={revealed.has(q.id)}
                     />
+                    {revealed.has(q.id) && shortAnswerGrades[q.id] && (
+                      <p
+                        className={`whitespace-pre-wrap rounded-md px-2 py-1 text-xs ${
+                          shortAnswerGrades[q.id]!.verdict === 'correct'
+                            ? 'bg-success/10 text-success'
+                            : shortAnswerGrades[q.id]!.verdict === 'partial'
+                              ? 'bg-warning/10 text-warning'
+                              : 'bg-error/10 text-error'
+                        }`}
+                      >
+                        {shortAnswerGrades[q.id]!.feedback}
+                      </p>
+                    )}
                     {revealed.has(q.id) && q.suggestedAnswer && (
-                      <p className='text-success mt-1 text-xs'>
-                        {_('Suggested:')} {q.suggestedAnswer}
+                      <p className='text-base-content/70 whitespace-pre-wrap text-xs'>
+                        <span className='font-medium'>{_('Suggested:')}</span> {q.suggestedAnswer}
                       </p>
                     )}
                   </div>
@@ -210,9 +309,9 @@ const ComprehensionView: React.FC<ComprehensionViewProps> = ({ bookKey }) => {
               <button
                 className='btn btn-primary btn-sm w-full'
                 onClick={handleCheckAnswers}
-                disabled={!allAnswered}
+                disabled={!allAnswered || checkingAnswers}
               >
-                {_('Check answers')}
+                {checkingAnswers ? _('Checking...') : _('Check answers')}
               </button>
             )}
 

@@ -146,8 +146,22 @@ describe('buildPopupContextBundle', () => {
       'vol-3',
       expect.any(String),
       aiSettings,
-      DEFAULT_CONTEXT_TRANSLATION_SETTINGS.sameBookChunkCount,
+      DEFAULT_CONTEXT_TRANSLATION_SETTINGS.sameBookChunkCount * 3,
       { maxPage: 3 },
+    );
+    expect(mockHybridSearch).toHaveBeenNthCalledWith(
+      1,
+      'vol-1',
+      expect.any(String),
+      aiSettings,
+      DEFAULT_CONTEXT_TRANSLATION_SETTINGS.priorVolumeChunkCount * 2,
+    );
+    expect(mockHybridSearch).toHaveBeenNthCalledWith(
+      2,
+      'vol-2',
+      expect.any(String),
+      aiSettings,
+      DEFAULT_CONTEXT_TRANSLATION_SETTINGS.priorVolumeChunkCount * 2,
     );
   });
 
@@ -175,5 +189,35 @@ describe('buildPopupContextBundle', () => {
     expect(bundle.sameBookChunks).toHaveLength(1);
     expect(bundle.sameBookChunks[0]).toContain('Later, the guard stepped away.');
     expect(bundle.sameBookChunks[0]).not.toContain('He remained by his side through the night.');
+  });
+
+  test('deduplicates same-book retrieval chunks before trimming to configured count', async () => {
+    mockIsIndexed.mockResolvedValue(true);
+    mockGetPopupLocalContext.mockResolvedValue({
+      localPastContext: 'Past context ending at the selected text.',
+      localFutureBuffer: 'A few words ahead.',
+      windowStartPage: 5,
+    });
+    mockBoundedHybridSearch.mockResolvedValue([
+      makeChunk('vol-3', 'Repeated memory chunk.'),
+      makeChunk('vol-3', 'Repeated memory chunk.', 0.85),
+      makeChunk('vol-3', 'Second unique memory chunk.', 0.8),
+    ]);
+
+    const bundle = await buildPopupContextBundle({
+      bookKey: 'vol-3-hash',
+      bookHash: 'vol-3',
+      currentPage: 6,
+      selectedText: '殿下',
+      settings: {
+        ...DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+        sameBookChunkCount: 2,
+      },
+      aiSettings,
+    });
+
+    expect(bundle.sameBookChunks).toHaveLength(2);
+    expect(bundle.sameBookChunks[0]).toContain('Repeated memory chunk.');
+    expect(bundle.sameBookChunks[1]).toContain('Second unique memory chunk.');
   });
 });

@@ -76,6 +76,8 @@ export interface TranslationRequest {
   outputFields: TranslationOutputField[];
   /** Optional runtime controls for repair / rescue / sanitization. */
   harness?: Partial<ContextTranslationHarnessSettings>;
+  /** Optional Jinja-style template override for the lookup system prompt. */
+  systemPromptTemplate?: string;
   /** Optional generation overrides for the active AI provider. */
   inferenceParams?: InferenceParams;
 }
@@ -178,6 +180,8 @@ export interface ContextDictionarySettings {
   source?: 'ai' | 'dictionary';
   /** Custom prompt instructions keyed by field id (e.g. 'simpleDefinition'). Overrides defaults. */
   promptInstructions?: Record<string, string>;
+  /** Optional Jinja-style template override for the dictionary system prompt. */
+  systemPromptTemplate?: string;
 }
 
 /** Settings for the context-aware translation feature */
@@ -206,6 +210,8 @@ export interface ContextTranslationSettings {
   autoExpandSelection?: boolean;
   /** Advanced repair / rescue / sanitization controls for the translation harness. */
   harness?: Partial<ContextTranslationHarnessSettings>;
+  /** Optional Jinja-style template override for the translation system prompt. */
+  systemPromptTemplate?: string;
 }
 
 /** A single entry from a StarDict dictionary. */

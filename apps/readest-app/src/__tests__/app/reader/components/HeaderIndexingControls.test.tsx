@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SystemSettings } from '@/types/settings';
+import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
+import { DEFAULT_READSETTINGS } from '@/services/constants';
 import type { ReaderIndexProgress } from '@/store/readerStore';
 
 const {
@@ -210,6 +212,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.settings = {
     aiSettings: {
+      ...DEFAULT_AI_SETTINGS,
       enabled: true,
       providers: [],
       profiles: [
@@ -219,10 +222,11 @@ beforeEach(() => {
       activeProfileId: 'profile-default',
     },
     globalReadSettings: {
+      ...DEFAULT_READSETTINGS,
       autoIndexOnOpen: true,
     },
     lastOpenBooks: ['reader'],
-  };
+  } as unknown as SystemSettings;
   state.bookKeys = ['reader-key-1'];
   state.bookDataByKey = {
     'reader-key-1': {
@@ -259,7 +263,7 @@ describe('reader header indexing controls', () => {
 
     await waitFor(() =>
       expect(indexBookMock).toHaveBeenCalledWith(
-        state.bookDataByKey['reader-key-1'].bookDoc,
+        state.bookDataByKey['reader-key-1']!.bookDoc,
         'hash-1',
         state.settings.aiSettings,
         expect.any(Function),
@@ -279,7 +283,7 @@ describe('reader header indexing controls', () => {
     await waitFor(() => expect(isBookIndexedMock).toHaveBeenCalledWith('hash-1'));
     await waitFor(() =>
       expect(indexBookMock).toHaveBeenCalledWith(
-        state.bookDataByKey['reader-key-1'].bookDoc,
+        state.bookDataByKey['reader-key-1']!.bookDoc,
         'hash-1',
         state.settings.aiSettings,
         expect.any(Function),

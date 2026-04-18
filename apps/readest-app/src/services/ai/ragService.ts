@@ -266,12 +266,13 @@ export async function indexBook(
       errorMessages,
       durationMs,
     };
-    cancelledBookIndexes.delete(bookHash);
   } catch (error) {
     state.status = 'error';
     state.error = (error as Error).message;
     aiLogger.rag.indexError(bookHash, (error as Error).message);
     throw error;
+  } finally {
+    cancelledBookIndexes.delete(bookHash);
   }
 }
 
