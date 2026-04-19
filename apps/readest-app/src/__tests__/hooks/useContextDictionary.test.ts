@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+
 vi.mock('@/hooks/useContextLookup', () => ({
   useContextLookup: vi.fn(),
 }));
 
 import { useContextDictionary } from '@/hooks/useContextDictionary';
 import { useContextLookup } from '@/hooks/useContextLookup';
-import type { UseContextLookupResult } from '@/hooks/useContextLookup';
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
@@ -15,21 +15,7 @@ import type {
   PopupRetrievalHints,
   RetrievalStatus,
 } from '@/services/contextTranslation/types';
-
-const popupContextBundle: PopupContextBundle = {
-  localPastContext: 'context text',
-  localFutureBuffer: '',
-  sameBookChunks: [],
-  priorVolumeChunks: [],
-  dictionaryEntries: [],
-  retrievalStatus: 'local-only',
-  retrievalHints: {
-    currentVolumeIndexed: true,
-    missingLocalIndex: false,
-    missingPriorVolumes: [],
-    missingSeriesAssignment: false,
-  },
-};
+import type { UseContextLookupResult } from '@/hooks/useContextLookup';
 
 const retrievalHints: PopupRetrievalHints = {
   currentVolumeIndexed: true,
@@ -38,8 +24,20 @@ const retrievalHints: PopupRetrievalHints = {
   missingSeriesAssignment: false,
 };
 
+const popupContextBundle: PopupContextBundle = {
+  localPastContext: 'context text',
+  localFutureBuffer: '',
+  sameBookChunks: [],
+  priorVolumeChunks: [],
+  dictionaryEntries: [],
+  retrievalStatus: 'local-only',
+  retrievalHints,
+  dictionaryResults: [],
+};
+
 const lookupExamples: LookupExample[] = [];
 const lookupAnnotations: LookupAnnotationSlots | null = null;
+
 const lookupResult: UseContextLookupResult = {
   result: { simpleDefinition: 'simple definition' },
   partialResult: null,
@@ -56,6 +54,8 @@ const lookupResult: UseContextLookupResult = {
   examples: lookupExamples,
   annotations: lookupAnnotations,
   debugInfo: null,
+  availabilityHint: null,
+  fieldProvenance: null,
   saveToVocabulary: vi.fn(async () => {}),
 };
 
@@ -88,7 +88,7 @@ beforeEach(() => {
 });
 
 describe('useContextDictionary', () => {
-  test('maps dictionary props through the shared lookup hook', () => {
+  test('maps dictionary input through useContextLookup', () => {
     const result = useContextDictionary(defaultProps);
 
     expect(useContextLookup).toHaveBeenCalledWith({
@@ -99,54 +99,22 @@ describe('useContextDictionary', () => {
       currentPage: defaultProps.currentPage,
       settings: defaultProps.translationSettings,
       dictionarySettings: defaultProps.dictionarySettings,
+      bookLanguage: undefined,
     });
-    expect(result.popupContext).toBe(popupContextBundle);
-    expect(result.result).toBeNull();
-    expect(result.examples).toEqual(lookupExamples);
+    expect(result).toBe(lookupResult);
   });
 
-  test('merges dictionary-backed fields over AI results when configured', () => {
-    vi.mocked(useContextLookup).mockReturnValue({
-      ...lookupResult,
-      result: {
-        simpleDefinition: 'ai definition',
-        contextualMeaning: 'ai contextual meaning',
-        sourceExamples: 'ai examples',
-      },
-      partialResult: {
-        simpleDefinition: 'streaming ai definition',
-        contextualMeaning: 'streaming ai contextual meaning',
-        sourceExamples: 'streaming ai examples',
-      },
-      popupContext: {
-        ...popupContextBundle,
-        dictionaryResults: [{ headword: '知己', definition: '辞書定義', source: 'Test Dict' }],
-      },
-      examples: [
-        { exampleId: '1', sourceText: '彼は知己だ。', targetText: 'He is a close friend.' },
-      ],
-    });
-
-    const result = useContextDictionary({
+  test('passes through optional bookLanguage', () => {
+    useContextDictionary({
       ...defaultProps,
-      dictionarySettings: {
-        ...defaultProps.dictionarySettings,
-        fieldSources: {
-          simpleDefinition: 'dictionary',
-          contextualMeaning: 'ai',
-          sourceExamples: 'dictionary',
-        },
-      },
+      bookLanguage: 'ja',
     });
 
-    expect(result.result).toEqual({
-      simpleDefinition: '辞書定義',
-      contextualMeaning: 'ai contextual meaning',
-    });
-    expect(result.partialResult).toEqual({
-      simpleDefinition: '辞書定義',
-      contextualMeaning: 'streaming ai contextual meaning',
-    });
-    expect(result.examples).toEqual([]);
+    expect(useContextLookup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'dictionary',
+        bookLanguage: 'ja',
+      }),
+    );
   });
 });

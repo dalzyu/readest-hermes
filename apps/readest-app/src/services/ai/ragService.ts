@@ -5,6 +5,7 @@ import { withRetryAndTimeout, AI_TIMEOUTS, AI_RETRY_CONFIGS } from './utils/retr
 import { getProviderForTask } from './providers';
 import { resolveEmbeddingModelId } from './constants';
 import { aiLogger } from './logger';
+import { rerankByLiteralMatch } from './utils/literalRerank';
 import type {
   AISettings,
   TextChunk,
@@ -41,14 +42,61 @@ function getEmbeddingBatchSize(model: unknown): number {
   return Math.max(1, configuredBatchSize);
 }
 
+type LocalizedText = Record<string, string>;
+type ContributorMetadata = { name?: string | LocalizedText };
+
 export interface BookDocType {
   sections?: SectionItem[];
   toc?: TOCItem[];
-  metadata?: { title?: string | { [key: string]: string }; author?: string | { name?: string } };
+  metadata?: {
+    title?: string | LocalizedText;
+    author?: string | ContributorMetadata | LocalizedText;
+  };
+}
+
+function resolveLocalizedText(value?: string | LocalizedText): string | undefined {
+  if (!value) return undefined;
+  if (typeof value === 'string') return value;
+  return value['en'] || value['default'] || Object.values(value)[0];
 }
 
 const indexingStates = new Map<string, IndexingState>();
 const cancelledBookIndexes = new Set<string>();
+
+interface QueryEmbeddingCacheEntry {
+  providerModel: string;
+  embedding: number[];
+  cachedAt: number;
+}
+
+const QUERY_EMBEDDING_CACHE_TTL_MS = 5 * 60 * 1000;
+const queryEmbeddingCache = new Map<string, QueryEmbeddingCacheEntry>();
+
+function normalizeEmbeddingCacheKey(query: string): string {
+  return query.trim().toLocaleLowerCase();
+}
+
+function getCachedEmbedding(query: string, providerModel: string): number[] | null {
+  const key = normalizeEmbeddingCacheKey(query);
+  if (!key) return null;
+
+  const cached = queryEmbeddingCache.get(key);
+  if (!cached) return null;
+  if (cached.providerModel !== providerModel) return null;
+
+  if (Date.now() - cached.cachedAt > QUERY_EMBEDDING_CACHE_TTL_MS) {
+    queryEmbeddingCache.delete(key);
+    return null;
+  }
+
+  return cached.embedding;
+}
+
+function setCachedEmbedding(query: string, embedding: number[], providerModel: string): void {
+  const key = normalizeEmbeddingCacheKey(query);
+  if (!key) return;
+  queryEmbeddingCache.set(key, { providerModel, embedding, cachedAt: Date.now() });
+}
 
 function assertIndexingNotCancelled(bookHash: string): void {
   if (!cancelledBookIndexes.has(bookHash)) return;
@@ -67,20 +115,23 @@ export async function isBookIndexed(bookHash: string): Promise<boolean> {
 }
 
 function extractTitle(metadata?: BookDocType['metadata']): string {
-  if (!metadata?.title) return 'Unknown Book';
-  if (typeof metadata.title === 'string') return metadata.title;
-  return (
-    metadata.title['en'] ||
-    metadata.title['default'] ||
-    Object.values(metadata.title)[0] ||
-    'Unknown Book'
-  );
+  return resolveLocalizedText(metadata?.title) ?? 'Unknown Book';
 }
 
 function extractAuthor(metadata?: BookDocType['metadata']): string {
   if (!metadata?.author) return 'Unknown Author';
   if (typeof metadata.author === 'string') return metadata.author;
-  return metadata.author.name || 'Unknown Author';
+
+  const contributorName =
+    typeof metadata.author === 'object' && metadata.author !== null && 'name' in metadata.author
+      ? (metadata.author as ContributorMetadata).name
+      : undefined;
+  const authorAsLocalized = metadata.author as LocalizedText;
+  return (
+    resolveLocalizedText(contributorName) ??
+    resolveLocalizedText(authorAsLocalized) ??
+    'Unknown Author'
+  );
 }
 
 function getChapterTitle(toc: TOCItem[] | undefined, sectionIndex: number): string {
@@ -232,13 +283,10 @@ export async function indexBook(
     }
 
     assertIndexingNotCancelled(bookHash);
-    onProgress?.({ current: 0, total: 2, phase: 'indexing' });
+    onProgress?.({ current: 1, total: 1, phase: 'finalizing' });
+    aiLogger.rag.indexProgress('finalizing', 1, 1);
     aiLogger.store.saveChunks(bookHash, allChunks.length);
     await aiStore.saveChunks(allChunks);
-
-    onProgress?.({ current: 1, total: 2, phase: 'indexing' });
-    aiLogger.store.saveBM25(bookHash);
-    await aiStore.saveBM25Index(bookHash, allChunks);
 
     const meta: BookIndexMeta = {
       bookHash,
@@ -251,8 +299,6 @@ export async function indexBook(
     };
     aiLogger.store.saveMeta(meta);
     await aiStore.saveMeta(meta);
-
-    onProgress?.({ current: 2, total: 2, phase: 'indexing' });
     state.status = 'complete';
     state.progress = 100;
     const durationMs = Date.now() - startTime;
@@ -276,65 +322,26 @@ export async function indexBook(
   }
 }
 
-export async function hybridSearch(
-  bookHash: string,
-  query: string,
-  settings: AISettings,
-  topK = 10,
-  maxPage?: number,
-): Promise<ScoredChunk[]> {
-  return boundedHybridSearch(bookHash, query, settings, topK, maxPage);
-}
-
-// ---------------------------------------------------------------------------
-// Embedding query LRU cache — avoids re-embedding the same query text
-// ---------------------------------------------------------------------------
-const EMBEDDING_CACHE_MAX = 500;
-const embeddingCache = new Map<string, number[]>();
-let embeddingCacheProviderModelKey = '';
-
-function getCachedEmbedding(query: string): number[] | undefined {
-  const value = embeddingCache.get(query);
-  if (value) {
-    // Move to end (most recently used)
-    embeddingCache.delete(query);
-    embeddingCache.set(query, value);
-  }
-  return value;
-}
-
-function setCachedEmbedding(query: string, embedding: number[], providerModelKey: string): void {
-  // Invalidate cache on provider/model change
-  if (providerModelKey !== embeddingCacheProviderModelKey) {
-    embeddingCache.clear();
-    embeddingCacheProviderModelKey = providerModelKey;
-  }
-  if (embeddingCache.size >= EMBEDDING_CACHE_MAX) {
-    // Evict oldest entry (first key)
-    const oldest = embeddingCache.keys().next().value;
-    if (oldest !== undefined) embeddingCache.delete(oldest);
-  }
-  embeddingCache.set(query, embedding);
-}
-
-export async function boundedHybridSearch(
+export async function vectorSearch(
   bookHash: string,
   query: string,
   settings: AISettings,
   topK = 10,
   bounds?: number | PageSearchBounds,
+  rerankTerm?: string,
 ): Promise<ScoredChunk[]> {
   const normalizedBounds = typeof bounds === 'number' ? { maxPage: bounds } : bounds;
   aiLogger.search.query(query, normalizedBounds?.maxPage);
   const { provider, modelId } = getProviderForTask(settings, 'embedding');
-  let queryEmbedding: number[] | null = null;
+  const providerModelKey = `${provider.id}:${modelId}`;
 
-  try {
-    // Check LRU cache first
-    const cached = getCachedEmbedding(query);
-    if (cached) {
-      queryEmbedding = cached;
-    } else {
+  const queryEmbedding = await (async (): Promise<number[] | null> => {
+    try {
+      const cached = getCachedEmbedding(query, providerModelKey);
+      if (cached) {
+        return cached;
+      }
+
       const { embedding } = await withRetryAndTimeout(
         () =>
           embed({
@@ -344,15 +351,26 @@ export async function boundedHybridSearch(
         AI_TIMEOUTS.EMBEDDING_SINGLE,
         AI_RETRY_CONFIGS.EMBEDDING,
       );
-      queryEmbedding = embedding;
-      setCachedEmbedding(query, embedding, `${provider.id}:${modelId}`);
+      setCachedEmbedding(query, embedding, providerModelKey);
+      return embedding;
+    } catch {
+      return null;
     }
-  } catch {
-    // bm25 only fallback
+  })();
+
+  if (!queryEmbedding) {
+    return [];
   }
 
-  const results = await aiStore.hybridSearch(bookHash, queryEmbedding, query, topK, bounds);
-  aiLogger.search.hybridResults(results.length, [...new Set(results.map((r) => r.searchMethod))]);
+  const vectorTopK = Math.max(topK * 2, topK);
+  const vectorResults = await aiStore.vectorSearch(bookHash, queryEmbedding, vectorTopK, bounds);
+  const rerankedResults = await rerankByLiteralMatch(vectorResults, rerankTerm ?? query);
+  const results = rerankedResults.slice(0, topK);
+
+  if (results.length > 0) {
+    aiLogger.search.rerankedResults(results.length, results[0]!.score);
+  }
+
   return results;
 }
 

@@ -70,7 +70,6 @@ export const aiLogger = {
     saveChunks: (bookHash: string, count: number) =>
       log('info', 'STORE', `Saving ${count} chunks`, { bookHash }),
     saveMeta: (meta: object) => log('info', 'STORE', `Saving book meta`, meta),
-    saveBM25: (bookHash: string) => log('info', 'STORE', `Saving BM25 index`, { bookHash }),
     loadChunks: (bookHash: string, count: number) =>
       log('debug', 'STORE', `Loaded ${count} chunks`, { bookHash }),
     clear: (bookHash: string) => log('info', 'STORE', `Cleared book data`, { bookHash }),
@@ -80,12 +79,10 @@ export const aiLogger = {
   search: {
     query: (query: string, maxSection?: number) =>
       log('info', 'SEARCH', `Query: "${query.slice(0, 50)}..."`, { maxSection }),
-    bm25Results: (count: number, topScore: number) =>
-      log('debug', 'SEARCH', `BM25: ${count} results, top score: ${topScore.toFixed(3)}`),
+    rerankedResults: (count: number, topScore: number) =>
+      log('debug', 'SEARCH', `Reranked: ${count} results, top score: ${topScore.toFixed(4)}`),
     vectorResults: (count: number, topScore: number) =>
       log('debug', 'SEARCH', `Vector: ${count} results, top similarity: ${topScore.toFixed(4)}`),
-    hybridResults: (count: number, methods: string[]) =>
-      log('info', 'SEARCH', `Hybrid: ${count} results`, { methods }),
     spoilerFiltered: (before: number, after: number, maxSection: number) =>
       log('debug', 'SEARCH', `Spoiler filter: ${before} → ${after} (max section: ${maxSection})`),
   },

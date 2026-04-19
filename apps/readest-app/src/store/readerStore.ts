@@ -47,10 +47,13 @@ interface ViewState {
   sessionStartPage: number | null;
 }
 
+export type ReaderIndexPhase = 'pending' | 'chunking' | 'embedding' | 'finalizing' | 'complete';
+
 export interface ReaderIndexProgress {
+  runId: string;
   current: number;
   total: number;
-  phase: 'chunking' | 'embedding' | 'indexing';
+  phase: ReaderIndexPhase;
 }
 
 interface ReaderStore {
@@ -95,10 +98,24 @@ interface ReaderStore {
   recreateViewer: (envConfig: EnvConfigType, key: string) => void;
   recordSession: (key: string) => boolean;
   indexingProgress: Record<string, ReaderIndexProgress>;
-  startIndexing: (key: string) => void;
-  updateIndexingProgress: (key: string, progress: ReaderIndexProgress) => void;
-  finishIndexing: (key: string) => void;
-  cancelIndexing: (key: string) => void;
+  startIndexing: (key: string, runId: string) => void;
+  updateIndexingProgress: (
+    key: string,
+    runId: string,
+    progress: Omit<ReaderIndexProgress, 'runId'>,
+  ) => void;
+  finishIndexing: (key: string, runId: string) => void;
+  cancelIndexing: (key: string, runId?: string) => void;
+}
+
+const INDEXING_COMPLETE_HOLD_MS = 1200;
+const indexingClearTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function clearIndexingTimer(key: string): void {
+  const timer = indexingClearTimers.get(key);
+  if (!timer) return;
+  clearTimeout(timer);
+  indexingClearTimers.delete(key);
 }
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
@@ -107,29 +124,84 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   hoveredBookKey: null,
   setBookKeys: (keys: string[]) => set({ bookKeys: keys }),
   indexingProgress: {},
-  startIndexing: (key: string) =>
+  startIndexing: (key: string, runId: string) => {
+    clearIndexingTimer(key);
     set((state) => ({
       indexingProgress: {
         ...state.indexingProgress,
-        [key]: { current: 0, total: 1, phase: 'chunking' },
+        [key]: { runId, current: 0, total: 1, phase: 'pending' },
       },
-    })),
-  updateIndexingProgress: (key: string, progress: ReaderIndexProgress) =>
-    set((state) => ({
-      indexingProgress: { ...state.indexingProgress, [key]: progress },
-    })),
-  finishIndexing: (key: string) =>
+    }));
+  },
+  updateIndexingProgress: (
+    key: string,
+    runId: string,
+    progress: Omit<ReaderIndexProgress, 'runId'>,
+  ) =>
     set((state) => {
+      const currentProgress = state.indexingProgress[key];
+      if (!currentProgress || currentProgress.runId !== runId) {
+        return state;
+      }
+      return {
+        indexingProgress: {
+          ...state.indexingProgress,
+          [key]: { runId, current: progress.current, total: progress.total, phase: progress.phase },
+        },
+      };
+    }),
+  finishIndexing: (key: string, runId: string) => {
+    clearIndexingTimer(key);
+    set((state) => {
+      const currentProgress = state.indexingProgress[key];
+      if (!currentProgress || currentProgress.runId !== runId) {
+        return state;
+      }
+      return {
+        indexingProgress: {
+          ...state.indexingProgress,
+          [key]: {
+            ...currentProgress,
+            current: currentProgress.total,
+            phase: 'complete',
+          },
+        },
+      };
+    });
+
+    const timer = setTimeout(() => {
+      set((state) => {
+        const currentProgress = state.indexingProgress[key];
+        if (
+          !currentProgress ||
+          currentProgress.runId !== runId ||
+          currentProgress.phase !== 'complete'
+        ) {
+          return state;
+        }
+        const indexingProgress = { ...state.indexingProgress };
+        delete indexingProgress[key];
+        return { indexingProgress };
+      });
+      indexingClearTimers.delete(key);
+    }, INDEXING_COMPLETE_HOLD_MS);
+    indexingClearTimers.set(key, timer);
+  },
+  cancelIndexing: (key: string, runId?: string) => {
+    clearIndexingTimer(key);
+    set((state) => {
+      const currentProgress = state.indexingProgress[key];
+      if (!currentProgress) {
+        return state;
+      }
+      if (runId && currentProgress.runId !== runId) {
+        return state;
+      }
       const indexingProgress = { ...state.indexingProgress };
       delete indexingProgress[key];
       return { indexingProgress };
-    }),
-  cancelIndexing: (key: string) =>
-    set((state) => {
-      const indexingProgress = { ...state.indexingProgress };
-      delete indexingProgress[key];
-      return { indexingProgress };
-    }),
+    });
+  },
   setHoveredBookKey: (key: string | null) => set({ hoveredBookKey: key }),
   getView: (key: string | null) => (key && get().viewStates[key]?.view) || null,
   setView: (key: string, view) =>

@@ -244,6 +244,7 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
               <IndexingProgressBar
                 current={indexingProgress[bookKey]!.current}
                 total={indexingProgress[bookKey]!.total}
+                phase={indexingProgress[bookKey]!.phase}
               />
             )}
           </div>

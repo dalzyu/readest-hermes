@@ -6,9 +6,10 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { eventDispatcher } from '@/utils/event';
 import { DocumentLoader } from '@/libs/document';
-import { indexBook } from '@/services/ai';
+import { startBookIndexing, subscribeToIndexingRun } from '@/services/ai/indexingRuntime';
 import { aiLogger } from '@/services/ai/logger';
 import { aiStore } from '@/services/ai/storage/aiStore';
+import { useLibraryIndexingStore } from '@/store/libraryIndexingStore';
 import type { AISettings, IndexResult } from '@/services/ai/types';
 import type { Book } from '@/types/book';
 import type { AppService } from '@/types/system';
@@ -81,6 +82,7 @@ export async function indexSeriesVolumes(
   let failed = 0;
   let warnings = 0;
 
+  const libraryIndexingStore = useLibraryIndexingStore.getState();
   const orderedVolumes = [...series.volumes].sort((a, b) => a.volumeIndex - b.volumeIndex);
   const initialStates = await loadSeriesIndexStates(series);
   for (const volume of orderedVolumes) {
@@ -96,22 +98,51 @@ export async function indexSeriesVolumes(
       const { file } = await appService.loadBookContent(book);
       const loader = new DocumentLoader(file);
       const { book: bookDoc } = await loader.open();
-      const result: IndexResult = await indexBook(
-        bookDoc as Parameters<typeof indexBook>[0],
-        book.hash,
+
+      const { runId, promise } = startBookIndexing({
+        scope: 'library',
+        key: book.hash,
+        bookHash: book.hash,
+        bookDoc: bookDoc as Parameters<typeof startBookIndexing>[0]['bookDoc'],
         aiSettings,
-      );
-      if (result.status === 'complete') {
-        indexed++;
-      } else if (result.status === 'partial') {
-        warnings++;
-      } else if (result.status === 'already-indexed') {
-        skipped++;
-      } else if (result.status === 'empty') {
-        skipped++;
+      });
+
+      libraryIndexingStore.startIndexing(book.hash, runId);
+      const unsubscribe = subscribeToIndexingRun('library', book.hash, (event) => {
+        if (event.runId !== runId) return;
+
+        if (event.type === 'progress') {
+          libraryIndexingStore.updateIndexingProgress(book.hash, runId, event.progress);
+          return;
+        }
+
+        if (event.type === 'complete') {
+          libraryIndexingStore.finishIndexing(book.hash, runId);
+          return;
+        }
+
+        if (event.type === 'cancelled' || event.type === 'error') {
+          libraryIndexingStore.cancelIndexing(book.hash, runId);
+        }
+      });
+
+      try {
+        const result: IndexResult = await promise;
+        if (result.status === 'complete') {
+          indexed++;
+        } else if (result.status === 'partial') {
+          warnings++;
+        } else if (result.status === 'already-indexed') {
+          skipped++;
+        } else if (result.status === 'empty') {
+          skipped++;
+        }
+      } finally {
+        unsubscribe();
       }
     } catch (error) {
       failed++;
+      libraryIndexingStore.cancelIndexing(book.hash);
       aiLogger.rag.indexError(volume.bookHash, `indexSeriesVolumes: ${error}`);
     }
   }
@@ -131,10 +162,19 @@ const SeriesCard: React.FC<SeriesCardProps> = ({ series, libraryBooks, onIndexed
   const { settings } = useSettingsStore();
   const [indexStates, setIndexStates] = useState<Record<string, boolean>>({});
   const [isIndexing, setIsIndexing] = useState(false);
+  const libraryIndexingProgress = useLibraryIndexingStore((state) => state.indexingProgress);
 
   const orderedVolumes = useMemo(
     () => [...series.volumes].sort((a, b) => a.volumeIndex - b.volumeIndex),
     [series.volumes],
+  );
+  const isAnyVolumeIndexing = useMemo(
+    () =>
+      orderedVolumes.some((volume) => {
+        const progress = libraryIndexingProgress[volume.bookHash];
+        return Boolean(progress && progress.phase !== 'complete');
+      }),
+    [orderedVolumes, libraryIndexingProgress],
   );
 
   useEffect(() => {
@@ -196,15 +236,33 @@ const SeriesCard: React.FC<SeriesCardProps> = ({ series, libraryBooks, onIndexed
           <button className='btn btn-ghost btn-sm' onClick={handleManage}>
             {_('Manage')}
           </button>
-          <button className='btn btn-primary btn-sm' onClick={handleIndexAll} disabled={isIndexing}>
-            {isIndexing ? _('Indexing...') : _('Index All')}
+          <button
+            className='btn btn-primary btn-sm'
+            onClick={handleIndexAll}
+            disabled={isIndexing || isAnyVolumeIndexing}
+          >
+            {isIndexing || isAnyVolumeIndexing ? _('Indexing...') : _('Index All')}
           </button>
         </div>
       </div>
       <ul className='space-y-2'>
         {orderedVolumes.map((volume) => {
           const book = libraryBooks.find((item) => item.hash === volume.bookHash);
-          const indexed = indexStates[volume.bookHash];
+          const volumeProgress = libraryIndexingProgress[volume.bookHash];
+          const isVolumeIndexing = Boolean(volumeProgress && volumeProgress.phase !== 'complete');
+          const indexed = Boolean(
+            indexStates[volume.bookHash] || volumeProgress?.phase === 'complete',
+          );
+          const statusLabel = isVolumeIndexing
+            ? _('Indexing...')
+            : indexed
+              ? _('Indexed')
+              : _('Not indexed');
+          const statusTone = isVolumeIndexing
+            ? 'bg-info/15 text-info'
+            : indexed
+              ? 'bg-success/15 text-success'
+              : 'bg-base-300 text-base-content/60';
 
           return (
             <li
@@ -219,13 +277,8 @@ const SeriesCard: React.FC<SeriesCardProps> = ({ series, libraryBooks, onIndexed
                   {book?.title || volume.bookHash}
                 </div>
               </div>
-              <span
-                className={clsx(
-                  'rounded-full px-2 py-1 text-xs font-medium',
-                  indexed ? 'bg-success/15 text-success' : 'bg-base-300 text-base-content/60',
-                )}
-              >
-                {indexed ? _('Indexed') : _('Not indexed')}
+              <span className={clsx('rounded-full px-2 py-1 text-xs font-medium', statusTone)}>
+                {statusLabel}
               </span>
             </li>
           );

@@ -92,10 +92,23 @@ vi.mock('@/components/ModalPortal', () => ({
 }));
 
 vi.mock('@/app/library/components/BookshelfItem', () => ({
-  default: () => <div>book-item</div>,
+  default: () => (
+    <div
+      className='book-item library-grid-item flex h-full flex-col justify-end'
+      data-testid='bookshelf-item-root'
+    >
+      <button className='bookitem-main aspect-[28/41] w-full' type='button'>
+        mocked-book-item
+      </button>
+      <div
+        data-testid='bookshelf-item-footer'
+        className='flex items-center justify-end'
+        style={{ height: '15px', minHeight: '15px' }}
+      />
+    </div>
+  ),
   generateBookshelfItems: (books: Book[]) => books,
 }));
-
 vi.mock('@/app/library/components/SelectModeActions', () => ({
   default: () => null,
 }));
@@ -205,6 +218,22 @@ describe('Bookshelf', () => {
 
     expect(await screen.findByRole('heading', { name: 'Reading stats' })).toBeTruthy();
     expect(container.querySelector('.bookshelf-items > article')).toBeTruthy();
+  });
+
+  test('renders import tile with grid-aligned padding and footer spacer', () => {
+    const { container } = renderBookshelf({ surface: 'books' });
+
+    const importTile = container.querySelector('.bookshelf-import-item') as HTMLElement | null;
+    expect(importTile).not.toBeNull();
+    expect(importTile?.className.startsWith('book-item bookshelf-import-item ')).toBe(true);
+    expect(importTile?.className.includes('px-')).toBe(true);
+    expect(importTile?.className.includes('mx-')).toBe(false);
+
+    const importFooter = importTile?.querySelector('[data-import-footer]') as HTMLElement | null;
+    const regularFooter = screen.getByTestId('bookshelf-item-footer');
+    expect(importFooter).not.toBeNull();
+    expect(importFooter?.style.height).toBe(regularFooter.style.height);
+    expect(importFooter?.style.minHeight).toBe(regularFooter.style.minHeight);
   });
 
   test('shows the reading stats card in zero-state so new users can set goals', () => {

@@ -446,32 +446,37 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   );
 
   const renderImportTile = () => (
-    <div
-      className={clsx(
-        'book-item bookshelf-import-item mx-0 my-2 flex h-full flex-col justify-end sm:mx-4 sm:my-4',
-      )}
-      style={
-        coverFit === 'fit' && viewMode === 'grid'
-          ? {
-              display: 'flex',
-              paddingBottom: `${iconSize15 + 24}px`,
-            }
-          : undefined
-      }
-    >
-      <button
-        aria-label={_('Import Books')}
-        className={clsx(
-          'bookitem-main bg-base-100 hover:bg-base-300/50',
-          'flex items-center justify-center',
-          'aspect-[28/41] w-full',
-        )}
-        onClick={handleImportBooks}
-      >
-        <div className='flex items-center justify-center'>
-          <PiPlus className='size-10' color='gray' />
+    <div className='book-item bookshelf-import-item px-0 py-2 sm:px-4 sm:py-4'>
+      <div className='visible-focus-inset-2 sm:hover:bg-base-300/50 group flex h-full flex-col sm:rounded-md'>
+        <div className='flex h-full flex-col justify-end'>
+          <button
+            aria-label={_('Import Books')}
+            className={clsx(
+              'bookitem-main bg-base-100 hover:bg-base-300/50',
+              'flex items-center justify-center',
+              'aspect-[28/41] w-full',
+            )}
+            onClick={handleImportBooks}
+          >
+            <div className='flex items-center justify-center'>
+              <PiPlus className='size-10' color='gray' />
+            </div>
+          </button>
+          <div className='flex w-full flex-col p-0 pt-2'>
+            <div className='min-w-0 flex-1'>
+              <h4 className='invisible overflow-hidden text-ellipsis whitespace-nowrap text-[0.6em] text-xs font-semibold'>
+                {_('Import Books')}
+              </h4>
+            </div>
+            <div
+              data-import-footer
+              aria-hidden='true'
+              className='flex items-center justify-end'
+              style={{ height: `${iconSize15}px`, minHeight: `${iconSize15}px` }}
+            />
+          </div>
         </div>
-      </button>
+      </div>
     </div>
   );
 

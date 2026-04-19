@@ -10,7 +10,6 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
   aiStore: {
     isIndexed: vi.fn(),
     saveChunks: vi.fn(),
-    saveBM25Index: vi.fn(),
     saveMeta: vi.fn(),
   },
 }));
@@ -46,7 +45,6 @@ vi.mock('@/services/ai/logger', () => ({
     },
     store: {
       saveChunks: vi.fn(),
-      saveBM25: vi.fn(),
       saveMeta: vi.fn(),
     },
   },
@@ -122,8 +120,10 @@ beforeEach(() => {
 
   mockGetProvider.mockReturnValue({
     provider: {
+      id: 'provider-id',
       getEmbeddingModel: () => ({ maxEmbeddingsPerCall: 100 }),
     },
+    modelId: 'text-embedding-3-small',
     inferenceParams: {},
     config: baseSettings.providers[0],
   } as never);
@@ -135,7 +135,6 @@ beforeEach(() => {
 
   mockAiStore.isIndexed.mockResolvedValue(false);
   mockAiStore.saveChunks.mockResolvedValue(undefined);
-  mockAiStore.saveBM25Index.mockResolvedValue(undefined);
   mockAiStore.saveMeta.mockResolvedValue(undefined);
 });
 
@@ -216,7 +215,6 @@ describe('indexBook', () => {
     expect(result.errorMessages).toEqual([]);
 
     expect(mockAiStore.saveChunks).toHaveBeenCalledOnce();
-    expect(mockAiStore.saveBM25Index).toHaveBeenCalledOnce();
     expect(mockAiStore.saveMeta).toHaveBeenCalledOnce();
 
     // Progress should have been reported

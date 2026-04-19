@@ -68,7 +68,7 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
     streaming,
     activeFieldId,
     error,
-    aiUnavailable,
+    availabilityHint,
     retrievalStatus,
     retrievalHints,
     popupContext,
@@ -166,6 +166,7 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
       loading={loading}
       aiEnabled={aiEnabled}
       hasDisplayedResult={hasDisplayedResult}
+      availabilityHint={availabilityHint}
       onSpeakSelectedText={() => handleSpeak(currentTerm)}
       askAboutThisEnabled={Boolean(result && !streaming && popupContext)}
       onAskAboutThis={handleAskAboutThis}
@@ -188,11 +189,6 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
         <p className='text-sm italic text-gray-400'>{_('Translating...')}</p>
       )}
       {error && <p className='text-sm text-red-400'>{error}</p>}
-      {aiUnavailable && (
-        <p className='mb-1 text-xs text-amber-400/80'>
-          {_('AI translation unavailable — showing dictionary results only')}
-        </p>
-      )}
       {(japaneseGrammarHint || frequencyBadge) && (
         <div className='mb-1 flex items-center gap-2'>
           {japaneseGrammarHint && (

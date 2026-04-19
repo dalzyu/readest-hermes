@@ -88,6 +88,7 @@ function mockResult(overrides: Partial<ReturnType<typeof mockUseContextDictionar
     },
     examples: [],
     annotations: {},
+    availabilityHint: 'ai-on' as const,
     saveToVocabulary: vi.fn(),
     ...overrides,
   };

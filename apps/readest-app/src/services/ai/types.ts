@@ -141,7 +141,7 @@ export interface TextChunk {
 
 export interface ScoredChunk extends TextChunk {
   score: number;
-  searchMethod: 'bm25' | 'vector' | 'hybrid';
+  searchMethod: 'vector' | 'reranked';
 }
 
 export interface BookIndexMeta {
@@ -166,7 +166,7 @@ export interface IndexingState {
 export interface EmbeddingProgress {
   current: number;
   total: number;
-  phase: 'chunking' | 'embedding' | 'indexing';
+  phase: 'chunking' | 'embedding' | 'finalizing';
 }
 
 export interface IndexResult {

@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import AIPanel from '@/components/settings/AIPanel';
 import AITranslatePanel from '@/components/settings/AITranslatePanel';
 import SettingsDialog from '@/components/settings/SettingsDialog';
-import type { TranslationSource } from '@/services/contextTranslation/simpleLookup';
 
 const saveSettingsMock = vi.fn().mockResolvedValue(undefined);
 const setSettingsMock = vi.fn();
@@ -36,7 +35,6 @@ const { stableSettings } = vi.hoisted(() => {
     globalReadSettings: {
       contextTranslation: {
         enabled: true,
-        source: 'ai' as TranslationSource,
         targetLanguage: 'en',
         recentContextPages: 3,
         lookAheadWords: 80,
@@ -44,6 +42,12 @@ const { stableSettings } = vi.hoisted(() => {
         priorVolumeRagEnabled: true,
         sameBookChunkCount: 3,
         priorVolumeChunkCount: 2,
+        fieldSources: {
+          translation: 'ai',
+          contextualMeaning: 'ai',
+          examples: 'ai',
+          grammarHint: 'ai',
+        },
         harness: {
           flow: 'production',
           repairEnabled: true,
@@ -94,6 +98,7 @@ const { stableSettings } = vi.hoisted(() => {
         enabled: false,
         sourceExamples: true,
       },
+      translationProvider: 'azure',
     },
     userDictionaryMeta: [
       {
@@ -231,7 +236,13 @@ vi.mock('@/services/contextTranslation/dictionaryService', () => ({
 describe('AIPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    stableSettings.globalReadSettings.contextTranslation.source = 'ai';
+    stableSettings.globalReadSettings.contextTranslation.fieldSources = {
+      translation: 'ai',
+      contextualMeaning: 'ai',
+      examples: 'ai',
+      grammarHint: 'ai',
+    };
+    stableSettings.globalReadSettings.translationProvider = 'azure';
     Object.defineProperty(global.navigator, 'clipboard', {
       value: { writeText: writeClipboardMock },
       configurable: true,
@@ -371,25 +382,69 @@ describe('AIPanel', () => {
     });
   });
 
-  test('translation source dropdown includes Dictionary', () => {
+  test('translation field source controls include translator and dictionary routes', () => {
     render(<AITranslatePanel />);
-    const dropdown = screen.getByTestId('translation-source');
+
+    const dropdown = screen.getByTestId('translation-field-source-translation');
     expect(dropdown).toBeTruthy();
+    expect(
+      (dropdown as HTMLSelectElement).querySelector('option[value="translator"]'),
+    ).toBeTruthy();
     expect(
       (dropdown as HTMLSelectElement).querySelector('option[value="dictionary"]'),
     ).toBeTruthy();
   });
 
-  test('preserves saved dictionary translation source on mount', () => {
-    stableSettings.globalReadSettings.contextTranslation.source = 'dictionary';
+  test('preserves saved translator translation source and provider on mount', () => {
+    stableSettings.globalReadSettings.contextTranslation.fieldSources = {
+      translation: 'translator',
+      contextualMeaning: 'ai',
+      examples: 'ai',
+      grammarHint: 'ai',
+    };
+    stableSettings.globalReadSettings.translationProvider = 'google';
 
     render(<AITranslatePanel />);
 
-    expect((screen.getByTestId('translation-source') as HTMLSelectElement).value).toBe(
-      'dictionary',
+    expect(
+      (screen.getByTestId('translation-field-source-translation') as HTMLSelectElement).value,
+    ).toBe('translator');
+    expect((screen.getByTestId('translation-provider-select') as HTMLSelectElement).value).toBe(
+      'google',
     );
     expect(setSettingsMock).not.toHaveBeenCalled();
     expect(saveSettingsMock).not.toHaveBeenCalled();
+  });
+
+  test('changing translation provider persists translator routing and provider selection', async () => {
+    render(<AITranslatePanel />);
+
+    fireEvent.change(screen.getByTestId('translation-provider-select'), {
+      target: { value: 'deepl' },
+    });
+
+    await waitFor(() => expect(saveSettingsMock).toHaveBeenCalled());
+
+    const savedSettings = saveSettingsMock.mock.calls.at(-1)?.[1] as typeof stableSettings;
+    expect(savedSettings.globalReadSettings.translationProvider).toBe('deepl');
+    expect(savedSettings.globalReadSettings.contextTranslation.fieldSources.translation).toBe(
+      'translator',
+    );
+  });
+
+  test('changing example field source persists non-ai routing', async () => {
+    render(<AITranslatePanel />);
+
+    fireEvent.change(screen.getByTestId('translation-field-source-examples'), {
+      target: { value: 'corpus' },
+    });
+
+    await waitFor(() => expect(saveSettingsMock).toHaveBeenCalled());
+
+    const savedSettings = saveSettingsMock.mock.calls.at(-1)?.[1] as typeof stableSettings;
+    expect(savedSettings.globalReadSettings.contextTranslation.fieldSources.examples).toBe(
+      'corpus',
+    );
   });
 
   test('does not render the old harness controls', () => {

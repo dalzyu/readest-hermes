@@ -1,6 +1,7 @@
 import type {
   ContextDictionaryFieldSources,
   ContextDictionarySettings,
+  ContextTranslationFieldSources,
   ContextTranslationHarnessSettings,
   ContextTranslationSettings,
   TranslationOutputField,
@@ -69,6 +70,23 @@ export function resolveContextTranslationHarnessSettings(
   };
 }
 
+export const DEFAULT_CONTEXT_TRANSLATION_FIELD_SOURCES: Required<ContextTranslationFieldSources> = {
+  translation: 'ai',
+  contextualMeaning: 'ai',
+  examples: 'ai',
+  grammarHint: 'ai',
+};
+
+export function resolveContextTranslationFieldSources(
+  settings?: ContextTranslationSettings,
+): Required<ContextTranslationFieldSources> {
+  return {
+    ...DEFAULT_CONTEXT_TRANSLATION_FIELD_SOURCES,
+    translation: settings?.source === 'dictionary' ? 'dictionary' : 'ai',
+    ...settings?.fieldSources,
+  };
+}
+
 export const DEFAULT_CONTEXT_TRANSLATION_SETTINGS: ContextTranslationSettings = {
   enabled: false,
   targetLanguage: 'en',
@@ -79,6 +97,7 @@ export const DEFAULT_CONTEXT_TRANSLATION_SETTINGS: ContextTranslationSettings = 
   priorVolumeRagEnabled: true,
   sameBookChunkCount: 3,
   priorVolumeChunkCount: 2,
+  fieldSources: DEFAULT_CONTEXT_TRANSLATION_FIELD_SOURCES,
   harness: DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
   outputFields: [
     {

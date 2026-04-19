@@ -2,14 +2,10 @@ import { TextChunk, ScoredChunk, BookIndexMeta, AIConversation, AIMessage } from
 import type { VocabularyEntry, BookSeries } from '@/services/contextTranslation/types';
 import { aiLogger } from '../logger';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const lunr = require('lunr') as typeof import('lunr');
-
 const DB_NAME = 'hermes-ai';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 const CHUNKS_STORE = 'chunks';
 const META_STORE = 'bookMeta';
-const BM25_STORE = 'bm25Indices';
 const CONVERSATIONS_STORE = 'conversations';
 const MESSAGES_STORE = 'messages';
 const VOCAB_STORE = 'vocabulary';
@@ -94,7 +90,6 @@ function isPageWithinBounds(pageNumber: number, bounds?: number | PageSearchBoun
 class AIStore {
   private db: IDBDatabase | null = null;
   private chunkCache = new Map<string, TextChunk[]>();
-  private indexCache = new Map<string, lunr.Index>();
   private metaCache = new Map<string, BookIndexMeta>();
   private conversationCache = new Map<string, AIConversation[]>();
   private seriesMigrationComplete = false;
@@ -110,7 +105,6 @@ class AIStore {
       this.db = null;
     }
     this.chunkCache.clear();
-    this.indexCache.clear();
     this.metaCache.clear();
     this.conversationCache.clear();
     this.seriesMigrationComplete = false;
@@ -134,12 +128,16 @@ class AIStore {
         const db = (event.target as IDBOpenDBRequest).result;
         const oldVersion = event.oldVersion;
 
-        // force re-indexing on schema changes
+        // force re-indexing on early schema changes
         if (oldVersion > 0 && oldVersion < 2) {
           if (db.objectStoreNames.contains(CHUNKS_STORE)) db.deleteObjectStore(CHUNKS_STORE);
           if (db.objectStoreNames.contains(META_STORE)) db.deleteObjectStore(META_STORE);
-          if (db.objectStoreNames.contains(BM25_STORE)) db.deleteObjectStore(BM25_STORE);
+          if (db.objectStoreNames.contains('bm25Indices')) db.deleteObjectStore('bm25Indices');
           aiLogger.store.error('migration', 'Clearing old AI stores for re-indexing (v2)');
+        }
+
+        if (oldVersion < 8 && db.objectStoreNames.contains('bm25Indices')) {
+          db.deleteObjectStore('bm25Indices');
         }
 
         const upgradeTx = (event.target as IDBOpenDBRequest).transaction!;
@@ -159,7 +157,6 @@ class AIStore {
         ensureIndex(chunksStore, 'bookHash', 'bookHash');
 
         openOrCreateStore(META_STORE, 'bookHash');
-        openOrCreateStore(BM25_STORE, 'bookHash');
 
         const conversationsStore = openOrCreateStore(CONVERSATIONS_STORE, 'id');
         ensureIndex(conversationsStore, 'bookHash', 'bookHash');
@@ -295,54 +292,6 @@ class AIStore {
     });
   }
 
-  async saveBM25Index(bookHash: string, chunks: TextChunk[]): Promise<void> {
-    const index = lunr(function (this: lunr.Builder) {
-      this.ref('id');
-      this.field('text');
-      this.field('chapterTitle');
-      this.pipeline.remove(lunr.stemmer);
-      this.searchPipeline.remove(lunr.stemmer);
-      for (const chunk of chunks)
-        this.add({ id: chunk.id, text: chunk.text, chapterTitle: chunk.chapterTitle });
-    });
-    const db = await this.openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(BM25_STORE, 'readwrite');
-      tx.objectStore(BM25_STORE).put({ bookHash, serialized: JSON.stringify(index) });
-      tx.oncomplete = () => {
-        this.indexCache.set(bookHash, index);
-        resolve();
-      };
-      tx.onerror = () => {
-        aiLogger.store.error('saveBM25Index', tx.error?.message || 'TX error');
-        reject(tx.error);
-      };
-    });
-  }
-
-  private async loadBM25Index(bookHash: string): Promise<lunr.Index | null> {
-    if (this.indexCache.has(bookHash)) return this.indexCache.get(bookHash)!;
-    const db = await this.openDB();
-    return new Promise((resolve, reject) => {
-      const req = db.transaction(BM25_STORE, 'readonly').objectStore(BM25_STORE).get(bookHash);
-      req.onsuccess = () => {
-        const data = req.result as { serialized: string } | undefined;
-        if (!data) {
-          resolve(null);
-          return;
-        }
-        try {
-          const index = lunr.Index.load(JSON.parse(data.serialized));
-          this.indexCache.set(bookHash, index);
-          resolve(index);
-        } catch {
-          resolve(null);
-        }
-      };
-      req.onerror = () => reject(req.error);
-    });
-  }
-
   async vectorSearch(
     bookHash: string,
     queryEmbedding: number[],
@@ -370,68 +319,10 @@ class AIStore {
     return results;
   }
 
-  async bm25Search(
-    bookHash: string,
-    query: string,
-    topK: number,
-    maxPage?: number | PageSearchBounds,
-  ): Promise<ScoredChunk[]> {
-    const index = await this.loadBM25Index(bookHash);
-    if (!index) return [];
-    const chunks = await this.getChunks(bookHash);
-    const chunkMap = new Map(chunks.map((c) => [c.id, c]));
-    try {
-      const results = index.search(query);
-      const scored: ScoredChunk[] = [];
-      for (const result of results) {
-        const chunk = chunkMap.get(result.ref);
-        if (!chunk) continue;
-        if (!isPageWithinBounds(chunk.pageNumber, maxPage)) continue;
-        scored.push({ ...chunk, score: result.score, searchMethod: 'bm25' });
-        if (scored.length >= topK) break;
-      }
-      if (scored.length > 0) aiLogger.search.bm25Results(scored.length, scored[0]!.score);
-      return scored;
-    } catch {
-      return [];
-    }
-  }
-
-  async hybridSearch(
-    bookHash: string,
-    queryEmbedding: number[] | null,
-    query: string,
-    topK: number,
-    maxPage?: number | PageSearchBounds,
-  ): Promise<ScoredChunk[]> {
-    const [vectorResults, bm25Results] = await Promise.all([
-      queryEmbedding ? this.vectorSearch(bookHash, queryEmbedding, topK * 2, maxPage) : [],
-      this.bm25Search(bookHash, query, topK * 2, maxPage),
-    ]);
-    const normalize = (results: ScoredChunk[], weight: number) => {
-      if (results.length === 0) return [];
-      const max = Math.max(...results.map((r) => r.score));
-      return results.map((r) => ({ ...r, score: max > 0 ? (r.score / max) * weight : 0 }));
-    };
-    const weighted = [...normalize(vectorResults, 1.0), ...normalize(bm25Results, 0.8)];
-    const merged = new Map<string, ScoredChunk>();
-    for (const r of weighted) {
-      const key = r.text.slice(0, 100);
-      const existing = merged.get(key);
-      if (existing) {
-        existing.score = Math.max(existing.score, r.score);
-        existing.searchMethod = 'hybrid';
-      } else merged.set(key, { ...r });
-    }
-    return Array.from(merged.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topK);
-  }
-
   async clearBook(bookHash: string): Promise<void> {
     const db = await this.openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction([CHUNKS_STORE, META_STORE, BM25_STORE], 'readwrite');
+      const tx = db.transaction([CHUNKS_STORE, META_STORE], 'readwrite');
       const cursor = tx.objectStore(CHUNKS_STORE).index('bookHash').openCursor(bookHash);
       cursor.onsuccess = (e) => {
         const c = (e.target as IDBRequest<IDBCursorWithValue>).result;
@@ -441,10 +332,8 @@ class AIStore {
         }
       };
       tx.objectStore(META_STORE).delete(bookHash);
-      tx.objectStore(BM25_STORE).delete(bookHash);
       tx.oncomplete = () => {
         this.chunkCache.delete(bookHash);
-        this.indexCache.delete(bookHash);
         this.metaCache.delete(bookHash);
         resolve();
       };

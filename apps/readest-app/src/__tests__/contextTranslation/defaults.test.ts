@@ -5,6 +5,7 @@ import {
   DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS,
   CONTEXT_LOOKUP_MODES,
   getContextDictionaryOutputFields,
+  resolveContextTranslationFieldSources,
 } from '@/services/contextTranslation/defaults';
 import type {
   BookSeries,
@@ -101,6 +102,27 @@ describe('DEFAULT_CONTEXT_TRANSLATION_SETTINGS', () => {
     };
 
     expect(series.volumes[1]?.volumeIndex).toBe(2);
+  });
+});
+
+describe('resolveContextTranslationFieldSources', () => {
+  test('defaults to AI-backed sources when unset', () => {
+    const resolved = resolveContextTranslationFieldSources(DEFAULT_CONTEXT_TRANSLATION_SETTINGS);
+
+    expect(resolved.translation).toBe('ai');
+    expect(resolved.contextualMeaning).toBe('ai');
+    expect(resolved.examples).toBe('ai');
+    expect(resolved.grammarHint).toBe('ai');
+  });
+
+  test('maps legacy source=dictionary into translation field source', () => {
+    const resolved = resolveContextTranslationFieldSources({
+      ...DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+      source: 'dictionary',
+      fieldSources: undefined,
+    });
+
+    expect(resolved.translation).toBe('dictionary');
   });
 });
 

@@ -5,10 +5,6 @@ vi.mock('@/utils/simplecc', () => ({
   runSimpleCC: vi.fn((text: string) => text),
 }));
 
-vi.mock('@/services/contextTranslation/simpleLookup', () => ({
-  runSimpleLookup: vi.fn(),
-}));
-
 vi.mock('@/utils/supabase', () => ({
   supabase: {
     auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) },

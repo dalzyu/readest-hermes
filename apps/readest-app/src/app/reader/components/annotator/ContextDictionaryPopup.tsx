@@ -72,7 +72,7 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
     streaming,
     activeFieldId,
     error,
-    aiUnavailable,
+    availabilityHint,
     retrievalStatus,
     retrievalHints,
     popupContext,
@@ -165,6 +165,7 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
       loading={loading}
       aiEnabled={aiEnabled}
       hasDisplayedResult={hasDisplayedResult}
+      availabilityHint={availabilityHint}
       onSpeakSelectedText={handleSpeak}
       askAboutThisEnabled={Boolean(result && !streaming && popupContext)}
       onAskAboutThis={handleAskAboutThis}
@@ -185,11 +186,6 @@ const ContextDictionaryPopup: React.FC<ContextDictionaryPopupProps> = ({
         <p className='text-sm italic text-gray-400'>{_('Looking up...')}</p>
       )}
       {error && <p className='text-sm text-red-400'>{error}</p>}
-      {aiUnavailable && (
-        <p className='mb-1 text-xs text-amber-400/80'>
-          {_('AI translation unavailable — showing dictionary results only')}
-        </p>
-      )}
       {(japaneseGrammarHint || frequencyBadge) && (
         <div className='mb-1 flex items-center gap-2'>
           {japaneseGrammarHint && (

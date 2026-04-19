@@ -18,7 +18,8 @@ const {
   finishIndexingMock,
   cancelIndexingMock,
   saveConfigMock,
-  indexBookMock,
+  startBookIndexingMock,
+  subscribeToIndexingRunMock,
   isBookIndexedMock,
   cancelBookIndexingMock,
 } = vi.hoisted(() => {
@@ -32,6 +33,7 @@ const {
     viewSettings: { focusMode: false } as { focusMode: boolean },
     indexingProgress: {} as Record<string, ReaderIndexProgress>,
   };
+  const runtimeSubscribers = new Set<(event: unknown) => void>();
 
   return {
     state,
@@ -46,18 +48,48 @@ const {
     finishIndexingMock: vi.fn(),
     cancelIndexingMock: vi.fn(),
     saveConfigMock: vi.fn().mockResolvedValue(undefined),
-    indexBookMock: vi
+    startBookIndexingMock: vi
       .fn()
-      .mockImplementation(
-        async (
-          _doc: unknown,
-          _hash: string,
-          _settings: SystemSettings['aiSettings'],
-          onProgress?: (progress: ReaderIndexProgress) => void,
-        ) => {
-          onProgress?.({ current: 1, total: 2, phase: 'chunking' });
-        },
-      ),
+      .mockImplementation(({ key, bookHash }: { key: string; bookHash: string }) => {
+        const runId = 'run-1';
+        const result = {
+          status: 'complete' as const,
+          chunksProcessed: 4,
+          totalSections: 1,
+          skippedSections: 0,
+          errorMessages: [],
+          durationMs: 1,
+        };
+        queueMicrotask(() => {
+          for (const subscriber of runtimeSubscribers) {
+            subscriber({
+              type: 'progress',
+              runId,
+              scope: 'reader',
+              key,
+              bookHash,
+              progress: { current: 1, total: 2, phase: 'chunking' },
+            });
+            subscriber({
+              type: 'complete',
+              runId,
+              scope: 'reader',
+              key,
+              bookHash,
+              result,
+            });
+          }
+        });
+        return { runId, promise: Promise.resolve(result) };
+      }),
+    subscribeToIndexingRunMock: vi.fn(
+      (_scope: string, _key: string, subscriber: (event: unknown) => void) => {
+        runtimeSubscribers.add(subscriber);
+        return () => {
+          runtimeSubscribers.delete(subscriber);
+        };
+      },
+    ),
     isBookIndexedMock: vi.fn().mockResolvedValue(false),
     cancelBookIndexingMock: vi.fn(),
   };
@@ -155,6 +187,9 @@ vi.mock('@/utils/window', () => ({
 vi.mock('@/services/environment', () => ({
   isTauriAppPlatform: () => false,
 }));
+vi.mock('@/services/contextTranslation/sourceRouter', () => ({
+  detectAIAvailability: () => ({ chat: true, embedding: true }),
+}));
 
 vi.mock('@/utils/nav', () => ({
   navigateToLibrary: vi.fn(),
@@ -198,8 +233,12 @@ vi.mock('@/app/reader/components/BooksGrid', () => ({
   default: () => <div data-testid='books-grid' />,
 }));
 
+vi.mock('@/services/ai/indexingRuntime', () => ({
+  startBookIndexing: startBookIndexingMock,
+  subscribeToIndexingRun: subscribeToIndexingRunMock,
+}));
+
 vi.mock('@/services/ai/ragService', () => ({
-  indexBook: indexBookMock,
   isBookIndexed: isBookIndexedMock,
   cancelBookIndexing: cancelBookIndexingMock,
 }));
@@ -262,19 +301,23 @@ describe('reader header indexing controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Index' }));
 
     await waitFor(() =>
-      expect(indexBookMock).toHaveBeenCalledWith(
-        state.bookDataByKey['reader-key-1']!.bookDoc,
-        'hash-1',
-        state.settings.aiSettings,
-        expect.any(Function),
+      expect(startBookIndexingMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: 'reader',
+          key: 'reader-key-1',
+          bookHash: 'hash-1',
+          bookDoc: state.bookDataByKey['reader-key-1']!.bookDoc,
+          aiSettings: state.settings.aiSettings,
+        }),
       ),
     );
-    expect(startIndexingMock).toHaveBeenCalledWith('reader-key-1');
+    expect(startIndexingMock).toHaveBeenCalledWith('reader-key-1', 'run-1');
     expect(updateIndexingProgressMock).toHaveBeenCalledWith(
       'reader-key-1',
+      'run-1',
       expect.objectContaining({ current: 1, total: 2, phase: 'chunking' }),
     );
-    expect(finishIndexingMock).toHaveBeenCalledWith('reader-key-1');
+    expect(finishIndexingMock).toHaveBeenCalledWith('reader-key-1', 'run-1');
   });
 
   it('auto-indexes the primary book when opening the reader', async () => {
@@ -282,18 +325,22 @@ describe('reader header indexing controls', () => {
 
     await waitFor(() => expect(isBookIndexedMock).toHaveBeenCalledWith('hash-1'));
     await waitFor(() =>
-      expect(indexBookMock).toHaveBeenCalledWith(
-        state.bookDataByKey['reader-key-1']!.bookDoc,
-        'hash-1',
-        state.settings.aiSettings,
-        expect.any(Function),
+      expect(startBookIndexingMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: 'reader',
+          key: 'reader-key-1',
+          bookHash: 'hash-1',
+          bookDoc: state.bookDataByKey['reader-key-1']!.bookDoc,
+          aiSettings: state.settings.aiSettings,
+        }),
       ),
     );
-    expect(startIndexingMock).toHaveBeenCalledWith('reader-key-1');
+    expect(startIndexingMock).toHaveBeenCalledWith('reader-key-1', 'run-1');
     expect(updateIndexingProgressMock).toHaveBeenCalledWith(
       'reader-key-1',
+      'run-1',
       expect.objectContaining({ current: 1, total: 2, phase: 'chunking' }),
     );
-    expect(finishIndexingMock).toHaveBeenCalledWith('reader-key-1');
+    expect(finishIndexingMock).toHaveBeenCalledWith('reader-key-1', 'run-1');
   });
 });

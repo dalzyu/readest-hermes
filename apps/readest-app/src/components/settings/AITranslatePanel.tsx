@@ -6,6 +6,7 @@ import HelpTip from '@/components/primitives/HelpTip';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
+import { useAuth } from '@/context/AuthContext';
 import {
   previewDictionaryZip,
   importUserDictionary,
@@ -16,6 +17,7 @@ import {
 import { getTranslatorLanguageOptions } from '@/services/translatorLanguages';
 import type {
   ContextDictionarySettings,
+  ContextTranslationFieldSources,
   ContextTranslationSettings,
   UserDictionary,
   ContextDictionaryFieldSource,
@@ -24,25 +26,78 @@ import {
   DEFAULT_CONTEXT_DICTIONARY_FIELD_SOURCES,
   DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS,
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+  DEFAULT_CONTEXT_TRANSLATION_FIELD_SOURCES,
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
   resolveContextDictionaryFieldSources,
+  resolveContextTranslationFieldSources,
 } from '@/services/contextTranslation/defaults';
 import {
   DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
   TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
   getMissingPromptTemplateVariables,
 } from '@/services/contextTranslation/promptBuilder';
+import {
+  getTranslators,
+  getTranslatorDisplayLabel,
+  isTranslatorAvailable,
+  type TranslatorName,
+} from '@/services/translators/providers';
 
 const DEFAULT_BY_ID: Record<string, string> = Object.fromEntries(
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields.map((f) => [f.id, f.promptInstruction]),
 );
 
-type TranslationSource = 'ai' | 'dictionary';
+type TranslationFieldSourceMap = Required<ContextTranslationFieldSources>;
+type TranslationFieldKey = keyof TranslationFieldSourceMap;
+type TranslationProviderOption = TranslatorName | 'ai';
 
-function normalizeTranslationSource(
-  source: ContextTranslationSettings['source'],
-): TranslationSource {
-  return source === 'dictionary' ? 'dictionary' : 'ai';
+const DEFAULT_TRANSLATION_PROVIDER: TranslatorName = 'deepl';
+
+function normalizeTranslationProvider(
+  provider: string | undefined,
+  translationSource: TranslationFieldSourceMap['translation'],
+): TranslationProviderOption {
+  if (translationSource === 'ai') return 'ai';
+  if (
+    provider === 'deepl' ||
+    provider === 'azure' ||
+    provider === 'google' ||
+    provider === 'yandex'
+  ) {
+    return provider;
+  }
+  return DEFAULT_TRANSLATION_PROVIDER;
+}
+
+function getTranslationFieldOptions(
+  fieldId: TranslationFieldKey,
+  _: (value: string) => string,
+  aiEnabled: boolean,
+): Array<{
+  value: TranslationFieldSourceMap[TranslationFieldKey];
+  label: string;
+  disabled?: boolean;
+}> {
+  switch (fieldId) {
+    case 'translation':
+      return [
+        { value: 'ai', label: _('AI'), disabled: !aiEnabled },
+        { value: 'translator', label: _('Upstream Translator') },
+        { value: 'dictionary', label: _('Dictionary') },
+      ];
+    case 'contextualMeaning':
+      return [
+        { value: 'ai', label: _('AI'), disabled: !aiEnabled },
+        { value: 'dictionary', label: _('Dictionary') },
+      ];
+    case 'examples':
+      return [
+        { value: 'ai', label: _('AI'), disabled: !aiEnabled },
+        { value: 'corpus', label: _('Corpus') },
+      ];
+    case 'grammarHint':
+      return [{ value: 'ai', label: _('AI'), disabled: !aiEnabled }];
+  }
 }
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -53,6 +108,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 const AITranslatePanel: React.FC = () => {
   const _ = useTranslation();
   const { envConfig } = useEnv();
+  const { token } = useAuth();
   const { settings, setSettings, saveSettings } = useSettingsStore();
 
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
@@ -63,6 +119,12 @@ const AITranslatePanel: React.FC = () => {
 
   const ctxDictSettings: ContextDictionarySettings =
     settings?.globalReadSettings?.contextDictionary ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS;
+
+  const initialTranslationFieldSources = resolveContextTranslationFieldSources(ctxTransSettings);
+  const initialTranslationProvider = normalizeTranslationProvider(
+    settings?.globalReadSettings?.translationProvider,
+    initialTranslationFieldSources.translation,
+  );
 
   const [ctxEnabled, setCtxEnabled] = useState(ctxTransSettings.enabled);
   const [ctxTargetLang, setCtxTargetLang] = useState(ctxTransSettings.targetLanguage);
@@ -81,8 +143,11 @@ const AITranslatePanel: React.FC = () => {
     ctxTransSettings.priorVolumeChunkCount,
   );
   const [ctxOutputFields, setCtxOutputFields] = useState(ctxTransSettings.outputFields);
-  const [ctxSource, setCtxSource] = useState<TranslationSource>(
-    normalizeTranslationSource(ctxTransSettings.source),
+  const [ctxFieldSources, setCtxFieldSources] = useState<TranslationFieldSourceMap>(
+    initialTranslationFieldSources,
+  );
+  const [ctxTranslationProvider, setCtxTranslationProvider] = useState<TranslationProviderOption>(
+    initialTranslationProvider,
   );
   const [ctxFieldStrategy, setCtxFieldStrategy] = useState<'single' | 'multi'>(
     ctxTransSettings.fieldStrategy ?? 'single',
@@ -146,6 +211,7 @@ const AITranslatePanel: React.FC = () => {
           contextTranslation: { ...current, ...patch },
         },
       };
+      settingsRef.current = newSettings;
       setSettings(newSettings);
       saveSettings(envConfig, newSettings).catch(console.error);
     },
@@ -165,6 +231,7 @@ const AITranslatePanel: React.FC = () => {
           contextDictionary: { ...current, ...patch },
         },
       };
+      settingsRef.current = newSettings;
       setSettings(newSettings);
       saveSettings(envConfig, newSettings).catch(console.error);
     },
@@ -182,12 +249,17 @@ const AITranslatePanel: React.FC = () => {
           ...patch,
         },
       };
+      settingsRef.current = newSettings;
       setSettings(newSettings);
       saveSettings(envConfig, newSettings).catch(console.error);
     },
     [envConfig, setSettings, saveSettings],
   );
 
+  const resolvedTranslationFieldSources: TranslationFieldSourceMap = {
+    ...DEFAULT_CONTEXT_TRANSLATION_FIELD_SOURCES,
+    ...ctxFieldSources,
+  };
   const resolvedDictFieldSources = {
     ...DEFAULT_CONTEXT_DICTIONARY_FIELD_SOURCES,
     ...ctxDictFieldSources,
@@ -207,12 +279,55 @@ const AITranslatePanel: React.FC = () => {
     };
   });
 
-  const updateSource = useCallback(
-    (source: TranslationSource) => {
-      setCtxSource(source);
-      saveCtxTransSetting({ source });
+  const updateTranslationFieldSource = useCallback(
+    (fieldId: TranslationFieldKey, source: TranslationFieldSourceMap[TranslationFieldKey]) => {
+      const next = {
+        ...resolvedTranslationFieldSources,
+        [fieldId]: source,
+      } as TranslationFieldSourceMap;
+      setCtxFieldSources(next);
+      saveCtxTransSetting({ fieldSources: next, source: undefined });
+
+      if (fieldId === 'translation' && source === 'translator' && ctxTranslationProvider === 'ai') {
+        setCtxTranslationProvider(DEFAULT_TRANSLATION_PROVIDER);
+        saveGlobalReadSetting({ translationProvider: DEFAULT_TRANSLATION_PROVIDER });
+      }
     },
-    [saveCtxTransSetting],
+    [
+      resolvedTranslationFieldSources,
+      saveCtxTransSetting,
+      ctxTranslationProvider,
+      saveGlobalReadSetting,
+    ],
+  );
+
+  const updateTranslationProviderSelection = useCallback(
+    (value: TranslationProviderOption) => {
+      setCtxTranslationProvider(value);
+      saveGlobalReadSetting({ translationProvider: value });
+
+      if (value === 'ai') {
+        if (resolvedTranslationFieldSources.translation !== 'ai') {
+          const next = {
+            ...resolvedTranslationFieldSources,
+            translation: 'ai',
+          } as TranslationFieldSourceMap;
+          setCtxFieldSources(next);
+          saveCtxTransSetting({ fieldSources: next, source: undefined });
+        }
+        return;
+      }
+
+      if (resolvedTranslationFieldSources.translation !== 'translator') {
+        const next = {
+          ...resolvedTranslationFieldSources,
+          translation: 'translator',
+        } as TranslationFieldSourceMap;
+        setCtxFieldSources(next);
+        saveCtxTransSetting({ fieldSources: next, source: undefined });
+      }
+    },
+    [resolvedTranslationFieldSources, saveGlobalReadSetting, saveCtxTransSetting],
   );
 
   const updatePrompt = useCallback(
@@ -420,8 +535,29 @@ const AITranslatePanel: React.FC = () => {
   );
 
   // Derived helpers
-  const isAiSource = ctxSource === 'ai';
-  const aiOnlyDisabled = !ctxEnabled || !isAiSource || !aiEnabled;
+  const hasToken = Boolean(token);
+  const translatorProviders = getTranslators();
+  const getTranslationFieldSource = (
+    fieldId: string,
+  ): TranslationFieldSourceMap[TranslationFieldKey] => {
+    switch (fieldId) {
+      case 'translation':
+        return resolvedTranslationFieldSources.translation;
+      case 'contextualMeaning':
+        return resolvedTranslationFieldSources.contextualMeaning;
+      case 'examples':
+        return resolvedTranslationFieldSources.examples;
+      case 'grammarHint':
+        return resolvedTranslationFieldSources.grammarHint;
+      default:
+        return 'ai';
+    }
+  };
+  const fieldUsesAi = (fieldId: string): boolean => getTranslationFieldSource(fieldId) === 'ai';
+  const hasAnyAiField = ctxOutputFields.some((field) => field.enabled && fieldUsesAi(field.id));
+  const translationProviderSelection: TranslationProviderOption =
+    resolvedTranslationFieldSources.translation === 'ai' ? 'ai' : ctxTranslationProvider;
+  const aiOnlyDisabled = !ctxEnabled || !hasAnyAiField || !aiEnabled;
 
   return (
     <div className='my-4 w-full space-y-6'>
@@ -494,11 +630,49 @@ const AITranslatePanel: React.FC = () => {
               </select>
             </div>
 
+            <div
+              className={clsx(
+                'config-item !h-auto flex-col !items-start gap-2 py-3',
+                !ctxEnabled && 'pointer-events-none select-none opacity-50',
+              )}
+            >
+              <span className='flex items-center gap-1'>
+                {_('Translation Provider')}
+                <HelpTip
+                  tip={_(
+                    'Choose the preferred upstream translator. Selecting AI routes the translation field back through the LLM.',
+                  )}
+                />
+              </span>
+              <select
+                data-testid='translation-provider-select'
+                className='select select-bordered select-sm bg-base-100 text-base-content w-full'
+                value={translationProviderSelection}
+                disabled={
+                  !ctxEnabled || resolvedTranslationFieldSources.translation === 'dictionary'
+                }
+                onChange={(e) =>
+                  updateTranslationProviderSelection(e.target.value as TranslationProviderOption)
+                }
+              >
+                <option value='ai'>{_('AI')}</option>
+                {translatorProviders.map((translator) => (
+                  <option
+                    key={translator.name}
+                    value={translator.name}
+                    disabled={!isTranslatorAvailable(translator, hasToken)}
+                  >
+                    {getTranslatorDisplayLabel(translator, hasToken, _)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Recent Context Pages — only meaningful for AI path */}
             <div
               className={clsx(
                 'config-item',
-                (!ctxEnabled || !isAiSource) && 'pointer-events-none select-none opacity-50',
+                aiOnlyDisabled && 'pointer-events-none select-none opacity-50',
               )}
             >
               <span>{_('Recent Context Pages')}</span>
@@ -508,7 +682,7 @@ const AITranslatePanel: React.FC = () => {
                 min={1}
                 max={20}
                 value={ctxRecentPages}
-                disabled={!ctxEnabled || !isAiSource}
+                disabled={aiOnlyDisabled}
                 onChange={(e) => {
                   const val = Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1));
                   setCtxRecentPages(val);
@@ -521,7 +695,7 @@ const AITranslatePanel: React.FC = () => {
             <div
               className={clsx(
                 'config-item',
-                (!ctxEnabled || !isAiSource) && 'pointer-events-none select-none opacity-50',
+                aiOnlyDisabled && 'pointer-events-none select-none opacity-50',
               )}
             >
               <span>{_('Look-ahead Words')}</span>
@@ -531,7 +705,7 @@ const AITranslatePanel: React.FC = () => {
                 min={0}
                 max={300}
                 value={ctxLookAheadWords}
-                disabled={!ctxEnabled || !isAiSource}
+                disabled={aiOnlyDisabled}
                 onChange={(e) => {
                   const val = Math.max(0, Math.min(300, parseInt(e.target.value, 10) || 0));
                   setCtxLookAheadWords(val);
@@ -681,7 +855,7 @@ const AITranslatePanel: React.FC = () => {
                     type='checkbox'
                     className='toggle toggle-sm'
                     checked={ctxFieldStrategy === 'multi'}
-                    disabled={!ctxEnabled || !isAiSource}
+                    disabled={aiOnlyDisabled}
                     onChange={() => {
                       const next = ctxFieldStrategy === 'multi' ? 'single' : 'multi';
                       setCtxFieldStrategy(next);
@@ -712,81 +886,90 @@ const AITranslatePanel: React.FC = () => {
               {ctxOutputFields
                 .slice()
                 .sort((a, b) => a.order - b.order)
-                .map((field) => (
-                  <div key={field.id} className='border-base-200 border-t px-4 py-2'>
-                    <div className='config-item !px-0'>
-                      <span className='text-sm'>{_(field.label)}</span>
-                      <input
-                        type='checkbox'
-                        className='toggle toggle-sm'
-                        checked={field.enabled}
-                        disabled={!ctxEnabled || field.id === 'translation'}
-                        onChange={() => {
-                          if (field.id === 'translation') return;
-                          const updated = ctxOutputFields.map((f) =>
-                            f.id === field.id ? { ...f, enabled: !f.enabled } : f,
-                          );
-                          setCtxOutputFields(updated);
-                          saveCtxTransSetting({ outputFields: updated });
-                        }}
-                      />
-                    </div>
+                .map((field) => {
+                  const fieldKey = field.id as TranslationFieldKey;
+                  const fieldSource = getTranslationFieldSource(field.id);
+                  const sourceOptions = getTranslationFieldOptions(fieldKey, _, aiEnabled);
+                  const promptUsesAi = fieldUsesAi(field.id);
 
-                    {/* Translation Source — nested under the Translation field (Fix 3) */}
-                    {field.id === 'translation' && (
+                  return (
+                    <div key={field.id} className='border-base-200 border-t px-4 py-2'>
+                      <div className='config-item !px-0'>
+                        <span className='text-sm'>{_(field.label)}</span>
+                        <input
+                          type='checkbox'
+                          className='toggle toggle-sm'
+                          checked={field.enabled}
+                          disabled={!ctxEnabled || field.id === 'translation'}
+                          onChange={() => {
+                            if (field.id === 'translation') return;
+                            const updated = ctxOutputFields.map((f) =>
+                              f.id === field.id ? { ...f, enabled: !f.enabled } : f,
+                            );
+                            setCtxOutputFields(updated);
+                            saveCtxTransSetting({ outputFields: updated });
+                          }}
+                        />
+                      </div>
+
                       <div className='mt-2 pl-1'>
                         <div className='config-item !px-0 !py-1'>
                           <span className='text-base-content/70 text-xs'>{_('Source')}</span>
                           <select
-                            data-testid='translation-source'
+                            data-testid={`translation-field-source-${field.id}`}
                             className='select select-bordered select-xs'
-                            value={ctxSource}
-                            onChange={(e) => updateSource(e.target.value as TranslationSource)}
+                            value={fieldSource}
+                            disabled={!ctxEnabled}
+                            onChange={(e) =>
+                              updateTranslationFieldSource(
+                                fieldKey,
+                                e.target.value as TranslationFieldSourceMap[TranslationFieldKey],
+                              )
+                            }
                           >
-                            <option value='ai' disabled={!aiEnabled}>
-                              {_('AI')}
-                              {!aiEnabled ? ` (${_('Enable AI first')})` : ''}
-                            </option>
-                            <option value='dictionary'>{_('Dictionary')}</option>
+                            {sourceOptions.map((option) => (
+                              <option
+                                key={option.value}
+                                value={option.value}
+                                disabled={option.disabled}
+                              >
+                                {option.label}
+                              </option>
+                            ))}
                           </select>
                         </div>
                       </div>
-                    )}
 
-                    {/* Advanced prompt — only shown for AI source on non-translation fields,
-                        or for translation field when AI is the source */}
-                    {(field.id !== 'translation' || isAiSource) && (
-                      <details>
-                        <summary
-                          data-testid={`advanced-${field.id}-summary`}
-                          className={clsx(
-                            'text-base-content/60 cursor-pointer text-sm',
-                            !isAiSource && 'pointer-events-none opacity-50',
-                          )}
-                        >
-                          {_('Advanced')}
-                        </summary>
-                        <div className='space-y-2 pl-4 pt-2'>
-                          <label className='text-sm'>{_('Prompt instruction:')}</label>
-                          <textarea
-                            data-testid={`prompt-textarea-${field.id}`}
-                            className='textarea textarea-bordered w-full text-sm'
-                            rows={3}
-                            value={field.promptInstruction}
-                            onChange={(e) => updatePrompt(field.id, e.target.value)}
-                          />
-                          <button
-                            data-testid={`reset-prompt-${field.id}`}
-                            className='btn btn-ghost btn-sm'
-                            onClick={() => resetToDefault(field.id)}
+                      {promptUsesAi && (
+                        <details>
+                          <summary
+                            data-testid={`advanced-${field.id}-summary`}
+                            className='text-base-content/60 cursor-pointer text-sm'
                           >
-                            {_('Reset to defaults')}
-                          </button>
-                        </div>
-                      </details>
-                    )}
-                  </div>
-                ))}
+                            {_('Advanced')}
+                          </summary>
+                          <div className='space-y-2 pl-4 pt-2'>
+                            <label className='text-sm'>{_('Prompt instruction:')}</label>
+                            <textarea
+                              data-testid={`prompt-textarea-${field.id}`}
+                              className='textarea textarea-bordered w-full text-sm'
+                              rows={3}
+                              value={field.promptInstruction}
+                              onChange={(e) => updatePrompt(field.id, e.target.value)}
+                            />
+                            <button
+                              data-testid={`reset-prompt-${field.id}`}
+                              className='btn btn-ghost btn-sm'
+                              onClick={() => resetToDefault(field.id)}
+                            >
+                              {_('Reset to defaults')}
+                            </button>
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })}
               {developerMode && (
                 <div className='border-base-200 border-t px-4 py-3'>
                   <div className='text-warning text-xs font-semibold'>

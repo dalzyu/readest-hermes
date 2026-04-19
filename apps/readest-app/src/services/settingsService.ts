@@ -27,6 +27,7 @@ import type { AISettings, AITaskType, ModelEntry, ProviderConfig } from './ai/ty
 import { getTargetLang, isCJKEnv } from '@/utils/misc';
 import { safeLoadJSON, safeSaveJSON } from './persistence';
 
+import { resolveContextTranslationFieldSources } from '@/services/contextTranslation/defaults';
 export interface Context {
   fs: FileSystem;
   isMobile: boolean;
@@ -197,10 +198,12 @@ function migrateAISettingsShape(aiSettings: AISettings): AISettings {
   };
 }
 
-function migrateContextTranslationSource(settings: SystemSettings): void {
+export function migrateContextTranslationSource(settings: SystemSettings): void {
   const current = settings.globalReadSettings.contextTranslation;
   if (!current) return;
-  current.source = current.source === 'dictionary' ? 'dictionary' : 'ai';
+
+  current.fieldSources = resolveContextTranslationFieldSources(current);
+  delete (current as { source?: unknown }).source;
 }
 
 export async function loadSettings(ctx: Context): Promise<SystemSettings> {

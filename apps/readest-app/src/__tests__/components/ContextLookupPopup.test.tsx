@@ -22,6 +22,7 @@ const defaultProps = {
   loading: false,
   aiEnabled: true,
   hasDisplayedResult: true,
+  availabilityHint: 'ai-on' as const,
   onSpeakSelectedText: vi.fn(),
   askAboutThisEnabled: true,
   onAskAboutThis: vi.fn(),
@@ -67,20 +68,39 @@ describe('ContextLookupPopup', () => {
     expect(defaultProps.onSave).toHaveBeenCalledTimes(1);
   });
 
-  test('renders AI disabled notice when AI is unavailable', () => {
+  test.each([
+    {
+      hint: 'ai-off-with-translator' as const,
+      message: 'Enable AI for contextual meaning and richer context.',
+    },
+    {
+      hint: 'ai-off-empty' as const,
+      message: 'AI is unavailable and no non-AI source can fill this result.',
+    },
+    {
+      hint: 'ai-request-failed' as const,
+      message: 'AI request failed. Showing dictionary/translator results only.',
+    },
+    {
+      hint: 'partial-no-ai' as const,
+      message: 'Enable AI for usage examples and grammar.',
+    },
+  ])('renders contextual availability message for $hint', ({ hint, message }) => {
+    render(<ContextLookupPopup {...defaultProps} availabilityHint={hint} />);
+
+    expect(screen.getByText(message)).toBeTruthy();
+  });
+
+  test('disables Ask About This unless AI is on', () => {
     render(
       <ContextLookupPopup
         {...defaultProps}
-        aiEnabled={false}
-        hasDisplayedResult={false}
-        loading={false}
+        availabilityHint='partial-no-ai'
+        askAboutThisEnabled={true}
       />,
     );
 
-    expect(
-      screen.getByText(
-        'Enable AI Assistant in Settings for contextual meaning, usage examples, and more.',
-      ),
-    ).toBeTruthy();
+    const askButton = screen.getByRole('button', { name: 'Ask About This' }) as HTMLButtonElement;
+    expect(askButton.disabled).toBe(true);
   });
 });

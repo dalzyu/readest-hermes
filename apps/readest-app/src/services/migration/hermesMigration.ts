@@ -5,11 +5,10 @@ const MIGRATION_GUARD_KEY = 'hermes:migration';
 const MIGRATION_DONE_VALUE = 'v1done';
 const LEGACY_IDB_NAME = 'readest-ai';
 const HERMES_IDB_NAME = 'hermes-ai';
-const HERMES_IDB_VERSION = 7;
+const HERMES_IDB_VERSION = 8;
 const IDB_STORES = [
   'chunks',
   'bookMeta',
-  'bm25Indices',
   'conversations',
   'messages',
   'vocabulary',
@@ -42,6 +41,9 @@ async function openDB(name: string, version?: number): Promise<IDBDatabase> {
     req.onerror = () => reject(req.error);
     req.onupgradeneeded = () => {
       const db = req.result;
+      if (db.objectStoreNames.contains('bm25Indices')) {
+        db.deleteObjectStore('bm25Indices');
+      }
       const upgradeTx = req.transaction!;
       const openOrCreateStore = (storeName: (typeof IDB_STORES)[number], keyPath: string) => {
         if (!db.objectStoreNames.contains(storeName)) {
@@ -57,7 +59,6 @@ async function openDB(name: string, version?: number): Promise<IDBDatabase> {
 
       openOrCreateStore('chunks', 'id');
       openOrCreateStore('bookMeta', 'bookHash');
-      openOrCreateStore('bm25Indices', 'bookHash');
 
       const conversationsStore = openOrCreateStore('conversations', 'id');
       ensureIndex(conversationsStore, 'bookHash', 'bookHash');

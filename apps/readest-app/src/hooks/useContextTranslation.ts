@@ -1,14 +1,5 @@
-import type {
-  LookupAnnotationSlots,
-  LookupExample,
-  ContextTranslationSettings,
-  PopupContextBundle,
-  PopupRetrievalHints,
-  RetrievalStatus,
-  TranslationResult,
-} from '@/services/contextTranslation/types';
-
 import { useContextLookup, type UseContextLookupResult } from './useContextLookup';
+import type { ContextTranslationSettings } from '@/services/contextTranslation/types';
 
 interface UseContextTranslationOptions {
   bookKey: string;
@@ -19,22 +10,7 @@ interface UseContextTranslationOptions {
   bookLanguage?: string;
 }
 
-interface UseContextTranslationResult {
-  result: TranslationResult | null;
-  partialResult: TranslationResult | null;
-  loading: boolean;
-  streaming: boolean;
-  activeFieldId: string | null;
-  error: string | null;
-  aiUnavailable: boolean;
-  retrievalStatus: RetrievalStatus;
-  retrievalHints: PopupRetrievalHints;
-  popupContext: PopupContextBundle | null;
-  examples: LookupExample[];
-  annotations: LookupAnnotationSlots | null;
-  debugInfo: UseContextLookupResult['debugInfo'];
-  saveToVocabulary: () => Promise<void>;
-}
+export type UseContextTranslationResult = UseContextLookupResult;
 
 export function useContextTranslation({
   bookKey,
@@ -44,22 +20,7 @@ export function useContextTranslation({
   settings,
   bookLanguage,
 }: UseContextTranslationOptions): UseContextTranslationResult {
-  const {
-    result,
-    partialResult,
-    loading,
-    streaming,
-    activeFieldId,
-    error,
-    aiUnavailable,
-    retrievalStatus,
-    retrievalHints,
-    popupContext,
-    examples,
-    annotations,
-    debugInfo,
-    saveToVocabulary,
-  } = useContextLookup({
+  return useContextLookup({
     mode: 'translation',
     bookKey,
     bookHash,
@@ -68,21 +29,4 @@ export function useContextTranslation({
     settings,
     bookLanguage,
   });
-
-  return {
-    result,
-    partialResult,
-    loading,
-    streaming,
-    activeFieldId,
-    error,
-    aiUnavailable,
-    retrievalStatus,
-    retrievalHints,
-    popupContext,
-    examples,
-    annotations,
-    debugInfo,
-    saveToVocabulary,
-  };
 }

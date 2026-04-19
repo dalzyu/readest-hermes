@@ -6,6 +6,21 @@ import Popup from '@/components/Popup';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { Position } from '@/utils/sel';
 
+type LookupAvailabilityHint =
+  | 'ai-on'
+  | 'ai-off-with-translator'
+  | 'ai-off-empty'
+  | 'ai-request-failed'
+  | 'partial-no-ai'
+  | null;
+
+const AVAILABILITY_MESSAGES: Record<Exclude<LookupAvailabilityHint, 'ai-on' | null>, string> = {
+  'ai-off-with-translator': 'Enable AI for contextual meaning and richer context.',
+  'ai-off-empty': 'AI is unavailable and no non-AI source can fill this result.',
+  'ai-request-failed': 'AI request failed. Showing dictionary/translator results only.',
+  'partial-no-ai': 'Enable AI for usage examples and grammar.',
+};
+
 export interface ContextLookupPopupProps {
   selectedText: string;
   selectedTextPinyin?: string;
@@ -17,6 +32,7 @@ export interface ContextLookupPopupProps {
   loading: boolean;
   aiEnabled: boolean;
   hasDisplayedResult: boolean;
+  availabilityHint: LookupAvailabilityHint;
   onSpeakSelectedText: () => void;
   askAboutThisEnabled: boolean;
   onAskAboutThis: () => void;
@@ -43,8 +59,9 @@ const ContextLookupPopup: React.FC<ContextLookupPopupProps> = ({
   retrievalStatusMeta,
   retrievalInfoText,
   loading,
-  aiEnabled,
-  hasDisplayedResult,
+  aiEnabled: _aiEnabled,
+  hasDisplayedResult: _hasDisplayedResult,
+  availabilityHint,
   onSpeakSelectedText,
   askAboutThisEnabled,
   onAskAboutThis,
@@ -65,6 +82,11 @@ const ContextLookupPopup: React.FC<ContextLookupPopupProps> = ({
   children,
 }) => {
   const _ = useTranslation();
+  const availabilityMessage =
+    availabilityHint && availabilityHint !== 'ai-on'
+      ? _(AVAILABILITY_MESSAGES[availabilityHint])
+      : null;
+  const askAboutThisAllowed = availabilityHint === 'ai-on' && askAboutThisEnabled;
 
   return (
     <div data-testid={testId} style={maxWidth ? { maxWidth } : undefined}>
@@ -141,8 +163,8 @@ const ContextLookupPopup: React.FC<ContextLookupPopupProps> = ({
             <button
               type='button'
               onClick={onAskAboutThis}
-              disabled={!askAboutThisEnabled}
-              className='rounded-full border border-cyan-400/40 px-3 py-1 text-xs font-medium text-cyan-200 transition-colors hover:border-cyan-300 hover:text-cyan-100 disabled:opacity-40'
+              disabled={!askAboutThisAllowed}
+              className='rounded-full border border-cyan-400/40 px-3 py-1 text-xs font-medium text-cyan-200 transition-colors hover:border-cyan-300 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40'
             >
               {_('Ask About This')}
             </button>
@@ -160,14 +182,10 @@ const ContextLookupPopup: React.FC<ContextLookupPopupProps> = ({
         <div className='flex flex-1 flex-col gap-3 overflow-y-auto p-4'>
           {children}
 
-          {!aiEnabled && !loading && !hasDisplayedResult && (
+          {!loading && availabilityMessage && (
             <div className='mt-1 flex items-start gap-1.5 rounded-md border border-cyan-400/20 bg-cyan-400/10 px-3 py-2'>
               <PiLightbulb size={14} className='mt-0.5 flex-shrink-0 text-cyan-300' />
-              <p className='text-xs leading-snug text-cyan-200/80'>
-                {_(
-                  'Enable AI Assistant in Settings for contextual meaning, usage examples, and more.',
-                )}
-              </p>
+              <p className='text-xs leading-snug text-cyan-200/80'>{availabilityMessage}</p>
             </div>
           )}
         </div>

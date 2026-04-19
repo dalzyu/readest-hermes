@@ -1,7 +1,7 @@
 import { streamText } from 'ai';
 import type { ChatModelAdapter, ChatModelRunResult } from '@assistant-ui/react';
 import { getProviderForTask } from '../providers';
-import { hybridSearch, isBookIndexed } from '../ragService';
+import { isBookIndexed, vectorSearch } from '../ragService';
 import { aiLogger } from '../logger';
 import { buildSystemPrompt } from '../prompts';
 import type { AISettings, ScoredChunk } from '../types';
@@ -98,12 +98,13 @@ export function createTauriAdapter(getOptions: () => TauriAdapterOptions): ChatM
 
       if (await isBookIndexed(bookHash)) {
         try {
-          chunks = await hybridSearch(
+          chunks = await vectorSearch(
             bookHash,
             query,
             settings,
             settings.maxContextChunks || 5,
             settings.spoilerProtection ? currentPage : undefined,
+            query,
           );
           aiLogger.chat.context(chunks.length, chunks.map((c) => c.text).join('').length);
           lastSources = chunks;

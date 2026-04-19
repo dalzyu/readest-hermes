@@ -33,7 +33,9 @@ import Notebook from './notebook/Notebook';
 import BooksGrid from './BooksGrid';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 
-import { cancelBookIndexing, indexBook, isBookIndexed } from '@/services/ai/ragService';
+import { startBookIndexing, subscribeToIndexingRun } from '@/services/ai/indexingRuntime';
+import { isBookIndexed } from '@/services/ai/ragService';
+import { detectAIAvailability } from '@/services/contextTranslation/sourceRouter';
 const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ ids, settings }) => {
   const _ = useTranslation();
   const router = useRouter();
@@ -233,30 +235,68 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
 
   useEffect(() => {
     if (!settings.globalReadSettings.autoIndexOnOpen) return;
-    if (!primaryBookKey || !primaryBookHash || !primaryBookData?.bookDoc) return;
+    if (!settings.aiSettings.enabled) return;
+    if (!primaryBookKey || !primaryBookHash) return;
     if (autoIndexAttempted.current.has(primaryBookHash)) return;
-    autoIndexAttempted.current.add(primaryBookHash);
+
+    const primaryData = getBookData(primaryBookKey);
+    if (!primaryData?.bookDoc) return;
 
     let cancelled = false;
+    let unsubscribeRun: (() => void) | null = null;
+    const abortController = new AbortController();
+
     const run = async () => {
       try {
-        const indexed = await isBookIndexed(primaryBookHash);
-        if (cancelled || indexed) {
-          finishIndexing(primaryBookKey);
+        const latestAiSettings = useSettingsStore.getState().settings.aiSettings;
+        if (!detectAIAvailability(latestAiSettings).embedding) {
           return;
         }
-        startIndexing(primaryBookKey);
-        await indexBook(
-          primaryBookData.bookDoc as Parameters<typeof indexBook>[0],
-          primaryBookHash,
-          settings.aiSettings,
-          (progress) => {
-            if (!cancelled) updateIndexingProgress(primaryBookKey, progress);
-          },
-        );
-        if (!cancelled) finishIndexing(primaryBookKey);
+
+        const indexed = await isBookIndexed(primaryBookHash);
+        if (cancelled || indexed) {
+          return;
+        }
+
+        const { runId, promise } = startBookIndexing({
+          scope: 'reader',
+          key: primaryBookKey,
+          bookHash: primaryBookHash,
+          bookDoc: primaryData.bookDoc as Parameters<typeof startBookIndexing>[0]['bookDoc'],
+          aiSettings: latestAiSettings,
+          signal: abortController.signal,
+        });
+
+        autoIndexAttempted.current.add(primaryBookHash);
+        startIndexing(primaryBookKey, runId);
+
+        unsubscribeRun = subscribeToIndexingRun('reader', primaryBookKey, (event) => {
+          if (event.runId !== runId) return;
+
+          if (event.type === 'progress') {
+            updateIndexingProgress(primaryBookKey, runId, event.progress);
+            return;
+          }
+
+          if (event.type === 'complete') {
+            finishIndexing(primaryBookKey, runId);
+            return;
+          }
+
+          if (event.type === 'cancelled' || event.type === 'error') {
+            autoIndexAttempted.current.delete(primaryBookHash);
+            cancelIndexing(primaryBookKey, runId);
+          }
+        });
+
+        await promise;
       } catch {
-        if (!cancelled) cancelIndexing(primaryBookKey);
+        if (!cancelled) {
+          autoIndexAttempted.current.delete(primaryBookHash);
+        }
+      } finally {
+        unsubscribeRun?.();
+        unsubscribeRun = null;
       }
     };
 
@@ -275,7 +315,9 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
 
     return () => {
       cancelled = true;
-      cancelBookIndexing(primaryBookHash);
+      abortController.abort();
+      unsubscribeRun?.();
+      unsubscribeRun = null;
       if (timeoutHandle !== null) {
         clearTimeout(timeoutHandle);
       }
@@ -290,13 +332,8 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
   }, [
     primaryBookKey,
     primaryBookHash,
-    primaryBookData,
-    settings.aiSettings,
+    settings.aiSettings.enabled,
     settings.globalReadSettings.autoIndexOnOpen,
-    startIndexing,
-    updateIndexingProgress,
-    finishIndexing,
-    cancelIndexing,
   ]);
 
   if (!bookKeys || bookKeys.length === 0) return null;

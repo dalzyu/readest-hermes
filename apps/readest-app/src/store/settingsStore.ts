@@ -4,6 +4,7 @@ import { SystemSettings } from '@/types/settings';
 import { EnvConfigType } from '@/services/environment';
 import { initDayjs } from '@/utils/time';
 import { DEFAULT_AI_PROFILE } from '@/services/ai/constants';
+import { resolveContextTranslationFieldSources } from '@/services/contextTranslation/defaults';
 
 export type FontPanelView = 'main-fonts' | 'custom-fonts';
 
@@ -26,9 +27,24 @@ interface SettingsState {
 }
 
 function normalizeSettings(settings: SystemSettings): SystemSettings {
-  const aiSettings = settings.aiSettings;
-  if (!aiSettings) return settings;
-  if ((aiSettings.profiles ?? []).length > 0) return settings;
+  const migrated: SystemSettings = { ...settings };
+
+  const contextTranslation = migrated.globalReadSettings?.contextTranslation;
+  if (contextTranslation) {
+    migrated.globalReadSettings = {
+      ...migrated.globalReadSettings,
+      contextTranslation: {
+        ...contextTranslation,
+        fieldSources: resolveContextTranslationFieldSources(contextTranslation),
+      },
+    };
+    delete (migrated.globalReadSettings.contextTranslation as { source?: unknown }).source;
+  }
+
+  const aiSettings = migrated.aiSettings;
+  if (!aiSettings) return migrated;
+  if ((aiSettings.profiles ?? []).length > 0) return migrated;
+
   const legacyAssignments = (
     aiSettings as typeof aiSettings & {
       modelAssignments?: Record<string, string>;
@@ -39,7 +55,7 @@ function normalizeSettings(settings: SystemSettings): SystemSettings {
   );
 
   return {
-    ...settings,
+    ...migrated,
     aiSettings: {
       ...aiSettings,
       profiles: [

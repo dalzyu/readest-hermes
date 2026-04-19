@@ -1,10 +1,12 @@
-import { boundedHybridSearch, hybridSearch } from '@/services/ai/ragService';
+import { vectorSearch } from '@/services/ai/ragService';
 import { aiStore } from '@/services/ai/storage/aiStore';
 import type { AISettings, ScoredChunk } from '@/services/ai/types';
 
 import { getPopupLocalContext } from './pageContextService';
+import { getDictionaryForm, isTokenizerReady } from './plugins/jpTokenizer';
 import { getPriorVolumes, getSeriesForBook } from './seriesService';
 import type { ContextTranslationSettings, PopupContextBundle } from './types';
+import { getCJKLanguage } from './utils';
 
 // ---------------------------------------------------------------------------
 // Page-level RAG chunk cache — subsequent lookups on the same page reuse results
@@ -18,8 +20,34 @@ interface PageCacheEntry {
 const pageCache = new Map<string, PageCacheEntry>();
 let pageCacheBookHash = '';
 
-function getPageCacheKey(bookHash: string, page: number, currentSentenceHash: string): string {
-  return `${bookHash}:${page}:${currentSentenceHash}`;
+function normalizeCacheSegment(value: string): string {
+  return value.replace(/\s+/gu, ' ').trim().toLocaleLowerCase();
+}
+
+function buildSelectedTextCacheSegment(selectedText: string, pageContext: string): string {
+  const normalizedSelectedText = normalizeCacheSegment(selectedText);
+  if (!normalizedSelectedText) return '';
+
+  const cjkLanguage = getCJKLanguage(selectedText, pageContext);
+  if (cjkLanguage !== 'japanese' || !isTokenizerReady()) {
+    return normalizedSelectedText;
+  }
+
+  const normalizedBaseForm = normalizeCacheSegment(getDictionaryForm(selectedText));
+  if (!normalizedBaseForm || normalizedBaseForm === normalizedSelectedText) {
+    return normalizedSelectedText;
+  }
+
+  return `${normalizedSelectedText}|${normalizedBaseForm}`;
+}
+
+function getPageCacheKey(
+  bookHash: string,
+  page: number,
+  currentSentenceHash: string,
+  selectedTextCacheSegment: string,
+): string {
+  return `${bookHash}:${page}:${currentSentenceHash}:${selectedTextCacheSegment}`;
 }
 
 /** Invalidate page cache on book change or navigation. */
@@ -190,7 +218,16 @@ export async function buildPopupContextBundle({
   );
 
   // Check page-level cache
-  const pageCacheKey = getPageCacheKey(bookHash, currentPage, currentSentenceHash);
+  const selectedTextCacheSegment = buildSelectedTextCacheSegment(
+    selectedText,
+    `${localContext.localPastContext}\n${localContext.localFutureBuffer}`,
+  );
+  const pageCacheKey = getPageCacheKey(
+    bookHash,
+    currentPage,
+    currentSentenceHash,
+    selectedTextCacheSegment,
+  );
   if (bookHash !== pageCacheBookHash) {
     invalidatePageCache(bookHash);
   }
@@ -216,7 +253,7 @@ export async function buildPopupContextBundle({
 
     const sameBookPromise =
       settings.sameBookRagEnabled && localContext.windowStartPage > 1
-        ? boundedHybridSearch(bookHash, query, aiSettings, sameBookSearchTopK, {
+        ? vectorSearch(bookHash, query, aiSettings, sameBookSearchTopK, {
             maxPage: localContext.windowStartPage - 1,
           }).then((chunks) =>
             dedupeByChunkText(
@@ -238,7 +275,7 @@ export async function buildPopupContextBundle({
               missingPriorVolumes.push(volume.volumeIndex);
               return [];
             }
-            const results = await hybridSearch(
+            const results = await vectorSearch(
               volume.bookHash,
               query,
               aiSettings,

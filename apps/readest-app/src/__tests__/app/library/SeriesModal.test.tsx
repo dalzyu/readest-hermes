@@ -13,7 +13,10 @@ const mockRemoveBookFromSeries = vi.fn();
 const mockDeleteSeries = vi.fn();
 const mockUpdateSeriesVolume = vi.fn();
 const mockIsIndexed = vi.fn();
-const mockIndexBook = vi.fn();
+const mockStartBookIndexing = vi.fn();
+const mockSubscribeToIndexingRun = vi.fn(
+  (_scope: unknown, _key: unknown, _subscriber: unknown) => () => undefined,
+);
 const mockLoadBookContent = vi.fn();
 const mockOpen = vi.fn();
 
@@ -86,8 +89,10 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
   },
 }));
 
-vi.mock('@/services/ai', () => ({
-  indexBook: (...args: unknown[]) => mockIndexBook(...args),
+vi.mock('@/services/ai/indexingRuntime', () => ({
+  startBookIndexing: (...args: unknown[]) => mockStartBookIndexing(...args),
+  subscribeToIndexingRun: (scope: unknown, key: unknown, subscriber: unknown) =>
+    mockSubscribeToIndexingRun(scope, key, subscriber),
 }));
 
 vi.mock('@/libs/document', () => ({
@@ -132,6 +137,17 @@ describe('SeriesModal', () => {
         toc: [],
       },
     });
+    mockStartBookIndexing.mockImplementation(({ bookHash }: { bookHash: string }) => ({
+      runId: `run-${bookHash}`,
+      promise: Promise.resolve({
+        status: 'complete' as const,
+        chunksProcessed: 1,
+        totalSections: 1,
+        skippedSections: 0,
+        errorMessages: [],
+        durationMs: 1,
+      }),
+    }));
   });
 
   test('shows ordered volumes, indexing state, and indexes all volumes in order', async () => {
@@ -154,9 +170,15 @@ describe('SeriesModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Index All' }));
 
     await waitFor(() => {
-      expect(mockIndexBook).toHaveBeenCalledTimes(1);
+      expect(mockStartBookIndexing).toHaveBeenCalledTimes(1);
     });
 
-    expect(mockIndexBook.mock.calls[0]?.[1]).toBe('vol-2');
+    expect(mockStartBookIndexing).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: 'library',
+        key: 'vol-2',
+        bookHash: 'vol-2',
+      }),
+    );
   });
 });

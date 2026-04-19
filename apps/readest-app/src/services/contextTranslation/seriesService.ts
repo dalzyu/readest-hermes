@@ -1,5 +1,7 @@
 import type { BookSeries } from './types';
 import { aiStore } from '@/services/ai/storage/aiStore';
+import { vectorSearch } from '@/services/ai/ragService';
+import type { AISettings } from '@/services/ai/types';
 
 export async function getAllSeries(): Promise<BookSeries[]> {
   return aiStore.getAllSeries();
@@ -113,6 +115,7 @@ export async function getCrossVolumeContext(
   currentBookHash: string,
   query: string,
   maxChunks: number,
+  aiSettings: AISettings,
 ): Promise<string> {
   const series = await aiStore.getSeriesForBook(currentBookHash);
   if (!series) return '';
@@ -131,7 +134,14 @@ export async function getCrossVolumeContext(
     if (results.length >= maxChunks) break;
     const isIndexed = await aiStore.isIndexed(siblingHash);
     if (!isIndexed) continue;
-    const chunks = await aiStore.bm25Search(siblingHash, query, maxChunks - results.length);
+    const chunks = await vectorSearch(
+      siblingHash,
+      query,
+      aiSettings,
+      maxChunks - results.length,
+      undefined,
+      query,
+    );
     for (const chunk of chunks) {
       results.push(`[${chunk.chapterTitle}] ${chunk.text}`);
       if (results.length >= maxChunks) break;

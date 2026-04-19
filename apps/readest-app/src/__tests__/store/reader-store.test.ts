@@ -374,23 +374,67 @@ describe('readerStore', () => {
     });
   });
   describe('indexing progress', () => {
-    test('tracks and clears indexing progress per book key', () => {
+    test('tracks run-scoped progress and clears after completion hold', () => {
+      vi.useFakeTimers();
       const store = useReaderStore.getState();
-      store.startIndexing('book-1');
+
+      store.startIndexing('book-1', 'run-1');
       expect(useReaderStore.getState().indexingProgress['book-1']).toEqual({
+        runId: 'run-1',
         current: 0,
         total: 1,
-        phase: 'chunking',
+        phase: 'pending',
       });
 
-      store.updateIndexingProgress('book-1', { current: 2, total: 4, phase: 'embedding' });
+      store.updateIndexingProgress('book-1', 'run-1', {
+        current: 2,
+        total: 4,
+        phase: 'embedding',
+      });
       expect(useReaderStore.getState().indexingProgress['book-1']).toEqual({
+        runId: 'run-1',
         current: 2,
         total: 4,
         phase: 'embedding',
       });
 
-      store.finishIndexing('book-1');
+      store.finishIndexing('book-1', 'run-1');
+      expect(useReaderStore.getState().indexingProgress['book-1']).toEqual({
+        runId: 'run-1',
+        current: 4,
+        total: 4,
+        phase: 'complete',
+      });
+
+      vi.advanceTimersByTime(1199);
+      expect(useReaderStore.getState().indexingProgress['book-1']).toBeDefined();
+
+      vi.advanceTimersByTime(1);
+      expect(useReaderStore.getState().indexingProgress['book-1']).toBeUndefined();
+      vi.useRealTimers();
+    });
+
+    test('ignores stale run updates and stale cancellations', () => {
+      const store = useReaderStore.getState();
+
+      store.startIndexing('book-1', 'run-2');
+      store.updateIndexingProgress('book-1', 'run-old', {
+        current: 1,
+        total: 3,
+        phase: 'chunking',
+      });
+
+      expect(useReaderStore.getState().indexingProgress['book-1']).toEqual({
+        runId: 'run-2',
+        current: 0,
+        total: 1,
+        phase: 'pending',
+      });
+
+      store.cancelIndexing('book-1', 'run-old');
+      expect(useReaderStore.getState().indexingProgress['book-1']).toBeDefined();
+
+      store.cancelIndexing('book-1', 'run-2');
       expect(useReaderStore.getState().indexingProgress['book-1']).toBeUndefined();
     });
   });

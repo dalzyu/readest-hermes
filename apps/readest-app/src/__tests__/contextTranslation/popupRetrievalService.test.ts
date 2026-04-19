@@ -2,15 +2,13 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const {
   mockGetPopupLocalContext,
-  mockBoundedHybridSearch,
-  mockHybridSearch,
+  mockVectorSearch,
   mockGetPriorVolumes,
   mockGetSeriesForBook,
   mockIsIndexed,
 } = vi.hoisted(() => ({
   mockGetPopupLocalContext: vi.fn(),
-  mockBoundedHybridSearch: vi.fn(),
-  mockHybridSearch: vi.fn(),
+  mockVectorSearch: vi.fn(),
   mockGetPriorVolumes: vi.fn(),
   mockGetSeriesForBook: vi.fn(),
   mockIsIndexed: vi.fn(),
@@ -21,8 +19,7 @@ vi.mock('@/services/contextTranslation/pageContextService', () => ({
 }));
 
 vi.mock('@/services/ai/ragService', () => ({
-  boundedHybridSearch: mockBoundedHybridSearch,
-  hybridSearch: mockHybridSearch,
+  vectorSearch: mockVectorSearch,
 }));
 
 vi.mock('@/services/contextTranslation/seriesService', () => ({
@@ -53,7 +50,7 @@ function makeChunk(bookHash: string, text: string, score = 0.9): ScoredChunk {
     text,
     pageNumber: 1,
     score,
-    searchMethod: 'hybrid',
+    searchMethod: 'vector',
   };
 }
 
@@ -68,8 +65,7 @@ describe('buildPopupContextBundle', () => {
       localFutureBuffer: 'A few words ahead.',
       windowStartPage: 4,
     });
-    mockBoundedHybridSearch.mockResolvedValue([]);
-    mockHybridSearch.mockResolvedValue([]);
+    mockVectorSearch.mockResolvedValue([]);
     mockGetPriorVolumes.mockResolvedValue([]);
     mockGetSeriesForBook.mockResolvedValue(null);
     mockIsIndexed.mockResolvedValue(false);
@@ -117,16 +113,16 @@ describe('buildPopupContextBundle', () => {
       createdAt: 1,
       updatedAt: 1,
     });
-    mockBoundedHybridSearch.mockResolvedValue([
-      makeChunk('vol-3', 'Earlier in this book the title marked deference.'),
-    ]);
+    mockVectorSearch
+      .mockResolvedValueOnce([
+        makeChunk('vol-3', 'Earlier in this book the title marked deference.'),
+      ])
+      .mockResolvedValueOnce([makeChunk('vol-1', 'Volume one introduced the title.', 0.4)])
+      .mockResolvedValueOnce([makeChunk('vol-2', 'Volume two repeated the title.', 0.8)]);
     mockGetPriorVolumes.mockResolvedValue([
       { bookHash: 'vol-1', volumeIndex: 1, label: 'Vol. 1' },
       { bookHash: 'vol-2', volumeIndex: 2, label: 'Vol. 2' },
     ]);
-    mockHybridSearch
-      .mockResolvedValueOnce([makeChunk('vol-1', 'Volume one introduced the title.', 0.4)])
-      .mockResolvedValueOnce([makeChunk('vol-2', 'Volume two repeated the title.', 0.8)]);
 
     const bundle = await buildPopupContextBundle({
       bookKey: 'vol-3-hash',
@@ -142,22 +138,22 @@ describe('buildPopupContextBundle', () => {
     expect(bundle.priorVolumeChunks[0]).toContain('Volume two repeated the title.');
     expect(bundle.retrievalHints.missingLocalIndex).toBe(false);
     expect(bundle.retrievalHints.missingPriorVolumes).toEqual([]);
-    expect(mockBoundedHybridSearch).toHaveBeenCalledWith(
+
+    expect(mockVectorSearch).toHaveBeenCalledTimes(3);
+    expect(mockVectorSearch).toHaveBeenCalledWith(
       'vol-3',
       expect.any(String),
       aiSettings,
       DEFAULT_CONTEXT_TRANSLATION_SETTINGS.sameBookChunkCount * 3,
       { maxPage: 3 },
     );
-    expect(mockHybridSearch).toHaveBeenNthCalledWith(
-      1,
+    expect(mockVectorSearch).toHaveBeenCalledWith(
       'vol-1',
       expect.any(String),
       aiSettings,
       DEFAULT_CONTEXT_TRANSLATION_SETTINGS.priorVolumeChunkCount * 2,
     );
-    expect(mockHybridSearch).toHaveBeenNthCalledWith(
-      2,
+    expect(mockVectorSearch).toHaveBeenCalledWith(
       'vol-2',
       expect.any(String),
       aiSettings,
@@ -172,7 +168,7 @@ describe('buildPopupContextBundle', () => {
       localFutureBuffer: ' through the night. Another sentence.',
       windowStartPage: 4,
     });
-    mockBoundedHybridSearch.mockResolvedValue([
+    mockVectorSearch.mockResolvedValue([
       makeChunk('vol-3', 'He remained by his side through the night.'),
       makeChunk('vol-3', 'Later, the guard stepped away.'),
     ]);
@@ -191,6 +187,40 @@ describe('buildPopupContextBundle', () => {
     expect(bundle.sameBookChunks[0]).not.toContain('He remained by his side through the night.');
   });
 
+  test('does not reuse page cache across different selected terms in same sentence', async () => {
+    mockIsIndexed.mockResolvedValue(true);
+    mockGetPopupLocalContext.mockResolvedValue({
+      localPastContext: 'The prince accepted the title and the crown.',
+      localFutureBuffer: ' The court watched in silence.',
+      windowStartPage: 4,
+    });
+    mockVectorSearch
+      .mockResolvedValueOnce([makeChunk('vol-3', 'Title usage from first lookup.')])
+      .mockResolvedValueOnce([makeChunk('vol-3', 'Crown usage from second lookup.')]);
+
+    const first = await buildPopupContextBundle({
+      bookKey: 'vol-3-hash',
+      bookHash: 'vol-3',
+      currentPage: 6,
+      selectedText: 'title',
+      settings: DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+      aiSettings,
+    });
+
+    const second = await buildPopupContextBundle({
+      bookKey: 'vol-3-hash',
+      bookHash: 'vol-3',
+      currentPage: 6,
+      selectedText: 'crown',
+      settings: DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+      aiSettings,
+    });
+
+    expect(mockVectorSearch).toHaveBeenCalledTimes(2);
+    expect(first.sameBookChunks[0]).toContain('Title usage from first lookup.');
+    expect(second.sameBookChunks[0]).toContain('Crown usage from second lookup.');
+  });
+
   test('deduplicates same-book retrieval chunks before trimming to configured count', async () => {
     mockIsIndexed.mockResolvedValue(true);
     mockGetPopupLocalContext.mockResolvedValue({
@@ -198,7 +228,7 @@ describe('buildPopupContextBundle', () => {
       localFutureBuffer: 'A few words ahead.',
       windowStartPage: 5,
     });
-    mockBoundedHybridSearch.mockResolvedValue([
+    mockVectorSearch.mockResolvedValue([
       makeChunk('vol-3', 'Repeated memory chunk.'),
       makeChunk('vol-3', 'Repeated memory chunk.', 0.85),
       makeChunk('vol-3', 'Second unique memory chunk.', 0.8),

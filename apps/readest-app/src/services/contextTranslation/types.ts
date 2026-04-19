@@ -55,6 +55,14 @@ export type LookupAnnotationSlots = {
 
 export type RetrievalStatus = 'local-only' | 'local-volume' | 'cross-volume';
 
+export type FieldSource = 'ai' | 'translator' | 'dictionary' | 'corpus';
+
+export interface LookupFieldProvenanceEntry {
+  source: FieldSource;
+  language: string;
+}
+
+export type LookupFieldProvenance = Record<string, LookupFieldProvenanceEntry>;
 export interface TranslationStreamResult {
   fields: TranslationResult;
   activeFieldId: string | null;
@@ -164,12 +172,16 @@ export interface PopupContextBundle {
 }
 
 /** Settings for the source-language dictionary lookup feature */
-export type ContextDictionaryFieldSource = 'ai' | 'dictionary';
+export type ContextDictionaryPrimaryFieldSource = 'ai' | 'dictionary';
+export type ContextDictionaryExampleFieldSource = 'ai' | 'corpus' | 'dictionary';
+export type ContextDictionaryFieldSource =
+  | ContextDictionaryPrimaryFieldSource
+  | ContextDictionaryExampleFieldSource;
 
 export interface ContextDictionaryFieldSources {
-  simpleDefinition?: ContextDictionaryFieldSource;
-  contextualMeaning?: ContextDictionaryFieldSource;
-  sourceExamples?: ContextDictionaryFieldSource;
+  simpleDefinition?: ContextDictionaryPrimaryFieldSource;
+  contextualMeaning?: ContextDictionaryPrimaryFieldSource;
+  sourceExamples?: ContextDictionaryExampleFieldSource;
 }
 
 export interface ContextDictionarySettings {
@@ -182,6 +194,13 @@ export interface ContextDictionarySettings {
   promptInstructions?: Record<string, string>;
   /** Optional Jinja-style template override for the dictionary system prompt. */
   systemPromptTemplate?: string;
+}
+
+export interface ContextTranslationFieldSources {
+  translation?: 'ai' | 'translator' | 'dictionary';
+  contextualMeaning?: 'ai' | 'dictionary';
+  examples?: 'ai' | 'corpus';
+  grammarHint?: 'ai';
 }
 
 /** Settings for the context-aware translation feature */
@@ -198,7 +217,11 @@ export interface ContextTranslationSettings {
   priorVolumeChunkCount: number;
   outputFields: TranslationOutputField[];
 
-  /** Translation source to use when looking up selected text. Defaults to 'ai'. */
+  /** Per-field source routing for translation mode. */
+  fieldSources?: ContextTranslationFieldSources;
+  /**
+   * @deprecated Legacy source flag. Migrated to fieldSources.translation on load.
+   */
   source?: 'ai' | 'dictionary';
   /**
    * Field strategy:

@@ -1,12 +1,21 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
+
 import { useTranslation } from '@/hooks/useTranslation';
+import { startBookIndexing, subscribeToIndexingRun } from '@/services/ai/indexingRuntime';
+import { cancelBookIndexing } from '@/services/ai/ragService';
+import { detectAIAvailability } from '@/services/contextTranslation/sourceRouter';
 import { useBookDataStore } from '@/store/bookDataStore';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useReaderStore } from '@/store/readerStore';
-import { cancelBookIndexing, indexBook } from '@/services/ai/ragService';
+import { useSettingsStore } from '@/store/settingsStore';
 
 interface IndexBookButtonProps {
   bookKey: string;
+}
+
+interface ActiveRunHandle {
+  runId: string;
+  abortController: AbortController;
+  unsubscribe: () => void;
 }
 
 const IndexBookButton: React.FC<IndexBookButtonProps> = ({ bookKey }) => {
@@ -21,48 +30,111 @@ const IndexBookButton: React.FC<IndexBookButtonProps> = ({ bookKey }) => {
     cancelIndexing,
   } = useReaderStore();
 
-  const running = useRef(false);
   const progress = indexingProgress[bookKey];
+  const activeRunRef = useRef<ActiveRunHandle | null>(null);
+
+  const embeddingAvailable = useMemo(
+    () => detectAIAvailability(settings.aiSettings).embedding,
+    [settings.aiSettings],
+  );
+
+  useEffect(() => {
+    return () => {
+      const activeRun = activeRunRef.current;
+      if (!activeRun) return;
+      activeRun.abortController.abort();
+      activeRun.unsubscribe();
+      activeRunRef.current = null;
+    };
+  }, []);
 
   const handleStart = async () => {
-    if (running.current) return;
+    if (activeRunRef.current) return;
+
     const bookData = getBookData(bookKey);
     const hash = bookData?.book?.hash;
-    if (!hash || !bookData?.bookDoc) return;
-    running.current = true;
-    startIndexing(bookKey);
+    if (!hash || !bookData?.bookDoc || !embeddingAvailable) return;
+
+    const abortController = new AbortController();
+    const { runId, promise } = startBookIndexing({
+      scope: 'reader',
+      key: bookKey,
+      bookHash: hash,
+      bookDoc: bookData.bookDoc,
+      aiSettings: settings.aiSettings,
+      signal: abortController.signal,
+    });
+
+    startIndexing(bookKey, runId);
+
+    const unsubscribe = subscribeToIndexingRun('reader', bookKey, (event) => {
+      if (event.runId !== runId) return;
+
+      if (event.type === 'progress') {
+        updateIndexingProgress(bookKey, runId, event.progress);
+        return;
+      }
+
+      if (event.type === 'complete') {
+        finishIndexing(bookKey, runId);
+        return;
+      }
+
+      if (event.type === 'cancelled' || event.type === 'error') {
+        cancelIndexing(bookKey, runId);
+      }
+    });
+
+    activeRunRef.current = { runId, abortController, unsubscribe };
+
     try {
-      await indexBook(
-        bookData.bookDoc as Parameters<typeof indexBook>[0],
-        hash,
-        settings.aiSettings,
-        (nextProgress) => updateIndexingProgress(bookKey, nextProgress),
-      );
-      finishIndexing(bookKey);
+      await promise;
     } catch {
-      cancelIndexing(bookKey);
+      // state updates are driven by runtime events
     } finally {
-      running.current = false;
+      if (activeRunRef.current?.runId === runId) {
+        activeRunRef.current.unsubscribe();
+        activeRunRef.current = null;
+      } else {
+        unsubscribe();
+      }
     }
   };
 
-  if (progress) {
+  const handleStop = () => {
+    const activeRun = activeRunRef.current;
+    if (activeRun) {
+      activeRun.abortController.abort();
+      cancelIndexing(bookKey, activeRun.runId);
+      return;
+    }
+
+    const hash = getBookData(bookKey)?.book?.hash;
+    if (hash) {
+      cancelBookIndexing(hash);
+    }
+    if (progress) {
+      cancelIndexing(bookKey, progress.runId);
+    }
+  };
+
+  const isRunning = Boolean(progress && progress.phase !== 'complete');
+
+  if (isRunning) {
     return (
-      <button
-        className='btn btn-ghost btn-xs h-7 min-h-7'
-        onClick={() => {
-          const hash = getBookData(bookKey)?.book?.hash;
-          if (hash) cancelBookIndexing(hash);
-          cancelIndexing(bookKey);
-        }}
-      >
+      <button className='btn btn-ghost btn-xs h-7 min-h-7' onClick={handleStop}>
         {_('Stop Index')}
       </button>
     );
   }
 
   return (
-    <button className='btn btn-ghost btn-xs h-7 min-h-7' onClick={() => void handleStart()}>
+    <button
+      className='btn btn-ghost btn-xs h-7 min-h-7'
+      onClick={() => void handleStart()}
+      disabled={!embeddingAvailable}
+      title={!embeddingAvailable ? _('Configure an embedding model to enable indexing') : undefined}
+    >
       {_('Index')}
     </button>
   );
