@@ -1,5 +1,15 @@
 {
   "releases": {
+    "0.3.0": {
+      "date": "2026-04-20",
+      "notes": [
+        "Context lookup and translation popups were redesigned with cleaner indexing progress, clearer availability messaging, and better source routing between AI, dictionaries, translators, and corpus context",
+        "RAG retrieval was rebuilt around vector similarity plus a literal-term reranker, fully removing the old BM25 hybrid pipeline and hardening popup retrieval caching",
+        "Imported dictionaries were rebuilt around a new storage and lookup path, fixing traditional Chinese locale matching, duplicate imports, stronger exact-match selection, and safer AI prompt injection",
+        "Translation and dictionary flows now degrade cleanly without AI when non-AI sources are available, while live local-model failures in Node and browser-adjacent paths were hardened",
+        "Reasoning presets now include an explicit Off mode, and local-model evaluation plus real-data probes verified the new lookup pipeline against imported dictionaries and book passages"
+      ]
+    },
     "0.2.4": {
       "date": "2026-04-15",
       "notes": [
