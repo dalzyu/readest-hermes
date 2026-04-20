@@ -50,19 +50,22 @@ const prLines = prWorkflow.split('\n').map((line) => line.trim());
 const releaseLines = releaseWorkflow.split('\n').map((line) => line.trim());
 
 describe('workflow alignment', () => {
-  test('PR workflow uses canonical app scripts', () => {
+  test('PR workflow uses canonical app scripts and the Hermes crate name', () => {
     expect(prLines).toContain('run: xvfb-run pnpm test:pr:tauri');
     expect(prWorkflow).toContain('pnpm test:pr:web');
     expect(prWorkflow).toContain('pnpm build-web && pnpm check:all');
+    expect(prWorkflow).toContain('cargo clippy -p Hermes --no-deps -- -D warnings');
+    expect(prWorkflow).not.toContain('cargo clippy -p Readest');
     expect(prWorkflow).not.toContain('build-web:vinext');
   });
 
   test('PR tauri job includes format and lint checks before tests', () => {
-    expect(prWorkflow).toContain("- name: run format check");
-    expect(prWorkflow).toContain("working-directory: apps/readest-app");
+    expect(prWorkflow).toContain('- name: run format check');
+    expect(prWorkflow).toContain('working-directory: apps/readest-app');
     expect(prWorkflow).toContain('pnpm format:check');
-    expect(prWorkflow).toContain("- name: run lint");
+    expect(prWorkflow).toContain('- name: run lint');
     expect(prWorkflow).toContain('pnpm lint');
+    expect(prWorkflow).toContain('cargo clippy -p Hermes --no-deps -- -D warnings');
     expect(prWorkflow).toContain('xvfb-run pnpm test:pr:tauri');
   });
 

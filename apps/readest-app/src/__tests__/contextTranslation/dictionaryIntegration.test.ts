@@ -7,7 +7,7 @@
  *
  * Run time: 30-90 s (145 MB dict parse + gzip over 362 k entries).
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -85,10 +85,11 @@ vi.mock('@/services/contextTranslation/plugins/jpTokenizer', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
+const dictZipPath = resolve(__dirname, '../../../../../.testdata/hanyudacidian-2.0-stardict.zip');
+const hasRealDictionaryFixture = existsSync(dictZipPath);
+
 function readDictZip(): Uint8Array {
-  // .testdata/ lives at the repository root (5 levels up from this file)
-  const zipPath = resolve(__dirname, '../../../../../.testdata/hanyudacidian-2.0-stardict.zip');
-  const buf = readFileSync(zipPath);
+  const buf = readFileSync(dictZipPath);
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
@@ -107,7 +108,7 @@ beforeEach(() => {
   settingsRef.current = [];
 });
 
-describe('HanYuDaCiDian — full StarDict import', () => {
+describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — full StarDict import', () => {
   test('parseDictionary returns 362k+ entries and correct dictionary name', async () => {
     const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
     const zip = readDictZip();
@@ -137,7 +138,7 @@ describe('HanYuDaCiDian — full StarDict import', () => {
   }, 120_000);
 });
 
-describe('HanYuDaCiDian — findMatches lookup tiers', () => {
+describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — findMatches lookup tiers', () => {
   let importedMeta: UserDictionary;
 
   // Import once for the whole describe block
@@ -207,7 +208,7 @@ describe('HanYuDaCiDian — findMatches lookup tiers', () => {
   }, 120_000);
 });
 
-describe('HanYuDaCiDian — lookupDefinitions end-to-end', () => {
+describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — lookupDefinitions end-to-end', () => {
   let importedMeta: UserDictionary;
 
   beforeEach(async () => {
