@@ -209,7 +209,8 @@ jobs:
         run: pnpm install
 
       - name: copy pdfjs-dist and simplecc-dist to public directory
-        run: pnpm --filter @readest/readest-app setup-vendors
+        working-directory: apps/readest-app
+        run: pnpm setup-vendors
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable

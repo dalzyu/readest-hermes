@@ -59,6 +59,14 @@ describe('workflow alignment', () => {
     expect(prWorkflow).not.toContain('build-web:vinext');
   });
 
+  test('release workflow prepares vendor assets from the app directory instead of a stale package filter', () => {
+    expect(releaseWorkflow).toContain('- name: copy pdfjs-dist and simplecc-dist to public directory');
+    expect(releaseWorkflow).toContain('working-directory: apps/readest-app');
+    expect(releaseWorkflow).toContain('run: pnpm setup-vendors');
+    expect(releaseWorkflow).not.toContain('pnpm --filter @readest/readest-app setup-vendors');
+  });
+
+
   test('PR tauri job includes format and lint checks before tests', () => {
     expect(prWorkflow).toContain('- name: run format check');
     expect(prWorkflow).toContain('working-directory: apps/readest-app');
