@@ -1,4 +1,52 @@
+import { gzipSync } from 'fflate';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+const records = new Map<string, unknown>();
+const settingsRef = { current: [] as UserDictionary[] };
+
+vi.mock('@/services/ai/storage/aiStore', () => ({
+  aiStore: {
+    async putRecord(_store: string, record: unknown) {
+      records.set((record as { id: string }).id, record);
+    },
+    async getRecord(_store: string, id: string) {
+      return records.get(id) ?? null;
+    },
+    async deleteRecord(_store: string, id: string) {
+      records.delete(id);
+    },
+  },
+}));
+
+vi.mock('@/store/settingsStore', () => ({
+  useSettingsStore: Object.assign(() => ({}), {
+    getState: () => ({
+      settings: {
+        get userDictionaryMeta() {
+          return settingsRef.current;
+        },
+      },
+      setSettings: vi.fn(),
+    }),
+    set: vi.fn(),
+    subscribe: () => () => {},
+  }),
+}));
+
+vi.mock('@/utils/simplecc', () => ({
+  initSimpleCC: vi.fn().mockResolvedValue(undefined),
+  runSimpleCC: vi.fn((text: string, variant: string) => {
+    if (variant === 's2t' && text === '一丁不识') return '一丁不識';
+    return text;
+  }),
+}));
+
+vi.mock('@/services/contextTranslation/plugins/jpTokenizer', () => ({
+  getDictionaryForm: vi.fn((text: string) => text),
+  getReadingRomaji: vi.fn(() => null),
+  initJapaneseTokenizer: vi.fn().mockResolvedValue(undefined),
+  isTokenizerReady: vi.fn(() => false),
+}));
 
 vi.mock('@/services/contextTranslation/llmClient', () => ({
   callLLM: vi.fn(),
@@ -11,7 +59,7 @@ vi.mock('@/utils/telemetry', () => ({
 import { callLLM } from '@/services/contextTranslation/llmClient';
 import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
-import type { PopupContextBundle } from '@/services/contextTranslation/types';
+import type { PopupContextBundle, UserDictionary } from '@/services/contextTranslation/types';
 
 const popupContext: PopupContextBundle = {
   localPastContext: 'A compact bit of local context.',
@@ -27,6 +75,17 @@ const popupContext: PopupContextBundle = {
     missingSeriesAssignment: false,
   },
 };
+
+function storeDictionaryRecord(
+  meta: UserDictionary,
+  entries: Array<{ headword: string; definition: string }>,
+) {
+  records.set(meta.id, {
+    id: meta.id,
+    meta,
+    blob: gzipSync(new TextEncoder().encode(JSON.stringify(entries))),
+  });
+}
 
 type Scenario = {
   selectedText: string;
@@ -58,6 +117,8 @@ async function runScenario({ selectedText, sourceLanguage, targetLanguage, respo
 describe('context lookup integration scenarios', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    records.clear();
+    settingsRef.current = [];
   });
 
   test.each([
@@ -132,5 +193,82 @@ describe('context lookup integration scenarios', () => {
 
     expect(result.ok).toBe(true);
     expect(result.detectedLanguage.confidence).toBeLessThanOrEqual(1);
+  });
+
+  test('injects locale-tagged traditional dictionary entries into translation prompts', async () => {
+    settingsRef.current = [
+      {
+        id: 'user-zh-tw-zh-tw',
+        name: 'Traditional Locale Dict',
+        language: 'zh-TW',
+        targetLanguage: 'zh-TW',
+        entryCount: 1,
+        source: 'user',
+        importedAt: 1_900_000_000,
+        enabled: true,
+      },
+    ];
+    storeDictionaryRecord(settingsRef.current[0]!, [
+      {
+        headword: '一丁不識',
+        definition: '不識一字，形容人不識字或文化程度極低',
+      },
+    ]);
+    vi.mocked(callLLM).mockResolvedValueOnce(
+      '<lookup_json>{"translation":"illiterate","contextualMeaning":"someone who cannot read a single character"}</lookup_json>',
+    );
+
+    const result = await runContextLookup({
+      mode: 'translation',
+      selectedText: '一丁不识',
+      popupContext,
+      sourceLanguage: 'zh',
+      targetLanguage: 'en',
+      outputFields: DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields,
+    });
+
+    const [, userPrompt] = vi.mocked(callLLM).mock.calls.at(-1)!;
+
+    expect(result.validationDecision).toBe('accept');
+    expect(userPrompt).toContain('<reference_dictionary>');
+    expect(userPrompt).toContain('一丁不識: 不識一字，形容人不識字或文化程度極低');
+  });
+
+  test('does not inject weak prefix fallback dictionary entries into translation prompts', async () => {
+    settingsRef.current = [
+      {
+        id: 'user-zh-zh-weak-fallback',
+        name: 'Weak Fallback Dict',
+        language: 'zh',
+        targetLanguage: 'zh',
+        entryCount: 1,
+        source: 'user',
+        importedAt: 1_900_000_001,
+        enabled: true,
+      },
+    ];
+    storeDictionaryRecord(settingsRef.current[0]!, [
+      {
+        headword: '封',
+        definition: '疆域；分界',
+      },
+    ]);
+    vi.mocked(callLLM).mockResolvedValueOnce(
+      '<lookup_json>{"translation":"titled mage","contextualMeaning":"an elite mage bearing an imperial title"}</lookup_json>',
+    );
+
+    await runContextLookup({
+      mode: 'translation',
+      selectedText: '封号法师',
+      popupContext,
+      sourceLanguage: 'zh',
+      targetLanguage: 'en',
+      outputFields: DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields,
+    });
+
+    const [, userPrompt] = vi.mocked(callLLM).mock.calls.at(-1)!;
+
+    expect(userPrompt).not.toContain('<reference_dictionary>');
+    expect(userPrompt).not.toContain('封:');
   });
 });

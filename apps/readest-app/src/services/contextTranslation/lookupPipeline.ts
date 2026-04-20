@@ -368,8 +368,9 @@ export async function runLookupPipeline(
   ): Promise<{
     bundle: PopupContextBundle;
     dictionaryResults: Awaited<ReturnType<typeof lookupDefinitions>>;
+    referenceDictionaryResults: Awaited<ReturnType<typeof lookupDefinitions>>;
   }> => {
-    const [bundle, dictionaryResults] = await Promise.all([
+    const [bundle, dictionaryResults, referenceDictionaryResults] = await Promise.all([
       consumePrefetch(request.bookHash, request.currentPage, term).then((prefetched) => {
         if (prefetched) {
           return prefetched;
@@ -389,18 +390,25 @@ export async function runLookupPipeline(
             () => [] as Awaited<ReturnType<typeof lookupDefinitions>>,
           )
         : Promise.resolve([] as Awaited<ReturnType<typeof lookupDefinitions>>),
+      shouldLookupDictionary
+        ? lookupDefinitions(term, sourceLanguage, request.settings.targetLanguage, {
+            maxMatchTier: 1,
+          }).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>)
+        : Promise.resolve([] as Awaited<ReturnType<typeof lookupDefinitions>>),
     ]);
 
     return {
       bundle,
       dictionaryResults,
+      referenceDictionaryResults,
     };
   };
 
-  let { bundle: popupContext, dictionaryResults } = await fetchBundleAndDictionary(
-    lookupText,
-    detectedLanguage.language,
-  );
+  let {
+    bundle: popupContext,
+    dictionaryResults,
+    referenceDictionaryResults,
+  } = await fetchBundleAndDictionary(lookupText, detectedLanguage.language);
 
   if (request.settings.autoExpandSelection !== false) {
     const expansionContext = [
@@ -416,14 +424,15 @@ export async function runLookupPipeline(
       expandedText = expanded;
       lookupText = expanded;
       detectedLanguage = detectLookupLanguage(lookupText, request.bookLanguage);
-      ({ bundle: popupContext, dictionaryResults } = await fetchBundleAndDictionary(
-        lookupText,
-        detectedLanguage.language,
-      ));
+      ({
+        bundle: popupContext,
+        dictionaryResults,
+        referenceDictionaryResults,
+      } = await fetchBundleAndDictionary(lookupText, detectedLanguage.language));
     }
   }
 
-  const dictionaryEntries = dictionaryResults.map(
+  const dictionaryEntries = referenceDictionaryResults.map(
     (entry) => `${entry.headword}: ${entry.definition}`,
   );
   popupContext = {

@@ -70,6 +70,36 @@ export function resolveContextTranslationHarnessSettings(
   };
 }
 
+export const CONTEXT_TRANSLATION_HARNESS_PRESETS: Record<
+  string,
+  ContextTranslationHarnessSettings
+> = {
+  balanced: DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
+  strictGemma: {
+    ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
+    contaminationMarkers: [
+      ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.contaminationMarkers,
+      'Here is',
+      '**',
+      '## ',
+    ],
+    reasoningMarkers: [
+      ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.reasoningMarkers,
+      'Here is',
+      '**',
+      '## ',
+      'Step 1',
+      'First,',
+      'Note:',
+    ],
+  },
+  lenientQwen: {
+    ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
+    contaminationMarkers: ['<channel|>', 'Thinking Process', 'Thought Process'],
+    reasoningMarkers: ['Thinking Process', 'Thought Process', 'The user wants me'],
+  },
+};
+
 export const DEFAULT_CONTEXT_TRANSLATION_FIELD_SOURCES: Required<ContextTranslationFieldSources> = {
   translation: 'ai',
   contextualMeaning: 'ai',

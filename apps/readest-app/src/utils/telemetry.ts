@@ -3,7 +3,11 @@ import posthog from 'posthog-js';
 export const TELEMETRY_OPT_OUT_KEY = 'readest-telemetry-opt-out';
 
 export const hasOptedOutTelemetry = () => {
-  return localStorage.getItem(TELEMETRY_OPT_OUT_KEY) === 'true';
+  try {
+    return localStorage.getItem(TELEMETRY_OPT_OUT_KEY) === 'true';
+  } catch {
+    return true; // non-browser env: treat as opted-out
+  }
 };
 
 export const captureEvent = (event: string, properties?: Record<string, unknown>) => {

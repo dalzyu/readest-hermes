@@ -1080,6 +1080,7 @@ const AIPanel: React.FC = () => {
                             }
                           />
                           <select
+                            data-testid={`task-reasoning-${task}`}
                             className='select select-bordered select-sm bg-base-100 text-base-content w-full'
                             value={params.reasoningEffort ?? ''}
                             onChange={(e) =>
@@ -1090,6 +1091,7 @@ const AIPanel: React.FC = () => {
                             }
                           >
                             <option value=''>{_('Reasoning')}</option>
+                            <option value='off'>{_('Off')}</option>
                             <option value='low'>{_('Low')}</option>
                             <option value='medium'>{_('Medium')}</option>
                             <option value='high'>{_('High')}</option>

@@ -199,10 +199,57 @@ describe('runLookupPipeline', () => {
       contextualMeaning: 'ai',
     });
     expect(result.availabilityHint).toBe('ai-on');
-    expect(mockLookupDefinitions).toHaveBeenCalledTimes(1);
+    expect(mockLookupDefinitions).toHaveBeenCalledTimes(2);
+    expect(mockLookupDefinitions).toHaveBeenNthCalledWith(1, '知己', 'zh', 'en');
+    expect(mockLookupDefinitions).toHaveBeenNthCalledWith(2, '知己', 'zh', 'en', {
+      maxMatchTier: 1,
+    });
     expect(mockRunContextLookup).toHaveBeenCalledWith(
       expect.objectContaining({
         preDictionaryEntries: ['知己: close friend'],
+      }),
+    );
+  });
+
+  test('keeps weak fallback dictionary results in popup display but not in AI reference entries', async () => {
+    mockLookupDefinitions.mockImplementation(
+      async (
+        _term: string,
+        _source: string,
+        _target: string,
+        options?: { maxMatchTier?: number },
+      ) =>
+        options?.maxMatchTier === 1
+          ? []
+          : [{ headword: '封', definition: '疆域；分界', source: 'Dict' }],
+    );
+    mockDetectAIAvailability.mockReturnValue({ chat: true, embedding: true });
+    mockResolveFieldSources.mockReturnValue({
+      translation: 'ai',
+      contextualMeaning: 'ai',
+    });
+
+    const result = await runLookupPipeline({
+      mode: 'translation',
+      bookKey: 'book-key',
+      bookHash: 'book-hash',
+      selectedText: '封号法师',
+      currentPage: 1,
+      settings: translationSettings,
+      dictionarySettings: DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+      aiSettings,
+      token: null,
+    });
+
+    expect(result.popupContext.dictionaryResults).toEqual([
+      { headword: '封', definition: '疆域；分界', source: 'Dict' },
+    ]);
+    expect(mockLookupDefinitions).toHaveBeenNthCalledWith(2, '封号法师', 'zh', 'en', {
+      maxMatchTier: 1,
+    });
+    expect(mockRunContextLookup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preDictionaryEntries: [],
       }),
     );
   });

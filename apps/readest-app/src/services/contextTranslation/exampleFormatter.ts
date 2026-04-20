@@ -1,5 +1,11 @@
 import { pinyin } from 'pinyin-pro';
-import type { LookupExample, TranslationOutputField, TranslationResult } from './types';
+import { DEFAULT_CONTEXT_DICTIONARY_SETTINGS, getContextDictionaryOutputFields } from './defaults';
+import type {
+  ContextDictionarySettings,
+  LookupExample,
+  TranslationOutputField,
+  TranslationResult,
+} from './types';
 import { classifyExampleMatch } from './exampleMatcher';
 import { getCJKLanguage, HAN_REGEX } from '@/services/contextTranslation/utils';
 import { isCJKStr } from '@/utils/lang';
@@ -11,6 +17,10 @@ type FormatRequest = {
   outputFields: TranslationOutputField[];
   /** Page context (localPastContext) used to disambiguate Japanese vs Chinese when the selected text is pure kanji. */
   pageContext?: string;
+};
+type LookupFormatRequest = FormatRequest & {
+  mode: 'translation' | 'dictionary';
+  dictionarySettings?: ContextDictionarySettings;
 };
 
 const NUMBERED_EXAMPLE_REGEX = /^(\d+\.\s*)(.+)$/u;
@@ -29,15 +39,18 @@ interface ParseStructuredExamplesOptions {
   allowIncomplete?: boolean;
 }
 
-function shouldFormatChineseExamples(request: FormatRequest, result: TranslationResult): boolean {
-  const field = getExampleField(result);
-  if (!field) return false;
-  const hasExamples = request.outputFields.some((f) => f.enabled && f.id === field);
+function shouldFormatChineseExamples(
+  request: FormatRequest,
+  fieldId: 'examples' | 'sourceExamples',
+): boolean {
+  const hasExamples = request.outputFields.some((field) => field.enabled && field.id === fieldId);
   if (!hasExamples) return false;
-  return (
-    request.sourceLanguage === 'zh' ||
-    getCJKLanguage(request.selectedText, request.pageContext ?? '') === 'chinese'
-  );
+  // Explicit Chinese source → add Pinyin
+  if (request.sourceLanguage === 'zh') return true;
+  // Explicit non-Chinese source → never add Pinyin regardless of text content
+  if (request.sourceLanguage) return false;
+  // Source language unknown → use text/context analysis
+  return getCJKLanguage(request.selectedText, request.pageContext ?? '') === 'chinese';
 }
 
 function shouldProcessExamples(request: FormatRequest, result: TranslationResult): boolean {
@@ -132,7 +145,11 @@ function formatExampleBlock(
   return formattedLines.join('\n');
 }
 
-function formatExamples(examples: string, request: FormatRequest): string {
+function formatExamples(
+  examples: string,
+  request: FormatRequest,
+  fieldId: 'examples' | 'sourceExamples',
+): string {
   const normalizedExamples = normalizeExampleLayout(examples);
   if (!normalizedExamples) {
     return examples;
@@ -173,7 +190,7 @@ function formatExamples(examples: string, request: FormatRequest): string {
       formatExampleBlock(
         block,
         request.selectedText,
-        shouldFormatChineseExamples(request, { examples }),
+        shouldFormatChineseExamples(request, fieldId),
       ),
     )
     .filter(Boolean)
@@ -199,9 +216,49 @@ export function formatTranslationResult(
 
   return {
     ...result,
-    ...(examples ? { examples: formatExamples(examples, request) } : {}),
-    ...(sourceExamples ? { sourceExamples: formatExamples(sourceExamples, request) } : {}),
+    ...(examples ? { examples: formatExamples(examples, request, 'examples') } : {}),
+    ...(sourceExamples
+      ? { sourceExamples: formatExamples(sourceExamples, request, 'sourceExamples') }
+      : {}),
   };
+}
+
+function resolveLookupOutputFields(request: LookupFormatRequest): TranslationOutputField[] {
+  if (request.mode === 'dictionary') {
+    return getContextDictionaryOutputFields(
+      request.dictionarySettings ?? DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
+    );
+  }
+
+  return request.outputFields;
+}
+
+export function formatLookupResult(
+  result: TranslationResult,
+  request: LookupFormatRequest,
+): TranslationResult {
+  return formatTranslationResult(result, {
+    ...request,
+    outputFields: resolveLookupOutputFields(request),
+  });
+}
+
+export function formatEnabledLookupResult(
+  result: TranslationResult,
+  request: LookupFormatRequest,
+): TranslationResult {
+  const outputFields = resolveLookupOutputFields(request);
+  const enabledFieldIds = new Set(
+    outputFields.filter((field) => field.enabled).map((field) => field.id),
+  );
+  const formatted = formatTranslationResult(result, {
+    ...request,
+    outputFields,
+  });
+
+  return Object.fromEntries(
+    Object.entries(formatted).filter(([fieldId]) => enabledFieldIds.has(fieldId)),
+  );
 }
 
 function stripNumbering(value: string): string {

@@ -236,6 +236,7 @@ vi.mock('@/services/contextTranslation/dictionaryService', () => ({
 describe('AIPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    stableSettings.aiSettings.enabled = false;
     stableSettings.globalReadSettings.contextTranslation.fieldSources = {
       translation: 'ai',
       contextualMeaning: 'ai',
@@ -258,6 +259,31 @@ describe('AIPanel', () => {
 
     expect(screen.getByText('Use same-book memory')).toBeTruthy();
     expect(screen.getByText('Use prior-volume memory')).toBeTruthy();
+  });
+
+  test('profiles can persist explicit reasoning off mode', async () => {
+    stableSettings.aiSettings.enabled = true;
+    render(<AIPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: /AI Profiles/i }));
+    fireEvent.change(screen.getByTestId('task-reasoning-translation'), {
+      target: { value: 'off' },
+    });
+
+    await waitFor(() => expect(saveSettingsMock).toHaveBeenCalled());
+
+    const savedAiSettings = (
+      saveSettingsMock.mock.calls.at(-1)?.[1] as {
+        aiSettings: {
+          profiles?: Array<{
+            inferenceParamsByTask: { translation?: { reasoningEffort?: string } };
+          }>;
+        };
+      }
+    ).aiSettings;
+    expect(savedAiSettings.profiles?.[0]?.inferenceParamsByTask.translation?.reasoningEffort).toBe(
+      'off',
+    );
   });
 
   test('renders provider list with configured providers', () => {
@@ -445,6 +471,49 @@ describe('AIPanel', () => {
     expect(savedSettings.globalReadSettings.contextTranslation.fieldSources.examples).toBe(
       'corpus',
     );
+  });
+
+  test('importing a dictionary persists a single metadata entry', async () => {
+    const { importUserDictionary } =
+      await import('@/services/contextTranslation/dictionaryService');
+    vi.mocked(importUserDictionary).mockResolvedValue({
+      id: 'user-imported',
+      name: 'TestDict',
+      language: 'zh-TW',
+      targetLanguage: 'zh-TW',
+      entryCount: 123,
+      source: 'user',
+      importedAt: 1_900_000_000,
+      enabled: true,
+    });
+
+    const { container } = render(<AITranslatePanel />);
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+
+    const file = new File(['dummy'], 'trad-zh-zh.zip', { type: 'application/zip' });
+    Object.defineProperty(fileInput!, 'files', { value: [file] });
+    fireEvent.change(fileInput!);
+
+    const modalTitle = await screen.findByText('Import Dictionary');
+    const modal = modalTitle.closest('.modal-box') as HTMLElement | null;
+    expect(modal).not.toBeNull();
+
+    const sourceSelect = modal?.querySelectorAll('select')[0] as HTMLSelectElement | undefined;
+    expect(sourceSelect).toBeTruthy();
+    fireEvent.change(sourceSelect!, { target: { value: 'zh-TW' } });
+
+    const importButton = screen.getByRole('button', { name: 'Import' }) as HTMLButtonElement;
+    await waitFor(() => expect(importButton.disabled).toBe(false));
+    fireEvent.click(importButton);
+
+    await waitFor(() => expect(saveSettingsMock).toHaveBeenCalled());
+
+    const savedSettings = saveSettingsMock.mock.calls.at(-1)?.[1] as typeof stableSettings;
+    expect(savedSettings.userDictionaryMeta).toHaveLength(2);
+    expect(
+      savedSettings.userDictionaryMeta.filter((dict) => dict.id === 'user-imported'),
+    ).toHaveLength(1);
   });
 
   test('does not render the old harness controls', () => {

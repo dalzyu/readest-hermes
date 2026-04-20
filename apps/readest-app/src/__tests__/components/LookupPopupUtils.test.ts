@@ -74,6 +74,18 @@ describe('LookupPopupUtils', () => {
       expect(text).toContain('Index this volume');
     });
 
+    test('returns configuration guidance when embeddings are unavailable', () => {
+      const hints = {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+        embeddingUnavailable: true,
+      };
+      const text = buildRetrievalInfoText('local-only', hints);
+      expect(text).toContain('Configure an embedding model');
+    });
+
     test('returns fuller context message when retrieval is active', () => {
       const hints = {
         currentVolumeIndexed: true,

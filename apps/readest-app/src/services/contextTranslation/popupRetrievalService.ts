@@ -5,7 +5,8 @@ import type { AISettings, ScoredChunk } from '@/services/ai/types';
 import { getPopupLocalContext } from './pageContextService';
 import { getDictionaryForm, isTokenizerReady } from './plugins/jpTokenizer';
 import { getPriorVolumes, getSeriesForBook } from './seriesService';
-import type { ContextTranslationSettings, PopupContextBundle } from './types';
+import { detectAIAvailability } from './sourceRouter';
+import type { ContextTranslationSettings, PopupContextBundle, PopupRetrievalHints } from './types';
 import { getCJKLanguage } from './utils';
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,25 @@ interface BuildPopupContextBundleOptions {
 function formatChunk(chunk: ScoredChunk, prefix?: string): string {
   const header = prefix ? `${prefix} · ${chunk.chapterTitle}` : chunk.chapterTitle;
   return `[${header}] ${chunk.text}`;
+}
+
+function buildLocalOnlyBundle(
+  localContext: {
+    localPastContext: string;
+    localFutureBuffer: string;
+  },
+  retrievalHints: PopupRetrievalHints,
+  dictionaryEntries: string[] = [],
+): PopupContextBundle {
+  return {
+    localPastContext: localContext.localPastContext,
+    localFutureBuffer: localContext.localFutureBuffer,
+    sameBookChunks: [],
+    priorVolumeChunks: [],
+    retrievalStatus: 'local-only',
+    retrievalHints,
+    dictionaryEntries,
+  };
 }
 
 const RETRIEVAL_QUERY_TAIL_CHARS = 480;
@@ -175,11 +195,22 @@ export async function buildPopupContextBundle({
 
   const series = await getSeriesForBook(bookHash);
   const priorVolumes = settings.priorVolumeRagEnabled ? await getPriorVolumes(bookHash) : [];
-  const currentVolumeIndexed =
-    (settings.sameBookRagEnabled || settings.priorVolumeRagEnabled) &&
-    (await aiStore.isIndexed(bookHash));
+  const retrievalRequested = settings.sameBookRagEnabled || settings.priorVolumeRagEnabled;
 
-  if (!currentVolumeIndexed) {
+  if (!retrievalRequested) {
+    return buildLocalOnlyBundle(localContext, {
+      currentVolumeIndexed: false,
+      missingLocalIndex: false,
+      missingPriorVolumes: [],
+      missingSeriesAssignment: !series,
+      embeddingUnavailable: false,
+    });
+  }
+
+  const embeddingAvailable = detectAIAvailability(aiSettings).embedding;
+  const currentVolumeIndexed = await aiStore.isIndexed(bookHash);
+
+  if (!embeddingAvailable || !currentVolumeIndexed) {
     const missingPriorVolumes: number[] = [];
     for (const volume of priorVolumes) {
       const indexed = await aiStore.isIndexed(volume.bookHash);
@@ -188,20 +219,13 @@ export async function buildPopupContextBundle({
       }
     }
 
-    return {
-      localPastContext: localContext.localPastContext,
-      localFutureBuffer: localContext.localFutureBuffer,
-      sameBookChunks: [],
-      priorVolumeChunks: [],
-      retrievalStatus: 'local-only',
-      retrievalHints: {
-        currentVolumeIndexed: false,
-        missingLocalIndex: true,
-        missingPriorVolumes,
-        missingSeriesAssignment: !series,
-      },
-      dictionaryEntries: [],
-    };
+    return buildLocalOnlyBundle(localContext, {
+      currentVolumeIndexed,
+      missingLocalIndex: !currentVolumeIndexed,
+      missingPriorVolumes,
+      missingSeriesAssignment: !series,
+      embeddingUnavailable: !embeddingAvailable,
+    });
   }
 
   const currentSentence = extractCurrentSentence(
@@ -318,6 +342,7 @@ export async function buildPopupContextBundle({
       missingLocalIndex: false,
       missingPriorVolumes,
       missingSeriesAssignment: !series,
+      embeddingUnavailable: false,
     },
     dictionaryEntries: [],
   };

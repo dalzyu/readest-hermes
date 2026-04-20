@@ -454,6 +454,40 @@ describe('streamTranslationWithContext', () => {
     expect(finalUpdate.fields['contextualMeaning']).toContain('trusted ally');
   });
 
+  test('streams dictionary source examples with the same formatting path as translation examples', async () => {
+    mockStreamLLM.mockImplementation(async function* () {
+      yield '<sourceExamples>1. 知己难逢\n';
+      yield 'English: True friends are hard to find.</sourceExamples>';
+    });
+
+    const updates = [];
+
+    for await (const update of streamLookupWithContext(
+      {
+        ...baseRequest,
+        mode: 'dictionary' as ContextLookupMode,
+        sourceLanguage: 'zh',
+        dictionarySettings: {
+          enabled: true,
+          sourceExamples: true,
+          fieldSources: {
+            simpleDefinition: 'ai',
+            contextualMeaning: 'ai',
+            sourceExamples: 'ai',
+          },
+        },
+      },
+      'mock-model' as never,
+    )) {
+      updates.push(update);
+    }
+
+    expect(updates[0]!.fields['sourceExamples']).toBe('1. 知己难逢\nPinyin: zhī jǐ nán féng');
+    expect(updates.at(-1)!.fields['sourceExamples']).toBe(
+      '1. 知己难逢\nPinyin: zhī jǐ nán féng\nEnglish: True friends are hard to find.',
+    );
+  });
+
   test('streams chinese examples with deterministic pinyin', async () => {
     mockStreamLLM.mockImplementation(async function* () {
       yield '<translation>kindred spirit</translation><examples>1. 知己难逢\n';

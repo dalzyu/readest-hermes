@@ -1,5 +1,8 @@
 import { gzip } from 'fflate';
+import type { ConvertChineseVariant } from '@/types/book';
 import { aiStore } from '@/services/ai/storage/aiStore';
+import { initSimpleCC, runSimpleCC } from '@/utils/simplecc';
+import { normalizedLangCode } from '@/utils/lang';
 import type { DictionaryEntry, UserDictionary } from './types';
 import { extractFromZip } from './dictionaryParser';
 import { parseDictionary, detectFormat } from './parsers/formatRouter';
@@ -43,87 +46,114 @@ function levenshtein(a: string, b: string): number {
   return dp[m * (n + 1) + n]!;
 }
 
-/**
- * Find matching entries in a single dictionary.
- * Pure function exported for unit testing.
- *
- * Tiers (each is exclusive, later tiers only run if earlier found nothing):
- * 1. Exact match via binary search
- * 2. Prefix: headword.startsWith(text) && text.length <= 40
- * 3. Prefix: text.startsWith(headword) && text.length <= 40
- * 4. Fuzzy: Levenshtein <= 2, up to 200 candidates, text.length <= 40
- *
- * Results are deduplicated by headword and capped at 3.
- */
-export function findMatches(entries: DictionaryEntry[], text: string): DictionaryEntry[] {
-  if (entries.length === 0 || text.length === 0) return [];
+function normalizeLookupText(value: string): string {
+  return value.normalize('NFKC').trim().toLocaleLowerCase();
+}
+
+type SearchableEntry = {
+  entry: DictionaryEntry;
+  normalizedHeadword: string;
+};
+
+type MatchTier = 1 | 2 | 3 | 4;
+
+type MatchResult = {
+  matches: DictionaryEntry[];
+  tier: MatchTier | null;
+};
+
+export type DictionaryLookupOptions = {
+  maxMatchTier?: MatchTier;
+};
+
+function findMatchesWithTier(entries: DictionaryEntry[], text: string): MatchResult {
+  if (entries.length === 0 || text.length === 0) return { matches: [], tier: null };
+
+  const normalizedText = normalizeLookupText(text);
+  if (!normalizedText) return { matches: [], tier: null };
 
   const MAX_PREFIX_LEN = 40;
   const MAX_FUZZY_DISTANCE = 2;
   const MAX_FUZZY_CANDIDATES = 200;
   const MAX_RESULTS = 3;
 
-  // Ensure entries are sorted for binary search (case-sensitive)
-  const sortedEntries = [...entries].sort((a, b) =>
-    a.headword < b.headword ? -1 : a.headword > b.headword ? 1 : 0,
-  );
+  const searchableEntries = entries
+    .map((entry) => ({ entry, normalizedHeadword: normalizeLookupText(entry.headword) }))
+    .filter((entry) => entry.normalizedHeadword.length > 0)
+    .sort((a, b) =>
+      a.normalizedHeadword < b.normalizedHeadword
+        ? -1
+        : a.normalizedHeadword > b.normalizedHeadword
+          ? 1
+          : 0,
+    );
 
-  // --- Tier 1: Exact match via binary search ---
   let lo = 0;
-  let hi = sortedEntries.length - 1;
+  let hi = searchableEntries.length - 1;
   while (lo <= hi) {
     const mid = (lo + hi) >>> 1;
-    const headword = sortedEntries[mid]!.headword;
-    const cmp = headword < text ? -1 : headword > text ? 1 : 0;
+    const headword = searchableEntries[mid]!.normalizedHeadword;
+    const cmp = headword < normalizedText ? -1 : headword > normalizedText ? 1 : 0;
     if (cmp === 0) {
-      // Found exact match - return immediately
-      return [sortedEntries[mid]!];
-    } else if (cmp < 0) {
+      return { matches: [searchableEntries[mid]!.entry], tier: 1 };
+    }
+    if (cmp < 0) {
       lo = mid + 1;
     } else {
       hi = mid - 1;
     }
   }
 
-  // Only proceed to later tiers if text.length <= 40
-  if (text.length > MAX_PREFIX_LEN) return [];
+  if (normalizedText.length > MAX_PREFIX_LEN) return { matches: [], tier: null };
 
   const seen = new Set<string>();
   const results: DictionaryEntry[] = [];
 
-  const addResult = (entry: DictionaryEntry) => {
+  const addResult = (candidate: SearchableEntry) => {
     if (results.length >= MAX_RESULTS) return;
-    if (seen.has(entry.headword)) return;
-    seen.add(entry.headword);
-    results.push(entry);
+    if (seen.has(candidate.normalizedHeadword)) return;
+    seen.add(candidate.normalizedHeadword);
+    results.push(candidate.entry);
   };
 
-  // --- Tier 2: headword.startsWith(text) ---
-  for (const entry of sortedEntries) {
-    if (entry.headword.startsWith(text)) {
-      addResult(entry);
+  for (const candidate of searchableEntries) {
+    if (candidate.normalizedHeadword.startsWith(normalizedText)) {
+      addResult(candidate);
     }
   }
-  if (results.length > 0) return results;
+  if (results.length > 0) return { matches: results, tier: 2 };
 
-  // --- Tier 3: text.startsWith(headword) ---
-  for (const entry of sortedEntries) {
-    if (text.startsWith(entry.headword)) {
-      addResult(entry);
+  for (const candidate of searchableEntries) {
+    if (normalizedText.startsWith(candidate.normalizedHeadword)) {
+      addResult(candidate);
     }
   }
-  if (results.length > 0) return results;
+  if (results.length > 0) return { matches: results, tier: 3 };
 
-  // --- Tier 4: Fuzzy ---
-  // Consider only first MAX_FUZZY_CANDIDATES entries (already sorted by headword)
-  const fuzzyCandidates = sortedEntries.slice(0, MAX_FUZZY_CANDIDATES);
-  for (const entry of fuzzyCandidates) {
-    if (levenshtein(entry.headword, text) <= MAX_FUZZY_DISTANCE) {
-      addResult(entry);
+  for (const candidate of searchableEntries.slice(0, MAX_FUZZY_CANDIDATES)) {
+    if (levenshtein(candidate.normalizedHeadword, normalizedText) <= MAX_FUZZY_DISTANCE) {
+      addResult(candidate);
     }
   }
 
-  return results;
+  if (results.length > 0) return { matches: results, tier: 4 };
+  return { matches: [], tier: null };
+}
+
+/**
+ * Find matching entries in a single dictionary.
+ * Pure function exported for unit testing.
+ *
+ * Tiers (each is exclusive, later tiers only run if earlier found nothing):
+ * 1. Exact match via binary search on normalized headwords
+ * 2. Prefix: headword.startsWith(text) && text.length <= 40
+ * 3. Prefix: text.startsWith(headword) && text.length <= 40
+ * 4. Fuzzy: Levenshtein <= 2, up to 200 candidates, text.length <= 40
+ *
+ * Results are deduplicated by normalized headword and capped at 3.
+ */
+export function findMatches(entries: DictionaryEntry[], text: string): DictionaryEntry[] {
+  return findMatchesWithTier(entries, text).matches;
 }
 
 function compressGzip(data: Uint8Array): Promise<Uint8Array> {
@@ -228,12 +258,11 @@ export async function previewDictionaryZip(
 }
 
 /**
- * Import a user dictionary from a StarDict zip file.
+ * Import a user dictionary into dictionary storage.
  *
- * Phase 1: extractFromZip -> parseIfo (get wordcount for display)
- * Phase 2: parseStarDict -> gzip compress -> write to IndexedDB
- * Write to settings userDictionaryMeta
- * Throw if 0 entries
+ * This function owns parsing and blob storage only. Metadata persistence belongs
+ * to the settings/UI layer so imports have exactly one settings write path.
+ * Throw if 0 entries.
  */
 export async function importUserDictionary(
   zipFile: File | Uint8Array,
@@ -263,12 +292,6 @@ export async function importUserDictionary(
     };
 
     await aiStore.putRecord(DICTIONARY_STORE, { id, meta: userMeta, blob: compressed });
-
-    // Update settings
-    const allMeta = await getUserDictionaryMeta();
-    allMeta.push(userMeta);
-    await saveUserDictionaryMeta(allMeta);
-
     // Cache entries
     memoryCache.set(id, entries);
 
@@ -279,17 +302,53 @@ export async function importUserDictionary(
 }
 
 /**
- * Delete a user dictionary.
- * - Remove from IndexedDB
- * - Remove from userDictionaryMeta in settings
- * - Clear from memory cache
+ * Delete a user dictionary from dictionary storage.
+ *
+ * Metadata persistence belongs to the settings/UI layer so deletes have exactly
+ * one settings write path.
  */
 export async function deleteUserDictionary(id: string): Promise<void> {
   await aiStore.deleteRecord(DICTIONARY_STORE, id);
   memoryCache.delete(id);
-  const allMeta = await getUserDictionaryMeta();
-  const filtered = allMeta.filter((m) => m.id !== id);
-  await saveUserDictionaryMeta(filtered);
+}
+
+const CHINESE_VARIANT_TRANSFORMS: readonly ConvertChineseVariant[] = [
+  's2t',
+  's2tw',
+  's2twp',
+  's2hk',
+  't2s',
+  'tw2s',
+  'tw2sp',
+  'hk2s',
+];
+
+async function buildDictionarySearchTerms(text: string, sourceLang: string): Promise<string[]> {
+  const terms = new Set<string>();
+  const normalizedSourceLang = normalizedLangCode(sourceLang);
+  const addTerm = (value: string | null | undefined) => {
+    const trimmed = value?.trim();
+    if (trimmed) terms.add(trimmed);
+  };
+
+  addTerm(text);
+
+  if (normalizedSourceLang === 'ja' && isTokenizerReady()) {
+    addTerm(getDictionaryForm(text));
+  }
+
+  if (normalizedSourceLang === 'zh') {
+    try {
+      await initSimpleCC();
+      for (const variant of CHINESE_VARIANT_TRANSFORMS) {
+        addTerm(runSimpleCC(text, variant));
+      }
+    } catch {
+      // Variant conversion is a best-effort lookup enhancement, not a hard dependency.
+    }
+  }
+
+  return [...terms];
 }
 
 /** Ranking helpers */
@@ -327,23 +386,26 @@ export async function lookupDefinitions(
   text: string,
   sourceLang: string,
   targetLang: string,
+  options: DictionaryLookupOptions = {},
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
 
-  // For Japanese, deconjugate to dictionary form and search both surface + base form
-  const isJapanese = sourceLang === 'ja';
-  const baseForm = isJapanese && isTokenizerReady() ? getDictionaryForm(text) : null;
-  const searchTerms = baseForm && baseForm !== text ? [text, baseForm] : [text];
+  const searchTerms = await buildDictionarySearchTerms(text, sourceLang);
 
   const MAX_RESULTS = 3;
+  const maxMatchTier = options.maxMatchTier ?? 4;
+  const normalizedSourceLang = normalizedLangCode(sourceLang);
+  const normalizedTargetLang = normalizedLangCode(targetLang);
 
   const allUser = (await getUserDictionaryMeta()).filter(
     (dictionary) => dictionary.enabled !== false && dictionary.source === 'user',
   );
   const matching = allUser.filter((dictionary) => {
-    const sourceMatch = dictionary.language === sourceLang;
-    const targetMatch = dictionary.targetLanguage === targetLang;
-    const monolingual = dictionary.language === dictionary.targetLanguage;
+    const dictionarySourceLang = normalizedLangCode(dictionary.language);
+    const dictionaryTargetLang = normalizedLangCode(dictionary.targetLanguage);
+    const sourceMatch = dictionarySourceLang === normalizedSourceLang;
+    const targetMatch = dictionaryTargetLang === normalizedTargetLang;
+    const monolingual = dictionarySourceLang === dictionaryTargetLang;
     return (sourceMatch && targetMatch) || (sourceMatch && monolingual);
   });
 
@@ -353,8 +415,8 @@ export async function lookupDefinitions(
     const entries = await loadDictionaryEntries(dict.id);
     if (entries.length === 0) continue;
 
-    // Determine if monolingual
-    const isMonolingual = dict.language === dict.targetLanguage;
+    const isMonolingual =
+      normalizedLangCode(dict.language) === normalizedLangCode(dict.targetLanguage);
     ranked.push(rankEntry(dict.id, dict.name, dict.importedAt, isMonolingual));
   }
 
@@ -373,12 +435,19 @@ export async function lookupDefinitions(
 
     const entries = await loadDictionaryEntries(rankedEntry.dictionaryId);
 
-    // Try each search term (surface form first, then base form if different)
-    let matches: DictionaryEntry[] = [];
+    // Prefer the strongest tier across all search terms so an exact variant match
+    // beats a weaker prefix fallback on the original surface form.
+    let bestMatches: MatchResult = { matches: [], tier: null };
     for (const term of searchTerms) {
-      matches = findMatches(entries, term);
-      if (matches.length > 0) break;
+      const candidateMatches = findMatchesWithTier(entries, term);
+      if (candidateMatches.matches.length === 0) continue;
+      if (bestMatches.tier === null || candidateMatches.tier! < bestMatches.tier) {
+        bestMatches = candidateMatches;
+      }
+      if (bestMatches.tier === 1) break;
     }
+    if (bestMatches.tier === null || bestMatches.tier > maxMatchTier) continue;
+    const matches = bestMatches.matches;
 
     // Take up to 1 from this dictionary
     for (const match of matches) {

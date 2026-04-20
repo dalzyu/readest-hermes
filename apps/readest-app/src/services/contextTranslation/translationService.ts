@@ -7,7 +7,7 @@ import type {
   TranslationStreamResult,
 } from './types';
 import type { ContextLookupMode } from './modes';
-import { formatTranslationResult } from './exampleFormatter';
+import { formatLookupResult } from './exampleFormatter';
 import { buildTranslationPrompt, buildLookupPrompt, buildPerFieldPrompt } from './promptBuilder';
 import { parseTranslationResponse, StreamingParser } from './responseParser';
 import { normalizeLookupResponse } from './normalizer';
@@ -240,7 +240,7 @@ export async function translateWithContext(
   seed?: FinalizeTranslationSeed,
 ): Promise<TranslationResult> {
   const finalized = await finalizeTranslationWithContext(request, model, abortSignal, seed);
-  return formatTranslationResult(finalized.fields, request);
+  return formatLookupResult(finalized.fields, { ...request, mode: 'translation' });
 }
 
 export async function* streamTranslationWithContext(
@@ -263,7 +263,7 @@ export async function* streamTranslationWithContext(
     rawText += chunk;
     const parsed = parser.parse(rawText, request.outputFields);
     yield {
-      fields: formatTranslationResult(parsed.fields, request),
+      fields: formatLookupResult(parsed.fields, { ...request, mode: 'translation' }),
       activeFieldId: parsed.activeFieldId,
       rawText,
       done: false,
@@ -271,9 +271,9 @@ export async function* streamTranslationWithContext(
   }
 
   yield {
-    fields: formatTranslationResult(
+    fields: formatLookupResult(
       sanitizeTranslationResult(parseTranslationResponse(rawText, request.outputFields), harness),
-      request,
+      { ...request, mode: 'translation' },
     ),
     activeFieldId: null,
     rawText,
@@ -323,7 +323,11 @@ export async function* streamLookupWithContext(
     rawText += chunk;
     const parsed = parser.parse(rawText, streamFields);
     yield {
-      fields: parsed.fields,
+      fields: formatLookupResult(parsed.fields, {
+        ...request,
+        outputFields: streamFields,
+        mode: request.mode,
+      }),
       activeFieldId: parsed.activeFieldId,
       rawText,
       done: false,
@@ -332,7 +336,11 @@ export async function* streamLookupWithContext(
 
   // Final: use normalizeLookupResponse with the complete raw text for authoritative parse
   yield {
-    fields: normalizeLookupResponse(rawText, request.mode),
+    fields: formatLookupResult(normalizeLookupResponse(rawText, request.mode), {
+      ...request,
+      outputFields: streamFields,
+      mode: request.mode,
+    }),
     activeFieldId: null,
     rawText,
     done: true,
@@ -396,7 +404,7 @@ export async function* streamPerFieldTranslation(
   while (!settled) {
     // Yield current snapshot
     yield {
-      fields: formatTranslationResult({ ...merged }, request),
+      fields: formatLookupResult({ ...merged }, { ...request, mode: 'translation' }),
       activeFieldId: latestActiveFieldId,
       rawText: '', // individual raw texts not meaningful in multi mode
       done: false,
@@ -407,7 +415,7 @@ export async function* streamPerFieldTranslation(
 
   // Yield final merged result
   yield {
-    fields: formatTranslationResult({ ...merged }, request),
+    fields: formatLookupResult({ ...merged }, { ...request, mode: 'translation' }),
     activeFieldId: null,
     rawText: '',
     done: true,

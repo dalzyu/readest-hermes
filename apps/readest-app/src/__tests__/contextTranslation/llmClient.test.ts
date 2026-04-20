@@ -59,6 +59,22 @@ describe('llmClient reasoning provider options', () => {
     );
   });
 
+  test('maps reasoning off to provider none without leaking custom params', async () => {
+    mockGenerateText.mockResolvedValue({ text: 'ok' });
+
+    await callLLM('system', 'user', 'model' as never, undefined, {
+      reasoningEffort: 'off',
+      temperature: 0.1,
+    });
+
+    const payload = mockGenerateText.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload['reasoningEffort']).toBeUndefined();
+    expect(payload['providerOptions']).toEqual({
+      openai: { reasoningEffort: 'none' },
+      openrouter: { reasoningEffort: 'none' },
+    });
+  });
+
   test('does not set providerOptions when reasoningEffort is absent', async () => {
     mockGenerateText.mockResolvedValue({ text: 'ok' });
 

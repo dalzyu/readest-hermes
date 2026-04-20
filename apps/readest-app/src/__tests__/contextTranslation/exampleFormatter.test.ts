@@ -150,4 +150,21 @@ describe('formatTranslationResult', () => {
       '1. Mr. Dursley worked at Grunnings.\nChinese: \u675c\u65af\u793c\u5148\u751f\u5728\u683c\u6797\u5c3c\u65af\u516c\u53f8\u5de5\u4f5c\u3002',
     );
   });
+
+  test('does not add pinyin to japanese-source examples even with pure-kanji selected text', () => {
+    const result = formatTranslationResult(
+      {
+        examples: '1. 彼は不安で眠れなかった。\nEnglish: He could not sleep due to anxiety.',
+      },
+      {
+        selectedText: '不安',
+        sourceLanguage: 'ja',
+        targetLanguage: 'en',
+        outputFields: fields,
+      },
+    );
+
+    // Should keep the example but must NOT inject Pinyin
+    expect(result['examples']).not.toContain('Pinyin:');
+  });
 });

@@ -6,12 +6,14 @@ const {
   mockGetPriorVolumes,
   mockGetSeriesForBook,
   mockIsIndexed,
+  mockDetectAIAvailability,
 } = vi.hoisted(() => ({
   mockGetPopupLocalContext: vi.fn(),
   mockVectorSearch: vi.fn(),
   mockGetPriorVolumes: vi.fn(),
   mockGetSeriesForBook: vi.fn(),
   mockIsIndexed: vi.fn(),
+  mockDetectAIAvailability: vi.fn(),
 }));
 
 vi.mock('@/services/contextTranslation/pageContextService', () => ({
@@ -31,6 +33,9 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
   aiStore: {
     isIndexed: mockIsIndexed,
   },
+}));
+vi.mock('@/services/contextTranslation/sourceRouter', () => ({
+  detectAIAvailability: mockDetectAIAvailability,
 }));
 
 import type { AISettings, ScoredChunk } from '@/services/ai/types';
@@ -65,6 +70,7 @@ describe('buildPopupContextBundle', () => {
       localFutureBuffer: 'A few words ahead.',
       windowStartPage: 4,
     });
+    mockDetectAIAvailability.mockReturnValue({ chat: true, embedding: true });
     mockVectorSearch.mockResolvedValue([]);
     mockGetPriorVolumes.mockResolvedValue([]);
     mockGetSeriesForBook.mockResolvedValue(null);
@@ -219,6 +225,31 @@ describe('buildPopupContextBundle', () => {
     expect(mockVectorSearch).toHaveBeenCalledTimes(2);
     expect(first.sameBookChunks[0]).toContain('Title usage from first lookup.');
     expect(second.sameBookChunks[0]).toContain('Crown usage from second lookup.');
+  });
+
+  test('skips vector retrieval when embeddings are unavailable even for indexed volumes', async () => {
+    mockDetectAIAvailability.mockReturnValue({ chat: true, embedding: false });
+    mockIsIndexed.mockImplementation(async (bookHash: string) => bookHash === 'vol-3');
+    mockGetPriorVolumes.mockResolvedValue([{ bookHash: 'vol-1', volumeIndex: 1, label: 'Vol. 1' }]);
+
+    const bundle = await buildPopupContextBundle({
+      bookKey: 'vol-3-hash',
+      bookHash: 'vol-3',
+      currentPage: 6,
+      selectedText: '殿下',
+      settings: DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+      aiSettings,
+    });
+
+    expect(mockVectorSearch).not.toHaveBeenCalled();
+    expect(bundle.retrievalStatus).toBe('local-only');
+    expect(bundle.retrievalHints).toEqual({
+      currentVolumeIndexed: true,
+      missingLocalIndex: false,
+      missingPriorVolumes: [1],
+      missingSeriesAssignment: true,
+      embeddingUnavailable: true,
+    });
   });
 
   test('deduplicates same-book retrieval chunks before trimming to configured count', async () => {

@@ -1,4 +1,5 @@
 import type { InferenceParams } from '@/services/ai/types';
+import { buildInferenceOptions } from '@/services/ai/inferenceParams';
 import { validateUserAndToken } from '@/utils/access';
 import { streamText, createGateway } from 'ai';
 import type { ModelMessage } from 'ai';
@@ -40,13 +41,7 @@ export async function POST(req: Request): Promise<Response> {
       model: languageModel,
       system: system || 'You are a helpful assistant.',
       messages: messages as ModelMessage[],
-      ...(inferenceParams ?? {}),
-      providerOptions: inferenceParams?.reasoningEffort
-        ? {
-            openai: { reasoningEffort: inferenceParams.reasoningEffort },
-            openrouter: { reasoningEffort: inferenceParams.reasoningEffort },
-          }
-        : undefined,
+      ...buildInferenceOptions(inferenceParams),
     });
 
     return result.toTextStreamResponse();

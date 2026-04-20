@@ -4,6 +4,7 @@ import {
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
   DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS,
   CONTEXT_LOOKUP_MODES,
+  CONTEXT_TRANSLATION_HARNESS_PRESETS,
   getContextDictionaryOutputFields,
   resolveContextTranslationFieldSources,
 } from '@/services/contextTranslation/defaults';
@@ -202,5 +203,36 @@ describe('getContextDictionaryOutputFields', () => {
     expect(fields.find((f) => f.id === 'simpleDefinition')!.enabled).toBe(true);
     expect(fields.find((f) => f.id === 'contextualMeaning')!.enabled).toBe(false);
     expect(fields.find((f) => f.id === 'sourceExamples')!.enabled).toBe(false);
+  });
+});
+
+describe('CONTEXT_TRANSLATION_HARNESS_PRESETS', () => {
+  test('exports balanced, strictGemma, and lenientQwen presets', () => {
+    expect(CONTEXT_TRANSLATION_HARNESS_PRESETS).toBeDefined();
+    expect(Object.keys(CONTEXT_TRANSLATION_HARNESS_PRESETS)).toEqual(
+      expect.arrayContaining(['balanced', 'strictGemma', 'lenientQwen']),
+    );
+  });
+
+  test('each preset has required harness fields', () => {
+    for (const [, preset] of Object.entries(CONTEXT_TRANSLATION_HARNESS_PRESETS)) {
+      expect(typeof preset.repairEnabled).toBe('boolean');
+      expect(Array.isArray(preset.contaminationMarkers)).toBe(true);
+      expect(Array.isArray(preset.reasoningMarkers)).toBe(true);
+    }
+  });
+
+  test('strictGemma has more contamination markers than balanced', () => {
+    const strict = CONTEXT_TRANSLATION_HARNESS_PRESETS['strictGemma']!;
+    const balanced = CONTEXT_TRANSLATION_HARNESS_PRESETS['balanced']!;
+    expect(strict.contaminationMarkers.length).toBeGreaterThan(
+      balanced.contaminationMarkers.length,
+    );
+  });
+
+  test('lenientQwen has fewer contamination markers than balanced', () => {
+    const lenient = CONTEXT_TRANSLATION_HARNESS_PRESETS['lenientQwen']!;
+    const balanced = CONTEXT_TRANSLATION_HARNESS_PRESETS['balanced']!;
+    expect(lenient.contaminationMarkers.length).toBeLessThan(balanced.contaminationMarkers.length);
   });
 });

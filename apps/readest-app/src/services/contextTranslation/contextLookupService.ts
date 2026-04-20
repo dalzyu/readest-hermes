@@ -14,7 +14,7 @@ import type { ValidationDecision } from './validator';
 import { captureEvent } from '@/utils/telemetry';
 import { detectLookupLanguage } from './languagePolicy';
 import { resolveLookupPlugins } from './plugins/registry';
-import { formatTranslationResult, parseRenderableExampleField } from './exampleFormatter';
+import { formatEnabledLookupResult, parseRenderableExampleField } from './exampleFormatter';
 
 import { buildLookupPrompt } from './promptBuilder';
 import { buildRepairPrompt } from './repairPromptBuilder';
@@ -172,6 +172,7 @@ export async function runContextLookup(
         request.selectedText,
         sourceLanguage,
         request.targetLanguage,
+        { maxMatchTier: 1 },
       );
       dictionaryEntries = entries.map((e) => `${e.headword}: ${e.definition}`);
     } catch {
@@ -220,21 +221,15 @@ export async function runContextLookup(
         request.inferenceParams,
       ));
     const normalized = overrideFields ?? normalizeLookupResponse(raw, request.mode);
-    const enabledFieldIds = new Set(
-      effectiveOutputFields.filter((field) => field.enabled).map((field) => field.id),
-    );
-    const fields =
-      request.mode === 'translation'
-        ? formatTranslationResult(normalized, {
-            selectedText: request.selectedText,
-            sourceLanguage,
-            targetLanguage: request.targetLanguage,
-            outputFields: effectiveOutputFields,
-            pageContext: request.popupContext.localPastContext,
-          })
-        : Object.fromEntries(
-            Object.entries(normalized).filter(([fieldId]) => enabledFieldIds.has(fieldId)),
-          );
+    const fields = formatEnabledLookupResult(normalized, {
+      mode: request.mode,
+      selectedText: request.selectedText,
+      sourceLanguage,
+      targetLanguage: request.targetLanguage,
+      outputFields: effectiveOutputFields,
+      dictionarySettings: request.dictionarySettings,
+      pageContext: request.popupContext.localPastContext,
+    });
     const validation = validateLookupResult(
       fields,
       primaryField,

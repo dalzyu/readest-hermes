@@ -150,6 +150,7 @@ export interface PopupRetrievalHints {
   missingLocalIndex: boolean;
   missingPriorVolumes: number[];
   missingSeriesAssignment: boolean;
+  embeddingUnavailable?: boolean;
 }
 
 /** A dictionary result for immediate display in the popup (no LLM required). */

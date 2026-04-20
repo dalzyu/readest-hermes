@@ -60,7 +60,9 @@ vi.mock('@/services/contextTranslation/dictionaryParser', () => {
   return {
     extractFromZip: vi.fn(async () => ({
       ifo: encoder.encode('bookname=Dummy\nwordcount=2\nsametypesequence=m\n'),
-      idx: encoder.encode('hello\x00\x00\x00\x00\x00\x00\x00\x05world\x00\x00\x00\x00\x00\x00\x00\x0a'),
+      idx: encoder.encode(
+        'hello\x00\x00\x00\x00\x00\x00\x00\x05world\x00\x00\x00\x00\x00\x00\x00\x0a',
+      ),
       dict: encoder.encode('definition for hello\x00definition for world'),
     })),
     parseStarDict: vi.fn(() => [
@@ -87,6 +89,16 @@ vi.mock('@/services/contextTranslation/dictionaryParser', () => {
 vi.mock('@/services/contextTranslation/plugins/jpTokenizer', () => ({
   getDictionaryForm: vi.fn((text: string) => text),
   isTokenizerReady: vi.fn(() => false),
+}));
+
+vi.mock('@/utils/simplecc', () => ({
+  initSimpleCC: vi.fn().mockResolvedValue(undefined),
+  runSimpleCC: vi.fn((text: string, variant: string) => {
+    if (variant === 's2t' && text === '计算机软件') return '計算機軟體';
+    if (variant === 't2s' && text === '計算機軟體') return '计算机软件';
+    if (variant === 's2t' && text === '一丁不识') return '一丁不識';
+    return text;
+  }),
 }));
 
 function fakeZipBuffer(): Uint8Array {
@@ -201,16 +213,15 @@ describe('importUserDictionary', () => {
     ).rejects.toThrow('Failed to import broken.txt');
   });
 
-  test('saves meta to settings store after import', async () => {
+  test('does not mutate settings metadata during import', async () => {
     await importUserDictionary(fakeZipBuffer(), {
       name: 'Second',
       language: 'ja',
       targetLanguage: 'en',
     });
 
-    expect(setSettingsSpy).toHaveBeenCalled();
-    expect(settingsRef.current).toHaveLength(1);
-    expect(settingsRef.current[0]!.name).toBe('Second');
+    expect(setSettingsSpy).not.toHaveBeenCalled();
+    expect(settingsRef.current).toHaveLength(0);
   });
 
   test('throws when dictionary has zero entries', async () => {
@@ -224,9 +235,8 @@ describe('importUserDictionary', () => {
       parseIfo: vi.fn(() => ({ name: 'Empty', wordcount: 0 })),
     }));
     vi.resetModules();
-    const { importUserDictionary: reimport } = await import(
-      '@/services/contextTranslation/dictionaryService',
-    );
+    const { importUserDictionary: reimport } =
+      await import('@/services/contextTranslation/dictionaryService');
 
     await expect(
       reimport(fakeZipBuffer(), {
@@ -258,16 +268,17 @@ describe('deleteUserDictionary', () => {
     vi.clearAllMocks();
     records.clear();
     settingsRef.current = [];
-    await importUserDictionary(fakeZipBuffer(), {
+    const first = await importUserDictionary(fakeZipBuffer(), {
       name: 'Dict A',
       language: 'en',
       targetLanguage: 'zh',
     });
-    await importUserDictionary(fakeZipBuffer(), {
+    const second = await importUserDictionary(fakeZipBuffer(), {
       name: 'Dict B',
       language: 'ja',
       targetLanguage: 'en',
     });
+    settingsRef.current = [first, second];
     setSettingsSpy.mockClear();
   });
 
@@ -280,13 +291,13 @@ describe('deleteUserDictionary', () => {
     await expect(aiStore.getRecord('dictionaryData', id)).resolves.toBeNull();
   });
 
-  test('removes meta from settings store', async () => {
+  test('does not mutate settings metadata during delete', async () => {
     const id = settingsRef.current[0]!.id;
 
     await deleteUserDictionary(id);
 
-    expect(settingsRef.current.find((meta) => meta.id === id)).toBeUndefined();
-    expect(setSettingsSpy).toHaveBeenCalled();
+    expect(settingsRef.current.find((meta) => meta.id === id)).toBeDefined();
+    expect(setSettingsSpy).not.toHaveBeenCalled();
   });
 
   test('deleting non-existent id does not throw', async () => {
@@ -357,6 +368,123 @@ describe('lookupDefinitions', () => {
 
   test('returns empty array for empty text', async () => {
     await expect(lookupDefinitions('', 'zh', 'en')).resolves.toEqual([]);
+  });
+
+  test('matches imported Chinese dictionaries across simplified and traditional variants', async () => {
+    settingsRef.current = [
+      {
+        id: 'user-zh-zh',
+        name: 'Traditional Zh-Zh',
+        language: 'zh',
+        targetLanguage: 'zh',
+        entryCount: 1,
+        source: 'user',
+        importedAt: 1_900_000_000,
+        enabled: true,
+      },
+    ];
+    storeDictionaryRecord(settingsRef.current[0]!, [
+      { headword: '計算機軟體', definition: '與電腦相關的程式集合' },
+    ]);
+
+    const result = await lookupDefinitions('计算机软件', 'zh', 'en');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.headword).toBe('計算機軟體');
+    expect(result[0]!.definition).toBe('與電腦相關的程式集合');
+  });
+
+  test('prefers exact variant matches over surface-form prefix fallbacks', async () => {
+    settingsRef.current = [
+      {
+        id: 'user-zh-zh-variant-priority',
+        name: 'Variant Priority Dict',
+        language: 'zh',
+        targetLanguage: 'zh',
+        entryCount: 2,
+        source: 'user',
+        importedAt: 1_900_000_000,
+        enabled: true,
+      },
+    ];
+    storeDictionaryRecord(settingsRef.current[0]!, [
+      { headword: '一', definition: '數詞，一個' },
+      { headword: '一丁不識', definition: '不識一字，形容人不識字或文化程度極低' },
+    ]);
+
+    const result = await lookupDefinitions('一丁不识', 'zh', 'en');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.headword).toBe('一丁不識');
+  });
+
+  test('allows callers to require exact-strength dictionary matches only', async () => {
+    settingsRef.current = [
+      {
+        id: 'user-zh-zh-weak-fallback',
+        name: 'Weak Fallback Dict',
+        language: 'zh',
+        targetLanguage: 'zh',
+        entryCount: 1,
+        source: 'user',
+        importedAt: 1_900_000_000,
+        enabled: true,
+      },
+    ];
+    storeDictionaryRecord(settingsRef.current[0]!, [{ headword: '封', definition: '疆域；分界' }]);
+
+    const defaultResult = await lookupDefinitions('封号法师', 'zh', 'en');
+    const exactOnlyResult = await lookupDefinitions('封号法师', 'zh', 'en', {
+      maxMatchTier: 1,
+    });
+
+    expect(defaultResult).toHaveLength(1);
+    expect(defaultResult[0]!.headword).toBe('封');
+    expect(exactOnlyResult).toEqual([]);
+  });
+
+  test('matches locale-tagged Chinese dictionaries when app lookup uses base zh', async () => {
+    settingsRef.current = [
+      {
+        id: 'user-zh-tw-zh-tw',
+        name: 'Traditional Locale Dict',
+        language: 'zh-TW',
+        targetLanguage: 'zh-TW',
+        entryCount: 1,
+        source: 'user',
+        importedAt: 1_900_000_001,
+        enabled: true,
+      },
+    ];
+    storeDictionaryRecord(settingsRef.current[0]!, [
+      { headword: '一丁不識', definition: '不識一字，形容人不識字或文化程度極低' },
+    ]);
+
+    const result = await lookupDefinitions('一丁不识', 'zh', 'en');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.headword).toBe('一丁不識');
+  });
+
+  test('matches locale-tagged bilingual target languages by base language', async () => {
+    settingsRef.current = [
+      {
+        id: 'user-en-zh-tw',
+        name: 'English to Traditional Chinese',
+        language: 'en',
+        targetLanguage: 'zh-TW',
+        entryCount: 1,
+        source: 'user',
+        importedAt: 1_900_000_002,
+        enabled: true,
+      },
+    ];
+    storeDictionaryRecord(settingsRef.current[0]!, [{ headword: 'hero', definition: '英雄' }]);
+
+    const result = await lookupDefinitions('hero', 'en', 'zh');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.definition).toBe('英雄');
   });
 });
 

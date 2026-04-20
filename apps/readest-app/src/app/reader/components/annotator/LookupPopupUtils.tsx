@@ -117,6 +117,9 @@ export function buildRetrievalInfoText(
   hints: PopupRetrievalHints,
 ): string {
   if (status === 'local-only') {
+    if (hints.embeddingUnavailable) {
+      return 'Configure an embedding model in AI settings to enable same-book and cross-volume retrieval.';
+    }
     if (hints.missingLocalIndex) {
       return hints.missingPriorVolumes.length > 0
         ? `Index this volume first. Then index volumes ${hints.missingPriorVolumes.join(', ')} to enable cross-volume context.`

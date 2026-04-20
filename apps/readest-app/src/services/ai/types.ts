@@ -31,6 +31,8 @@ export type AIProviderApiStandard = 'chat-completions' | 'responses';
 // Inference parameters
 // ---------------------------------------------------------------------------
 
+export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
+
 export interface InferenceParams {
   temperature?: number;
   maxTokens?: number;
@@ -40,7 +42,7 @@ export interface InferenceParams {
   topK?: number;
   seed?: number;
   stopSequences?: string[];
-  reasoningEffort?: 'low' | 'medium' | 'high';
+  reasoningEffort?: ReasoningEffort;
 }
 
 // ---------------------------------------------------------------------------
