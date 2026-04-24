@@ -585,11 +585,13 @@ def run(args: argparse.Namespace) -> None:
     device = args.device
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cpu":
+        emit_progress("transcribing", 0.01, "WARNING: Running on CPU — install CUDA PyTorch for GPU acceleration (see docs)")
     compute_type = args.compute_type or ("float16" if device == "cuda" else "int8")
     model_dir = args.model_dir or str((Path.home() / ".cache" / "hermes-audio-sync").resolve())
     Path(model_dir).mkdir(parents=True, exist_ok=True)
 
-    emit_progress("transcribing", 0.02, "Loading WhisperX model")
+    emit_progress("transcribing", 0.02, f"Loading WhisperX model '{args.model}' on {device} ({compute_type})")
     model = whisperx.load_model(args.model, device, compute_type=compute_type, download_root=model_dir, language=payload.get("language"))
 
     emit_progress("importing", 0.08, "Loading audiobook audio")

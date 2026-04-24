@@ -19,6 +19,8 @@
       "!public/**",
       "!src-tauri/**",
       "!next-env.d.ts",
+      "!.venv-whisperx/**",
+      "!.cache/**",
       "!i18next-scanner.config.cjs"
     ],
     "rules": {

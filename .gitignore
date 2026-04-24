@@ -68,3 +68,10 @@ docs/
 # Python cache
 __pycache__/
 *.pyc
+
+
+# Local helper/package build artifacts
+apps/readest-app/src-tauri/audio_sync_helper/build/
+apps/readest-app/src-tauri/audio_sync_helper/dist/
+apps/readest-app/src-tauri/audio_sync_helper/*.spec
+.cache/
