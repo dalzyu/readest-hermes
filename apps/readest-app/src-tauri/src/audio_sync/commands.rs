@@ -765,9 +765,11 @@ fn try_run_whisperx_helper(
         .arg("--audio-hash")
         .arg(&request.audio_hash)
         .arg("--run-id")
-        .arg(run_id)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .arg(run_id);
+    if let Some(model) = &request.model {
+        command.arg("--model").arg(model);
+    }
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
     let mut child = match command.spawn() {
         Ok(child) => child,
@@ -1164,6 +1166,7 @@ mod tests {
             transcript_path: Some("input.json".to_string()),
             output_path: Some("map.json".to_string()),
             report_path: Some("report.json".to_string()),
+            model: None,
         };
 
         let (map, report) = build_outputs(&request, &input, &metadata, &matches, "run-1")
@@ -1225,6 +1228,7 @@ mod tests {
             transcript_path: Some(prepared_input_path.to_string_lossy().to_string()),
             output_path: Some(output_path.to_string_lossy().to_string()),
             report_path: Some(report_path.to_string_lossy().to_string()),
+            model: None,
         };
 
         run_alignment_job(request, "real-run".to_string(), Arc::new(AtomicBool::new(false)))

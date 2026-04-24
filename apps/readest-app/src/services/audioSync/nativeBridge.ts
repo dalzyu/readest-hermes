@@ -40,6 +40,7 @@ export interface StartAlignmentJobRequest {
   transcriptPath?: string;
   outputPath?: string;
   reportPath?: string;
+  model?: string;
 }
 
 export interface AudioAlignmentJobHandle {

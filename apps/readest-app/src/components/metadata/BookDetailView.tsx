@@ -44,10 +44,12 @@ interface BookDetailViewProps {
   audioAsset?: BookAudioAsset | null;
   audioSyncStatus?: AudioSyncStatus | null;
   audioBusy?: boolean;
+  audioModel?: string;
   onAttachAudio?: () => void;
   onRemoveAudio?: () => void;
   onGenerateAudioSync?: () => void;
   onViewAudioSyncStatus?: () => void;
+  onAudioModelChange?: (model: string) => void;
 }
 
 const BookDetailView: React.FC<BookDetailViewProps> = ({
@@ -64,10 +66,12 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
   audioAsset,
   audioSyncStatus,
   audioBusy = false,
+  audioModel = 'large-v3',
   onAttachAudio,
   onRemoveAudio,
   onGenerateAudioSync,
   onViewAudioSyncStatus,
+  onAudioModelChange,
 }) => {
   const _ = useTranslation();
   const { envConfig, appService } = useEnv();
@@ -247,10 +251,12 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
           status={audioSyncStatus || null}
           busy={audioBusy}
           isDesktop={Boolean(appService?.isDesktopApp)}
+          model={audioModel}
           onAttach={onAttachAudio}
           onRemove={onRemoveAudio}
           onGenerateSync={onGenerateAudioSync}
           onViewStatus={onViewAudioSyncStatus}
+          onModelChange={onAudioModelChange}
         />
 
         <div className='metadata-series'>

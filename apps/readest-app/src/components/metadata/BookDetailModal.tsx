@@ -13,6 +13,7 @@ import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useFileSelector } from '@/hooks/useFileSelector';
 import { AUDIOBOOK_ACCEPT_FORMATS, SUPPORTED_AUDIOBOOK_EXTS } from '@/services/audioSync/constants';
+import { DEFAULT_WHISPERX_MODEL } from './BookAudioSection';
 import { useMetadataEdit } from './useMetadataEdit';
 import { DeleteAction } from '@/types/system';
 import { eventDispatcher } from '@/utils/event';
@@ -66,6 +67,7 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
   const [audioSyncStatus, setAudioSyncStatus] = useState<AudioSyncStatus | null>(null);
   const [isAudioBusy, setIsAudioBusy] = useState(false);
   const [isAudioStatusDialogOpen, setIsAudioStatusDialogOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_WHISPERX_MODEL);
   const { selectFiles } = useFileSelector(appService, _);
 
   // Initialize metadata edit hook
@@ -190,7 +192,7 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
 
     setIsAudioBusy(true);
     try {
-      const status = await startAudioAlignment(appService, book);
+      const status = await startAudioAlignment(appService, book, { model: selectedModel });
       setBookAudioAsset(status.asset);
       setAudioSyncStatus(status);
       setIsAudioStatusDialogOpen(true);
@@ -403,10 +405,12 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 audioAsset={bookAudioAsset}
                 audioSyncStatus={audioSyncStatus}
                 audioBusy={isAudioBusy}
+                audioModel={selectedModel}
                 onAttachAudio={handleAttachAudio}
                 onRemoveAudio={handleRemoveAudio}
                 onGenerateAudioSync={handleGenerateAudioSync}
                 onViewAudioSyncStatus={() => setIsAudioStatusDialogOpen(true)}
+                onAudioModelChange={setSelectedModel}
               />
             )}
           </div>

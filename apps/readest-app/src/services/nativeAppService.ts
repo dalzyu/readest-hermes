@@ -678,6 +678,7 @@ export class NativeAppService extends BaseAppService {
       outputPath:
         request?.outputPath || (await this.resolveFilePath(getAudioSyncMapFilename(book), 'Books')),
       reportPath: await this.resolveFilePath(getAudioAlignmentReportFilename(book), 'Books'),
+      model: request?.model,
     });
 
     return {

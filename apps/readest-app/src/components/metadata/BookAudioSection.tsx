@@ -3,15 +3,35 @@ import React from 'react';
 import { BookAudioAsset, AudioSyncStatus } from '@/services/audioSync/types';
 import { useTranslation } from '@/hooks/useTranslation';
 
+export interface WhisperxModelOption {
+  id: string;
+  label: string;
+}
+
+/** Models ordered from fastest/smallest to most accurate/largest. */
+export const WHISPERX_MODELS: WhisperxModelOption[] = [
+  { id: 'base.en', label: 'Fast English — base.en (~290 MB)' },
+  { id: 'base', label: 'Fast multilingual — base (~290 MB)' },
+  { id: 'small.en', label: 'Balanced English — small.en (~490 MB)' },
+  { id: 'small', label: 'Balanced multilingual — small (~490 MB)' },
+  { id: 'medium.en', label: 'Accurate English — medium.en (~1.5 GB)' },
+  { id: 'medium', label: 'Accurate multilingual — medium (~1.5 GB)' },
+  { id: 'large-v3', label: 'Best quality — large-v3 (~3 GB)' },
+];
+
+export const DEFAULT_WHISPERX_MODEL = 'large-v3';
+
 interface BookAudioSectionProps {
   asset: BookAudioAsset | null;
   status: AudioSyncStatus | null;
   busy: boolean;
   isDesktop: boolean;
+  model: string;
   onAttach?: () => void;
   onRemove?: () => void;
   onGenerateSync?: () => void;
   onViewStatus?: () => void;
+  onModelChange?: (model: string) => void;
 }
 
 function formatDuration(durationMs?: number): string | null {
@@ -48,10 +68,12 @@ const BookAudioSection: React.FC<BookAudioSectionProps> = ({
   status,
   busy,
   isDesktop,
+  model,
   onAttach,
   onRemove,
   onGenerateSync,
   onViewStatus,
+  onModelChange,
 }) => {
   const _ = useTranslation();
 
@@ -85,28 +107,53 @@ const BookAudioSection: React.FC<BookAudioSectionProps> = ({
       </div>
 
       {asset ? (
-        <div className='grid grid-cols-2 gap-4 sm:grid-cols-4'>
-          <div className='overflow-hidden'>
-            <span className='font-bold'>{_('File')}</span>
-            <p className='text-neutral-content line-clamp-1 text-sm'>{asset.originalFilename}</p>
+        <>
+          <div className='grid grid-cols-2 gap-4 sm:grid-cols-4'>
+            <div className='overflow-hidden'>
+              <span className='font-bold'>{_('File')}</span>
+              <p className='text-neutral-content line-clamp-1 text-sm'>{asset.originalFilename}</p>
+            </div>
+            <div className='overflow-hidden'>
+              <span className='font-bold'>{_('Format')}</span>
+              <p className='text-neutral-content text-sm'>{asset.format.toUpperCase()}</p>
+            </div>
+            <div className='overflow-hidden'>
+              <span className='font-bold'>{_('Duration')}</span>
+              <p className='text-neutral-content text-sm'>
+                {formatDuration(asset.durationMs) || _('Unknown')}
+              </p>
+            </div>
+            <div className='overflow-hidden'>
+              <span className='font-bold'>{_('Chapters')}</span>
+              <p className='text-neutral-content text-sm'>
+                {asset.chapterCount ? asset.chapterCount : _('Unknown')}
+              </p>
+            </div>
           </div>
-          <div className='overflow-hidden'>
-            <span className='font-bold'>{_('Format')}</span>
-            <p className='text-neutral-content text-sm'>{asset.format.toUpperCase()}</p>
-          </div>
-          <div className='overflow-hidden'>
-            <span className='font-bold'>{_('Duration')}</span>
-            <p className='text-neutral-content text-sm'>
-              {formatDuration(asset.durationMs) || _('Unknown')}
-            </p>
-          </div>
-          <div className='overflow-hidden'>
-            <span className='font-bold'>{_('Chapters')}</span>
-            <p className='text-neutral-content text-sm'>
-              {asset.chapterCount ? asset.chapterCount : _('Unknown')}
-            </p>
-          </div>
-        </div>
+
+          {onModelChange && (
+            <div className='mt-3'>
+              <label className='text-neutral-content/85 mb-1 block text-xs font-semibold'>
+                {_('Sync model')}
+              </label>
+              <select
+                className='select select-bordered select-sm w-full max-w-sm text-sm'
+                value={model}
+                disabled={busy}
+                onChange={(e) => onModelChange(e.target.value)}
+              >
+                {WHISPERX_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <p className='text-neutral-content/60 mt-1 text-xs'>
+                {_('Larger models are more accurate but require more VRAM and time.')}
+              </p>
+            </div>
+          )}
+        </>
       ) : (
         <p className='text-neutral-content text-sm'>
           {_('Attach an audiobook to keep audio and text in sync for this book.')}

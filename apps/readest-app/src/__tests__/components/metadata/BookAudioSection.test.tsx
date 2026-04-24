@@ -18,6 +18,7 @@ describe('BookAudioSection', () => {
         status={null}
         busy={false}
         isDesktop
+        model='large-v3'
         onAttach={vi.fn()}
         onGenerateSync={vi.fn()}
         onRemove={vi.fn()}
@@ -72,6 +73,7 @@ describe('BookAudioSection', () => {
         status={status}
         busy={false}
         isDesktop
+        model='large-v3'
         onAttach={vi.fn()}
         onGenerateSync={vi.fn()}
         onRemove={vi.fn()}
@@ -116,6 +118,7 @@ describe('BookAudioSection', () => {
         }}
         busy={false}
         isDesktop
+        model='large-v3'
         onAttach={vi.fn()}
         onGenerateSync={vi.fn()}
         onRemove={vi.fn()}

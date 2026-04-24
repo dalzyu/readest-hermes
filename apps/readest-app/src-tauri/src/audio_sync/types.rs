@@ -52,6 +52,7 @@ pub struct StartAlignmentJobRequest {
     pub transcript_path: Option<String>,
     pub output_path: Option<String>,
     pub report_path: Option<String>,
+    pub model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

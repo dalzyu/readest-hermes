@@ -147,6 +147,8 @@ export interface AudioSyncGeneratedPackage {
 export interface AudioSyncStartRequest {
   transcriptPath?: string;
   outputPath?: string;
+  /** WhisperX model ID, e.g. 'large-v3', 'small.en'. Defaults to 'large-v3' in helper. */
+  model?: string;
 }
 
 export interface AudioSyncJobStatus {
