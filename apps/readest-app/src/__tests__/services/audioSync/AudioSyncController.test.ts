@@ -142,7 +142,7 @@ function makeView(mediaOverlay: FakeMediaOverlay): FoliateView {
       await mediaOverlay.start(0);
     }),
     mediaOverlay,
-    resolveNavigation: (target) => ({
+    resolveNavigation: (target: unknown) => ({
       index: typeof target === 'string' && target.includes('/6/4!') ? 1 : 0,
     }),
   } as unknown as FoliateView;

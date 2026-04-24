@@ -245,7 +245,7 @@ function getFieldSource(fieldSources: FieldSourceMap, fieldId: string): FieldSou
 }
 
 function computeExamples(
-  mode: ContextLookupMode,
+  _mode: ContextLookupMode,
   fields: TranslationResult,
   selectedText: string,
   targetLanguage: string,

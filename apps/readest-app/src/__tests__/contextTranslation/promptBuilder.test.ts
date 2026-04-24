@@ -282,7 +282,7 @@ describe('buildTranslationPrompt', () => {
       ...baseRequest,
       outputFields: [
         {
-          ...baseFields[0],
+          ...baseFields[0]!,
           promptInstruction: 'Show <script>danger</script> here',
         },
       ],
@@ -297,7 +297,7 @@ describe('buildTranslationPrompt', () => {
       ...baseRequest,
       outputFields: [
         {
-          ...baseFields[0],
+          ...baseFields[0]!,
           promptInstruction: longInstruction,
         },
       ],

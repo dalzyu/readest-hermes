@@ -49,7 +49,11 @@ import {
   BookAudioAsset,
 } from '@/services/audioSync/types';
 import { prepareAudioAlignmentInput } from '@/services/audioSync/alignmentInput';
-import { loadAudioSyncCorrectionSidecar, saveBookAudioAsset } from '@/services/audioSync/storage';
+import {
+  loadAudioSyncCorrectionSidecar,
+  loadAudioSyncMap,
+  saveBookAudioAsset,
+} from '@/services/audioSync/storage';
 import { applyAudioSyncCorrections } from '@/services/audioSync/corrections';
 import { generateEpubMediaOverlayPackage } from '@/services/audioSync/EpubMediaOverlayService';
 import {

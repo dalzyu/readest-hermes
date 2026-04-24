@@ -304,7 +304,7 @@ describe('Notebook', () => {
     const { rerender } = render(<Notebook />);
 
     await waitFor(() => {
-      expect(mockBookDataById.book1.config?.notebookActiveTab).toBe('ai');
+      expect(mockBookDataById['book1']!.config?.notebookActiveTab).toBe('ai');
     });
     expect(screen.getByRole('button', { name: 'AI' }).className).toContain('bg-base-300/85');
     expect(mockSetConfig).toHaveBeenCalledWith(
@@ -315,7 +315,7 @@ describe('Notebook', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Notes' }));
 
     await waitFor(() => {
-      expect(mockBookDataById.book1.config?.notebookActiveTab).toBe('notes');
+      expect(mockBookDataById['book1']!.config?.notebookActiveTab).toBe('notes');
     });
     expect(screen.getByRole('button', { name: 'Notes' }).className).toContain('bg-base-300/85');
     expect(mockSetConfig).toHaveBeenLastCalledWith(
@@ -329,7 +329,7 @@ describe('Notebook', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Notes' }).className).toContain('bg-base-300/85');
     });
-    expect(mockBookDataById.book1.config?.notebookActiveTab).toBe('notes');
+    expect(mockBookDataById['book1']!.config?.notebookActiveTab).toBe('notes');
     expect(screen.getByRole('button', { name: 'AI' }).className).not.toContain('bg-base-300/85');
   });
 
@@ -337,7 +337,7 @@ describe('Notebook', () => {
     mockSettings.aiSettings.enabled = false;
     mockSettings.globalReadSettings.notebookActiveTab = 'notes';
     mockSidebarState.sideBarBookKey = 'book1-view0';
-    mockBookDataById.book1.config = { updatedAt: 0, notebookActiveTab: 'ai' };
+    mockBookDataById['book1']!.config = { updatedAt: 0, notebookActiveTab: 'ai' };
 
     render(<Notebook />);
 
@@ -345,7 +345,7 @@ describe('Notebook', () => {
       expect(screen.getByRole('button', { name: 'Notes' }).className).toContain('bg-base-300/85');
     });
     expect(screen.queryByRole('button', { name: 'AI' })).toBeNull();
-    expect(mockBookDataById.book1.config?.notebookActiveTab).toBe('ai');
+    expect(mockBookDataById['book1']!.config?.notebookActiveTab).toBe('ai');
   });
 });
 

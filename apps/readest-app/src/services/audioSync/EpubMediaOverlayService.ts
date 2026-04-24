@@ -65,7 +65,7 @@ type PackageValidationSpec = {
 };
 
 function parseXml(text: string, mimeType: string): Document {
-  const doc = new DOMParser().parseFromString(text, mimeType);
+  const doc = new DOMParser().parseFromString(text, mimeType as DOMParserSupportedType);
   if (doc.getElementsByTagName('parsererror').length > 0) {
     throw new Error(`Failed to parse ${mimeType} document`);
   }
@@ -460,7 +460,7 @@ async function validateGeneratedPackage(
         } else {
           const src = text.getAttribute('src') || '';
           const [textPath, fragmentId] = src.split('#');
-          if (resolveZipPath(smilItem.path, textPath) !== sectionPath) {
+          if (resolveZipPath(smilItem.path, textPath ?? '') !== sectionPath) {
             diagnostics.push({
               code: 'invalid-smil-text-src',
               message: `Generated SMIL ${smilItem.path} points at ${src} instead of ${sectionPath}`,

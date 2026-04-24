@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { loadBookContent } from '@/services/bookService';
 import { Book } from '@/types/book';
-import { BaseDir, FileInfo, FileItem, FileSystem, ResolvedPath } from '@/types/system';
+import { BaseDir, FileInfo, FileSystem, ResolvedPath } from '@/types/system';
 import { getAudioSyncPackageFilename, getAudioSyncPackageProvenanceFilename } from '@/utils/book';
 
 function makeBook(overrides: Partial<Book> = {}): Book {
