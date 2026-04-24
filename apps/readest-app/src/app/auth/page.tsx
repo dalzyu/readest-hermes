@@ -44,6 +44,7 @@ interface ProviderLoginProp {
 
 const WEB_AUTH_CALLBACK = `${getBaseUrl()}/auth/callback`;
 const DEEPLINK_CALLBACK = 'hermes://auth-callback';
+// Keep this URI in lockstep with src-tauri/tauri.conf.json and native auth handlers.
 const USE_APPLE_SIGN_IN = process.env['NEXT_PUBLIC_USE_APPLE_SIGN_IN'] === 'true';
 
 const ProviderLogin: React.FC<ProviderLoginProp> = ({ provider, handleSignIn, Icon, label }) => {

@@ -3,9 +3,16 @@ import React, { useEffect, useState } from 'react';
 
 import { Book } from '@/types/book';
 import { BookMetadata } from '@/libs/document';
+import { AudioSyncStatus, BookAudioAsset } from '@/services/audioSync/types';
+import {
+  pollAudioAlignmentStatus,
+  startAudioAlignment,
+} from '@/services/audioSync/AudioAlignmentService';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useFileSelector } from '@/hooks/useFileSelector';
+import { AUDIOBOOK_ACCEPT_FORMATS, SUPPORTED_AUDIOBOOK_EXTS } from '@/services/audioSync/constants';
 import { useMetadataEdit } from './useMetadataEdit';
 import { DeleteAction } from '@/types/system';
 import { eventDispatcher } from '@/utils/event';
@@ -15,6 +22,7 @@ import Dialog from '@/components/Dialog';
 import BookDetailView from './BookDetailView';
 import BookDetailEdit from './BookDetailEdit';
 import SourceSelector from './SourceSelector';
+import AudioSyncStatusDialog from './AudioSyncStatusDialog';
 import Spinner from '../Spinner';
 
 interface BookDetailModalProps {
@@ -54,6 +62,11 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
   const [editMode, setEditMode] = useState(false);
   const [bookMeta, setBookMeta] = useState<BookMetadata | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
+  const [bookAudioAsset, setBookAudioAsset] = useState<BookAudioAsset | null>(null);
+  const [audioSyncStatus, setAudioSyncStatus] = useState<AudioSyncStatus | null>(null);
+  const [isAudioBusy, setIsAudioBusy] = useState(false);
+  const [isAudioStatusDialogOpen, setIsAudioStatusDialogOpen] = useState(false);
+  const { selectFiles } = useFileSelector(appService, _);
 
   // Initialize metadata edit hook
   const {
@@ -92,6 +105,157 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
     },
   };
 
+  const refreshAudioSyncState = async (currentAppService = appService) => {
+    if (!currentAppService?.isDesktopApp) {
+      setBookAudioAsset(null);
+      setAudioSyncStatus(null);
+      return;
+    }
+
+    try {
+      const status = await currentAppService.getAudioSyncStatus(book);
+      setBookAudioAsset(status.asset);
+      setAudioSyncStatus(status);
+    } catch (error) {
+      console.warn('Failed to load audio sync status', error);
+      setBookAudioAsset(null);
+      setAudioSyncStatus(null);
+    }
+  };
+
+  const handleAttachAudio = async () => {
+    if (!appService?.isDesktopApp) return;
+
+    const selection = await selectFiles({
+      type: 'audio',
+      multiple: false,
+      accept: AUDIOBOOK_ACCEPT_FORMATS,
+      extensions: [...SUPPORTED_AUDIOBOOK_EXTS],
+      dialogTitle: _('Select Audiobook'),
+    });
+
+    if (selection.error) {
+      eventDispatcher.dispatch('toast', { type: 'error', message: selection.error });
+      return;
+    }
+
+    const selected = selection.files[0];
+    const input = selected?.path || selected?.file;
+    if (!input) return;
+
+    setIsAudioBusy(true);
+    try {
+      await appService.attachBookAudio(book, input);
+      await refreshAudioSyncState(appService);
+      eventDispatcher.dispatch('toast', {
+        type: 'info',
+        message: _('Audiobook attached successfully.'),
+      });
+    } catch (error) {
+      eventDispatcher.dispatch('toast', {
+        type: 'error',
+        message: error instanceof Error ? error.message : _('Failed to attach audiobook.'),
+      });
+    } finally {
+      setIsAudioBusy(false);
+    }
+  };
+
+  const handleRemoveAudio = async () => {
+    if (!appService?.isDesktopApp || !bookAudioAsset) return;
+
+    const confirmed = await appService.ask(_('Remove the attached audiobook and sync data?'));
+    if (!confirmed) return;
+
+    setIsAudioBusy(true);
+    try {
+      await appService.removeBookAudio(book);
+      await refreshAudioSyncState(appService);
+      eventDispatcher.dispatch('toast', {
+        type: 'info',
+        message: _('Audiobook removed.'),
+      });
+    } catch (error) {
+      eventDispatcher.dispatch('toast', {
+        type: 'error',
+        message: error instanceof Error ? error.message : _('Failed to remove audiobook.'),
+      });
+    } finally {
+      setIsAudioBusy(false);
+    }
+  };
+
+  const handleGenerateAudioSync = async () => {
+    if (!appService?.isDesktopApp || !bookAudioAsset) return;
+
+    setIsAudioBusy(true);
+    try {
+      const status = await startAudioAlignment(appService, book);
+      setBookAudioAsset(status.asset);
+      setAudioSyncStatus(status);
+      setIsAudioStatusDialogOpen(true);
+      eventDispatcher.dispatch('toast', {
+        type: 'info',
+        message: _('Audiobook sync started.'),
+      });
+    } catch (error) {
+      eventDispatcher.dispatch('toast', {
+        type: 'error',
+        message: error instanceof Error ? error.message : _('Failed to start audiobook sync.'),
+      });
+    } finally {
+      setIsAudioBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    const runId = audioSyncStatus?.job?.runId;
+    const phase = audioSyncStatus?.job?.phase;
+    if (
+      !appService?.isDesktopApp ||
+      !runId ||
+      !phase ||
+      ['ready', 'failed', 'cancelled'].includes(phase)
+    ) {
+      return;
+    }
+
+    let disposed = false;
+    let timer: number | undefined;
+
+    const pollStatus = async () => {
+      try {
+        const status = await pollAudioAlignmentStatus(appService, book, runId);
+        if (disposed) return;
+        setBookAudioAsset(status.asset);
+        setAudioSyncStatus(status);
+        if (
+          status.job?.phase &&
+          ['ready', 'failed', 'cancelled'].includes(status.job.phase) &&
+          timer
+        ) {
+          window.clearInterval(timer);
+        }
+      } catch (error) {
+        if (!disposed) {
+          console.warn('Failed to poll audio sync status', error);
+        }
+      }
+    };
+
+    timer = window.setInterval(() => {
+      void pollStatus();
+    }, 1000);
+    void pollStatus();
+
+    return () => {
+      disposed = true;
+      if (timer) {
+        window.clearInterval(timer);
+      }
+    };
+  }, [appService, audioSyncStatus?.job?.phase, audioSyncStatus?.job?.runId, book]);
+
   useEffect(() => {
     const fetchBookDetails = async () => {
       const appService = await envConfig.getAppService();
@@ -103,6 +267,7 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
         setBookMeta(details);
         const size = await appService.getBookFileSize(book);
         setFileSize(size);
+        await refreshAudioSyncState(appService);
       } finally {
       }
     };
@@ -112,8 +277,11 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
 
   const handleClose = () => {
     setBookMeta(null);
+    setBookAudioAsset(null);
+    setAudioSyncStatus(null);
     setEditMode(false);
     setActiveDeleteAction(null);
+    setIsAudioStatusDialogOpen(false);
     onClose();
   };
 
@@ -232,10 +400,23 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 onDownload={handleBookDownload ? handleRedownload : undefined}
                 onUpload={handleBookUpload ? handleReupload : undefined}
                 onExport={handleBookExport}
+                audioAsset={bookAudioAsset}
+                audioSyncStatus={audioSyncStatus}
+                audioBusy={isAudioBusy}
+                onAttachAudio={handleAttachAudio}
+                onRemoveAudio={handleRemoveAudio}
+                onGenerateAudioSync={handleGenerateAudioSync}
+                onViewAudioSyncStatus={() => setIsAudioStatusDialogOpen(true)}
               />
             )}
           </div>
         </Dialog>
+
+        <AudioSyncStatusDialog
+          isOpen={isAudioStatusDialogOpen}
+          status={audioSyncStatus}
+          onClose={() => setIsAudioStatusDialogOpen(false)}
+        />
 
         {/* Source Selection Modal */}
         {showSourceSelection && (

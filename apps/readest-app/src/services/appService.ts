@@ -13,13 +13,33 @@ import {
 } from '@/types/system';
 import { DatabaseOpts, DatabaseService } from '@/types/database';
 import { SchemaType } from '@/services/database/migrate';
-import { Book, BookConfig, BookContent, ViewSettings } from '@/types/book';
-import { getLibraryFilename, getLibraryBackupFilename } from '@/utils/book';
+import { Book, BookConfig, BookContent, LoadBookContentOptions, ViewSettings } from '@/types/book';
+import { getAudioSourceFilename, getLibraryFilename, getLibraryBackupFilename } from '@/utils/book';
 
-import { getOSPlatform } from '@/utils/misc';
+import { getOSPlatform, uniqueId } from '@/utils/misc';
+import { partialMD5 } from '@/utils/md5';
+import { getFilename } from '@/utils/path';
 import { ProgressHandler } from '@/utils/transfer';
 import { CustomTextureInfo } from '@/styles/textures';
 import { CustomFont, CustomFontInfo } from '@/styles/fonts';
+import {
+  AudioAssetFormat,
+  AudioSyncJobStatus,
+  AudioSyncStartRequest,
+  AudioSyncStatus,
+  BookAudioAsset,
+} from '@/services/audioSync/types';
+import { SUPPORTED_AUDIOBOOK_EXTS } from '@/services/audioSync/constants';
+import {
+  clearBookAudioSidecars,
+  hasLegacyAudioSyncMap,
+  loadAudioAlignmentReport,
+  loadAudioSyncGeneratedPackage,
+  loadAudioSyncMap,
+  loadBookAudioAsset,
+  saveBookAudioAsset,
+} from '@/services/audioSync/storage';
+import { buildAudioSyncStatus } from '@/services/audioSync/status';
 
 import * as BookSvc from './bookService';
 import * as CloudSvc from './cloudService';
@@ -200,6 +220,80 @@ export abstract class BaseAppService implements AppService {
   async updateCoverImage(book: Book, imageUrl?: string, imageFile?: string): Promise<void> {
     return BookSvc.updateCoverImage(this.coverCtx, book, imageUrl, imageFile);
   }
+  async attachBookAudio(book: Book, file: string | File): Promise<BookAudioAsset> {
+    const sourceFile = typeof file === 'string' ? await this.fs.openFile(file, 'None') : file;
+    const originalFilename = typeof file === 'string' ? getFilename(file) : file.name;
+    const format = originalFilename.split('.').pop()?.toLowerCase() as AudioAssetFormat | undefined;
+    if (!format || !SUPPORTED_AUDIOBOOK_EXTS.includes(format)) {
+      throw new Error(`Unsupported audiobook format: ${originalFilename || 'unknown file'}`);
+    }
+
+    await clearBookAudioSidecars(this.fs, book);
+
+    const originalPath = getAudioSourceFilename(book, format);
+    if (typeof file === 'string') {
+      await this.fs.copyFile(file, originalPath, 'Books');
+    } else {
+      await this.fs.writeFile(originalPath, 'Books', file);
+    }
+
+    const now = Date.now();
+    const asset: BookAudioAsset = {
+      id: uniqueId(),
+      bookHash: book.hash,
+      audioHash: await partialMD5(sourceFile),
+      originalPath,
+      originalFilename,
+      format,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await saveBookAudioAsset(this.fs, book, asset);
+    return asset;
+  }
+
+  async getBookAudioAsset(book: Book): Promise<BookAudioAsset | null> {
+    return loadBookAudioAsset(this.fs, book);
+  }
+
+  async removeBookAudio(book: Book): Promise<void> {
+    await clearBookAudioSidecars(this.fs, book);
+  }
+
+  async generateCorrectedAudioSyncPackage(_book: Book): Promise<void> {
+    throw new Error(
+      'Corrected EPUB3 package generation is only available on desktop Hermes builds',
+    );
+  }
+
+  async startAudioSync(_book: Book, _request?: AudioSyncStartRequest): Promise<AudioSyncJobStatus> {
+    throw new Error('Audio sync is only available on desktop Hermes builds');
+  }
+
+  async getAudioSyncStatus(book: Book, _runId?: string): Promise<AudioSyncStatus> {
+    const [asset, map, report, generatedPackage, legacyMapDetected] = await Promise.all([
+      loadBookAudioAsset(this.fs, book),
+      loadAudioSyncMap(this.fs, book),
+      loadAudioAlignmentReport(this.fs, book),
+      loadAudioSyncGeneratedPackage(this.fs, book),
+      hasLegacyAudioSyncMap(this.fs, book),
+    ]);
+    return buildAudioSyncStatus(
+      {
+        asset,
+        map,
+        job: null,
+        report,
+        package: generatedPackage,
+      },
+      { legacyMapDetected: !map && legacyMapDetected },
+    );
+  }
+
+  async cancelAudioSync(_book: Book, _runId: string): Promise<void> {
+    throw new Error('Audio sync is only available on desktop Hermes builds');
+  }
 
   async importFont(file?: string | File): Promise<CustomFontInfo | null> {
     return FontSvc.importFont(this.fs, file);
@@ -313,8 +407,8 @@ export abstract class BaseAppService implements AppService {
     return BookSvc.getBookFileSize(this.fs, book);
   }
 
-  async loadBookContent(book: Book): Promise<BookContent> {
-    return BookSvc.loadBookContent(this.fs, book);
+  async loadBookContent(book: Book, options?: LoadBookContentOptions): Promise<BookContent> {
+    return BookSvc.loadBookContent(this.fs, book, options);
   }
 
   async loadBookConfig(book: Book, settings: SystemSettings): Promise<BookConfig> {

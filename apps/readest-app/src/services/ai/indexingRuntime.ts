@@ -118,7 +118,7 @@ export function startBookIndexing({
 
   let cancelledBySignal = false;
   const handleAbort = () => {
-    cancelBookIndexing(bookHash);
+    cancelBookIndexing(runId);
     if (activeRunIds.get(runKey) !== runId) return;
     cancelledBySignal = true;
     clearRun(scope, key, runId);
@@ -129,10 +129,16 @@ export function startBookIndexing({
 
   const promise = (async () => {
     try {
-      const result = await indexBook(bookDoc, bookHash, aiSettings, (progress) => {
-        if (activeRunIds.get(runKey) !== runId) return;
-        notify({ type: 'progress', runId, scope, key, bookHash, progress });
-      });
+      const result = await indexBook(
+        bookDoc,
+        bookHash,
+        aiSettings,
+        (progress) => {
+          if (activeRunIds.get(runKey) !== runId) return;
+          notify({ type: 'progress', runId, scope, key, bookHash, progress });
+        },
+        runId,
+      );
 
       if (activeRunIds.get(runKey) === runId) {
         clearRun(scope, key, runId);

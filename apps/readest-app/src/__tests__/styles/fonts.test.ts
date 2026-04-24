@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/utils/misc', () => ({ isCJKEnv: vi.fn(() => false) }));
+vi.mock('@/utils/misc', () => ({
+  isCJKEnv: vi.fn(() => false),
+  stubTranslation: vi.fn((key: string) => key),
+}));
 vi.mock('@/utils/path', () => ({
   getFilename: vi.fn((path: string) => path.split('/').pop() || path),
 }));
@@ -338,7 +341,7 @@ describe('mountAdditionalFonts', () => {
     expect(hrefs.some((h) => h.includes('jsdelivr.net'))).toBe(false);
   });
 
-  it('should mount CJK fonts when isCJK is true', async () => {
+  it('should mount CJK fonts without Readest-hosted links when isCJK is true', async () => {
     await mountAdditionalFonts(document, true);
 
     // Should have a style element with @font-face rules
@@ -356,6 +359,7 @@ describe('mountAdditionalFonts', () => {
     const links = document.head.querySelectorAll('link');
     const hrefs = Array.from(links).map((l) => l.getAttribute('href') || '');
     expect(hrefs.some((h) => h.includes('jsdelivr.net'))).toBe(true);
+    expect(hrefs.some((h) => h.includes('storage.readest.com'))).toBe(false);
   });
 
   it('should mount CJK fonts when isCJKEnv returns true', async () => {

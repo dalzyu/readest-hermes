@@ -12,6 +12,7 @@ import {
 
 import { Book } from '@/types/book';
 import { BookMetadata } from '@/libs/document';
+import { AudioSyncStatus, BookAudioAsset } from '@/services/audioSync/types';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
@@ -27,6 +28,7 @@ import { saveSysSettings } from '@/helpers/settings';
 import BookCover from '@/components/BookCover';
 import Dropdown from '../Dropdown';
 import MenuItem from '../MenuItem';
+import BookAudioSection from './BookAudioSection';
 
 interface BookDetailViewProps {
   book: Book;
@@ -39,6 +41,13 @@ interface BookDetailViewProps {
   onDownload?: () => void;
   onUpload?: () => void;
   onExport?: () => void;
+  audioAsset?: BookAudioAsset | null;
+  audioSyncStatus?: AudioSyncStatus | null;
+  audioBusy?: boolean;
+  onAttachAudio?: () => void;
+  onRemoveAudio?: () => void;
+  onGenerateAudioSync?: () => void;
+  onViewAudioSyncStatus?: () => void;
 }
 
 const BookDetailView: React.FC<BookDetailViewProps> = ({
@@ -52,9 +61,16 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
   onDownload,
   onUpload,
   onExport,
+  audioAsset,
+  audioSyncStatus,
+  audioBusy = false,
+  onAttachAudio,
+  onRemoveAudio,
+  onGenerateAudioSync,
+  onViewAudioSyncStatus,
 }) => {
   const _ = useTranslation();
-  const { envConfig } = useEnv();
+  const { envConfig, appService } = useEnv();
   const { settings } = useSettingsStore();
 
   const toggleSeriesCollapse = () => {
@@ -226,6 +242,17 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
             </div>
           )}
         </div>
+        <BookAudioSection
+          asset={audioAsset || null}
+          status={audioSyncStatus || null}
+          busy={audioBusy}
+          isDesktop={Boolean(appService?.isDesktopApp)}
+          onAttach={onAttachAudio}
+          onRemove={onRemoveAudio}
+          onGenerateSync={onGenerateAudioSync}
+          onViewStatus={onViewAudioSyncStatus}
+        />
+
         <div className='metadata-series'>
           <button
             className={clsx(

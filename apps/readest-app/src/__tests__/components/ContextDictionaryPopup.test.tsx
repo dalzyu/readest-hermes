@@ -112,14 +112,14 @@ describe('ContextDictionaryPopup', () => {
     expect(screen.getByRole('button', { name: 'Ask About This' })).toBeTruthy();
   });
 
-  test('TTS button dispatches tts-speak event with selected text and bookKey', () => {
+  test('TTS button dispatches tts-popup-speak event with selected text and bookKey', () => {
     mockUseContextDictionary.mockReturnValue(mockResult());
 
     render(<ContextDictionaryPopup {...defaultProps} />);
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Speak' })[0]!);
 
-    expect(eventDispatcher.dispatch).toHaveBeenCalledWith('tts-speak', {
+    expect(eventDispatcher.dispatch).toHaveBeenCalledWith('tts-popup-speak', {
       bookKey: 'book-1',
       text: '知己',
       oneTime: true,

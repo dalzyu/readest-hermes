@@ -5,7 +5,7 @@ import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { SYNC_BOOKS_INTERVAL_SEC } from '@/services/constants';
+import { CLOUD_ENABLED, SYNC_BOOKS_INTERVAL_SEC } from '@/services/constants';
 import { throttle } from '@/utils/throttle';
 import { debounce } from '@/utils/debounce';
 import { eventDispatcher } from '@/utils/event';
@@ -20,7 +20,7 @@ export const useBooksSync = () => {
   const isPullingRef = useRef(false);
 
   const getNewBooks = useCallback(() => {
-    if (!user) return {};
+    if (!CLOUD_ENABLED || !user) return {};
     const library = useLibraryStore.getState().library;
     const newBooks = library.filter(
       (book) =>
@@ -36,7 +36,7 @@ export const useBooksSync = () => {
 
   const pullLibrary = useCallback(
     async (fullRefresh = false, verbose = false) => {
-      if (!user) return;
+      if (!CLOUD_ENABLED || !user) return;
       if (isPullingRef.current) {
         console.log('Pull already in progress, skipping...');
         return;
@@ -66,6 +66,7 @@ export const useBooksSync = () => {
   const handleAutoSync = useCallback(
     throttle(
       () => {
+        if (!CLOUD_ENABLED) return;
         const newBooks = getNewBooks();
         if (newBooks.lastSyncedAt) {
           syncBooks(newBooks.books, 'both');
@@ -78,7 +79,7 @@ export const useBooksSync = () => {
   );
 
   useEffect(() => {
-    if (!user) return;
+    if (!CLOUD_ENABLED || !user) return;
     if (isPullingRef.current) {
       return;
     }
@@ -86,7 +87,7 @@ export const useBooksSync = () => {
   }, [user, library, handleAutoSync]);
 
   const pushLibrary = useCallback(async () => {
-    if (!user) return;
+    if (!CLOUD_ENABLED || !user) return;
     const newBooks = getNewBooks();
     if (newBooks.lastSyncedAt) {
       await syncBooks(newBooks?.books, 'push');
@@ -94,12 +95,12 @@ export const useBooksSync = () => {
   }, [user, syncBooks, getNewBooks]);
 
   useEffect(() => {
-    if (!user || !useSyncInited || !libraryLoaded) return;
+    if (!CLOUD_ENABLED || !user || !useSyncInited || !libraryLoaded) return;
     pullLibrary();
   }, [user, useSyncInited, libraryLoaded, pullLibrary]);
 
   const updateLibrary = useCallback(async () => {
-    if (!syncedBooks?.length) return;
+    if (!CLOUD_ENABLED || !syncedBooks?.length) return;
 
     // Process old books first so that when we update the library the order is preserved
     syncedBooks.sort((a, b) => a.updatedAt - b.updatedAt);
@@ -177,6 +178,7 @@ export const useBooksSync = () => {
   );
 
   useEffect(() => {
+    if (!CLOUD_ENABLED) return;
     if (isSyncing) {
       debouncedUpdateLibrary();
     } else {

@@ -7,6 +7,7 @@ import type {
   InferenceParams,
   TranslationOutputField,
   PopupContextBundle,
+  UserDictionary,
 } from './types';
 import type { NormalizedLookupResult } from './normalizer';
 import type { DetectedLanguageInfo } from './languagePolicy';
@@ -46,6 +47,8 @@ export interface ContextLookupRequest {
   rawResponse?: string;
   /** Pre-resolved dictionary entries to inject into the context. Skips the internal lookupDefinitions call. */
   preDictionaryEntries?: string[];
+  /** Pre-resolved user dictionary metadata. Skips the internal getUserDictionaryMeta call. */
+  userDictionaryMeta?: UserDictionary[];
 }
 
 export interface ContextLookupResult {
@@ -172,6 +175,7 @@ export async function runContextLookup(
         request.selectedText,
         sourceLanguage,
         request.targetLanguage,
+        request.userDictionaryMeta ?? [],
         { maxMatchTier: 1 },
       );
       dictionaryEntries = entries.map((e) => `${e.headword}: ${e.definition}`);

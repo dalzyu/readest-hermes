@@ -191,13 +191,60 @@ describe('indexingRuntime', () => {
 
     controller.abort();
 
-    expect(mockCancelBookIndexing).toHaveBeenCalledWith('book-a');
+    expect(mockCancelBookIndexing).toHaveBeenCalledWith(run.runId);
     expect(getRunId('reader', 'book-key')).toBeNull();
     expect(events).toContain('cancelled');
 
     deferred.reject(new Error('Indexing cancelled'));
     await expect(run.promise).rejects.toThrow('Indexing cancelled');
     unsubscribe();
+  });
+
+  test('cancelling one run does not cancel a concurrent run for the same book', async () => {
+    const deferredReader = createDeferred<IndexResult>();
+    const deferredLibrary = createDeferred<IndexResult>();
+
+    mockIndexBook
+      .mockImplementationOnce(async () => deferredReader.promise)
+      .mockImplementationOnce(async () => deferredLibrary.promise);
+
+    const readerController = new AbortController();
+    const readerRun = startBookIndexing({
+      scope: 'reader',
+      key: 'reader-book',
+      bookHash: 'book-a',
+      bookDoc: dummyDoc,
+      aiSettings,
+      signal: readerController.signal,
+    });
+
+    const libraryRun = startBookIndexing({
+      scope: 'library',
+      key: 'library-book',
+      bookHash: 'book-a',
+      bookDoc: dummyDoc,
+      aiSettings,
+    });
+
+    readerController.abort();
+
+    expect(mockCancelBookIndexing).toHaveBeenCalledWith(readerRun.runId);
+    expect(mockCancelBookIndexing).not.toHaveBeenCalledWith('book-a');
+    expect(getRunId('reader', 'reader-book')).toBeNull();
+    expect(getRunId('library', 'library-book')).toBe(libraryRun.runId);
+
+    deferredReader.reject(new Error('Indexing cancelled'));
+    deferredLibrary.resolve({
+      status: 'complete',
+      chunksProcessed: 1,
+      totalSections: 1,
+      skippedSections: 0,
+      errorMessages: [],
+      durationMs: 1,
+    });
+
+    await expect(readerRun.promise).rejects.toThrow('Indexing cancelled');
+    await expect(libraryRun.promise).resolves.toMatchObject({ status: 'complete' });
   });
 
   test('emits progress phase transitions and complete event for active run', async () => {

@@ -18,8 +18,9 @@ import { uniqueId } from '@/utils/misc';
 import { eventDispatcher } from '@/utils/event';
 import { getBookDirFromLanguage } from '@/utils/book';
 import { Overlay } from '@/components/Overlay';
-import { saveSysSettings } from '@/helpers/settings';
+
 import { NOTE_PREFIX } from '@/types/view';
+import type { SystemSettings } from '@/types/settings';
 import useShortcuts from '@/hooks/useShortcuts';
 import BooknoteItem from '../sidebar/BooknoteItem';
 import AIAssistant from './AIAssistant';
@@ -35,18 +36,30 @@ const MAX_NOTEBOOK_WIDTH = 0.45;
 const Notebook: React.FC = ({}) => {
   const _ = useTranslation();
   const { envConfig, appService } = useEnv();
-  const { settings } = useSettingsStore();
+  const { settings, setSettings, saveSettings } = useSettingsStore();
   const { updateAppTheme, safeAreaInsets, systemUIVisible, statusBarHeight } = useThemeStore();
   const { sideBarBookKey } = useSidebarStore();
-  const { notebookWidth, isNotebookVisible, isNotebookPinned, notebookActiveTab } =
-    useNotebookStore();
-  const { notebookNewAnnotation, notebookEditAnnotation, setNotebookPin } = useNotebookStore();
-  const { getBookData, getConfig, saveConfig, updateBooknotes } = useBookDataStore();
+  const {
+    notebookWidth,
+    isNotebookVisible,
+    isNotebookPinned,
+    notebookActiveTabs,
+    notebookActiveBookKey,
+    notebookActiveTab,
+    notebookNewAnnotation,
+    notebookEditAnnotation,
+    setNotebookPin,
+    getNotebookWidth,
+    setNotebookWidth,
+    setNotebookVisible,
+    toggleNotebookPin,
+    setNotebookNewAnnotation,
+    setNotebookEditAnnotation,
+    setNotebookActiveTab,
+    setNotebookBookKey,
+  } = useNotebookStore();
+  const { getBookData, getConfig, saveConfig, setConfig, updateBooknotes } = useBookDataStore();
   const { getView, getProgress, getViewSettings } = useReaderStore();
-  const { getNotebookWidth, setNotebookWidth, setNotebookVisible, toggleNotebookPin } =
-    useNotebookStore();
-  const { setNotebookNewAnnotation, setNotebookEditAnnotation, setNotebookActiveTab } =
-    useNotebookStore();
   const { activeConversationId } = useAIChatStore();
 
   const [isSearchBarVisible, setIsSearchBarVisible] = useState(false);
@@ -60,6 +73,27 @@ const Notebook: React.FC = ({}) => {
     handleVerticalDragStart,
   } = useSwipeToDismiss(() => setNotebookVisible(false));
   const isMobile = window.innerWidth < 640;
+  const aiEnabled = settings?.aiSettings?.enabled ?? false;
+  const ctxEnabled = settings?.globalReadSettings?.contextTranslation?.enabled ?? false;
+  const storedNotebookActiveTab = sideBarBookKey ? notebookActiveTabs[sideBarBookKey] : undefined;
+  const notebookBookConfig = sideBarBookKey ? getConfig(sideBarBookKey) : null;
+  const persistedNotebookActiveTab = notebookBookConfig?.notebookActiveTab;
+  const notebookTabFallback =
+    notebookActiveBookKey === sideBarBookKey ? notebookActiveTab : undefined;
+  const legacyNotebookActiveTab = settings.globalReadSettings.notebookActiveTab ?? 'notes';
+  const notebookRawActiveTab =
+    storedNotebookActiveTab ??
+    persistedNotebookActiveTab ??
+    notebookTabFallback ??
+    legacyNotebookActiveTab;
+  const notebookAvailableTabs: NotebookTab[] = aiEnabled
+    ? ctxEnabled
+      ? ['notes', 'ai', 'vocabulary']
+      : ['notes', 'ai']
+    : ['notes'];
+  const effectiveNotebookActiveTab = notebookAvailableTabs.includes(notebookRawActiveTab)
+    ? notebookRawActiveTab
+    : 'notes';
 
   const onNavigateEvent = async () => {
     const pinButton = document.querySelector('.sidebar-pin-btn');
@@ -93,9 +127,6 @@ const Notebook: React.FC = ({}) => {
     setNotebookWidth(settings.globalReadSettings.notebookWidth);
     setNotebookPin(settings.globalReadSettings.isNotebookPinned);
     setNotebookVisible(settings.globalReadSettings.isNotebookPinned);
-    if (settings.globalReadSettings.notebookActiveTab) {
-      setNotebookActiveTab(settings.globalReadSettings.notebookActiveTab);
-    }
 
     eventDispatcher.on('navigate', onNavigateEvent);
     return () => {
@@ -103,6 +134,49 @@ const Notebook: React.FC = ({}) => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setNotebookBookKey(sideBarBookKey);
+    if (!sideBarBookKey) return;
+
+    if (notebookActiveTabs[sideBarBookKey] !== undefined) return;
+
+    const initialTab = persistedNotebookActiveTab ?? notebookTabFallback ?? legacyNotebookActiveTab;
+    setNotebookActiveTab(sideBarBookKey, initialTab);
+  }, [
+    legacyNotebookActiveTab,
+    notebookActiveBookKey,
+    notebookActiveTab,
+    notebookActiveTabs,
+    notebookTabFallback,
+    persistedNotebookActiveTab,
+    setNotebookActiveTab,
+    setNotebookBookKey,
+    sideBarBookKey,
+  ]);
+
+  useEffect(() => {
+    if (!sideBarBookKey) return;
+
+    const currentTab = notebookActiveTabs[sideBarBookKey];
+    if (currentTab === undefined) return;
+    if (currentTab === notebookBookConfig?.notebookActiveTab) return;
+
+    setConfig(sideBarBookKey, { notebookActiveTab: currentTab });
+    const nextConfig = getConfig(sideBarBookKey);
+    if (!nextConfig) return;
+
+    void saveConfig(envConfig, sideBarBookKey, nextConfig, settings);
+  }, [
+    envConfig,
+    getConfig,
+    notebookActiveTabs,
+    notebookBookConfig?.notebookActiveTab,
+    saveConfig,
+    setConfig,
+    sideBarBookKey,
+    settings,
+  ]);
 
   useEffect(() => {
     if (!isNotebookVisible || notebookNewAnnotation || notebookEditAnnotation) {
@@ -119,16 +193,20 @@ const Notebook: React.FC = ({}) => {
 
   const handleTogglePin = () => {
     toggleNotebookPin();
-    const globalReadSettings = settings.globalReadSettings;
-    const newGlobalReadSettings = { ...globalReadSettings, isNotebookPinned: !isNotebookPinned };
-    saveSysSettings(envConfig, 'globalReadSettings', newGlobalReadSettings);
+    const nextSettings: SystemSettings = {
+      ...settings,
+      globalReadSettings: {
+        ...settings.globalReadSettings,
+        isNotebookPinned: !isNotebookPinned,
+      },
+    };
+    setSettings(nextSettings);
+    void saveSettings(envConfig, nextSettings);
   };
 
   const handleTabChange = (tab: NotebookTab) => {
-    setNotebookActiveTab(tab);
-    const globalReadSettings = settings.globalReadSettings;
-    const newGlobalReadSettings = { ...globalReadSettings, notebookActiveTab: tab };
-    saveSysSettings(envConfig, 'globalReadSettings', newGlobalReadSettings);
+    if (!sideBarBookKey) return;
+    setNotebookActiveTab(sideBarBookKey, tab);
   };
 
   const handleClickOverlay = () => {
@@ -315,13 +393,13 @@ const Notebook: React.FC = ({}) => {
           )}
           <NotebookHeader
             isPinned={isNotebookPinned}
-            isSearchBarVisible={isSearchBarVisible && notebookActiveTab === 'notes'}
+            isSearchBarVisible={isSearchBarVisible && effectiveNotebookActiveTab === 'notes'}
             handleClose={() => setNotebookVisible(false)}
             handleTogglePin={handleTogglePin}
             handleToggleSearchBar={handleToggleSearchBar}
-            showSearchButton={notebookActiveTab === 'notes'}
+            showSearchButton={effectiveNotebookActiveTab === 'notes'}
           />
-          {notebookActiveTab === 'notes' && (
+          {effectiveNotebookActiveTab === 'notes' && (
             <div
               className={clsx('search-bar', {
                 'search-bar-visible': isSearchBarVisible,
@@ -336,11 +414,11 @@ const Notebook: React.FC = ({}) => {
             </div>
           )}
         </div>
-        {notebookActiveTab === 'ai' ? (
+        {effectiveNotebookActiveTab === 'ai' ? (
           <div className='flex min-h-0 flex-1 flex-col'>
             <AIAssistant key={activeConversationId ?? 'new'} bookKey={sideBarBookKey} />
           </div>
-        ) : notebookActiveTab === 'vocabulary' ? (
+        ) : effectiveNotebookActiveTab === 'vocabulary' ? (
           <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
             <VocabularyPanel bookKey={sideBarBookKey} bookHash={bookData.book?.hash ?? ''} />
           </div>
@@ -435,7 +513,10 @@ const Notebook: React.FC = ({}) => {
             paddingBottom: `${(safeAreaInsets?.bottom || 0) / 2}px`,
           }}
         >
-          <NotebookTabNavigation activeTab={notebookActiveTab} onTabChange={handleTabChange} />
+          <NotebookTabNavigation
+            activeTab={effectiveNotebookActiveTab}
+            onTabChange={handleTabChange}
+          />
         </div>
       </div>
     </>

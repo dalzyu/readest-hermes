@@ -371,6 +371,7 @@ export interface BookConfig {
   booknotes?: BookNote[];
   searchConfig?: Partial<BookSearchConfig>;
   viewSettings?: Partial<ViewSettings>;
+  notebookActiveTab?: 'notes' | 'ai' | 'vocabulary';
 
   lastSyncedAtConfig?: number;
   lastSyncedAtNotes?: number;
@@ -404,4 +405,8 @@ export interface BooksGroup {
 export interface BookContent {
   book: Book;
   file: File;
+}
+
+export interface LoadBookContentOptions {
+  preferGeneratedPackage?: boolean;
 }

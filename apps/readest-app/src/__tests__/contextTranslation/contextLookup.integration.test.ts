@@ -104,6 +104,7 @@ async function runScenario({ selectedText, sourceLanguage, targetLanguage, respo
     popupContext,
     targetLanguage,
     outputFields: DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields,
+    userDictionaryMeta: settingsRef.current,
   });
 
   return {
@@ -225,6 +226,7 @@ describe('context lookup integration scenarios', () => {
       sourceLanguage: 'zh',
       targetLanguage: 'en',
       outputFields: DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields,
+      userDictionaryMeta: settingsRef.current,
     });
 
     const [, userPrompt] = vi.mocked(callLLM).mock.calls.at(-1)!;
@@ -264,6 +266,7 @@ describe('context lookup integration scenarios', () => {
       sourceLanguage: 'zh',
       targetLanguage: 'en',
       outputFields: DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields,
+      userDictionaryMeta: settingsRef.current,
     });
 
     const [, userPrompt] = vi.mocked(callLLM).mock.calls.at(-1)!;

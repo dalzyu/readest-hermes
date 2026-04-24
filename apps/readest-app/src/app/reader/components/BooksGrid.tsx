@@ -122,7 +122,9 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
               appService?.hasRoundedWindow && 'rounded-window',
             )}
           >
-            {isBookmarked && !hoveredBookKey && <Ribbon width={`${horizontalGapPercent}%`} />}
+            {chromeVisible && isBookmarked && !hoveredBookKey && (
+              <Ribbon width={`${horizontalGapPercent}%`} />
+            )}
             {chromeVisible && (
               <>
                 <HeaderBar
@@ -150,7 +152,7 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
               gridInsets={gridInsets}
               contentInsets={contentInsets}
             />
-            {viewSettings.vertical && viewSettings.scrolled && (
+            {chromeVisible && viewSettings.vertical && viewSettings.scrolled && (
               <>
                 {(showFooter || viewSettings.doubleBorder) && (
                   <div
@@ -172,7 +174,7 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
                 )}
               </>
             )}
-            {viewSettings.vertical && viewSettings.doubleBorder && (
+            {chromeVisible && viewSettings.vertical && viewSettings.doubleBorder && (
               <DoubleBorder
                 showHeader={showHeader}
                 showFooter={showFooter}
@@ -194,17 +196,19 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
                 gridInsets={gridInsets}
               />
             )}
-            <HintInfo
-              bookKey={bookKey}
-              showDoubleBorder={viewSettings.vertical && viewSettings.doubleBorder}
-              isScrolled={viewSettings.scrolled}
-              isVertical={viewSettings.vertical}
-              isEink={viewSettings.isEink}
-              horizontalGap={horizontalGapPercent}
-              contentInsets={contentInsets}
-              gridInsets={gridInsets}
-            />
-            {viewSettings.readingRulerEnabled && viewState?.inited && (
+            {chromeVisible && (
+              <HintInfo
+                bookKey={bookKey}
+                showDoubleBorder={viewSettings.vertical && viewSettings.doubleBorder}
+                isScrolled={viewSettings.scrolled}
+                isVertical={viewSettings.vertical}
+                isEink={viewSettings.isEink}
+                horizontalGap={horizontalGapPercent}
+                contentInsets={contentInsets}
+                gridInsets={gridInsets}
+              />
+            )}
+            {chromeVisible && viewSettings.readingRulerEnabled && viewState?.inited && (
               <ReadingRuler
                 bookKey={bookKey}
                 isVertical={viewSettings.vertical}
@@ -226,10 +230,12 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
                 gridInsets={gridInsets}
               />
             )}
-            <Annotator bookKey={bookKey} />
-            <SearchResultsNav bookKey={bookKey} gridInsets={gridInsets} />
-            <BooknotesNav bookKey={bookKey} gridInsets={gridInsets} toc={bookDoc.toc || []} />
-            <FootnotePopup bookKey={bookKey} bookDoc={bookDoc} />
+            {chromeVisible && <Annotator bookKey={bookKey} />}
+            {chromeVisible && <SearchResultsNav bookKey={bookKey} gridInsets={gridInsets} />}
+            {chromeVisible && (
+              <BooknotesNav bookKey={bookKey} gridInsets={gridInsets} toc={bookDoc.toc || []} />
+            )}
+            {chromeVisible && <FootnotePopup bookKey={bookKey} bookDoc={bookDoc} />}
             {chromeVisible && (
               <FooterBar
                 bookKey={bookKey}
@@ -240,7 +246,7 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
                 gridInsets={gridInsets}
               />
             )}
-            {indexingProgress[bookKey] && (
+            {chromeVisible && indexingProgress[bookKey] && (
               <IndexingProgressBar
                 current={indexingProgress[bookKey]!.current}
                 total={indexingProgress[bookKey]!.total}

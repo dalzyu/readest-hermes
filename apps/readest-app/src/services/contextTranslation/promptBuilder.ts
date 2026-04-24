@@ -35,6 +35,20 @@ function sanitizeContextText(text: string): string {
   return text.replace(/</g, '\u2039').replace(/>/g, '\u203a');
 }
 
+/**
+ * Sanitizes a user-configurable promptInstruction before injection into the system prompt.
+ * Prevents structural XML injection and limits size.
+ */
+function sanitizePromptInstruction(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length > 500) return '';
+  return trimmed
+    .replace(/</g, '\u2039')
+    .replace(/>/g, '\u203a')
+    .replace(/`/g, "'")
+    .replace(/\s+/g, ' ');
+}
+
 const JINJA_VARIABLE_REGEX = /{{\s*([A-Za-z_][A-Za-z0-9_]*)\s*}}/g;
 
 export const TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES = [
@@ -86,7 +100,14 @@ function applySystemPromptTemplate(
 ): string {
   if (!template?.trim()) return fallback;
   const missing = getMissingPromptTemplateVariables(template, requiredVariables);
-  if (missing.length > 0) return fallback;
+  if (missing.length > 0) {
+    console.warn(
+      '[promptBuilder] Custom system prompt template is missing required variables:',
+      missing,
+      '\u2014 falling back to default prompt.',
+    );
+    return fallback;
+  }
   return renderPromptTemplate(template, variables);
 }
 
@@ -137,7 +158,7 @@ export function buildTranslationPrompt(request: TranslationRequest): {
   const fieldInstructions = enabledFields
     .map(
       (field) =>
-        `- <${field.id}>: ${field.promptInstruction} Wrap your answer in <${field.id}>...</${field.id}> tags.`,
+        `- <${field.id}>: ${sanitizePromptInstruction(field.promptInstruction)} Wrap your answer in <${field.id}>...</${field.id}> tags.`,
     )
     .join('\n');
 
@@ -212,7 +233,7 @@ ${responseTemplate}${examplesLayoutInstruction}${referenceDictionaryInstruction}
     },
     defaultSystemPrompt,
   );
-  const userPrompt = `<selected_text>${request.selectedText}</selected_text>
+  const userPrompt = `<selected_text>${sanitizeContextText(request.selectedText)}</selected_text>
 
 ${buildContextSections(request)}
 
@@ -245,7 +266,7 @@ function buildDictionaryPrompt(request: LookupPromptRequest): {
   const fieldInstructions = enabledFields
     .map(
       (field) =>
-        `- <${field.id}>: ${field.promptInstruction} Wrap your answer in <${field.id}>...</${field.id}> tags.`,
+        `- <${field.id}>: ${sanitizePromptInstruction(field.promptInstruction)} Wrap your answer in <${field.id}>...</${field.id}> tags.`,
     )
     .join('\n');
 
@@ -302,7 +323,7 @@ Respond with ONLY the tagged fields. Do not add any preamble or extra commentary
     },
     defaultSystemPrompt,
   );
-  const userPrompt = `<selected_text>${request.selectedText}</selected_text>
+  const userPrompt = `<selected_text>${sanitizeContextText(request.selectedText)}</selected_text>
 
 ${buildContextSections(request)}
 
@@ -366,12 +387,12 @@ export function buildPerFieldPrompt(
 
   const systemPrompt = `You are a literary translation assistant.${sourceLangHint}
 
-Task: ${field.promptInstruction}
+Task: ${sanitizePromptInstruction(field.promptInstruction)}
 
 Respond entirely in ${targetLang}. Output ONLY the requested content — no preamble, no XML tags, no labels.
 Do not reveal your reasoning. Never write "Thinking Process", "The user wants me", "Analyze the Request", steps, plans, or any self-referential analysis.${examplesLayout}${referenceDictNote}${pairHints}`;
 
-  const userPrompt = `<selected_text>${request.selectedText}</selected_text>
+  const userPrompt = `<selected_text>${sanitizeContextText(request.selectedText)}</selected_text>
 
 ${buildContextSections(request)}`;
 

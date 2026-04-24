@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Book } from '@/types/book';
@@ -8,6 +8,7 @@ import { readingStatsService } from '@/services/readingStats/readingStatsService
 import { navigateToLibrary } from '@/utils/nav';
 
 const searchParamsState = vi.hoisted(() => ({}) as Record<string, string>);
+const bookshelfSelectionState = vi.hoisted(() => ({ selectedBooks: [] as string[] }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -54,9 +55,19 @@ vi.mock('@/store/libraryStore', () => ({
     setCurrentBookshelf: vi.fn(),
     setLibrary: vi.fn(),
     updateBooks: vi.fn(),
-    setSelectedBooks: vi.fn(),
-    getSelectedBooks: () => [],
-    toggleSelectedBook: vi.fn(),
+    setSelectedBooks: vi.fn((books: string[]) => {
+      bookshelfSelectionState.selectedBooks = [...books];
+    }),
+    getSelectedBooks: () => bookshelfSelectionState.selectedBooks,
+    toggleSelectedBook: vi.fn((id: string) => {
+      if (bookshelfSelectionState.selectedBooks.includes(id)) {
+        bookshelfSelectionState.selectedBooks = bookshelfSelectionState.selectedBooks.filter(
+          (bookId) => bookId !== id,
+        );
+      } else {
+        bookshelfSelectionState.selectedBooks = [...bookshelfSelectionState.selectedBooks, id];
+      }
+    }),
     getGroupName: () => '',
   }),
 }));
@@ -80,7 +91,28 @@ vi.mock('@/utils/event', () => ({
 }));
 
 vi.mock('@/components/Alert', () => ({
-  default: () => null,
+  default: ({
+    title,
+    message,
+    onConfirm,
+    onCancel,
+  }: {
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+  }) => (
+    <div>
+      <div>{title}</div>
+      <div>{message}</div>
+      <button type='button' onClick={onConfirm}>
+        Confirm
+      </button>
+      <button type='button' onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/Spinner', () => ({
@@ -110,7 +142,16 @@ vi.mock('@/app/library/components/BookshelfItem', () => ({
   generateBookshelfItems: (books: Book[]) => books,
 }));
 vi.mock('@/app/library/components/SelectModeActions', () => ({
-  default: () => null,
+  default: ({ onDelete, onCancel }: { onDelete: () => void; onCancel: () => void }) => (
+    <div>
+      <button type='button' onClick={onDelete}>
+        Delete
+      </button>
+      <button type='button' onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/app/library/components/GroupingModal', () => ({
@@ -157,7 +198,17 @@ const clearSearchParamsState = () => {
   });
 };
 
-const renderBookshelf = (params: Record<string, string | undefined> = {}) => {
+const renderBookshelf = (
+  params: Record<string, string | undefined> = {},
+  options: {
+    libraryBooks?: Book[];
+    isSelectMode?: boolean;
+    isSelectAll?: boolean;
+    isSelectNone?: boolean;
+    handleBookDelete?: React.ComponentProps<typeof Bookshelf>['handleBookDelete'];
+    handlePushLibrary?: React.ComponentProps<typeof Bookshelf>['handlePushLibrary'];
+  } = {},
+) => {
   clearSearchParamsState();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined) {
@@ -165,20 +216,29 @@ const renderBookshelf = (params: Record<string, string | undefined> = {}) => {
     }
   });
 
+  const handleImportBooks = vi.fn();
+  const handleBookUpload = vi.fn(async () => true);
+  const handleBookDownload = vi.fn(async () => true);
+  const handleBookDelete = options.handleBookDelete ?? vi.fn(async () => true);
+  const handleSetSelectMode = vi.fn();
+  const handleShowDetailsBook = vi.fn();
+  const handleLibraryNavigation = vi.fn();
+  const handlePushLibrary = options.handlePushLibrary ?? vi.fn(async () => undefined);
+
   return render(
     <Bookshelf
-      libraryBooks={[makeBook()]}
-      isSelectMode={false}
-      isSelectAll={false}
-      isSelectNone={false}
-      handleImportBooks={vi.fn()}
-      handleBookUpload={vi.fn(async () => true)}
-      handleBookDownload={vi.fn(async () => true)}
-      handleBookDelete={vi.fn(async () => true)}
-      handleSetSelectMode={vi.fn()}
-      handleShowDetailsBook={vi.fn()}
-      handleLibraryNavigation={vi.fn()}
-      handlePushLibrary={vi.fn(async () => undefined)}
+      libraryBooks={options.libraryBooks ?? [makeBook()]}
+      isSelectMode={options.isSelectMode ?? false}
+      isSelectAll={options.isSelectAll ?? false}
+      isSelectNone={options.isSelectNone ?? false}
+      handleImportBooks={handleImportBooks}
+      handleBookUpload={handleBookUpload}
+      handleBookDownload={handleBookDownload}
+      handleBookDelete={handleBookDelete}
+      handleSetSelectMode={handleSetSelectMode}
+      handleShowDetailsBook={handleShowDetailsBook}
+      handleLibraryNavigation={handleLibraryNavigation}
+      handlePushLibrary={handlePushLibrary}
       booksTransferProgress={{}}
     />,
   );
@@ -189,6 +249,7 @@ describe('Bookshelf', () => {
     vi.clearAllMocks();
     mockGetDailyStats.mockReset();
     mockGetDailyStats.mockReturnValue([]);
+    bookshelfSelectionState.selectedBooks = [];
     clearSearchParamsState();
   });
 
@@ -253,6 +314,79 @@ describe('Bookshelf', () => {
 
     expect(screen.queryByRole('heading', { name: 'Reading stats' })).toBeNull();
     expect(screen.queryByText('From saved reading sessions')).toBeNull();
+  });
+
+  test('deleting a selected generated group expands to its member books', async () => {
+    const handleBookDelete = vi.fn(async () => true);
+    const handlePushLibrary = vi.fn(async () => undefined);
+    const libraryBooks = [
+      makeBook({
+        hash: 'series-book-1',
+        title: 'Series Book 1',
+        author: 'Series Author',
+        updatedAt: 3,
+        metadata: {
+          title: 'Series Book 1',
+          author: 'Series Author',
+          language: 'en',
+          series: 'Series One',
+          seriesIndex: 1,
+        },
+      }),
+      makeBook({
+        hash: 'series-book-2',
+        title: 'Series Book 2',
+        author: 'Series Author',
+        updatedAt: 2,
+        metadata: {
+          title: 'Series Book 2',
+          author: 'Series Author',
+          language: 'en',
+          series: 'Series One',
+          seriesIndex: 2,
+        },
+      }),
+      makeBook({
+        hash: 'standalone-book',
+        title: 'Standalone Book',
+        author: 'Standalone Author',
+        updatedAt: 1,
+      }),
+    ];
+
+    renderBookshelf(
+      { surface: 'books', groupBy: 'series' },
+      {
+        libraryBooks,
+        isSelectMode: true,
+        isSelectAll: true,
+        handleBookDelete,
+        handlePushLibrary,
+      },
+    );
+
+    await waitFor(() => {
+      expect(bookshelfSelectionState.selectedBooks).toHaveLength(2);
+    });
+    expect(bookshelfSelectionState.selectedBooks).toContain('standalone-book');
+    expect(bookshelfSelectionState.selectedBooks).not.toContain('series-book-1');
+    expect(bookshelfSelectionState.selectedBooks).not.toContain('series-book-2');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => {
+      expect(handleBookDelete).toHaveBeenCalledTimes(3);
+      expect(handlePushLibrary).toHaveBeenCalledTimes(1);
+    });
+
+    const deleteCalls = handleBookDelete.mock.calls as unknown as Array<
+      [Book, boolean | undefined]
+    >;
+    expect(deleteCalls.map(([book]) => book.hash).sort()).toEqual(
+      ['series-book-1', 'series-book-2', 'standalone-book'].sort(),
+    );
+    expect(deleteCalls.every(([, syncBooks]) => syncBooks === false)).toBe(true);
   });
   test('switching from My Series to My Books clears series-only params', () => {
     renderBookshelf({ surface: 'series', groupBy: 'series', group: 'series-1' });

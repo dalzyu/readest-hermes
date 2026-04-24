@@ -7,6 +7,8 @@ use tauri::State;
 const DISCORD_APP_ID: &str = "1462683110612144348";
 const MAX_TITLE_LENGTH: usize = 128;
 const MAX_AUTHOR_LENGTH: usize = 128;
+const DISCORD_BUTTON_LABEL: &str = "Hermes releases";
+const DISCORD_BUTTON_URL: &str = "https://github.com/dalzyu/readest-hermes/releases/latest";
 
 #[derive(Debug)]
 pub struct DiscordRpcClient {
@@ -119,7 +121,7 @@ pub async fn update_book_presence(
 
     activity_builder = activity_builder.assets(assets_builder);
 
-    let button = activity::Button::new("Read on Readest", "https://web.readest.com");
+    let button = activity::Button::new(DISCORD_BUTTON_LABEL, DISCORD_BUTTON_URL);
     activity_builder = activity_builder.buttons(vec![button]);
 
     if let Some(ref mut discord_client) = client.client {
@@ -179,4 +181,18 @@ pub async fn update_book_presence(_presence: BookPresenceData) -> Result<(), Str
 #[tauri::command]
 pub async fn clear_book_presence() -> Result<(), String> {
     Ok(()) // No-op on non-desktop platforms
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hermes_discord_button_defaults_are_branded() {
+        assert_eq!(DISCORD_BUTTON_LABEL, "Hermes releases");
+        assert_eq!(
+            DISCORD_BUTTON_URL,
+            "https://github.com/dalzyu/readest-hermes/releases/latest"
+        );
+    }
 }

@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import AIPanel from '@/components/settings/AIPanel';
 import AITranslatePanel from '@/components/settings/AITranslatePanel';
 import SettingsDialog from '@/components/settings/SettingsDialog';
+import {
+  AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST,
+  SUPPORTED_PROVIDER_TYPES,
+} from '@/services/ai/capabilities';
 
 const saveSettingsMock = vi.fn().mockResolvedValue(undefined);
 const setSettingsMock = vi.fn();
@@ -12,7 +16,7 @@ const writeClipboardMock = vi.fn().mockResolvedValue(undefined);
 
 // vi.hoisted runs before vi.mock factories — use it to create stable object references
 // that won't cause useEffect infinite re-render loops.
-const { stableSettings } = vi.hoisted(() => {
+const { stableSettings, healthCheckMock, isAvailableMock } = vi.hoisted(() => {
   const stableSettings = {
     aiSettings: {
       enabled: false,
@@ -123,7 +127,9 @@ const { stableSettings } = vi.hoisted(() => {
       convertChineseVariant: 'none',
     },
   };
-  return { stableSettings };
+  const healthCheckMock = vi.fn().mockResolvedValue(true);
+  const isAvailableMock = vi.fn().mockResolvedValue(true);
+  return { stableSettings, healthCheckMock, isAvailableMock };
 });
 
 vi.mock('@/hooks/useTranslation', () => ({
@@ -136,12 +142,61 @@ vi.mock('@/context/EnvContext', () => ({
 
 vi.mock('@/services/ai/providers', () => ({
   createProviderFromConfig: () => ({
-    healthCheck: vi.fn().mockResolvedValue(true),
-    isAvailable: vi.fn().mockResolvedValue(true),
+    healthCheck: healthCheckMock,
+    isAvailable: isAvailableMock,
   }),
+  getProviderForTask: (
+    settings: {
+      providers: Array<{
+        id: string;
+        models?: Array<{ id: string; kind: 'chat' | 'embedding' }>;
+      }>;
+      profiles: Array<{
+        id: string;
+        modelAssignments: Partial<
+          Record<
+            'translation' | 'dictionary' | 'chat' | 'embedding',
+            { providerId?: string; modelId?: string }
+          >
+        >;
+      }>;
+      activeProfileId: string;
+    },
+    task: 'translation' | 'dictionary' | 'chat' | 'embedding',
+  ) => {
+    const profile =
+      settings.profiles.find((entry) => entry.id === settings.activeProfileId) ??
+      settings.profiles[0];
+    const kind = task === 'embedding' ? 'embedding' : 'chat';
+    const selection = profile?.modelAssignments?.[task];
+
+    if (selection?.providerId) {
+      const selectedProvider = settings.providers.find(
+        (provider) => provider.id === selection.providerId,
+      );
+      if (selectedProvider) {
+        const selectedModelId =
+          selectedProvider.models?.find(
+            (model) => model.kind === kind && model.id === selection.modelId,
+          )?.id ?? selectedProvider.models?.find((model) => model.kind === kind)?.id;
+        if (selectedModelId) {
+          return { config: selectedProvider, modelId: selectedModelId, inferenceParams: {} };
+        }
+      }
+    }
+
+    for (const provider of settings.providers) {
+      const modelId = provider.models?.find((model) => model.kind === kind)?.id;
+      if (modelId) {
+        return { config: provider, modelId, inferenceParams: {} };
+      }
+    }
+
+    throw new Error(`No configured ${kind} model found for task: ${task}`);
+  },
   getAIProvider: () => ({
-    healthCheck: vi.fn().mockResolvedValue(true),
-    isAvailable: vi.fn().mockResolvedValue(true),
+    healthCheck: healthCheckMock,
+    isAvailable: isAvailableMock,
   }),
 }));
 
@@ -292,6 +347,85 @@ describe('AIPanel', () => {
     expect(screen.getByText('Providers')).toBeTruthy();
     // The default Ollama provider should be listed
     expect(screen.getAllByText('Ollama').length).toBeGreaterThan(0);
+  });
+
+  test('split-provider connection test only requires embeddings on the routed provider', async () => {
+    const originalAiSettings = JSON.parse(
+      JSON.stringify(stableSettings.aiSettings),
+    ) as typeof stableSettings.aiSettings;
+
+    try {
+      stableSettings.aiSettings = {
+        ...originalAiSettings,
+        enabled: true,
+        providers: [
+          {
+            id: 'chat-provider',
+            name: 'Chat Provider',
+            providerType: 'openai',
+            baseUrl: 'https://api.openai.com',
+            model: 'gpt-4o-mini',
+            embeddingModel: '',
+          },
+          {
+            id: 'embedding-provider',
+            name: 'Embedding Provider',
+            providerType: 'openai',
+            baseUrl: 'https://api.openai.com',
+            model: '',
+            embeddingModel: 'text-embedding-3-small',
+          },
+        ],
+      };
+
+      render(<AIPanel />);
+      fireEvent.click(screen.getByRole('button', { name: /Test Connection/i }));
+
+      await waitFor(() => expect(healthCheckMock).toHaveBeenCalledTimes(1));
+      expect(healthCheckMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          requireEmbedding: false,
+          modelId: 'gpt-4o-mini',
+        }),
+      );
+      expect(screen.getByText('Connected')).toBeTruthy();
+    } finally {
+      stableSettings.aiSettings = originalAiSettings;
+    }
+  });
+
+  test('provider picker uses the shared provider type list', async () => {
+    stableSettings.aiSettings.enabled = true;
+    const { container } = render(<AIPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Add/i }));
+
+    await waitFor(() => expect(container.querySelector('select')).not.toBeNull());
+    const providerTypeSelect = container.querySelector('select') as HTMLSelectElement;
+    expect(Array.from(providerTypeSelect.options).map((option) => option.value)).toEqual(
+      SUPPORTED_PROVIDER_TYPES,
+    );
+  });
+
+  test('ai-gateway embedding model selector exposes the shared allowlist', async () => {
+    stableSettings.aiSettings.enabled = true;
+    const { container } = render(<AIPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Add/i }));
+    await waitFor(() => expect(container.querySelector('select')).not.toBeNull());
+
+    const providerTypeSelect = container.querySelector('select') as HTMLSelectElement;
+    fireEvent.change(providerTypeSelect, { target: { value: 'ai-gateway' } });
+
+    await waitFor(() =>
+      expect(container.querySelector('datalist#ai-gateway-embedding-model-options')).not.toBeNull(),
+    );
+
+    const optionValues = Array.from(
+      container.querySelectorAll('datalist#ai-gateway-embedding-model-options option'),
+    ).map((option) => option.getAttribute('value'));
+
+    expect(optionValues).toEqual(AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST);
   });
 
   test('edits provider display name and model entries', async () => {

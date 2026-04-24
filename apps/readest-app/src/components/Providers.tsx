@@ -10,6 +10,7 @@ import { CSPostHogProvider } from '@/context/PHContext';
 import { SyncProvider } from '@/context/SyncContext';
 import { initSystemThemeListener, loadDataTheme } from '@/store/themeStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { CLOUD_ENABLED } from '@/services/constants';
 import { useSafeAreaInsets } from '@/hooks/useSafeAreaInsets';
 import { useDefaultIconSize } from '@/hooks/useResponsiveSize';
 import { useBackgroundTexture } from '@/hooks/useBackgroundTexture';
@@ -64,23 +65,29 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   }, [envConfig, appService, applyUILanguage, applyBackgroundTexture, applyEinkMode]);
 
   // Make sure appService is available in all children components
-  if (!appService) return;
+  if (!appService) return null;
+
+  const appShell = (
+    <DropdownProvider>
+      <CommandPaletteProvider>
+        {children}
+        <CommandPalette />
+        <AtmosphereOverlay />
+      </CommandPaletteProvider>
+    </DropdownProvider>
+  );
 
   return (
     <CSPostHogProvider>
-      <AuthProvider>
-        <IconContext.Provider value={{ size: `${iconSize}px` }}>
-          <SyncProvider>
-            <DropdownProvider>
-              <CommandPaletteProvider>
-                {children}
-                <CommandPalette />
-                <AtmosphereOverlay />
-              </CommandPaletteProvider>
-            </DropdownProvider>
-          </SyncProvider>
-        </IconContext.Provider>
-      </AuthProvider>
+      <IconContext.Provider value={{ size: `${iconSize}px` }}>
+        {CLOUD_ENABLED ? (
+          <AuthProvider>
+            <SyncProvider>{appShell}</SyncProvider>
+          </AuthProvider>
+        ) : (
+          appShell
+        )}
+      </IconContext.Provider>
     </CSPostHogProvider>
   );
 };

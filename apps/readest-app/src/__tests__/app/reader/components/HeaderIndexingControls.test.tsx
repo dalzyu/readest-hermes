@@ -320,6 +320,25 @@ describe('reader header indexing controls', () => {
     expect(finishIndexingMock).toHaveBeenCalledWith('reader-key-1', 'run-1');
   });
 
+  it('stops manual indexing using the active run id', async () => {
+    state.indexingProgress = {
+      'reader-key-1': {
+        runId: 'run-42',
+        current: 1,
+        total: 2,
+        phase: 'embedding',
+      },
+    };
+
+    render(<IndexBookButton bookKey='reader-key-1' />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop Index' }));
+
+    expect(cancelBookIndexingMock).toHaveBeenCalledWith('run-42');
+    expect(cancelBookIndexingMock).not.toHaveBeenCalledWith('hash-1');
+    expect(cancelIndexingMock).toHaveBeenCalledWith('reader-key-1', 'run-42');
+  });
+
   it('auto-indexes the primary book when opening the reader', async () => {
     render(<ReaderContent settings={state.settings} />);
 

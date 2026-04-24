@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-vi.mock('@/hooks/useContextLookup', () => ({
-  useContextLookup: vi.fn(),
+vi.mock('@/hooks/useLookupPipeline', () => ({
+  useLookupPipeline: vi.fn(),
 }));
 
 import { useContextTranslation } from '@/hooks/useContextTranslation';
-import { useContextLookup } from '@/hooks/useContextLookup';
+import { useLookupPipeline } from '@/hooks/useLookupPipeline';
 import type {
   ContextTranslationSettings,
   LookupAnnotationSlots,
@@ -14,7 +14,7 @@ import type {
   PopupRetrievalHints,
   RetrievalStatus,
 } from '@/services/contextTranslation/types';
-import type { UseContextLookupResult } from '@/hooks/useContextLookup';
+import type { UseContextLookupResult } from '@/hooks/useLookupPipeline';
 
 const retrievalHints: PopupRetrievalHints = {
   currentVolumeIndexed: true,
@@ -54,7 +54,7 @@ const lookupResult: UseContextLookupResult = {
   annotations: lookupAnnotations,
   debugInfo: null,
   availabilityHint: 'ai-on',
-  fieldProvenance: { translation: 'ai' },
+  fieldProvenance: { translation: { source: 'ai' } },
   saveToVocabulary: vi.fn(async () => {}),
 };
 
@@ -81,14 +81,14 @@ const defaultProps = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(useContextLookup).mockReturnValue(lookupResult);
+  vi.mocked(useLookupPipeline).mockReturnValue(lookupResult);
 });
 
 describe('useContextTranslation', () => {
   test('maps translation input through useContextLookup', () => {
     const result = useContextTranslation(defaultProps);
 
-    expect(useContextLookup).toHaveBeenCalledWith({
+    expect(useLookupPipeline).toHaveBeenCalledWith({
       mode: 'translation',
       bookKey: defaultProps.bookKey,
       bookHash: defaultProps.bookHash,
@@ -101,7 +101,7 @@ describe('useContextTranslation', () => {
     expect(result.result).toEqual({ translation: 'close friend' });
     expect(result.popupContext).toBe(popupContextBundle);
     expect(result.availabilityHint).toBe('ai-on');
-    expect(result.fieldProvenance).toEqual({ translation: 'ai' });
+    expect(result.fieldProvenance).toEqual({ translation: { source: 'ai' } });
   });
 
   test('passes through saveToVocabulary and retrieval metadata', async () => {

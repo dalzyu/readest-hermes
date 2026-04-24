@@ -3,12 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 import { detectLookupLanguage } from '@/services/contextTranslation/languagePolicy';
+import { KNOWN_TRANSLATORS } from '@/services/contextTranslation/defaults';
 import {
   runLookupPipeline,
   type LookupAvailabilityHint,
-  type LookupFieldProvenance,
   type LookupPipelineDebugInfo,
 } from '@/services/contextTranslation/lookupPipeline';
+import type { LookupFieldProvenance } from '@/services/contextTranslation/types';
 import { saveLookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
 import { saveVocabularyEntry } from '@/services/contextTranslation/vocabularyService';
 import type {
@@ -24,6 +25,7 @@ import type {
 import type { ValidationDecision } from '@/services/contextTranslation/validator';
 import type { TranslatorName } from '@/services/translators/providers';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useReaderStore } from '@/store/readerStore';
 import { eventDispatcher } from '@/utils/event';
 
 export interface UseLookupPipelineInput {
@@ -59,14 +61,17 @@ export interface UseLookupPipelineResult {
   saveToVocabulary: () => Promise<void>;
 }
 
+// Type aliases so consumers that used useContextLookup can import from here directly.
+export type UseContextLookupInput = UseLookupPipelineInput;
+export type UseContextLookupResult = UseLookupPipelineResult;
+export type LookupDebugInfo = LookupPipelineDebugInfo;
+
 const EMPTY_RETRIEVAL_HINTS: PopupRetrievalHints = {
   currentVolumeIndexed: false,
   missingLocalIndex: false,
   missingPriorVolumes: [],
   missingSeriesAssignment: false,
 };
-
-const KNOWN_TRANSLATORS: readonly TranslatorName[] = ['deepl', 'azure', 'google', 'yandex'];
 
 function normalizeTranslationProvider(provider?: string): TranslatorName | undefined {
   if (!provider || provider === 'ai') return undefined;
@@ -117,6 +122,7 @@ export function useLookupPipeline({
           (appSettings as { translationProvider?: string } | undefined)?.translationProvider,
       ),
       developerMode: appSettings?.aiSettings?.developerMode ?? false,
+      userDictionaryMeta: appSettings?.userDictionaryMeta ?? [],
     }),
     [currentPage, settings, dictionarySettings, appSettings],
   );
@@ -178,6 +184,7 @@ export function useLookupPipeline({
               token,
               preferredTranslationProvider: requestSnapshot.translationProvider,
               developerMode: requestSnapshot.developerMode,
+              userDictionaryMeta: requestSnapshot.userDictionaryMeta,
             },
             {
               signal: abortController.signal,
@@ -268,17 +275,30 @@ export function useLookupPipeline({
       return;
     }
 
+    const location = useReaderStore.getState().getProgress(bookKey)?.location;
+
     saveLookupHistoryEntry({
       bookHash,
       term,
       context: contextRef.current,
       result,
       mode,
+      ...(location ? { location } : {}),
     });
 
     void eventDispatcher.dispatch('lookup-history-updated', { bookHash });
     lookupHistoryKeyRef.current = historyKey;
-  }, [bookHash, expandedText, loading, mode, result, selectedText, streaming, validationDecision]);
+  }, [
+    bookHash,
+    bookKey,
+    expandedText,
+    loading,
+    mode,
+    result,
+    selectedText,
+    streaming,
+    validationDecision,
+  ]);
 
   const saveToVocabulary = useCallback(async () => {
     if (!result) return;
@@ -299,6 +319,8 @@ export function useLookupPipeline({
         text: `${example.sourceText}\n${example.targetText}`,
       })),
     });
+
+    await eventDispatcher.dispatch('vocabulary-updated', { bookHash });
   }, [
     bookHash,
     bookLanguage,
@@ -320,7 +342,7 @@ export function useLookupPipeline({
     aiUnavailable,
     expandedText,
     validationDecision,
-    retrievalStatus: popupContext?.retrievalStatus ?? 'local-only',
+    retrievalStatus: popupContext?.retrievalStatus ?? 'idle',
     retrievalHints: popupContext?.retrievalHints ?? EMPTY_RETRIEVAL_HINTS,
     popupContext,
     examples,

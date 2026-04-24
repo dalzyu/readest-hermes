@@ -98,13 +98,27 @@ const SeriesModal: React.FC = () => {
   };
 
   const handleAddToSeries = async (seriesId: string) => {
-    if (!bookHash) return;
+    if (!bookHash || currentSeries?.id === seriesId) return;
 
-    if (currentSeries && currentSeries.id !== seriesId) {
-      await removeBookFromSeries(currentSeries.id, bookHash);
+    try {
+      await addBookToSeries(seriesId, bookHash);
+      if (currentSeries) {
+        try {
+          await removeBookFromSeries(currentSeries.id, bookHash);
+        } catch {
+          try {
+            await removeBookFromSeries(seriesId, bookHash);
+          } catch {}
+          throw new Error('failed to remove previous series membership');
+        }
+      }
+    } catch {
+      try {
+        await refreshCurrentBook();
+      } catch {}
+      return;
     }
 
-    await addBookToSeries(seriesId, bookHash);
     await refreshCurrentBook();
     notifySeriesUpdated();
   };
@@ -117,8 +131,32 @@ const SeriesModal: React.FC = () => {
   };
 
   const handleCreateAndAdd = async () => {
-    if (!bookHash || !newSeriesName.trim()) return;
-    await createSeries(newSeriesName.trim(), [bookHash]);
+    const seriesName = newSeriesName.trim();
+    if (!bookHash || !seriesName) return;
+
+    let createdSeriesId: string | null = null;
+
+    try {
+      const createdSeries = await createSeries(seriesName, [bookHash]);
+      createdSeriesId = createdSeries.id;
+
+      if (currentSeries) {
+        try {
+          await removeBookFromSeries(currentSeries.id, bookHash);
+        } catch {
+          try {
+            await deleteSeries(createdSeriesId);
+          } catch {}
+          throw new Error('failed to remove previous series membership');
+        }
+      }
+    } catch {
+      try {
+        await refreshCurrentBook();
+      } catch {}
+      return;
+    }
+
     setNewSeriesName('');
     setCreating(false);
     await refreshCurrentBook();

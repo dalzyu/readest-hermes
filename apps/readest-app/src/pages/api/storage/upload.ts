@@ -31,12 +31,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const bucketName = process.env['TEMP_STORAGE_PUBLIC_BUCKET_NAME'] || '';
       const uploadUrl = await getUploadSignedUrl(fileKey, fileSize, 1800, bucketName);
       const downloadUrl = await getDownloadSignedUrl(fileKey, 3 * 86400, bucketName);
-      const pathname = new URL(downloadUrl).pathname;
       const publicBaseUrl = HERMES_PUBLIC_STORAGE_BASE_URL;
-      const publicDownloadUrl = `${publicBaseUrl}${pathname.replace(`/${bucketName}`, '')}`;
+      const downloadResponseUrl =
+        publicBaseUrl && bucketName
+          ? `${publicBaseUrl}${new URL(downloadUrl).pathname.replace(`/${bucketName}`, '')}`
+          : downloadUrl;
       return res.status(200).json({
         uploadUrl,
-        downloadUrl: publicDownloadUrl,
+        downloadUrl: downloadResponseUrl,
       });
     } catch (error) {
       console.error('Error creating presigned post for temp file:', error);

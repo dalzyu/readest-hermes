@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
-import type { LookupDebugInfo } from '@/hooks/useContextLookup';
+import type { LookupDebugInfo } from '@/hooks/useLookupPipeline';
 
 interface LookupDebugSectionProps {
   debugInfo: LookupDebugInfo;

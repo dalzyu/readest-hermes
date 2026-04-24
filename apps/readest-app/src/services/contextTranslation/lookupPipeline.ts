@@ -1,4 +1,5 @@
 import { getProviderForTask } from '@/services/ai/providers';
+import { aiStore } from '@/services/ai/storage/aiStore';
 import type { AISettings } from '@/services/ai/types';
 import type { BookDocType } from '@/services/ai/ragService';
 import type { TranslatorName } from '@/services/translators/providers';
@@ -8,6 +9,7 @@ import {
   DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS,
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
   getContextDictionaryOutputFields,
+  KNOWN_TRANSLATORS,
 } from './defaults';
 import { lookupDefinitions } from './dictionaryService';
 import { parseRenderableExampleField } from './exampleFormatter';
@@ -16,6 +18,7 @@ import type { ContextLookupMode } from './modes';
 import { buildLookupPrompt, buildPerFieldPrompt, buildTranslationPrompt } from './promptBuilder';
 import { consumePrefetch } from './prefetchService';
 import { buildPopupContextBundle } from './popupRetrievalService';
+import { getPriorVolumes } from './seriesService';
 import { expandToWordBoundary } from './selectionExpander';
 import {
   finalizeTranslationWithContext,
@@ -32,12 +35,16 @@ import type {
   FieldSource,
   LookupAnnotationSlots,
   LookupExample,
+  LookupFieldProvenance,
+  LookupFieldProvenanceEntry,
   PopupContextBundle,
   PopupRetrievalHints,
+  ProvenanceValue,
   RetrievalStatus,
   TranslationOutputField,
   TranslationRequest,
   TranslationResult,
+  UserDictionary,
 } from './types';
 import { validateLookupResult, type ValidationDecision } from './validator';
 
@@ -48,8 +55,6 @@ export type LookupAvailabilityHint =
   | 'ai-request-failed'
   | 'partial-no-ai'
   | null;
-
-export type LookupFieldProvenance = Record<string, FieldSource | 'aiUnavailable' | 'empty'>;
 
 export interface LookupPipelineDebugInfo {
   systemPrompt: string;
@@ -96,6 +101,8 @@ export interface LookupPipelineRequest {
   preferredTranslationProvider?: TranslatorName;
   bookDoc?: BookDocType | null;
   developerMode?: boolean;
+  /** User dictionary metadata used for dictionary lookups. Supplied by the hook from settingsStore. */
+  userDictionaryMeta?: UserDictionary[];
 }
 
 export interface RunLookupPipelineOptions {
@@ -110,7 +117,65 @@ const EMPTY_RETRIEVAL_HINTS: PopupRetrievalHints = {
   missingSeriesAssignment: false,
 };
 
-const KNOWN_TRANSLATORS: readonly TranslatorName[] = ['deepl', 'azure', 'google', 'yandex'];
+async function buildLocalOnlyPopupContextBundle(
+  request: LookupPipelineRequest,
+  term: string,
+): Promise<PopupContextBundle> {
+  const localOnlySettings = {
+    ...request.settings,
+    sameBookRagEnabled: false,
+    priorVolumeRagEnabled: false,
+  };
+
+  const baseBundle = await buildPopupContextBundle({
+    bookKey: request.bookKey,
+    bookHash: request.bookHash,
+    currentPage: request.currentPage,
+    selectedText: term,
+    settings: localOnlySettings,
+    aiSettings: request.aiSettings,
+  }).catch(
+    () =>
+      ({
+        localPastContext: '',
+        localFutureBuffer: '',
+        sameBookChunks: [],
+        priorVolumeChunks: [],
+        retrievalStatus: 'local-only' as const,
+        retrievalHints: EMPTY_RETRIEVAL_HINTS,
+        dictionaryEntries: [],
+      }) satisfies PopupContextBundle,
+  );
+
+  const [currentVolumeIndexed, priorVolumes] = await Promise.all([
+    aiStore.isIndexed(request.bookHash).catch(() => false),
+    request.settings.priorVolumeRagEnabled
+      ? getPriorVolumes(request.bookHash).catch(() => [])
+      : Promise.resolve([] as Awaited<ReturnType<typeof getPriorVolumes>>),
+  ]);
+
+  const missingPriorVolumes: number[] = [];
+  for (const volume of priorVolumes) {
+    const indexed = await aiStore.isIndexed(volume.bookHash).catch(() => false);
+    if (!indexed) {
+      missingPriorVolumes.push(volume.volumeIndex);
+    }
+  }
+
+  return {
+    ...baseBundle,
+    sameBookChunks: [],
+    priorVolumeChunks: [],
+    retrievalStatus: 'local-only',
+    retrievalHints: {
+      ...baseBundle.retrievalHints,
+      currentVolumeIndexed,
+      missingLocalIndex: !currentVolumeIndexed,
+      missingPriorVolumes,
+      embeddingUnavailable: !detectAIAvailability(request.aiSettings).embedding,
+    },
+  };
+}
 
 function resolvePreferredTranslator(request: LookupPipelineRequest): TranslatorName | undefined {
   if (request.preferredTranslationProvider) {
@@ -185,12 +250,9 @@ function computeExamples(
   selectedText: string,
   targetLanguage: string,
 ): LookupExample[] {
-  return parseRenderableExampleField(
-    fields,
-    selectedText,
-    targetLanguage,
-    mode === 'dictionary' ? { allowIncomplete: true } : { allowIncomplete: true },
-  );
+  return parseRenderableExampleField(fields, selectedText, targetLanguage, {
+    allowIncomplete: true,
+  });
 }
 
 function mergeAiFields(
@@ -213,11 +275,15 @@ function finalizeFieldProvenance(
   fields: TranslationResult,
   fieldProvenance: LookupFieldProvenance,
 ): LookupFieldProvenance {
-  const finalized: LookupFieldProvenance = { ...fieldProvenance };
+  const finalized: Record<string, LookupFieldProvenanceEntry> = { ...fieldProvenance };
 
   for (const fieldId of requestedFieldIds) {
     if (finalized[fieldId]) continue;
-    finalized[fieldId] = fields[fieldId]?.trim() ? 'empty' : 'empty';
+    if (!fields[fieldId]?.trim()) {
+      finalized[fieldId] = { source: 'empty' };
+    }
+    // Fields with content but no recorded provenance are left unset;
+    // determineAvailabilityHint checks fields[] directly for content presence.
   }
 
   return finalized;
@@ -236,7 +302,7 @@ function determineAvailabilityHint(input: {
   }
 
   const hasFilledField = input.requestedFieldIds.some((fieldId) => input.fields[fieldId]?.trim());
-  const hasTranslatorTranslation = input.fieldProvenance['translation'] === 'translator';
+  const hasTranslatorTranslation = input.fieldProvenance['translation']?.source === 'translator';
 
   if (!input.aiAttempted && input.aiUnavailable) {
     if (!hasFilledField) {
@@ -252,7 +318,7 @@ function determineAvailabilityHint(input: {
 
   if (input.aiAttempted) {
     const aiUnavailableFieldExists = input.requestedFieldIds.some(
-      (fieldId) => input.fieldProvenance[fieldId] === 'aiUnavailable',
+      (fieldId) => input.fieldProvenance[fieldId]?.source === 'aiUnavailable',
     );
 
     return aiUnavailableFieldExists ? 'partial-no-ai' : 'ai-on';
@@ -271,19 +337,38 @@ function determineAvailabilityHint(input: {
 
 function resolvePrimaryField(
   outputFields: TranslationOutputField[],
+  fields: TranslationResult,
   mode: ContextLookupMode,
 ): string {
-  return (
-    outputFields.find((field) => field.enabled)?.id ??
-    (mode === 'dictionary' ? 'simpleDefinition' : 'translation')
-  );
+  if (mode === 'dictionary') {
+    // Dictionary lookups should validate on the definition/meaning fields first;
+    // source examples are supplemental and should not drive acceptance on their own.
+    const filledDictionaryField = ['simpleDefinition', 'contextualMeaning'].find((fieldId) =>
+      fields[fieldId]?.trim(),
+    );
+
+    if (filledDictionaryField) {
+      return filledDictionaryField;
+    }
+  }
+
+  if (mode === 'dictionary') {
+    return (
+      outputFields.find(
+        (field) =>
+          field.enabled && (field.id === 'simpleDefinition' || field.id === 'contextualMeaning'),
+      )?.id ?? 'simpleDefinition'
+    );
+  }
+
+  return outputFields.find((field) => field.enabled)?.id ?? 'translation';
 }
 
 function createBaseResult(input: {
   mode: ContextLookupMode;
   selectedText: string;
   targetLanguage: string;
-  outputFields: TranslationOutputField[];
+  validationOutputFields: TranslationOutputField[];
   fields: TranslationResult;
   fieldProvenance: LookupFieldProvenance;
   detectedLanguage: DetectedLanguageInfo;
@@ -293,7 +378,7 @@ function createBaseResult(input: {
   debug: LookupPipelineDebugInfo | null;
   annotations?: LookupAnnotationSlots;
 }): LookupPipelineResult {
-  const primaryField = resolvePrimaryField(input.outputFields, input.mode);
+  const primaryField = resolvePrimaryField(input.validationOutputFields, input.fields, input.mode);
   const validationDecision = validateLookupResult(
     input.fields,
     primaryField,
@@ -340,7 +425,7 @@ export async function runLookupPipeline(
       mode: request.mode,
       selectedText: '',
       targetLanguage: request.settings.targetLanguage,
-      outputFields: [],
+      validationOutputFields: [],
       fields: {},
       fieldProvenance: {},
       detectedLanguage: detectLookupLanguage('', request.bookLanguage),
@@ -370,8 +455,8 @@ export async function runLookupPipeline(
     dictionaryResults: Awaited<ReturnType<typeof lookupDefinitions>>;
     referenceDictionaryResults: Awaited<ReturnType<typeof lookupDefinitions>>;
   }> => {
-    const [bundle, dictionaryResults, referenceDictionaryResults] = await Promise.all([
-      consumePrefetch(request.bookHash, request.currentPage, term).then((prefetched) => {
+    const bundlePromise = consumePrefetch(request.bookHash, request.currentPage, term)
+      .then(async (prefetched) => {
         if (prefetched) {
           return prefetched;
         }
@@ -384,22 +469,28 @@ export async function runLookupPipeline(
           settings: request.settings,
           aiSettings: request.aiSettings,
         });
-      }),
-      shouldLookupDictionary
-        ? lookupDefinitions(term, sourceLanguage, request.settings.targetLanguage).catch(
-            () => [] as Awaited<ReturnType<typeof lookupDefinitions>>,
-          )
-        : Promise.resolve([] as Awaited<ReturnType<typeof lookupDefinitions>>),
-      shouldLookupDictionary
-        ? lookupDefinitions(term, sourceLanguage, request.settings.targetLanguage, {
-            maxMatchTier: 1,
-          }).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>)
-        : Promise.resolve([] as Awaited<ReturnType<typeof lookupDefinitions>>),
-    ]);
+      })
+      .catch(() => buildLocalOnlyPopupContextBundle(request, term));
+
+    const dictionaryLookupPromise = shouldLookupDictionary
+      ? lookupDefinitions(
+          term,
+          sourceLanguage,
+          request.settings.targetLanguage,
+          request.userDictionaryMeta ?? [],
+        ).catch(() => [] as Awaited<ReturnType<typeof lookupDefinitions>>)
+      : Promise.resolve([] as Awaited<ReturnType<typeof lookupDefinitions>>);
+
+    const [bundle, allResults] = await Promise.all([bundlePromise, dictionaryLookupPromise]);
+    const referenceDictionaryResults = allResults.filter(
+      (entry) =>
+        entry.headword.normalize('NFKC').trim().toLocaleLowerCase() ===
+        term.normalize('NFKC').trim().toLocaleLowerCase(),
+    );
 
     return {
       bundle,
-      dictionaryResults,
+      dictionaryResults: allResults,
       referenceDictionaryResults,
     };
   };
@@ -460,7 +551,7 @@ export async function runLookupPipeline(
     .map((entry) => entry.definition.trim())
     .filter(Boolean)
     .join('\n');
-  const dictionaryReferenceText = dictionaryResults
+  const dictionaryReferenceText = referenceDictionaryResults
     .map((entry) => `${entry.headword}: ${entry.definition}`.trim())
     .filter(Boolean)
     .join('\n');
@@ -482,7 +573,7 @@ export async function runLookupPipeline(
     }
 
     fields[fieldId] = dictionaryValue;
-    fieldProvenance[fieldId] = 'dictionary';
+    fieldProvenance[fieldId] = { source: 'dictionary' };
   }
 
   if (
@@ -500,7 +591,7 @@ export async function runLookupPipeline(
 
     if (translated.text.trim()) {
       fields['translation'] = translated.text.trim();
-      fieldProvenance['translation'] = 'translator';
+      fieldProvenance['translation'] = { source: 'translator' };
     }
   }
 
@@ -525,7 +616,7 @@ export async function runLookupPipeline(
       const examplesFieldValue = buildExamplesFieldValue(corpusExamples);
       for (const fieldId of corpusFieldIds) {
         fields[fieldId] = examplesFieldValue;
-        fieldProvenance[fieldId] = 'corpus';
+        fieldProvenance[fieldId] = { source: 'corpus' };
       }
     }
   }
@@ -627,7 +718,7 @@ export async function runLookupPipeline(
             const partialProvenance = { ...fieldProvenance };
             for (const fieldId of aiFieldIds) {
               if (partialFields[fieldId]?.trim() && !partialProvenance[fieldId]) {
-                partialProvenance[fieldId] = 'ai';
+                partialProvenance[fieldId] = { source: 'ai' };
               }
             }
 
@@ -698,7 +789,7 @@ export async function runLookupPipeline(
             const partialProvenance = { ...fieldProvenance };
             for (const fieldId of aiFieldIds) {
               if (partialFields[fieldId]?.trim() && !partialProvenance[fieldId]) {
-                partialProvenance[fieldId] = 'ai';
+                partialProvenance[fieldId] = { source: 'ai' };
               }
             }
 
@@ -741,6 +832,7 @@ export async function runLookupPipeline(
           model,
           abortSignal: options.signal,
           preDictionaryEntries: dictionaryEntries,
+          userDictionaryMeta: request.userDictionaryMeta ?? [],
           inferenceParams,
           systemPromptTemplate:
             request.mode === 'dictionary'
@@ -757,7 +849,7 @@ export async function runLookupPipeline(
         const mergedFields = mergeAiFields(fields, lookupResult.fields);
         for (const fieldId of aiFieldIds) {
           if (mergedFields[fieldId]?.trim() && !fieldProvenance[fieldId]) {
-            fieldProvenance[fieldId] = 'ai';
+            fieldProvenance[fieldId] = { source: 'ai' };
           }
         }
 
@@ -783,11 +875,12 @@ export async function runLookupPipeline(
 
   for (const fieldId of aiFieldIds) {
     if (!fields[fieldId]?.trim() && !fieldProvenance[fieldId]) {
-      fieldProvenance[fieldId] = aiFailed
+      const fallbackSource: ProvenanceValue = aiFailed
         ? 'aiUnavailable'
         : aiSettingsUnavailable
           ? 'aiUnavailable'
           : 'empty';
+      fieldProvenance[fieldId] = { source: fallbackSource };
     }
   }
 
@@ -805,7 +898,10 @@ export async function runLookupPipeline(
     mode: request.mode,
     selectedText: lookupText,
     targetLanguage: request.settings.targetLanguage,
-    outputFields,
+    validationOutputFields:
+      request.mode === 'dictionary'
+        ? getContextDictionaryOutputFields(dictionarySettings)
+        : outputFields,
     fields,
     fieldProvenance: finalizedProvenance,
     detectedLanguage,
@@ -814,7 +910,7 @@ export async function runLookupPipeline(
     aiUnavailable:
       aiFailed ||
       (aiSettingsUnavailable && aiFieldIds.length > 0) ||
-      finalizedProvenance['translation'] === 'aiUnavailable',
+      finalizedProvenance['translation']?.source === 'aiUnavailable',
     debug,
     annotations,
   });

@@ -4,6 +4,7 @@ import {
   Book,
   BookConfig,
   BookContent,
+  LoadBookContentOptions,
   BookFormat,
   BookNote,
   FIXED_LAYOUT_FORMATS,
@@ -29,6 +30,7 @@ import { ClosableFile } from '@/utils/file';
 import { TxtToEpubConverter } from '@/utils/txt';
 import { svg2png } from '@/utils/svg';
 import { normalizeMetadataIsbn } from '@/utils/isbn';
+import { loadAudioSyncGeneratedPackage } from '@/services/audioSync/storage';
 import { BookFileNotFoundError } from './errors';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 
@@ -445,8 +447,22 @@ export async function getBookFileSize(fs: FileSystem, book: Book): Promise<numbe
   return null;
 }
 
-export async function loadBookContent(fs: FileSystem, book: Book): Promise<BookContent> {
+export async function loadBookContent(
+  fs: FileSystem,
+  book: Book,
+  options: LoadBookContentOptions = {},
+): Promise<BookContent> {
   let file: File;
+  if (options.preferGeneratedPackage !== false && book.format === 'EPUB') {
+    const generatedPackage = await loadAudioSyncGeneratedPackage(fs, book);
+    if (
+      generatedPackage?.validation.valid &&
+      (await fs.exists(generatedPackage.packagePath, 'Books'))
+    ) {
+      file = await fs.openFile(generatedPackage.packagePath, 'Books');
+      return { book, file };
+    }
+  }
   const fp = getLocalBookFilename(book);
   if (await fs.exists(fp, 'Books')) {
     file = await fs.openFile(fp, 'Books');

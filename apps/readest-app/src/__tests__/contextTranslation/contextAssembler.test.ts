@@ -89,4 +89,21 @@ describe('assemblePopupLocalContext', () => {
 
     expect(result.localPastContext).toContain('\n');
   });
+
+  test('respects a token budget when the retained token starts at offset zero', () => {
+    const result = assemblePopupLocalContext(
+      [
+        { pageNumber: 1, text: 'Current page text.' },
+        { pageNumber: 2, text: 'alpha beta gamma.' },
+      ],
+      {
+        currentPage: 1,
+        windowSize: 1,
+        selectedText: 'missing',
+        lookAheadWords: 1,
+      },
+    );
+
+    expect(result.localFutureBuffer).toBe('alpha');
+  });
 });

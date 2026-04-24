@@ -29,7 +29,7 @@ function trimToTokenCount(text: string, tokenCount: number): string {
   }
 
   const lastMatch = matches[tokenCount - 1];
-  if (!lastMatch?.index) {
+  if (lastMatch?.index === undefined) {
     return text.trim();
   }
 

@@ -1,28 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const allowedOrigins = [
-  'https://web.readest.com',
-  'https://tauri.localhost',
-  'http://tauri.localhost',
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'tauri://localhost',
-];
-
 const corsOptions = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': '*',
   'Access-Control-Max-Age': '86400',
 };
 
-export function middleware(request: NextRequest) {
+const isLocalOrigin = (origin: string) => {
+  try {
+    const parsedOrigin = new URL(origin);
+
+    if (parsedOrigin.protocol === 'tauri:' && parsedOrigin.hostname === 'localhost') {
+      return true;
+    }
+
+    if (parsedOrigin.protocol !== 'http:' && parsedOrigin.protocol !== 'https:') {
+      return false;
+    }
+
+    return (
+      parsedOrigin.hostname === 'localhost' ||
+      parsedOrigin.hostname === '127.0.0.1' ||
+      parsedOrigin.hostname.endsWith('.localhost')
+    );
+  } catch {
+    return false;
+  }
+};
+
+const getAllowedOrigin = (request: NextRequest) => {
   const origin = request.headers.get('origin') ?? '';
-  const isAllowedOrigin = allowedOrigins.includes(origin);
+  if (!origin) {
+    return '';
+  }
+
+  if (origin === request.nextUrl.origin) {
+    return origin;
+  }
+
+  return isLocalOrigin(origin) ? origin : '';
+};
+
+export function middleware(request: NextRequest) {
+  const allowedOrigin = getAllowedOrigin(request);
 
   if (request.method === 'OPTIONS') {
     const preflightHeaders = new Headers({
       ...corsOptions,
-      ...(isAllowedOrigin && { 'Access-Control-Allow-Origin': origin }),
+      ...(allowedOrigin && { 'Access-Control-Allow-Origin': allowedOrigin }),
     });
 
     return new NextResponse(null, {
@@ -33,8 +58,8 @@ export function middleware(request: NextRequest) {
 
   const response = NextResponse.next();
 
-  if (isAllowedOrigin) {
-    response.headers.set('Access-Control-Allow-Origin', origin);
+  if (allowedOrigin) {
+    response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
   }
 
   Object.entries(corsOptions).forEach(([key, value]) => {

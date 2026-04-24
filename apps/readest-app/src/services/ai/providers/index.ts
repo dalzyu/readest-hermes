@@ -19,6 +19,7 @@ import {
   providerTypeSupportsEmbeddings,
   findProfileOrDefault,
 } from '../constants';
+import { isSupportedProviderType } from '../capabilities';
 import { TASK_INFERENCE_DEFAULTS } from '../types';
 
 export {
@@ -36,6 +37,10 @@ export {
 // ---------------------------------------------------------------------------
 
 export function createProviderFromConfig(config: ProviderConfig): AIProvider {
+  if (!isSupportedProviderType(config.providerType)) {
+    throw new Error(`Unknown provider type: ${config.providerType}`);
+  }
+
   switch (config.providerType) {
     case 'ollama':
       return new OllamaProvider(config);

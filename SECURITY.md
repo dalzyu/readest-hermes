@@ -64,12 +64,14 @@ Hermes is a cross-platform e-reader (macOS, Windows, Linux, Android, iOS, Web) b
 
 ## Supported Versions
 
-Hermes does not currently maintain separate release channels. Security updates are provided only for the latest release series.
+Hermes does not currently maintain separate release channels. Security updates are provided only for the current maintained Hermes line.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
-| < 0.1   | :x:                |
+| 0.3.x   | :white_check_mark: |
+| < 0.3   | :x:                |
+
+Older 0.1.x releases are unsupported.
 
 ## Reporting a Vulnerability
 

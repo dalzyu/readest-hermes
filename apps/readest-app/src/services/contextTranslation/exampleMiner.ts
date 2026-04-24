@@ -19,7 +19,30 @@ type RankedSentence = {
   score: number;
 };
 
-const wholeBookCache = new Map<string, RankedSentence[]>();
+class LRUCache<K, V> {
+  private readonly map = new Map<K, V>();
+
+  constructor(private readonly maxSize: number) {}
+
+  get(key: K): V | undefined {
+    if (!this.map.has(key)) return undefined;
+    const value = this.map.get(key)!;
+    this.map.delete(key);
+    this.map.set(key, value); // promote to MRU
+    return value;
+  }
+
+  set(key: K, value: V): void {
+    if (this.map.has(key)) this.map.delete(key);
+    if (this.map.size >= this.maxSize) {
+      // evict LRU (first inserted)
+      this.map.delete(this.map.keys().next().value!);
+    }
+    this.map.set(key, value);
+  }
+}
+
+const wholeBookCache = new LRUCache<string, RankedSentence[]>(5);
 
 function normalizeText(value: string): string {
   return value.trim().toLocaleLowerCase();

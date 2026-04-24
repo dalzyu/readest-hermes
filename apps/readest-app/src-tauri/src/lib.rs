@@ -23,6 +23,7 @@ use tauri_plugin_fs::FsExt;
 #[cfg(desktop)]
 use tauri::{Listener, Url};
 mod dir_scanner;
+mod audio_sync;
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 mod discord_rpc;
 #[cfg(target_os = "macos")]
@@ -170,6 +171,14 @@ pub fn run() {
             get_environment_variable,
             get_executable_dir,
             dir_scanner::read_dir,
+            audio_sync::commands::inspect_audio_metadata,
+            audio_sync::commands::import_audio_metadata,
+            audio_sync::commands::start_alignment_job,
+            audio_sync::commands::read_alignment_job_status,
+            audio_sync::commands::cancel_alignment_job,
+            audio_sync::runtime_manager::get_audio_sync_helper_status,
+            audio_sync::runtime_manager::install_audio_sync_helper,
+            audio_sync::runtime_manager::remove_audio_sync_helper,
             #[cfg(target_os = "macos")]
             macos::safari_auth::auth_with_safari,
             #[cfg(target_os = "macos")]
@@ -421,7 +430,7 @@ pub fn run() {
                     .decorations(false)
                     .visible(false)
                     .shadow(true)
-                    .title("Readest");
+                    .title("Hermes");
 
                 #[cfg(target_os = "windows")]
                 {

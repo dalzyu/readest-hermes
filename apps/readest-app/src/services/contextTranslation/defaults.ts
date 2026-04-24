@@ -1,3 +1,5 @@
+import type { TranslatorName } from '@/services/translators/providers';
+
 import type {
   ContextDictionaryFieldSources,
   ContextDictionarySettings,
@@ -6,6 +8,9 @@ import type {
   ContextTranslationSettings,
   TranslationOutputField,
 } from './types';
+/** Canonical list of known translator provider names. */
+export const KNOWN_TRANSLATORS: readonly TranslatorName[] = ['deepl', 'azure', 'google', 'yandex'];
+
 export { CONTEXT_LOOKUP_MODES } from './modes';
 
 export const DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS: ContextTranslationHarnessSettings = {
@@ -53,20 +58,27 @@ export const DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS: ContextTranslationHar
     'Source:',
     'Context:',
   ],
+  additionalContaminationMarkers: [],
+  additionalReasoningMarkers: [],
 };
 
 export function resolveContextTranslationHarnessSettings(
   harness?: Partial<ContextTranslationHarnessSettings>,
 ): ContextTranslationHarnessSettings {
+  const base = DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS;
   return {
-    ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
+    ...base,
     ...harness,
     flow: 'production',
+    // If a full override is explicitly provided, use it; otherwise merge defaults + additive extensions.
     contaminationMarkers:
-      harness?.contaminationMarkers ??
-      DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.contaminationMarkers,
+      harness?.contaminationMarkers != null
+        ? harness.contaminationMarkers
+        : [...base.contaminationMarkers, ...(harness?.additionalContaminationMarkers ?? [])],
     reasoningMarkers:
-      harness?.reasoningMarkers ?? DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.reasoningMarkers,
+      harness?.reasoningMarkers != null
+        ? harness.reasoningMarkers
+        : [...base.reasoningMarkers, ...(harness?.additionalReasoningMarkers ?? [])],
   };
 }
 
@@ -75,29 +87,17 @@ export const CONTEXT_TRANSLATION_HARNESS_PRESETS: Record<
   ContextTranslationHarnessSettings
 > = {
   balanced: DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
-  strictGemma: {
-    ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
-    contaminationMarkers: [
-      ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.contaminationMarkers,
-      'Here is',
-      '**',
-      '## ',
-    ],
-    reasoningMarkers: [
-      ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS.reasoningMarkers,
-      'Here is',
-      '**',
-      '## ',
-      'Step 1',
-      'First,',
-      'Note:',
-    ],
-  },
-  lenientQwen: {
-    ...DEFAULT_CONTEXT_TRANSLATION_HARNESS_SETTINGS,
+  // strictGemma: adds extra markers via additionalContaminationMarkers/additionalReasoningMarkers
+  // so callers get the full default list plus the Gemma-specific extras.
+  strictGemma: resolveContextTranslationHarnessSettings({
+    additionalContaminationMarkers: ['Here is', '**', '## '],
+    additionalReasoningMarkers: ['Here is', '**', '## ', 'Step 1', 'First,', 'Note:'],
+  }),
+  // lenientQwen: explicitly overrides the full marker list to a smaller lenient set.
+  lenientQwen: resolveContextTranslationHarnessSettings({
     contaminationMarkers: ['<channel|>', 'Thinking Process', 'Thought Process'],
     reasoningMarkers: ['Thinking Process', 'Thought Process', 'The user wants me'],
-  },
+  }),
 };
 
 export const DEFAULT_CONTEXT_TRANSLATION_FIELD_SOURCES: Required<ContextTranslationFieldSources> = {

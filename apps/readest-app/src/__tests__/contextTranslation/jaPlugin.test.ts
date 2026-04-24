@@ -1,4 +1,19 @@
-import { describe, expect, test, afterEach } from 'vitest';
+import { describe, expect, test, afterEach, vi } from 'vitest';
+
+const { mockInitJapaneseTokenizer } = vi.hoisted(() => ({
+  mockInitJapaneseTokenizer: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/services/contextTranslation/plugins/jpTokenizer', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/services/contextTranslation/plugins/jpTokenizer')
+  >('@/services/contextTranslation/plugins/jpTokenizer');
+  return {
+    ...actual,
+    initJapaneseTokenizer: mockInitJapaneseTokenizer,
+  };
+});
+
 import { jaPlugin } from '@/services/contextTranslation/plugins/jaPlugin';
 import { _setTokenizerForTest } from '@/services/contextTranslation/plugins/jpTokenizer';
 import type { IpadicToken, Tokenizer } from 'kuromoji';
@@ -30,6 +45,7 @@ function mockTokenizer(tokenMap: Record<string, IpadicToken[]>): Tokenizer {
 }
 
 afterEach(() => {
+  mockInitJapaneseTokenizer.mockClear();
   _setTokenizerForTest(null);
 });
 
@@ -38,24 +54,27 @@ describe('jaPlugin', () => {
     const annotations = jaPlugin.enrichSourceAnnotations?.({}, 'きっぷ');
 
     expect(annotations?.phonetic).toBe('kippu');
+    expect(mockInitJapaneseTokenizer).not.toHaveBeenCalled();
   });
 
   test('extends katakana long vowels in romaji output', () => {
     const annotations = jaPlugin.enrichSourceAnnotations?.({}, 'ゲーム');
 
     expect(annotations?.phonetic).toBe('geemu');
+    expect(mockInitJapaneseTokenizer).not.toHaveBeenCalled();
   });
 
-  test('returns undefined for kanji text when tokenizer not loaded', () => {
-    // Without kuromoji, kanji text cannot be romanized deterministically
+  test('returns undefined for kanji text when tokenizer not loaded and starts loading', () => {
     const annotations = jaPlugin.enrichSourceAnnotations?.({}, '食べる');
 
+    expect(mockInitJapaneseTokenizer).toHaveBeenCalledTimes(1);
     expect(annotations).toBeUndefined();
   });
 
-  test('returns undefined for pure kanji text when tokenizer not loaded', () => {
+  test('returns undefined for pure kanji text when tokenizer not loaded and starts loading', () => {
     const annotations = jaPlugin.enrichSourceAnnotations?.({}, '東京');
 
+    expect(mockInitJapaneseTokenizer).toHaveBeenCalledTimes(1);
     expect(annotations).toBeUndefined();
   });
 
@@ -99,6 +118,7 @@ describe('jaPlugin', () => {
 
     const annotations = jaPlugin.enrichSourceAnnotations?.({}, '食べる');
     expect(annotations?.phonetic).toBe('taberu');
+    expect(mockInitJapaneseTokenizer).not.toHaveBeenCalled();
   });
 
   test('romanizes kanji in examples when tokenizer is available', () => {
@@ -130,6 +150,7 @@ describe('jaPlugin', () => {
     );
 
     expect(annotations?.['1']?.phonetic).toBe('tabemono');
+    expect(mockInitJapaneseTokenizer).not.toHaveBeenCalled();
   });
 
   test('adds phonetic annotations to example text', () => {
@@ -139,14 +160,16 @@ describe('jaPlugin', () => {
     );
 
     expect(annotations?.['1']?.phonetic).toBe('suupaa');
+    expect(mockInitJapaneseTokenizer).not.toHaveBeenCalled();
   });
 
-  test('skips example annotations for kanji when tokenizer not loaded', () => {
+  test('skips example annotations for kanji when tokenizer not loaded and starts loading', () => {
     const annotations = jaPlugin.enrichExampleAnnotations?.(
       [{ exampleId: '1', sourceText: '食べ物', targetText: 'food' }],
       'source',
     );
 
+    expect(mockInitJapaneseTokenizer).toHaveBeenCalledTimes(1);
     expect(annotations).toBeUndefined();
   });
 

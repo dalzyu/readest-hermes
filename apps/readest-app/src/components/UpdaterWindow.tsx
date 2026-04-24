@@ -229,7 +229,7 @@ export const UpdaterContent = ({
             await downloadWithProgress(downloadUrl, exeFilePath, onEvent);
             try {
               console.log('Launching new executable:', exeFilePath);
-              const command = Command.create('start-readest', ['/C', 'start', '', exeFilePath]);
+              const command = Command.create('start-hermes', ['/C', 'start', '', exeFilePath]);
               await command.spawn();
               console.log('New executable launched, exiting current app...');
               setTimeout(async () => {

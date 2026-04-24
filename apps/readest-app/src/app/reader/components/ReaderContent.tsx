@@ -180,11 +180,11 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
   };
 
   const exitFocusMode = () => {
-    const primaryBookKey = bookKeys[0];
-    if (!primaryBookKey) return;
-    const primaryViewSettings = getViewSettings(primaryBookKey);
-    if (!primaryViewSettings?.focusMode) return;
-    setViewSettings(primaryBookKey, { ...primaryViewSettings, focusMode: false });
+    bookKeys.forEach((bookKey) => {
+      const viewSettings = getViewSettings(bookKey);
+      if (!viewSettings?.focusMode) return;
+      setViewSettings(bookKey, { ...viewSettings, focusMode: false });
+    });
   };
 
   const handleCloseBooks = throttle(async () => {
@@ -350,7 +350,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
       )
     );
   }
-  const chromeSuppressed = !!viewSettings.focusMode;
+  const chromeSuppressed = bookKeys.some((bookKey) => getViewSettings(bookKey)?.focusMode);
   return (
     <div className='reader-content full-height flex'>
       {!chromeSuppressed && <SideBar />}

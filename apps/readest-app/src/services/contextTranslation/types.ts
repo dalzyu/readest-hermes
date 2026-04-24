@@ -32,6 +32,16 @@ export interface ContextTranslationHarnessSettings {
   translationMaxWords: number;
   contaminationMarkers: string[];
   reasoningMarkers: string[];
+  /**
+   * Extra contamination markers merged with the defaults in `resolveContextTranslationHarnessSettings`.
+   * Use this to extend the default list without replicating it.
+   */
+  additionalContaminationMarkers?: string[];
+  /**
+   * Extra reasoning markers merged with the defaults in `resolveContextTranslationHarnessSettings`.
+   * Use this to extend the default list without replicating it.
+   */
+  additionalReasoningMarkers?: string[];
 }
 
 /** The parsed result from the LLM, keyed by field id */
@@ -53,13 +63,15 @@ export type LookupAnnotationSlots = {
   target?: LookupAnnotations;
 };
 
-export type RetrievalStatus = 'local-only' | 'local-volume' | 'cross-volume';
+/** 'idle' = no lookup has completed yet (pre-lookup initial state). */
+export type RetrievalStatus = 'idle' | 'local-only' | 'local-volume' | 'cross-volume';
 
 export type FieldSource = 'ai' | 'translator' | 'dictionary' | 'corpus';
+export type ProvenanceValue = FieldSource | 'aiUnavailable' | 'empty';
 
 export interface LookupFieldProvenanceEntry {
-  source: FieldSource;
-  language: string;
+  source: ProvenanceValue;
+  language?: string;
 }
 
 export type LookupFieldProvenance = Record<string, LookupFieldProvenanceEntry>;

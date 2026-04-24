@@ -27,6 +27,7 @@ import {
 import { UserStorageQuota, UserDailyTranslationQuota } from '@/types/quota';
 import { getDefaultMaxBlockSize, getDefaultMaxInlineSize } from '@/utils/config';
 import { stubTranslation as _ } from '@/utils/misc';
+import { getAppVersion } from '@/utils/version';
 import { DEFAULT_AI_SETTINGS } from './ai/constants';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from './contextTranslation/defaults';
 
@@ -55,6 +56,8 @@ export const BOOK_UNGROUPED_ID = '';
 
 export const SUPPORTED_IMAGE_EXTS = ['png', 'jpg', 'jpeg'];
 export const IMAGE_ACCEPT_FORMATS = SUPPORTED_IMAGE_EXTS.map((ext) => `.${ext}`).join(', ');
+export const SUPPORTED_AUDIO_EXTS = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'm4b'];
+export const AUDIO_ACCEPT_FORMATS = SUPPORTED_AUDIO_EXTS.map((ext) => `.${ext}`).join(', ');
 
 export const DEFAULT_KOSYNC_SETTINGS = {
   serverUrl: 'https://sync.koreader.rocks/', // https://kosync.ak-team.com:3042/
@@ -712,8 +715,8 @@ export const CLOUD_ENABLED = false;
 
 export const DOWNLOAD_READEST_URL = 'https://github.com/dalzyu/readest-hermes/releases/latest';
 
-export const HERMES_WEB_BASE_URL = 'https://web.readest.com';
-export const HERMES_NODE_BASE_URL = 'https://node.readest.com';
+export const HERMES_WEB_BASE_URL = '';
+export const HERMES_NODE_BASE_URL = '';
 
 const LATEST_DOWNLOAD_BASE_URL =
   'https://github.com/dalzyu/readest-hermes/releases/latest/download';
@@ -722,9 +725,9 @@ export const HERMES_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 
 export const HERMES_CHANGELOG_FILE = `${LATEST_DOWNLOAD_BASE_URL}/release-notes.json`;
 
-export const HERMES_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';
+export const HERMES_PUBLIC_STORAGE_BASE_URL = '';
 
-export const HERMES_OPDS_USER_AGENT = 'Hermes/0.1 (OPDS Browser)';
+export const HERMES_OPDS_USER_AGENT = 'Hermes/' + getAppVersion() + ' (OPDS Browser)';
 
 export const SYNC_PROGRESS_INTERVAL_SEC = 3;
 export const SYNC_NOTES_INTERVAL_SEC = 5;

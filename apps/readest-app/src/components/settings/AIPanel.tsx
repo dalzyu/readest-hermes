@@ -14,7 +14,11 @@ import HelpTip from '@/components/primitives/HelpTip';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
-import { createProviderFromConfig } from '@/services/ai/providers';
+import { createProviderFromConfig, getProviderForTask } from '@/services/ai/providers';
+import {
+  AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST,
+  SUPPORTED_PROVIDER_TYPES,
+} from '@/services/ai/capabilities';
 import {
   DEFAULT_AI_SETTINGS,
   DEFAULT_AI_PROFILE,
@@ -52,22 +56,6 @@ const PROVIDER_TYPE_LABELS: Record<AIProviderType, string> = {
   togetherai: 'Together AI',
   'ai-gateway': 'AI Gateway',
 };
-
-const PROVIDER_TYPES_ORDERED: AIProviderType[] = [
-  'ollama',
-  'openai',
-  'anthropic',
-  'google',
-  'openrouter',
-  'deepseek',
-  'mistral',
-  'groq',
-  'xai',
-  'cohere',
-  'fireworks',
-  'togetherai',
-  'ai-gateway',
-];
 
 const REQUIRES_API_KEY: Set<AIProviderType> = new Set([
   'openai',
@@ -134,7 +122,7 @@ function emptyConfig(providerType: AIProviderType): ProviderConfig {
             : providerType === 'ai-gateway'
               ? [
                   { id: 'google/gemini-2.5-flash-lite', kind: 'chat' },
-                  { id: 'openai/text-embedding-3-small', kind: 'embedding' },
+                  { id: AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST[0], kind: 'embedding' },
                 ]
               : [];
 
@@ -269,7 +257,7 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
               onChange({ ...fresh, id: config.id, name: config.name });
             }}
           >
-            {PROVIDER_TYPES_ORDERED.map((t) => (
+            {SUPPORTED_PROVIDER_TYPES.map((t) => (
               <option key={t} value={t}>
                 {PROVIDER_TYPE_LABELS[t]}
               </option>
@@ -381,7 +369,13 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
                     className='input input-bordered input-sm w-full'
                     value={model.id}
                     onChange={(e) => setModelEntry(index, { id: e.target.value })}
-                    list={config.providerType === 'ollama' ? 'ollama-model-options' : undefined}
+                    list={
+                      config.providerType === 'ollama'
+                        ? 'ollama-model-options'
+                        : config.providerType === 'ai-gateway' && model.kind === 'embedding'
+                          ? 'ai-gateway-embedding-model-options'
+                          : undefined
+                    }
                     placeholder='model-id'
                   />
                   <input
@@ -424,6 +418,13 @@ const ProviderForm: React.FC<ProviderFormProps> = ({
           {config.providerType === 'ollama' && ollamaModels.length > 0 && (
             <datalist id='ollama-model-options'>
               {ollamaModels.map((model) => (
+                <option key={model} value={model} />
+              ))}
+            </datalist>
+          )}
+          {config.providerType === 'ai-gateway' && (
+            <datalist id='ai-gateway-embedding-model-options'>
+              {AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST.map((model) => (
                 <option key={model} value={model} />
               ))}
             </datalist>
@@ -679,16 +680,28 @@ const AIPanel: React.FC = () => {
     setConnectionStatus('testing');
     setErrorMessage('');
 
-    const embeddingProviderId = modelAssignments.embedding?.providerId ?? activeProviderId;
+    const runtimeSettings: AISettings = {
+      ...aiSettings,
+      providers,
+      profiles: profilesState,
+      activeProfileId,
+    };
+    let embeddingProviderId = activeProviderId;
+    try {
+      embeddingProviderId = getProviderForTask(runtimeSettings, 'embedding').config.id;
+    } catch {
+      // Keep the active-provider fallback when no embedding route can be resolved.
+    }
     const requireEmbedding = embeddingProviderId === config.id;
     const chatModelId =
       modelAssignments.chat?.providerId === config.id
         ? modelAssignments.chat.modelId || resolveChatModelId(config)
         : resolveChatModelId(config);
-    const embeddingModelId =
-      modelAssignments.embedding?.providerId === config.id
+    const embeddingModelId = requireEmbedding
+      ? modelAssignments.embedding?.providerId === config.id
         ? modelAssignments.embedding.modelId || resolveEmbeddingModelId(config)
-        : resolveEmbeddingModelId(config);
+        : resolveEmbeddingModelId(config)
+      : undefined;
 
     if (requireEmbedding && !providerConfigCanServeEmbeddings(config)) {
       setConnectionStatus('error');

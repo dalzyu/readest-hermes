@@ -58,3 +58,13 @@ docs/
 
 /screenshots
 /.screenshots
+
+
+# Generated test data (large, machine-specific)
+.testdata/
+
+# Local WhisperX dev venv
+.venv-whisperx/
+# Python cache
+__pycache__/
+*.pyc

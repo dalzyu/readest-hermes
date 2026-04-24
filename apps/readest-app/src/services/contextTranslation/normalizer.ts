@@ -1,6 +1,15 @@
 import type { ContextLookupMode } from './modes';
 import type { TranslationResult } from './types';
 
+const KNOWN_FIELD_IDS = new Set([
+  'translation',
+  'contextualMeaning',
+  'examples',
+  'grammarHint',
+  'simpleDefinition',
+  'sourceExamples',
+]);
+
 const LOOKUP_JSON_REGEX = /<lookup_json>([\s\S]*?)<\/lookup_json>/u;
 const XML_TAG_REGEX = /<(\w+)>([\s\S]*?)<\/\1>/gu;
 
@@ -37,6 +46,11 @@ function parseJsonCandidate(candidate: string): Record<string, string> | null {
   }
 }
 
+function isValidLookupObject(parsed: Record<string, string>): boolean {
+  const keys = Object.keys(parsed);
+  return keys.length > 0 && keys.every((key) => KNOWN_FIELD_IDS.has(key));
+}
+
 /**
  * Extracts the <lookup_json>...</lookup_json> block from a raw LLM response.
  * Returns null if no sentinel block is found.
@@ -71,7 +85,7 @@ function extractLooseJsonObject(raw: string): Record<string, string> | null {
 
   for (const candidate of candidates) {
     const parsed = parseJsonCandidate(candidate);
-    if (parsed) return parsed;
+    if (parsed && isValidLookupObject(parsed)) return parsed;
   }
   return null;
 }
@@ -79,9 +93,14 @@ function extractLooseJsonObject(raw: string): Record<string, string> | null {
 /**
  * Parses XML-tagged fields from a raw LLM response as a fallback.
  * e.g. <translation>bonjour</translation> → { translation: 'bonjour' }
- * Falls back to raw text as 'translation' when no tags are found.
+/**
+ * Parses XML-tagged fields from a raw LLM response as a fallback.
+ * e.g. <translation>bonjour</translation> → { translation: 'bonjour' }
+ * Falls back to mode-appropriate field when no tags are found:
+ * - translation mode → 'translation'
+ * - dictionary mode → 'simpleDefinition'
  */
-function normalizeTaggedFallback(raw: string, _mode: ContextLookupMode): NormalizedLookupResult {
+function normalizeTaggedFallback(raw: string, mode: ContextLookupMode): NormalizedLookupResult {
   const result: NormalizedLookupResult = {};
   let match: RegExpExecArray | null;
 
@@ -95,7 +114,8 @@ function normalizeTaggedFallback(raw: string, _mode: ContextLookupMode): Normali
   }
 
   if (Object.keys(result).length === 0) {
-    result['translation'] = raw.trim();
+    const fallbackField = mode === 'dictionary' ? 'simpleDefinition' : 'translation';
+    result[fallbackField] = raw.trim();
   }
 
   return result;

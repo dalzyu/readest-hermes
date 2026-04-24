@@ -26,6 +26,7 @@ import { readingStatsService } from '@/services/readingStats/readingStatsService
 interface ViewState {
   /* Unique key for each book view */
   key: string;
+  bookHash: string;
   view: FoliateView | null;
   viewerKey: string;
   isPrimary: boolean;
@@ -241,6 +242,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         ...state.viewStates,
         [key]: {
           key: '',
+          bookHash: id,
           view: null,
           viewerKey: '',
           isPrimary: false,
@@ -344,6 +346,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           [key]: {
             ...state.viewStates[key],
             key,
+            bookHash: id,
             view: null,
             viewerKey: `${key}-${uniqueId()}`,
             isPrimary,
@@ -369,6 +372,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           [key]: {
             ...state.viewStates[key],
             key: '',
+            bookHash: id,
             view: null,
             viewerKey: '',
             isPrimary: false,
@@ -616,7 +620,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     const startedAt = viewState.sessionStartedAt;
     const secondsRead = Math.floor((endedAt - startedAt) / 1000);
     const pageDelta = Math.max(0, currentPage - sessionStartPage);
-    const bookHash = key.split('-')[0] || '';
+    const bookHash = viewState.bookHash;
 
     const recorded = readingStatsService.recordSession({
       bookHash,
@@ -642,3 +646,48 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     return recorded;
   },
 }));
+
+function flushActiveReadingSessions(): void {
+  const { viewStates, recordSession } = useReaderStore.getState();
+  Object.entries(viewStates).forEach(([key, viewState]) => {
+    const recorded = recordSession(key);
+    if (recorded || !viewState.sessionStartedAt) return;
+
+    useReaderStore.setState((state) => ({
+      viewStates: {
+        ...state.viewStates,
+        [key]: {
+          ...state.viewStates[key]!,
+          sessionStartedAt: null,
+          sessionStartPage: null,
+        },
+      },
+    }));
+  });
+}
+
+function resumeActiveReadingSessions(): void {
+  const { viewStates, setViewInited } = useReaderStore.getState();
+  Object.entries(viewStates).forEach(([key, viewState]) => {
+    if (viewState.view && viewState.inited && !viewState.sessionStartedAt) {
+      setViewInited(key, true);
+    }
+  });
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      flushActiveReadingSessions();
+      return;
+    }
+
+    if (document.visibilityState === 'visible') {
+      resumeActiveReadingSessions();
+    }
+  };
+
+  window.addEventListener('beforeunload', flushActiveReadingSessions);
+  window.addEventListener('pagehide', flushActiveReadingSessions);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+}

@@ -9,6 +9,8 @@ vi.mock('@/utils/misc', () => ({
   getOSPlatform: vi.fn(() => 'macos'),
 }));
 
+import packageJson from '../../../package.json';
+
 import {
   DATA_SUBDIR,
   LOCAL_BOOKS_SUBDIR,
@@ -847,12 +849,9 @@ describe('services/constants', () => {
       expect(DOWNLOAD_READEST_URL).toMatch(/^https:\/\//);
     });
 
-    it('HERMES_WEB_BASE_URL is a valid URL', () => {
-      expect(HERMES_WEB_BASE_URL).toMatch(/^https:\/\//);
-    });
-
-    it('HERMES_NODE_BASE_URL is a valid URL', () => {
-      expect(HERMES_NODE_BASE_URL).toMatch(/^https:\/\//);
+    it('HERMES base URLs stay blank until explicitly configured', () => {
+      expect(HERMES_WEB_BASE_URL).toBe('');
+      expect(HERMES_NODE_BASE_URL).toBe('');
     });
 
     it('HERMES_UPDATER_FILE is a URL ending with .json', () => {
@@ -865,13 +864,12 @@ describe('services/constants', () => {
       expect(HERMES_CHANGELOG_FILE).toMatch(/\.json$/);
     });
 
-    it('HERMES_PUBLIC_STORAGE_BASE_URL is a valid URL', () => {
-      expect(HERMES_PUBLIC_STORAGE_BASE_URL).toMatch(/^https:\/\//);
+    it('HERMES_PUBLIC_STORAGE_BASE_URL defaults to blank', () => {
+      expect(HERMES_PUBLIC_STORAGE_BASE_URL).toBe('');
     });
 
-    it('HERMES_OPDS_USER_AGENT is a non-empty string', () => {
-      expect(typeof HERMES_OPDS_USER_AGENT).toBe('string');
-      expect(HERMES_OPDS_USER_AGENT.length).toBeGreaterThan(0);
+    it('HERMES_OPDS_USER_AGENT tracks the app version', () => {
+      expect(HERMES_OPDS_USER_AGENT).toBe(`Hermes/${packageJson.version} (OPDS Browser)`);
     });
   });
 

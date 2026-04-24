@@ -8,10 +8,9 @@ export { isTokenizerReady };
 
 export type PhoneticResult = { value: string };
 
-// Pre-warm the tokenizer so it is ready when the user first selects text.
-// This is a no-op if the tokenizer is already loading / loaded.
-if (typeof window !== 'undefined') {
-  initJapaneseTokenizer().catch(() => {
+function warmTokenizerIfNeeded(): void {
+  if (typeof window === 'undefined' || isTokenizerReady()) return;
+  void initJapaneseTokenizer().catch(() => {
     /* dict load failure is non-fatal — we fall back to kana-only */
   });
 }
@@ -40,6 +39,7 @@ function safeRomaji(text: string): PhoneticResult {
     if (isTokenizerReady()) {
       return { value: getReadingRomaji(text) };
     }
+    warmTokenizerIfNeeded();
     return { value: '' }; // tokenizer warming up
   }
   const romaji = toRomaji(text).trim();

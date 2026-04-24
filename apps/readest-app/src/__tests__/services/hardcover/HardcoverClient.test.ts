@@ -1,4 +1,12 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+
+vi.mock('@/services/environment', () => ({
+  isTauriAppPlatform: vi.fn(() => false),
+}));
+vi.mock('@tauri-apps/plugin-http', () => ({
+  fetch: vi.fn(),
+}));
+
 import { HardcoverClient } from '@/services/hardcover/HardcoverClient';
 import type { HardcoverSyncMapStore } from '@/services/hardcover/HardcoverSyncMapStore';
 import type { Book, BookConfig, BookNote } from '@/types/book';
@@ -70,6 +78,12 @@ describe('HardcoverClient', () => {
 
     client = new HardcoverClient(mockSettings, mockMapStore);
     clientApi = client as unknown as HardcoverClientTestApi;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   test('should normalize accessToken correctly', () => {

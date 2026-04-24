@@ -124,8 +124,8 @@ interface KeyDownInterceptor {
 )
 class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
     private val implementation = NativeBridge()
-    private var redirectScheme = "readest"
-    private var redirectHost = "auth-callback"
+    private val redirectScheme = "hermes"
+    private val redirectHost = "auth-callback"
     private val billingManager by lazy {
         BillingManager(activity)
     }
@@ -153,7 +153,8 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
         val uri = intent?.data ?: return
         Log.e("NativeBridgePlugin", "Received intent: $uri")
         when {
-          uri.scheme == "readest" && uri.host == "auth-callback" -> {
+          uri.scheme == redirectScheme &&
+            uri.host == redirectHost -> {
               val result = JSObject().apply {
                   put("redirectUrl", uri.toString())
               }

@@ -130,6 +130,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('VocabularyPanel review workflow', () => {
@@ -268,6 +270,81 @@ describe('VocabularyPanel review workflow', () => {
     await screen.findByText('solo');
     expect(screen.getByPlaceholderText('Search vocabulary...')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Reveal answer' })).toBeNull();
+  });
+
+  test('refreshes saved vocabulary and due count after a vocabulary update event for the current book', async () => {
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    await screen.findByRole('button', { name: 'Review (3)' });
+
+    const freshEntry: VocabularyEntry = {
+      id: 'delta-id',
+      bookHash: 'book-hash',
+      term: 'delta',
+      context: 'delta context',
+      result: { translation: 'delta answer', contextualMeaning: 'delta meaning' },
+      addedAt: 4000,
+      reviewCount: 0,
+    };
+
+    mockGetVocabularyForBook.mockResolvedValueOnce([...entries, freshEntry]);
+    mockGetDueVocabularyForBook.mockResolvedValueOnce([...entries, freshEntry]);
+
+    await act(async () => {
+      await eventDispatcher.dispatch('vocabulary-updated', { bookHash: 'book-hash' });
+    });
+
+    await screen.findByRole('button', { name: 'Review (4)' });
+    expect(screen.getByText('delta')).toBeTruthy();
+  });
+
+  test('plays the current book key when listening mode speaks the term', async () => {
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    await screen.findByRole('button', { name: 'Review (3)' });
+    fireEvent.click(screen.getByRole('button', { name: 'Review (3)' }));
+    await screen.findByRole('button', { name: 'Exit review' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Listen' }));
+
+    const dispatchSpy = vi.spyOn(eventDispatcher, 'dispatch').mockResolvedValue(undefined);
+    fireEvent.click(screen.getByTitle('Listen'));
+
+    expect(dispatchSpy).toHaveBeenCalledWith('tts-speak', {
+      bookKey: 'book-key',
+      text: 'alpha',
+      oneTime: true,
+    });
+  });
+
+  test('populates multiple-choice options when switching into MC mode during review', async () => {
+    render(<VocabularyPanel bookKey='book-key' bookHash='book-hash' />);
+
+    await screen.findByRole('button', { name: 'Review (3)' });
+    fireEvent.click(screen.getByRole('button', { name: 'Review (3)' }));
+    await screen.findByRole('button', { name: 'Exit review' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'MC' }));
+
+    const correctChoice = await screen.findByRole('button', { name: 'alpha answer' });
+    expect(correctChoice.hasAttribute('disabled')).toBe(false);
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(correctChoice);
+      expect(mockMarkVocabularyEntryReviewed).toHaveBeenCalledWith(entries[0], 4);
+
+      await act(async () => {
+        await Promise.resolve();
+        vi.advanceTimersByTime(800);
+        await Promise.resolve();
+      });
+
+      expect(screen.getByText('beta context')).toBeTruthy();
+      expect(screen.queryByText('alpha context')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -85,13 +85,14 @@ const ContextTranslationPopup: React.FC<ContextTranslationPopupProps> = ({
     bookLanguage,
   });
 
-  const source = settings.source ?? 'ai';
+  const source = settings.fieldSources?.translation ?? 'ai';
 
   // Map source key 鈫?display label for the "Translation" field header
   // Non-AI sources show "Translation (Source)" so the user knows which provider was used
   const sourceLabels: Record<string, string> = {
     ai: _('Translation'),
     dictionary: `${_('Translation')} (${_('Dictionary')})`,
+    translator: `${_('Translation')} (${_('Translator')})`,
   };
 
   const enabledFields = settings.outputFields

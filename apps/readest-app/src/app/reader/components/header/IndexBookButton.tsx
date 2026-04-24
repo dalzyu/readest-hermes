@@ -109,11 +109,8 @@ const IndexBookButton: React.FC<IndexBookButtonProps> = ({ bookKey }) => {
       return;
     }
 
-    const hash = getBookData(bookKey)?.book?.hash;
-    if (hash) {
-      cancelBookIndexing(hash);
-    }
     if (progress) {
+      cancelBookIndexing(progress.runId);
       cancelIndexing(bookKey, progress.runId);
     }
   };

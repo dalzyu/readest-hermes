@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type {
   TranslationOutputField,
   TranslationRequest,
+  TranslationStreamResult,
 } from '@/services/contextTranslation/types';
 
 vi.mock('@/services/contextTranslation/llmClient', () => ({
@@ -13,6 +14,7 @@ vi.mock('@/services/contextTranslation/llmClient', () => ({
 import { callLLM, streamLLM } from '@/services/contextTranslation/llmClient';
 import {
   streamLookupWithContext,
+  streamPerFieldTranslation,
   streamTranslationWithContext,
   translateWithContext,
 } from '@/services/contextTranslation/translationService';
@@ -511,5 +513,88 @@ describe('streamTranslationWithContext', () => {
     expect(updates.at(-1)!.fields['examples']).toBe(
       '1. 知己难逢\nPinyin: zhī jǐ nán féng\nEnglish: True friends are hard to find.',
     );
+  });
+});
+
+describe('streamPerFieldTranslation', () => {
+  test('yields partial results and final merged fields without polling', async () => {
+    mockStreamLLM
+      .mockImplementationOnce(async function* () {
+        yield 'close';
+        yield ' friend';
+      })
+      .mockImplementationOnce(async function* () {
+        yield 'trusted';
+        yield ' ally';
+      });
+
+    const updates: TranslationStreamResult[] = [];
+
+    for await (const update of streamPerFieldTranslation(baseRequest, 'mock-model' as never)) {
+      updates.push(update);
+    }
+
+    const partialUpdates = updates.filter((update) => !update.done);
+    const finalUpdate = updates.at(-1)!;
+
+    expect(partialUpdates.length).toBeGreaterThanOrEqual(4);
+    expect(finalUpdate.done).toBe(true);
+    expect(finalUpdate.fields['translation']).toBe('close friend');
+    expect(finalUpdate.fields['contextualMeaning']).toBe('trusted ally');
+  });
+
+  test('rethrows AbortError from one field and skips the final merged snapshot', async () => {
+    const abortError = new Error('Aborted');
+    abortError.name = 'AbortError';
+
+    mockStreamLLM
+      .mockImplementationOnce(async function* () {
+        yield 'close';
+        throw abortError;
+      })
+      .mockImplementationOnce(async function* () {
+        yield 'trusted ally';
+      });
+
+    const updates: TranslationStreamResult[] = [];
+    const streamPromise = (async () => {
+      for await (const update of streamPerFieldTranslation(baseRequest, 'mock-model' as never)) {
+        updates.push(update);
+      }
+    })();
+
+    await expect(streamPromise).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(updates.some((update) => update.fields['translation']?.includes('close') === true)).toBe(
+      true,
+    );
+    expect(updates.some((update) => update.done)).toBe(false);
+  });
+
+  test('rethrows field-stream errors after yielding partial updates and skips the final merged snapshot', async () => {
+    const fieldError = new Error('Field stream failed');
+
+    mockStreamLLM
+      .mockImplementationOnce(async function* () {
+        yield 'close';
+        throw fieldError;
+      })
+      .mockImplementationOnce(async function* () {
+        yield 'trusted ally';
+      });
+
+    const updates: TranslationStreamResult[] = [];
+    const streamPromise = (async () => {
+      for await (const update of streamPerFieldTranslation(baseRequest, 'mock-model' as never)) {
+        updates.push(update);
+      }
+    })();
+
+    await expect(streamPromise).rejects.toThrow('Field stream failed');
+
+    expect(updates.some((update) => update.fields['translation']?.includes('close') === true)).toBe(
+      true,
+    );
+    expect(updates.some((update) => update.done)).toBe(false);
   });
 });

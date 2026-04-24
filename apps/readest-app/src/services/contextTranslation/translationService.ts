@@ -365,59 +365,83 @@ export async function* streamPerFieldTranslation(
     .filter((f) => f.enabled)
     .sort((a, b) => a.order - b.order);
 
-  // Shared mutable state — each field updates its slot
-  const merged: TranslationResult = {};
-  let latestActiveFieldId: string | null = null;
+  if (enabledFields.length === 0) {
+    yield { fields: {}, activeFieldId: null, rawText: '', done: true };
+    return;
+  }
 
-  // Launch one stream per field
-  const fieldStreams = enabledFields.map(async (field) => {
+  const merged: TranslationResult = {};
+
+  let notifyResolve: (() => void) | null = null;
+  const notify = () => {
+    notifyResolve?.();
+    notifyResolve = null;
+  };
+  const waitForUpdate = () =>
+    new Promise<void>((resolve) => {
+      notifyResolve = resolve;
+    });
+
+  type PendingYield =
+    | { done: false; fields: TranslationResult; activeFieldId: string }
+    | { done: true; fields: TranslationResult };
+  const pending: PendingYield[] = [];
+
+  let settledFields = 0;
+
+  const fieldTasks = enabledFields.map(async (field) => {
     const { systemPrompt, userPrompt } = buildPerFieldPrompt(field, request);
     let fieldText = '';
 
-    for await (const chunk of streamLLM(
-      systemPrompt,
-      userPrompt,
-      model,
-      abortSignal,
-      request.inferenceParams,
-    )) {
-      fieldText += chunk;
-      merged[field.id] = fieldText.trim();
-      latestActiveFieldId = field.id;
-    }
+    try {
+      for await (const chunk of streamLLM(
+        systemPrompt,
+        userPrompt,
+        model,
+        abortSignal,
+        request.inferenceParams,
+      )) {
+        fieldText += chunk;
+        merged[field.id] = fieldText.trim();
+        pending.push({ done: false, fields: { ...merged }, activeFieldId: field.id });
+        notify();
+      }
 
-    // Mark field done with final trim
-    merged[field.id] = fieldText.trim();
+      merged[field.id] = fieldText.trim();
+    } finally {
+      settledFields += 1;
+      if (settledFields === enabledFields.length) {
+        pending.push({ done: true, fields: { ...merged } });
+        notify();
+      }
+    }
   });
 
-  // Poll merged results while any stream is still running
-  const allDone = Promise.all(fieldStreams);
-  let settled = false;
-  allDone
-    .then(() => {
-      settled = true;
-    })
-    .catch(() => {
-      settled = true;
-    });
+  const allDone = Promise.all(fieldTasks);
+  void allDone.catch(() => undefined);
 
-  while (!settled) {
-    // Yield current snapshot
-    yield {
-      fields: formatLookupResult({ ...merged }, { ...request, mode: 'translation' }),
-      activeFieldId: latestActiveFieldId,
-      rawText: '', // individual raw texts not meaningful in multi mode
-      done: false,
-    };
-    // Brief pause to batch updates instead of busy-looping
-    await new Promise((resolve) => setTimeout(resolve, 50));
+  while (true) {
+    while (pending.length > 0) {
+      const item = pending.shift()!;
+      if (item.done) {
+        await allDone;
+        yield {
+          fields: formatLookupResult(item.fields, { ...request, mode: 'translation' }),
+          activeFieldId: null,
+          rawText: '',
+          done: true,
+        };
+        return;
+      }
+
+      yield {
+        fields: formatLookupResult(item.fields, { ...request, mode: 'translation' }),
+        activeFieldId: item.activeFieldId,
+        rawText: '',
+        done: false,
+      };
+    }
+
+    await waitForUpdate();
   }
-
-  // Yield final merged result
-  yield {
-    fields: formatLookupResult({ ...merged }, { ...request, mode: 'translation' }),
-    activeFieldId: null,
-    rawText: '',
-    done: true,
-  };
 }

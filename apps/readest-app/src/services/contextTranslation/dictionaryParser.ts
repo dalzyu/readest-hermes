@@ -9,7 +9,11 @@ export function parseIfo(buffer: Uint8Array): {
   wordcount: number;
   sametypesequence?: string;
 } {
-  const text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  const utf8Buffer =
+    buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf
+      ? buffer.subarray(3)
+      : buffer;
+  const text = new TextDecoder('utf-8', { fatal: true }).decode(utf8Buffer);
   const lines = text.split(/\r?\n/);
 
   const parsed: Record<string, string> = {};
@@ -59,6 +63,7 @@ export function parseStarDict(buffers: {
   const entries: DictionaryEntry[] = [];
   const idx = buffers.idx;
   const dict = buffers.dict;
+  const idxView = new DataView(idx.buffer, idx.byteOffset, idx.byteLength);
 
   let offset = 0;
 
@@ -76,24 +81,19 @@ export function parseStarDict(buffers: {
     offset = termEnd + 1; // skip null terminator
 
     // Read 4-byte big-endian offset
-    if (offset + 4 > idx.length) break;
-    const entryOffset =
-      ((idx[offset] ?? 0) << 24) |
-      ((idx[offset + 1] ?? 0) << 16) |
-      ((idx[offset + 2] ?? 0) << 8) |
-      (idx[offset + 3] ?? 0);
+    if (offset + 4 > idxView.byteLength) break;
+    const entryOffset = idxView.getUint32(offset, false);
     offset += 4;
 
     // Read 4-byte big-endian size
-    if (offset + 4 > idx.length) break;
-    const size =
-      ((idx[offset] ?? 0) << 24) |
-      ((idx[offset + 1] ?? 0) << 16) |
-      ((idx[offset + 2] ?? 0) << 8) |
-      (idx[offset + 3] ?? 0);
+    if (offset + 4 > idxView.byteLength) break;
+    const size = idxView.getUint32(offset, false);
     offset += 4;
 
-    // Slice dict buffer
+    if (entryOffset + size > dict.length) {
+      throw new Error(`Dictionary entry '${headword}' is out of bounds`);
+    }
+
     const definitionBytes = dict.slice(entryOffset, entryOffset + size);
     let definition = new TextDecoder('utf-8', { fatal: true }).decode(definitionBytes);
 
@@ -125,7 +125,7 @@ export function parseStarDict(buffers: {
 export async function extractFromZip(
   zipBuffer: Uint8Array,
 ): Promise<{ ifo: Uint8Array; idx: Uint8Array; dict: Uint8Array }> {
-  const { unzip } = await import('fflate');
+  const { unzip, gunzip } = await import('fflate');
 
   return new Promise((resolve, reject) => {
     unzip(zipBuffer, (err, files) => {
@@ -136,7 +136,8 @@ export async function extractFromZip(
 
       let ifoBuffer: Uint8Array | undefined;
       let idxBuffer: Uint8Array | undefined;
-      let dictBuffer: Uint8Array | undefined;
+      let plainDictBuffer: Uint8Array | undefined;
+      let compressedDictBufferPromise: Promise<Uint8Array> | undefined;
 
       for (const [filename, file] of Object.entries(files)) {
         if (!file) continue;
@@ -145,16 +146,43 @@ export async function extractFromZip(
           ifoBuffer = file;
         } else if (filename.endsWith('.idx')) {
           idxBuffer = file;
-        } else if (filename.endsWith('.dict.dz') || filename.endsWith('.dict')) {
-          dictBuffer = file;
+        } else if (filename.endsWith('.dict.dz')) {
+          compressedDictBufferPromise = new Promise((resolve, reject) => {
+            gunzip(file, (gunzipErr, data) => {
+              if (gunzipErr) {
+                reject(new Error(`Failed to decompress ${filename}: ${gunzipErr.message}`));
+                return;
+              }
+              resolve(data);
+            });
+          });
+        } else if (filename.endsWith('.dict')) {
+          plainDictBuffer = file;
         }
       }
 
-      if (!ifoBuffer) throw new Error('.ifo file not found in zip');
-      if (!idxBuffer) throw new Error('.idx file not found in zip');
-      if (!dictBuffer) throw new Error('.dict or .dict.dz file not found in zip');
+      if (!ifoBuffer) {
+        reject(new Error('.ifo file not found in zip'));
+        return;
+      }
+      if (!idxBuffer) {
+        reject(new Error('.idx file not found in zip'));
+        return;
+      }
 
-      resolve({ ifo: ifoBuffer, idx: idxBuffer, dict: dictBuffer });
+      const dictBufferPromise =
+        compressedDictBufferPromise ??
+        (plainDictBuffer ? Promise.resolve(plainDictBuffer) : undefined);
+
+      if (!dictBufferPromise) {
+        reject(new Error('.dict or .dict.dz file not found in zip'));
+        return;
+      }
+
+      const ifo = ifoBuffer;
+      const idx = idxBuffer;
+
+      dictBufferPromise.then((dictBuffer) => resolve({ ifo, idx, dict: dictBuffer }), reject);
     });
   });
 }

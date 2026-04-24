@@ -227,7 +227,7 @@ describe('Import series suggestions', () => {
   });
 });
 
-describe('buildImportSeriesSuggestions — non-ASCII titles and authors', () => {
+describe('buildImportSeriesSuggestions — multilingual normalization', () => {
   const makeBook = (overrides: Partial<Book> = {}): Book => ({
     hash: 'book-' + Math.random().toString(36).slice(2),
     format: 'EPUB' as const,
@@ -238,7 +238,7 @@ describe('buildImportSeriesSuggestions — non-ASCII titles and authors', () => 
     ...overrides,
   });
 
-  const makeSeries = (name: string, _author: string, volumes: string[]): BookSeries => ({
+  const makeSeries = (name: string, volumes: string[]): BookSeries => ({
     id: 'series-' + Math.random().toString(36).slice(2),
     name,
     volumes: volumes.map((hash, i) => ({ bookHash: hash, volumeIndex: i + 1 })),
@@ -246,38 +246,39 @@ describe('buildImportSeriesSuggestions — non-ASCII titles and authors', () => 
     updatedAt: 1,
   });
 
-  test('CJK title — non-ASCII characters are stripped, no suggestion produced', () => {
-    // normalizeSuggestionText uses /[^a-z0-9]+/gi which drops CJK characters.
-    // Without an ASCII title, titleMatches is false → no suggestion.
-    const importedBook = makeBook({ title: '三体', author: 'Liu Cixin' });
-    const series: BookSeries[] = [makeSeries('Three Body', 'Liu Cixin', ['existing-1'])];
-    const library: Book[] = [
-      makeBook({ hash: 'existing-1', title: 'Three Body 1', author: 'Liu Cixin' }),
-    ];
+  test.each([
+    {
+      label: 'CJK',
+      title: '三体 2',
+      author: '刘慈欣',
+      seriesName: '三体',
+      existingTitle: '三体 1',
+    },
+    {
+      label: 'Cyrillic',
+      title: 'Война и мир 2',
+      author: 'Лев Толстой',
+      seriesName: 'Война и мир',
+      existingTitle: 'Война и мир 1',
+    },
+    {
+      label: 'Arabic',
+      title: 'ثلاثية غرناطة 2',
+      author: 'رضوى عاشور',
+      seriesName: 'ثلاثية غرناطة',
+      existingTitle: 'ثلاثية غرناطة 1',
+    },
+  ] as const)(
+    '$label titles and authors produce a suggestion',
+    ({ title, author, seriesName, existingTitle }) => {
+      const importedBook = makeBook({ title, author });
+      const series: BookSeries[] = [makeSeries(seriesName, ['existing-1'])];
+      const library: Book[] = [makeBook({ hash: 'existing-1', title: existingTitle, author })];
 
-    const suggestions = buildImportSeriesSuggestions([importedBook], series, library);
-    expect(suggestions).toHaveLength(0);
-  });
-
-  test('Arabic author name — non-ASCII characters stripped, no author match', () => {
-    const importedBook = makeBook({ title: 'Cosmos 2', author: 'كارل ساغان' });
-    const series: BookSeries[] = [makeSeries('Cosmos', 'Carl Sagan', ['existing-1'])];
-    const library: Book[] = [
-      makeBook({ hash: 'existing-1', title: 'Cosmos 1', author: 'Carl Sagan' }),
-    ];
-
-    const suggestions = buildImportSeriesSuggestions([importedBook], series, library);
-    expect(suggestions).toHaveLength(0);
-  });
-
-  test('Cyrillic title — normalized to empty, no match', () => {
-    const importedBook = makeBook({ title: 'Война и мир', author: 'Leo Tolstoy' });
-    const series: BookSeries[] = [makeSeries('War and Peace', 'Leo Tolstoy', ['existing-1'])];
-    const library: Book[] = [
-      makeBook({ hash: 'existing-1', title: 'War and Peace 1', author: 'Leo Tolstoy' }),
-    ];
-
-    const suggestions = buildImportSeriesSuggestions([importedBook], series, library);
-    expect(suggestions).toHaveLength(0);
-  });
+      const suggestions = buildImportSeriesSuggestions([importedBook], series, library);
+      expect(suggestions).toHaveLength(1);
+      expect(suggestions[0]?.series.name).toBe(seriesName);
+      expect(suggestions[0]?.suggestedVolumeIndex).toBe(2);
+    },
+  );
 });

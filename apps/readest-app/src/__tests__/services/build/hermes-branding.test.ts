@@ -21,6 +21,7 @@ describe('Hermes branding copy', () => {
     );
     const koSyncSettings = readRepoFile('apps/readest-app/src/app/reader/components/KOSyncSettings.tsx');
     const commandRegistry = readRepoFile('apps/readest-app/src/services/commandRegistry.ts');
+    const nativeLib = readRepoFile('apps/readest-app/src-tauri/src/lib.rs');
     const nav = readRepoFile('apps/readest-app/src/utils/nav.ts');
 
     expect(layout).toContain("const title = 'Hermes");
@@ -44,6 +45,7 @@ describe('Hermes branding copy', () => {
     expect(commandRegistry).toContain("About Hermes");
     expect(commandRegistry).toContain("Help improve Hermes");
     expect(nav).toContain("title: appService.isMacOSApp ? '' : 'Hermes'");
+    expect(nativeLib).toContain('.title("Hermes")');
   });
 
   test('upstream links keep original-project attribution in visible text', () => {
@@ -70,6 +72,20 @@ describe('Hermes branding copy', () => {
     const constants = readRepoFile('apps/readest-app/src/services/constants.ts');
     expect(constants).toContain("'Hermes/");
     expect(constants).not.toMatch(/READEST_OPDS_USER_AGENT\s*=\s*'Readest\//);
+  });
+
+  test('build tooling targets the Hermes crate name', () => {
+    const cargoToml = readRepoFile('apps/readest-app/src-tauri/Cargo.toml');
+    const { scripts } = JSON.parse(readRepoFile('apps/readest-app/package.json')) as {
+      scripts: Record<string, string>;
+    };
+    const workflow = readRepoFile('.github/workflows/pull-request.yml');
+
+    expect(cargoToml).toContain('name = "Hermes"');
+    expect(cargoToml).not.toContain('name = "Readest"');
+    expect(scripts['fmt:check']).toBe('cargo fmt -p Hermes --check');
+    expect(scripts['clippy:check']).toBe('cargo clippy -p Hermes --no-deps -- -D warnings');
+    expect(workflow).toContain('cargo clippy -p Hermes --no-deps -- -D warnings');
   });
 
   test('SECURITY.md references Hermes, not Readest', () => {

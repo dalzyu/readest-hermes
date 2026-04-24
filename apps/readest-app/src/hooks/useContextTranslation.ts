@@ -1,4 +1,4 @@
-import { useContextLookup, type UseContextLookupResult } from './useContextLookup';
+import { useLookupPipeline, type UseContextLookupResult } from './useLookupPipeline';
 import type { ContextTranslationSettings } from '@/services/contextTranslation/types';
 
 interface UseContextTranslationOptions {
@@ -20,7 +20,7 @@ export function useContextTranslation({
   settings,
   bookLanguage,
 }: UseContextTranslationOptions): UseContextTranslationResult {
-  return useContextLookup({
+  return useLookupPipeline({
     mode: 'translation',
     bookKey,
     bookHash,

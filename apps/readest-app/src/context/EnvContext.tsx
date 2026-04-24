@@ -13,14 +13,29 @@ interface EnvContextType {
 
 const EnvContext = createContext<EnvContextType | undefined>(undefined);
 
+// Coalesce React strict-mode double mounts and concurrent bootstrap calls so startup stays single-flight.
+let appServiceInitPromise: Promise<AppService> | null = null;
+
+const initializeAppService = (envConfig: EnvConfigType): Promise<AppService> => {
+  if (!appServiceInitPromise) {
+    appServiceInitPromise = (async () => {
+      await runHermesMigration();
+      return envConfig.getAppService();
+    })().finally(() => {
+      appServiceInitPromise = null;
+    });
+  }
+
+  return appServiceInitPromise;
+};
+
 export const EnvProvider = ({ children }: { children: ReactNode }) => {
   const [envConfig] = useState<EnvConfigType>(env);
   const [appService, setAppService] = useState<AppService | null>(null);
 
   React.useEffect(() => {
     const init = async () => {
-      await runHermesMigration();
-      const service = await envConfig.getAppService();
+      const service = await initializeAppService(envConfig);
       setAppService(service);
     };
     void init();

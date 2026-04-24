@@ -1,5 +1,12 @@
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, test } from 'vitest';
 import packageJson from '../../../../package.json';
+
+const repoRoot = path.resolve(import.meta.dirname, '../../../../../..');
+const appdataXmlPath = path.join(repoRoot, 'data/metainfo/appdata.xml');
+const appdataChecksumPath = path.join(repoRoot, 'data/metainfo/appdata.xml.sha256');
 
 describe('package build scripts', () => {
   test('keeps upstream canonical script names', () => {
@@ -66,6 +73,13 @@ describe('package build scripts', () => {
     expect(packageJson.scripts['check:lookbehind-regex']).toContain(
       'scripts/check-build-output.mjs',
     );
+  });
+
+  test('keeps the appdata checksum in sync with appdata.xml', () => {
+    const expectedHash = createHash('sha256').update(fs.readFileSync(appdataXmlPath)).digest('hex');
+    const checksumFile = fs.readFileSync(appdataChecksumPath, 'utf8').replace(/\r?\n$/, '');
+
+    expect(checksumFile).toBe(`${expectedHash}  ../../data/metainfo/appdata.xml`);
   });
 
   test('routes generic local tauri commands through the local override config', () => {

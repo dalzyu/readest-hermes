@@ -61,7 +61,13 @@ function resolveLocalizedText(value?: string | LocalizedText): string | undefine
 }
 
 const indexingStates = new Map<string, IndexingState>();
-const cancelledBookIndexes = new Set<string>();
+const cancelledIndexingRuns = new Set<string>();
+let indexingCancellationCounter = 0;
+
+function nextIndexingCancellationKey(): string {
+  indexingCancellationCounter += 1;
+  return `indexing-${Date.now()}-${indexingCancellationCounter}`;
+}
 
 interface QueryEmbeddingCacheEntry {
   providerModel: string;
@@ -98,14 +104,14 @@ function setCachedEmbedding(query: string, embedding: number[], providerModel: s
   queryEmbeddingCache.set(key, { providerModel, embedding, cachedAt: Date.now() });
 }
 
-function assertIndexingNotCancelled(bookHash: string): void {
-  if (!cancelledBookIndexes.has(bookHash)) return;
-  cancelledBookIndexes.delete(bookHash);
+function assertIndexingNotCancelled(cancellationKey: string): void {
+  if (!cancelledIndexingRuns.has(cancellationKey)) return;
+  cancelledIndexingRuns.delete(cancellationKey);
   throw new Error('Indexing cancelled');
 }
 
-export function cancelBookIndexing(bookHash: string): void {
-  cancelledBookIndexes.add(bookHash);
+export function cancelBookIndexing(cancellationKey: string): void {
+  cancelledIndexingRuns.add(cancellationKey);
 }
 
 export async function isBookIndexed(bookHash: string): Promise<boolean> {
@@ -147,10 +153,12 @@ export async function indexBook(
   bookHash: string,
   settings: AISettings,
   onProgress?: (progress: EmbeddingProgress) => void,
+  cancellationKey?: string,
 ): Promise<IndexResult> {
   const startTime = Date.now();
   const title = extractTitle(bookDoc.metadata);
-  cancelledBookIndexes.delete(bookHash);
+  const indexingCancellationKey = cancellationKey ?? nextIndexingCancellationKey();
+  cancelledIndexingRuns.delete(indexingCancellationKey);
 
   if (await aiStore.isIndexed(bookHash)) {
     aiLogger.rag.isIndexed(bookHash, true);
@@ -189,14 +197,14 @@ export async function indexBook(
 
   try {
     onProgress?.({ current: 0, total: 1, phase: 'chunking' });
-    assertIndexingNotCancelled(bookHash);
+    assertIndexingNotCancelled(indexingCancellationKey);
     aiLogger.rag.indexProgress('chunking', 0, sections.length);
     const allChunks: TextChunk[] = [];
     let skippedCount = 0;
     const errorMessages: string[] = [];
 
     for (let i = 0; i < sections.length; i++) {
-      assertIndexingNotCancelled(bookHash);
+      assertIndexingNotCancelled(indexingCancellationKey);
       const section = sections[i]!;
       try {
         const doc = await section.createDocument();
@@ -250,7 +258,7 @@ export async function indexBook(
       let embeddedCount = 0;
       let embeddingDimensions = 0;
 
-      assertIndexingNotCancelled(bookHash);
+      assertIndexingNotCancelled(indexingCancellationKey);
       for (let batchStart = 0; batchStart < texts.length; batchStart += batchSize) {
         const batchTexts = texts.slice(batchStart, batchStart + batchSize);
         const { embeddings } = await withRetryAndTimeout(
@@ -282,7 +290,7 @@ export async function indexBook(
       throw e;
     }
 
-    assertIndexingNotCancelled(bookHash);
+    assertIndexingNotCancelled(indexingCancellationKey);
     onProgress?.({ current: 1, total: 1, phase: 'finalizing' });
     aiLogger.rag.indexProgress('finalizing', 1, 1);
     aiLogger.store.saveChunks(bookHash, allChunks.length);
@@ -318,7 +326,7 @@ export async function indexBook(
     aiLogger.rag.indexError(bookHash, (error as Error).message);
     throw error;
   } finally {
-    cancelledBookIndexes.delete(bookHash);
+    cancelledIndexingRuns.delete(indexingCancellationKey);
   }
 }
 

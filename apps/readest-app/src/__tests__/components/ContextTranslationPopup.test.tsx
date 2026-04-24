@@ -75,6 +75,7 @@ const settings: ContextTranslationSettings = {
       promptInstruction: 'Give usage examples.',
     },
   ],
+  fieldSources: { translation: 'ai' },
 };
 
 const defaultProps = {
@@ -164,7 +165,7 @@ describe('ContextTranslationPopup', () => {
     expect(container.querySelectorAll('.bg-yellow-300\\/20').length).toBeGreaterThan(0);
   });
 
-  test('renders a speak button that dispatches tts-speak with text and bookKey', () => {
+  test('renders a speak button that dispatches tts-popup-speak with text and bookKey', () => {
     mockUseContextTranslation.mockReturnValue({
       result: { translation: 'by his side' },
       partialResult: null,
@@ -190,7 +191,7 @@ describe('ContextTranslationPopup', () => {
     const speakBtns = screen.getAllByRole('button', { name: 'Speak' });
     fireEvent.click(speakBtns[0]!);
 
-    expect(mockDispatch).toHaveBeenCalledWith('tts-speak', {
+    expect(mockDispatch).toHaveBeenCalledWith('tts-popup-speak', {
       bookKey: 'book-key-1',
       text: '\u8eab\u4fa7',
       oneTime: true,
@@ -223,7 +224,7 @@ describe('ContextTranslationPopup', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Speak' })[0]!);
     unmount();
 
-    expect(mockDispatch).toHaveBeenCalledWith('tts-stop', { bookKey: 'book-key-1' });
+    expect(mockDispatch).toHaveBeenCalledWith('tts-popup-stop', { bookKey: 'book-key-1' });
   });
   test('uses a secondary highlight color for spacing-variant example matches and omits invalid examples', () => {
     mockUseContextTranslation.mockReturnValue({
@@ -375,6 +376,37 @@ describe('ContextTranslationPopup', () => {
     expect(screen.getByTestId('tts-translation')).toBeTruthy();
   });
 
+  test('translator source labels translation as Translation (Translator)', () => {
+    mockUseContextTranslation.mockReturnValue({
+      result: { translation: 'by his side', contextualMeaning: 'trusted companion' },
+      partialResult: null,
+      loading: false,
+      streaming: false,
+      activeFieldId: null,
+      error: null,
+      retrievalStatus: 'local-only',
+      retrievalHints: {
+        currentVolumeIndexed: true,
+        missingLocalIndex: false,
+        missingPriorVolumes: [],
+        missingSeriesAssignment: false,
+      },
+      popupContext: null,
+      examples: [],
+      annotations: {},
+      saveToVocabulary: vi.fn(),
+    });
+
+    render(
+      <ContextTranslationPopup
+        {...defaultProps}
+        settings={{ ...settings, fieldSources: { translation: 'translator' } }}
+      />,
+    );
+
+    expect(screen.getByText('Translation (Translator)')).toBeTruthy();
+  });
+
   test('contextual meaning field has TTS button', () => {
     mockUseContextTranslation.mockReturnValue({
       result: { translation: 'by his side', contextualMeaning: 'trusted companion' },
@@ -400,7 +432,7 @@ describe('ContextTranslationPopup', () => {
     expect(screen.getByTestId('tts-contextual-meaning')).toBeTruthy();
   });
 
-  test('TTS button on translation field dispatches tts-speak with translation text', () => {
+  test('TTS button on translation field dispatches tts-popup-speak with translation text', () => {
     mockUseContextTranslation.mockReturnValue({
       result: { translation: 'by his side', contextualMeaning: 'trusted companion' },
       partialResult: null,
@@ -424,7 +456,7 @@ describe('ContextTranslationPopup', () => {
     render(<ContextTranslationPopup {...defaultProps} />);
     fireEvent.click(screen.getByTestId('tts-translation'));
 
-    expect(mockDispatch).toHaveBeenCalledWith('tts-speak', {
+    expect(mockDispatch).toHaveBeenCalledWith('tts-popup-speak', {
       bookKey: 'book-key-1',
       text: 'by his side',
       oneTime: true,
@@ -432,7 +464,7 @@ describe('ContextTranslationPopup', () => {
     });
   });
 
-  test('TTS button on contextual meaning field dispatches tts-speak with contextual meaning text', () => {
+  test('TTS button on contextual meaning field dispatches tts-popup-speak with contextual meaning text', () => {
     mockUseContextTranslation.mockReturnValue({
       result: { translation: 'by his side', contextualMeaning: 'trusted companion' },
       partialResult: null,
@@ -456,7 +488,7 @@ describe('ContextTranslationPopup', () => {
     render(<ContextTranslationPopup {...defaultProps} />);
     fireEvent.click(screen.getByTestId('tts-contextual-meaning'));
 
-    expect(mockDispatch).toHaveBeenCalledWith('tts-speak', {
+    expect(mockDispatch).toHaveBeenCalledWith('tts-popup-speak', {
       bookKey: 'book-key-1',
       text: 'trusted companion',
       oneTime: true,

@@ -34,12 +34,235 @@ vi.mock('@ai-sdk/openai', () => ({
   createOpenAI: (...args: unknown[]) => (mockCreateOpenAI as (...a: unknown[]) => unknown)(...args),
 }));
 
+const mockCreateOpenAICompatible = vi.fn(() => {
+  const client = vi.fn((modelId: string) => `chat:${modelId}`);
+  return Object.assign(client, {
+    textEmbeddingModel: vi.fn((modelId: string) => `embedding:${modelId}`),
+    embeddingModel: vi.fn((modelId: string) => `embedding:${modelId}`),
+  });
+});
+
+vi.mock('@ai-sdk/openai-compatible', () => ({
+  createOpenAICompatible: (...args: unknown[]) =>
+    (mockCreateOpenAICompatible as (...a: unknown[]) => unknown)(...args),
+}));
+
+const mockCreateAnthropic = vi.fn(() => {
+  const client = vi.fn((modelId: string) => `anthropic:${modelId}`);
+  return client;
+});
+
+vi.mock('@ai-sdk/anthropic', () => ({
+  createAnthropic: (...args: unknown[]) =>
+    (mockCreateAnthropic as (...a: unknown[]) => unknown)(...args),
+}));
+
+const mockCreateGoogleGenerativeAI = vi.fn(() => {
+  const client = vi.fn((modelId: string) => `google:${modelId}`);
+  return Object.assign(client, {
+    textEmbeddingModel: vi.fn((modelId: string) => `embedding:${modelId}`),
+  });
+});
+
+vi.mock('@ai-sdk/google', () => ({
+  createGoogleGenerativeAI: (...args: unknown[]) =>
+    (mockCreateGoogleGenerativeAI as (...a: unknown[]) => unknown)(...args),
+}));
+
+const mockCreateOpenRouter = vi.fn(() => ({
+  chat: vi.fn((modelId: string) => `openrouter:${modelId}`),
+}));
+
+vi.mock('@openrouter/ai-sdk-provider', () => ({
+  createOpenRouter: (...args: unknown[]) =>
+    (mockCreateOpenRouter as (...a: unknown[]) => unknown)(...args),
+}));
+
+const mockCreateGateway = vi.fn(() => {
+  const gateway = vi.fn((modelId: string) => `gateway:${modelId}`);
+  return Object.assign(gateway, {
+    embeddingModel: vi.fn((modelId: string) => `embedding:${modelId}`),
+  });
+});
+
+vi.mock('ai', () => ({
+  createGateway: (...args: unknown[]) =>
+    (mockCreateGateway as (...a: unknown[]) => unknown)(...args),
+}));
+
 import { OllamaProvider } from '@/services/ai/providers/OllamaProvider';
 import { AIGatewayProvider } from '@/services/ai/providers/AIGatewayProvider';
 import { OpenAIProvider } from '@/services/ai/providers/OpenAIProvider';
-import { getAIProvider, getProviderForTask } from '@/services/ai/providers';
-import type { AISettings, ProviderConfig } from '@/services/ai/types';
+import {
+  createProviderFromConfig,
+  getAIProvider,
+  getProviderForTask,
+  GenericSdkProvider,
+} from '@/services/ai/providers';
+import type { AIProviderType, AISettings, ProviderConfig } from '@/services/ai/types';
 import { DEFAULT_AI_SETTINGS, DEFAULT_OLLAMA_CONFIG } from '@/services/ai/constants';
+import {
+  AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST,
+  SUPPORTED_PROVIDER_TYPES,
+} from '@/services/ai/capabilities';
+
+const GENERIC_SDK_PROVIDER_CASES = [
+  {
+    providerType: 'xai',
+    expectedBaseURL: 'https://api.x.ai/v1',
+  },
+  {
+    providerType: 'cohere',
+    expectedBaseURL: 'https://api.cohere.ai/compatibility/v1',
+  },
+  {
+    providerType: 'fireworks',
+    expectedBaseURL: 'https://api.fireworks.ai/inference/v1',
+  },
+  {
+    providerType: 'togetherai',
+    expectedBaseURL: 'https://api.together.xyz/v1',
+  },
+] as const;
+
+function buildProviderConfig(providerType: AIProviderType): ProviderConfig {
+  switch (providerType) {
+    case 'ollama':
+      return {
+        id: 'ollama-test',
+        name: 'Ollama',
+        providerType,
+        baseUrl: 'http://127.0.0.1:11434',
+        models: [{ id: 'llama3.2', kind: 'chat' }],
+      };
+    case 'openai':
+      return {
+        id: 'openai-test',
+        name: 'OpenAI',
+        providerType,
+        baseUrl: 'http://127.0.0.1:8080',
+        apiKey: 'test-key',
+        apiStandard: 'chat-completions',
+        models: [
+          { id: 'gpt-4o-mini', kind: 'chat' },
+          { id: 'text-embedding-3-small', kind: 'embedding' },
+        ],
+      };
+    case 'anthropic':
+      return {
+        id: 'anthropic-test',
+        name: 'Anthropic',
+        providerType,
+        baseUrl: 'https://api.anthropic.com',
+        apiKey: 'test-key',
+        models: [{ id: 'claude-3-5-sonnet', kind: 'chat' }],
+      };
+    case 'google':
+      return {
+        id: 'google-test',
+        name: 'Google',
+        providerType,
+        baseUrl: 'https://generativelanguage.googleapis.com',
+        apiKey: 'test-key',
+        models: [
+          { id: 'gemini-2.5-flash', kind: 'chat' },
+          { id: 'gemini-embedding-001', kind: 'embedding' },
+        ],
+      };
+    case 'openrouter':
+      return {
+        id: 'openrouter-test',
+        name: 'OpenRouter',
+        providerType,
+        baseUrl: 'https://openrouter.ai/api/v1',
+        apiKey: 'test-key',
+        models: [{ id: 'openai/gpt-4o-mini', kind: 'chat' }],
+      };
+    case 'deepseek':
+      return {
+        id: 'deepseek-test',
+        name: 'DeepSeek',
+        providerType,
+        baseUrl: '',
+        apiKey: 'test-key',
+        models: [{ id: 'deepseek-chat', kind: 'chat' }],
+      };
+    case 'mistral':
+      return {
+        id: 'mistral-test',
+        name: 'Mistral',
+        providerType,
+        baseUrl: '',
+        apiKey: 'test-key',
+        models: [
+          { id: 'mistral-large-latest', kind: 'chat' },
+          { id: 'mistral-embed', kind: 'embedding' },
+        ],
+      };
+    case 'groq':
+      return {
+        id: 'groq-test',
+        name: 'Groq',
+        providerType,
+        baseUrl: '',
+        apiKey: 'test-key',
+        models: [{ id: 'llama-3.3-70b-versatile', kind: 'chat' }],
+      };
+    case 'xai':
+      return {
+        id: 'xai-test',
+        name: 'xAI',
+        providerType,
+        baseUrl: '',
+        apiKey: 'test-key',
+        models: [{ id: 'grok-4.1-fast-reasoning', kind: 'chat' }],
+      };
+    case 'cohere':
+      return {
+        id: 'cohere-test',
+        name: 'Cohere',
+        providerType,
+        baseUrl: '',
+        apiKey: 'test-key',
+        models: [
+          { id: 'command-r', kind: 'chat' },
+          { id: 'embed-multilingual-v3', kind: 'embedding' },
+        ],
+      };
+    case 'fireworks':
+      return {
+        id: 'fireworks-test',
+        name: 'Fireworks',
+        providerType,
+        baseUrl: '',
+        apiKey: 'test-key',
+        models: [{ id: 'accounts/fireworks/models/llama-v3p1-8b-instruct', kind: 'chat' }],
+      };
+    case 'togetherai':
+      return {
+        id: 'togetherai-test',
+        name: 'Together AI',
+        providerType,
+        baseUrl: '',
+        apiKey: 'test-key',
+        models: [{ id: 'meta-llama/Llama-3.1-8B-Instruct-Turbo', kind: 'chat' }],
+      };
+    case 'ai-gateway':
+      return {
+        id: 'ai-gateway-test',
+        name: 'AI Gateway',
+        providerType,
+        baseUrl: '',
+        apiKey: 'test-key',
+        models: [
+          { id: 'google/gemini-2.5-flash-lite', kind: 'chat' },
+          { id: AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST[0], kind: 'embedding' },
+        ],
+      };
+    default:
+      throw new Error(`Unsupported provider type in test: ${providerType}`);
+  }
+}
 
 describe('OllamaProvider', () => {
   beforeEach(() => {
@@ -162,6 +385,98 @@ describe('OpenAIProvider', () => {
     );
   });
 });
+
+describe.each(GENERIC_SDK_PROVIDER_CASES)(
+  'GenericSdkProvider $providerType',
+  ({ providerType, expectedBaseURL }) => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    test('supports the runtime provider and resolves the expected base URL', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ id: 'chat-model' }] }),
+      });
+
+      const provider = createProviderFromConfig({
+        id: `${providerType}-test`,
+        name: `${providerType} provider`,
+        providerType,
+        baseUrl: '',
+        models: [{ id: 'chat-model', kind: 'chat' }],
+        apiKey: 'test-key',
+      });
+
+      expect(GenericSdkProvider.supports(providerType)).toBe(true);
+      expect(provider.providerType).toBe(providerType);
+      expect(provider.getModel('chat-model')).toBe('chat:chat-model');
+
+      await provider.healthCheck({ modelId: 'chat-model' });
+
+      expect(mockCreateOpenAICompatible).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKey: 'test-key',
+          baseURL: expectedBaseURL,
+        }),
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${expectedBaseURL}/models`,
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer test-key' },
+        }),
+      );
+    });
+  },
+);
+
+describe('GenericSdkProvider health check normalization', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('strips trailing /v1 before fetching V1 model endpoints', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [{ id: 'chat-model' }] }),
+    });
+
+    const provider = createProviderFromConfig({
+      id: 'deepseek-v1-test',
+      name: 'DeepSeek',
+      providerType: 'deepseek',
+      baseUrl: 'https://api.example.com/v1',
+      models: [{ id: 'chat-model', kind: 'chat' }],
+      apiKey: 'test-key',
+    });
+
+    await expect(provider.healthCheck({ modelId: 'chat-model' })).resolves.toBe(true);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.example.com/v1/models',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer test-key' },
+      }),
+    );
+  });
+});
+
+describe.each(SUPPORTED_PROVIDER_TYPES)(
+  'createProviderFromConfig supports $providerType',
+  (providerType) => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    test('instantiates the runtime provider without throwing', () => {
+      const provider = createProviderFromConfig(buildProviderConfig(providerType));
+
+      expect(provider.providerType).toBe(providerType);
+    });
+  },
+);
 
 describe('getAIProvider', () => {
   test('should return OllamaProvider for ollama settings', () => {

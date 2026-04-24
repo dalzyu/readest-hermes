@@ -13,7 +13,7 @@ export function usePopupOwnedTTS(bookKey: string) {
   const speakOwnedText = useCallback(
     ({ text, lang }: PopupOwnedTTSSpeakInput) => {
       startedOwnedSpeechRef.current = true;
-      eventDispatcher.dispatch('tts-speak', {
+      eventDispatcher.dispatch('tts-popup-speak', {
         bookKey,
         text,
         oneTime: true,
@@ -26,7 +26,7 @@ export function usePopupOwnedTTS(bookKey: string) {
   const stopOwnedSpeech = useCallback(() => {
     if (!startedOwnedSpeechRef.current) return;
     startedOwnedSpeechRef.current = false;
-    eventDispatcher.dispatch('tts-stop', { bookKey });
+    eventDispatcher.dispatch('tts-popup-stop', { bookKey });
   }, [bookKey]);
 
   useEffect(() => stopOwnedSpeech, [stopOwnedSpeech]);

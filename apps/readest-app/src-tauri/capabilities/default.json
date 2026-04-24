@@ -92,10 +92,7 @@
       "identifier": "http:default",
       "allow": [
         {
-          "url": "https://*.readest.com"
-        },
-        {
-          "url": "https://github.com/readest/*"
+          "url": "https://github.com/dalzyu/readest-hermes/*"
         },
         {
           "url": "https://*.deepl.com"
@@ -169,19 +166,19 @@
       "identifier": "shell:allow-spawn",
       "allow": [
         {
-          "name": "start-readest",
+          "name": "start-hermes",
           "cmd": "cmd",
-          "args": ["/C", "start", "", { "validator": "^.*Readest(.*)\\.exe$" }]
+          "args": ["/C", "start", "", { "validator": "^.*Hermes(.*)\\.exe$" }]
         },
         {
           "name": "chmod-appimage",
           "cmd": "chmod",
-          "args": ["+x", { "validator": "^.*Readest(.*)\\.AppImage$" }]
+          "args": ["+x", { "validator": "^.*Hermes(.*)\\.AppImage$" }]
         },
         {
           "name": "launch-appimage",
           "cmd": "setsid",
-          "args": [{ "validator": "^.*Readest(.*)\\.AppImage$" }]
+          "args": [{ "validator": "^.*Hermes(.*)\\.AppImage$" }]
         }
       ]
     },

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-vi.mock('@/hooks/useContextLookup', () => ({
-  useContextLookup: vi.fn(),
+vi.mock('@/hooks/useLookupPipeline', () => ({
+  useLookupPipeline: vi.fn(),
 }));
 
 import { useContextDictionary } from '@/hooks/useContextDictionary';
-import { useContextLookup } from '@/hooks/useContextLookup';
+import { useLookupPipeline } from '@/hooks/useLookupPipeline';
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
@@ -15,7 +15,7 @@ import type {
   PopupRetrievalHints,
   RetrievalStatus,
 } from '@/services/contextTranslation/types';
-import type { UseContextLookupResult } from '@/hooks/useContextLookup';
+import type { UseContextLookupResult } from '@/hooks/useLookupPipeline';
 
 const retrievalHints: PopupRetrievalHints = {
   currentVolumeIndexed: true,
@@ -84,14 +84,14 @@ const defaultProps = {
 };
 
 beforeEach(() => {
-  vi.mocked(useContextLookup).mockReturnValue(lookupResult);
+  vi.mocked(useLookupPipeline).mockReturnValue(lookupResult);
 });
 
 describe('useContextDictionary', () => {
   test('maps dictionary input through useContextLookup', () => {
     const result = useContextDictionary(defaultProps);
 
-    expect(useContextLookup).toHaveBeenCalledWith({
+    expect(useLookupPipeline).toHaveBeenCalledWith({
       mode: 'dictionary',
       bookKey: defaultProps.bookKey,
       bookHash: defaultProps.bookHash,
@@ -110,7 +110,7 @@ describe('useContextDictionary', () => {
       bookLanguage: 'ja',
     });
 
-    expect(useContextLookup).toHaveBeenCalledWith(
+    expect(useLookupPipeline).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: 'dictionary',
         bookLanguage: 'ja',

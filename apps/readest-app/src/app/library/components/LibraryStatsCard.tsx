@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import {
@@ -53,6 +53,50 @@ const LibraryStatsCard: React.FC<LibraryStatsCardProps> = ({ className }) => {
   useEffect(() => {
     setDailyStats(readingStatsService.getDailyStats());
   }, []);
+
+  const refreshStats = useCallback(() => {
+    setDailyStats([...readingStatsService.getDailyStats()]);
+    setGoals({ ...readingStatsService.getGoals() });
+  }, []);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      refreshStats();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshStats();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Refresh once at the next local midnight instead of polling.
+    let timeoutId: number | undefined;
+    const scheduleNextMidnightRefresh = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now);
+      nextMidnight.setHours(24, 0, 0, 0);
+      const delay = Math.max(nextMidnight.getTime() - now.getTime(), 1);
+
+      timeoutId = window.setTimeout(() => {
+        refreshStats();
+        scheduleNextMidnightRefresh();
+      }, delay);
+    };
+
+    scheduleNextMidnightRefresh();
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [refreshStats]);
 
   const summary = useMemo(() => {
     const todayStats = getTodayStats(dailyStats);

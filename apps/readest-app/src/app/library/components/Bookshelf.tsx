@@ -329,15 +329,32 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   };
 
   const getBooksToDelete = () => {
-    const booksToDelete: Book[] = [];
-    bookIdsToDelete.forEach((id) => {
-      for (const book of filteredBooks.filter((book) => book.hash === id || book.groupId === id)) {
-        if (book && !book.deletedAt) {
-          booksToDelete.push(book);
-        }
+    const booksToDelete = new Map<string, Book>();
+    const groupBooksById = new Map(
+      currentBookshelfItems
+        .filter((item): item is BooksGroup => 'books' in item)
+        .map((group) => [group.id, group.books] as const),
+    );
+
+    for (const id of bookIdsToDelete) {
+      const book = filteredBooks.find((item) => item.hash === id);
+      if (book && !book.deletedAt) {
+        booksToDelete.set(book.hash, book);
+        continue;
       }
-    });
-    return booksToDelete;
+
+      const groupBooks =
+        groupBooksById.get(id) ?? filteredBooks.filter((book) => book.groupId === id);
+      if (groupBooks.length === 0) continue;
+
+      groupBooks.forEach((groupBook) => {
+        if (!groupBook.deletedAt) {
+          booksToDelete.set(groupBook.hash, groupBook);
+        }
+      });
+    }
+
+    return Array.from(booksToDelete.values());
   };
 
   const confirmDelete = async () => {

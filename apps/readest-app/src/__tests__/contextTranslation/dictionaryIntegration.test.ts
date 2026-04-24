@@ -164,6 +164,26 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — findMatches lookup
     expect(hits[0]!.definition).toContain('轻盈柔美');
   }, 120_000);
 
+  test('reuses cached search index across repeated lookups', async () => {
+    const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
+    const zip = readDictZip();
+    const { entries } = await parseDictionary('hanyudacidian-2.0-stardict.zip', zip);
+    const sortSpy = vi.spyOn(Array.prototype, 'sort');
+
+    try {
+      const firstHits = findMatches(entries, '婀娜');
+      const secondHits = findMatches(entries, '穿越');
+
+      expect(firstHits.length).toBeGreaterThan(0);
+      expect(firstHits[0]!.headword).toBe('婀娜');
+      expect(secondHits.length).toBeGreaterThan(0);
+      expect(secondHits[0]!.headword).toBe('穿越');
+      expect(sortSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      sortSpy.mockRestore();
+    }
+  }, 120_000);
+
   test('exact match — 穿越 is present in the dictionary', async () => {
     const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
     const zip = readDictZip();
@@ -224,7 +244,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — lookupDefinitions 
   test('lookupDefinitions — exact hit for 婀娜 when meta is registered and enabled', async () => {
     settingsRef.current = [{ ...importedMeta, enabled: true }];
 
-    const results = await lookupDefinitions('婀娜', 'zh', 'zh');
+    const results = await lookupDefinitions('婀娜', 'zh', 'zh', settingsRef.current);
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]!.headword).toBe('婀娜');
     expect(results[0]!.definition).toContain('轻盈柔美');
@@ -233,7 +253,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — lookupDefinitions 
   test('lookupDefinitions — simplified term finds match (穿越 exact, zh→zh)', async () => {
     settingsRef.current = [{ ...importedMeta, enabled: true }];
 
-    const results = await lookupDefinitions('穿越', 'zh', 'zh');
+    const results = await lookupDefinitions('穿越', 'zh', 'zh', settingsRef.current);
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]!.headword).toBe('穿越');
   }, 120_000);
@@ -241,7 +261,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — lookupDefinitions 
   test('lookupDefinitions — disabled dictionary is not queried', async () => {
     settingsRef.current = [{ ...importedMeta, enabled: false }];
 
-    const results = await lookupDefinitions('婀娜', 'zh', 'zh');
+    const results = await lookupDefinitions('婀娜', 'zh', 'zh', settingsRef.current);
     expect(results).toHaveLength(0);
   }, 120_000);
 
@@ -249,7 +269,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — lookupDefinitions 
     // Dict is zh→zh; querying with sourceLang ja should not include it
     settingsRef.current = [{ ...importedMeta, enabled: true }];
 
-    const results = await lookupDefinitions('婀娜', 'ja', 'en');
+    const results = await lookupDefinitions('婀娜', 'ja', 'en', settingsRef.current);
     expect(results).toHaveLength(0);
   }, 120_000);
 
@@ -257,7 +277,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — lookupDefinitions 
     settingsRef.current = [{ ...importedMeta, enabled: true }];
 
     // 一丁不识 (simplified) → simplecc s2t → 一丁不識 (traditional headword)
-    const results = await lookupDefinitions('一丁不识', 'zh', 'zh');
+    const results = await lookupDefinitions('一丁不识', 'zh', 'zh', settingsRef.current);
     expect(results.length).toBeGreaterThan(0);
     // headword should be the traditional form (or simplified if dict has it)
     expect(results[0]!.headword === '一丁不識' || results[0]!.headword.includes('一丁')).toBe(true);
@@ -267,14 +287,14 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — lookupDefinitions 
     settingsRef.current = [{ ...importedMeta, enabled: true }];
 
     // Confirm it works before deletion
-    const before = await lookupDefinitions('婀娜', 'zh', 'zh');
+    const before = await lookupDefinitions('婀娜', 'zh', 'zh', settingsRef.current);
     expect(before.length).toBeGreaterThan(0);
 
     // Delete and clear meta
     await deleteUserDictionary(importedMeta.id);
     settingsRef.current = [];
 
-    const after = await lookupDefinitions('婀娜', 'zh', 'zh');
+    const after = await lookupDefinitions('婀娜', 'zh', 'zh', settingsRef.current);
     expect(after).toHaveLength(0);
   }, 120_000);
 });

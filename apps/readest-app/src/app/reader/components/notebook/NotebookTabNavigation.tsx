@@ -20,13 +20,13 @@ const NotebookTabNavigation: React.FC<NotebookTabNavigationProps> = ({
   const { appService } = useEnv();
   const { settings } = useSettingsStore();
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
-
   const ctxEnabled = settings?.globalReadSettings?.contextTranslation?.enabled ?? false;
   const tabs: NotebookTab[] = aiEnabled
     ? ctxEnabled
       ? ['notes', 'ai', 'vocabulary']
       : ['notes', 'ai']
-    : [];
+    : ['notes'];
+  const effectiveActiveTab = tabs.includes(activeTab) ? activeTab : 'notes';
 
   const getTabLabel = (tab: NotebookTab) => {
     switch (tab) {
@@ -69,7 +69,7 @@ const NotebookTabNavigation: React.FC<NotebookTabNavigationProps> = ({
           role='button'
           className={clsx(
             'm-1.5 flex-1 cursor-pointer rounded-lg p-2 transition-colors duration-200',
-            activeTab === tab && 'bg-base-300/85',
+            effectiveActiveTab === tab && 'bg-base-300/85',
           )}
           onClick={() => onTabChange(tab)}
           onKeyDown={(e) => {

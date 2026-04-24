@@ -1,5 +1,5 @@
 // One-time startup migration: readest namespace → hermes namespace.
-// Guard key: 'hermes:migration' = 'v1done' prevents re-running.
+// Guard key: 'hermes:migration' = 'v1done' prevents re-running after the relevant work has completed.
 
 const MIGRATION_GUARD_KEY = 'hermes:migration';
 const MIGRATION_DONE_VALUE = 'v1done';
@@ -16,6 +16,8 @@ const IDB_STORES = [
   'dictionaryData',
 ] as const;
 
+let migrationPromise: Promise<void> | null = null;
+
 function migrateLocalStorage(): void {
   const keys = Object.keys(localStorage);
   for (const key of keys) {
@@ -24,8 +26,10 @@ function migrateLocalStorage(): void {
       : key.startsWith('readest_')
         ? `hermes_${key.slice('readest_'.length)}`
         : null;
-    // Only migrate if the target key doesn't already exist
+
+    // Only migrate if the target key doesn't already exist.
     if (!newKey || localStorage.getItem(newKey) !== null) continue;
+
     const value = localStorage.getItem(key);
     if (value !== null) {
       localStorage.setItem(newKey, value);
@@ -78,32 +82,68 @@ async function openDB(name: string, version?: number): Promise<IDBDatabase> {
   });
 }
 
+function cleanupDatabase(name: string): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.deleteDatabase(name);
+      request.onsuccess = () => resolve();
+      request.onerror = () => resolve();
+      request.onblocked = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+async function probeLegacyDatabasePresence(): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(LEGACY_IDB_NAME);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const hasStores = db.objectStoreNames.length > 0;
+      db.close();
+
+      if (hasStores) {
+        resolve(true);
+        return;
+      }
+
+      void cleanupDatabase(LEGACY_IDB_NAME).then(() => resolve(false));
+    };
+  });
+}
+
+async function legacyDatabaseExists(): Promise<boolean> {
+  if (typeof indexedDB === 'undefined') return false;
+  if (typeof indexedDB.databases === 'function') {
+    const dbs = await indexedDB.databases();
+    return dbs.some((db) => db.name === LEGACY_IDB_NAME);
+  }
+  return probeLegacyDatabasePresence();
+}
+
 async function migrateIDB(): Promise<void> {
   if (typeof indexedDB === 'undefined') return;
-  // indexedDB.databases() is not available in all browsers (e.g. Firefox ≤126)
-  if (typeof indexedDB.databases !== 'function') return;
+  if (!(await legacyDatabaseExists())) return;
 
-  const dbs = await indexedDB.databases();
-  const hasLegacy = dbs.some((db) => db.name === LEGACY_IDB_NAME);
-  if (!hasLegacy) return;
+  let srcDb: IDBDatabase | undefined;
+  let dstDb: IDBDatabase | undefined;
 
-  let srcDb: IDBDatabase;
-  let dstDb: IDBDatabase;
   try {
     srcDb = await openDB(LEGACY_IDB_NAME);
     dstDb = await openDB(HERMES_IDB_NAME, HERMES_IDB_VERSION);
-  } catch (err) {
-    console.warn('[hermesMigration] Could not open IDB for migration:', err);
-    return;
-  }
 
-  try {
+    const src = srcDb;
+    const dst = dstDb;
+    if (!src || !dst) return;
+
     for (const storeName of IDB_STORES) {
-      if (!srcDb.objectStoreNames.contains(storeName)) continue;
-      if (!dstDb.objectStoreNames.contains(storeName)) continue;
+      if (!src.objectStoreNames.contains(storeName)) continue;
+      if (!dst.objectStoreNames.contains(storeName)) continue;
 
       const records: unknown[] = await new Promise((resolve, reject) => {
-        const tx = srcDb.transaction(storeName, 'readonly');
+        const tx = src.transaction(storeName, 'readonly');
         const req = tx.objectStore(storeName).getAll();
         req.onsuccess = () => resolve(req.result as unknown[]);
         req.onerror = () => reject(req.error);
@@ -112,7 +152,7 @@ async function migrateIDB(): Promise<void> {
       if (records.length === 0) continue;
 
       await new Promise<void>((resolve, reject) => {
-        const tx = dstDb.transaction(storeName, 'readwrite');
+        const tx = dst.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         for (const record of records) {
           store.put(record);
@@ -122,27 +162,33 @@ async function migrateIDB(): Promise<void> {
       });
     }
   } finally {
-    srcDb.close();
-    dstDb.close();
+    srcDb?.close();
+    dstDb?.close();
   }
 
-  // Best-effort cleanup; non-fatal if it fails
-  try {
-    indexedDB.deleteDatabase(LEGACY_IDB_NAME);
-  } catch {
-    // ignore
-  }
+  await cleanupDatabase(LEGACY_IDB_NAME);
 }
 
 export async function runHermesMigration(): Promise<void> {
   if (typeof localStorage === 'undefined') return;
   if (localStorage.getItem(MIGRATION_GUARD_KEY) === MIGRATION_DONE_VALUE) return;
 
-  try {
-    migrateLocalStorage();
-    await migrateIDB();
-    localStorage.setItem(MIGRATION_GUARD_KEY, MIGRATION_DONE_VALUE);
-  } catch (err) {
-    console.warn('[hermesMigration] Migration failed, continuing with fresh state:', err);
+  if (migrationPromise) {
+    await migrationPromise;
+    return;
   }
+
+  migrationPromise = (async () => {
+    try {
+      migrateLocalStorage();
+      await migrateIDB();
+    } catch (err) {
+      console.warn('[hermesMigration] Migration failed, continuing with fresh state:', err);
+    } finally {
+      localStorage.setItem(MIGRATION_GUARD_KEY, MIGRATION_DONE_VALUE);
+      migrationPromise = null;
+    }
+  })();
+
+  await migrationPromise;
 }

@@ -1,4 +1,4 @@
-import { useContextLookup, type UseContextLookupResult } from './useContextLookup';
+import { useLookupPipeline, type UseContextLookupResult } from './useLookupPipeline';
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
@@ -15,7 +15,7 @@ export interface UseContextDictionaryInput {
 }
 
 export function useContextDictionary(input: UseContextDictionaryInput): UseContextLookupResult {
-  return useContextLookup({
+  return useLookupPipeline({
     mode: 'dictionary',
     bookKey: input.bookKey,
     bookHash: input.bookHash,

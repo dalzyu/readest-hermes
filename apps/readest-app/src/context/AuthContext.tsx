@@ -4,6 +4,7 @@ import { createContext, useState, useContext, ReactNode, useEffect } from 'react
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/utils/supabase';
 import posthog from 'posthog-js';
+import { CLOUD_ENABLED } from '@/services/constants';
 
 interface AuthContextType {
   token: string | null;
@@ -15,7 +16,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+const noopAuthContext: AuthContextType = {
+  token: null,
+  user: null,
+  login: () => {},
+  logout: () => {},
+  refresh: () => {},
+};
+
+const AuthProviderImpl = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('token');
@@ -104,8 +113,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  if (!CLOUD_ENABLED) {
+    return <AuthContext.Provider value={noopAuthContext}>{children}</AuthContext.Provider>;
+  }
+
+  return <AuthProviderImpl>{children}</AuthProviderImpl>;
+};
+
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
+  if (context) return context;
+  if (!CLOUD_ENABLED) return noopAuthContext;
+  throw new Error('useAuth must be used within AuthProvider');
 };

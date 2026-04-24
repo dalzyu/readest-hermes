@@ -27,6 +27,7 @@ import {
 import { type as osType } from '@tauri-apps/plugin-os';
 import { shareFile } from '@choochmeque/tauri-plugin-sharekit-api';
 
+import { Book } from '@/types/book';
 import {
   FileSystem,
   BaseDir,
@@ -40,6 +41,24 @@ import { getDirPath, getFilename } from '@/utils/path';
 import { NativeFile, RemoteFile } from '@/utils/file';
 import { copyURIToPath, getStorefrontRegionCode } from '@/utils/bridge';
 import { copyFiles } from '@/utils/files';
+import { getAudioAlignmentReportFilename, getAudioSyncMapFilename } from '@/utils/book';
+import {
+  AudioSyncJobStatus,
+  AudioSyncStartRequest,
+  AudioSyncStatus,
+  BookAudioAsset,
+} from '@/services/audioSync/types';
+import { prepareAudioAlignmentInput } from '@/services/audioSync/alignmentInput';
+import { loadAudioSyncCorrectionSidecar, saveBookAudioAsset } from '@/services/audioSync/storage';
+import { applyAudioSyncCorrections } from '@/services/audioSync/corrections';
+import { generateEpubMediaOverlayPackage } from '@/services/audioSync/EpubMediaOverlayService';
+import {
+  cancelAlignmentJob,
+  inspectAudioMetadata,
+  NativeAudioAlignmentJobStatus,
+  readAlignmentJobStatus,
+  startAlignmentJob,
+} from '@/services/audioSync/nativeBridge';
 
 import { BaseAppService } from './appService';
 import { DatabaseOpts, DatabaseService } from '@/types/database';
@@ -403,6 +422,28 @@ export const nativeFileSystem: FileSystem = {
   },
 };
 
+function mapNativeAudioSyncJob(status: NativeAudioAlignmentJobStatus): AudioSyncJobStatus {
+  const phase =
+    status.phase ||
+    (status.state === 'queued'
+      ? 'pending'
+      : status.state === 'running'
+        ? 'aligning'
+        : status.state === 'succeeded'
+          ? 'ready'
+          : status.state === 'failed'
+            ? 'failed'
+            : 'cancelled');
+
+  return {
+    runId: status.jobId,
+    phase,
+    progress: Math.round((status.progress ?? 0) * 100),
+    updatedAt: Date.now(),
+    message: status.detail,
+  };
+}
+
 const DIST_CHANNEL = (process.env['NEXT_PUBLIC_DIST_CHANNEL'] || 'readest') as DistChannel;
 
 export class NativeAppService extends BaseAppService {
@@ -590,6 +631,104 @@ export class NativeAppService extends BaseAppService {
     const { getMigrations } = await import('./database/migrations');
     await migrate(db, getMigrations(schema));
     return db;
+  }
+
+  override async attachBookAudio(book: Book, file: string | File): Promise<BookAudioAsset> {
+    const asset = await super.attachBookAudio(book, file);
+    try {
+      const summary = await inspectAudioMetadata({
+        audioPath: await this.resolveFilePath(asset.originalPath, 'Books'),
+      });
+      const enrichedAsset: BookAudioAsset = {
+        ...asset,
+        title: summary.title ?? asset.title,
+        durationMs: summary.durationMs ?? asset.durationMs,
+        chapterCount: summary.chapterCount ?? summary.chapters.length ?? asset.chapterCount,
+        chapters: summary.chapters.length > 0 ? summary.chapters : asset.chapters,
+        updatedAt: Date.now(),
+      };
+      await saveBookAudioAsset(this.fs, book, enrichedAsset);
+      return enrichedAsset;
+    } catch (error) {
+      console.info('Audio metadata inspection unavailable:', error);
+      return asset;
+    }
+  }
+
+  override async startAudioSync(
+    book: Book,
+    request?: AudioSyncStartRequest,
+  ): Promise<AudioSyncJobStatus> {
+    const asset = await this.getBookAudioAsset(book);
+    if (!asset) {
+      throw new Error('No audiobook is attached to this book');
+    }
+
+    const transcriptPath =
+      request?.transcriptPath || (await prepareAudioAlignmentInput(this, book, asset));
+    const handle = await startAlignmentJob({
+      bookHash: book.hash,
+      audioHash: asset.audioHash,
+      audioPath: await this.resolveFilePath(asset.normalizedPath || asset.originalPath, 'Books'),
+      transcriptPath,
+      outputPath:
+        request?.outputPath || (await this.resolveFilePath(getAudioSyncMapFilename(book), 'Books')),
+      reportPath: await this.resolveFilePath(getAudioAlignmentReportFilename(book), 'Books'),
+    });
+
+    return {
+      runId: handle.jobId,
+      phase: 'pending',
+      progress: 0,
+      updatedAt: Date.now(),
+    };
+  }
+
+  override async generateCorrectedAudioSyncPackage(book: Book): Promise<void> {
+    const asset = await this.getBookAudioAsset(book);
+    if (!asset) throw new Error('No audiobook attached to this book');
+
+    const [map, sidecar] = await Promise.all([
+      loadAudioSyncMap(this.fs, book),
+      loadAudioSyncCorrectionSidecar(this.fs, book),
+    ]);
+    if (!map) throw new Error('No sync map found — run Generate Sync first');
+    if (!sidecar || sidecar.corrections.length === 0) {
+      throw new Error('No corrections sidecar found — apply corrections before regenerating');
+    }
+
+    const correctedMap = applyAudioSyncCorrections(map, sidecar, asset);
+    await generateEpubMediaOverlayPackage(this, book, asset, correctedMap);
+  }
+
+  override async getAudioSyncStatus(book: Book, runId?: string): Promise<AudioSyncStatus> {
+    const status = await super.getAudioSyncStatus(book, runId);
+    if (!runId) {
+      return status;
+    }
+
+    try {
+      const job = mapNativeAudioSyncJob(await readAlignmentJobStatus({ jobId: runId }));
+      return { ...status, job };
+    } catch (error) {
+      return {
+        ...status,
+        job: {
+          runId,
+          phase: 'failed',
+          progress: 0,
+          updatedAt: Date.now(),
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
+  }
+
+  override async cancelAudioSync(_book: Book, runId: string): Promise<void> {
+    const result = await cancelAlignmentJob({ jobId: runId });
+    if (!result.cancelled) {
+      throw new Error(`Failed to cancel audio sync job ${runId}`);
+    }
   }
 
   async migrate20251029() {

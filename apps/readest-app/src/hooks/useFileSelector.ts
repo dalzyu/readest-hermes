@@ -2,7 +2,12 @@ import { AppService } from '@/types/system';
 import { isTauriAppPlatform } from '@/services/environment';
 import { basename } from '@tauri-apps/api/path';
 import { stubTranslation as _ } from '@/utils/misc';
-import { BOOK_ACCEPT_FORMATS, SUPPORTED_BOOK_EXTS } from '@/services/constants';
+import {
+  AUDIO_ACCEPT_FORMATS,
+  BOOK_ACCEPT_FORMATS,
+  SUPPORTED_AUDIO_EXTS,
+  SUPPORTED_BOOK_EXTS,
+} from '@/services/constants';
 
 export interface FileSelectorOptions {
   type: SelectionType;
@@ -125,8 +130,8 @@ export const FILE_SELECTION_PRESETS = {
     dialogTitle: _('Select Video'),
   },
   audio: {
-    accept: 'audio/*',
-    extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a'],
+    accept: AUDIO_ACCEPT_FORMATS,
+    extensions: SUPPORTED_AUDIO_EXTS,
     dialogTitle: _('Select Audio'),
   },
   books: {

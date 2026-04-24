@@ -1,6 +1,7 @@
 import { streamText } from 'ai';
 import type { ChatModelAdapter, ChatModelRunResult } from '@assistant-ui/react';
 import { getProviderForTask } from '../providers';
+import { buildInferenceOptions } from '../inferenceParams';
 import { isBookIndexed, vectorSearch } from '../ragService';
 import { aiLogger } from '../logger';
 import { buildSystemPrompt } from '../prompts';
@@ -76,6 +77,11 @@ async function* streamViaApiRoute(
     if (done) break;
     yield decoder.decode(value, { stream: true });
   }
+
+  const finalChunk = decoder.decode();
+  if (finalChunk) {
+    yield finalChunk;
+  }
 }
 
 export function createTauriAdapter(getOptions: () => TauriAdapterOptions): ChatModelAdapter {
@@ -148,7 +154,7 @@ export function createTauriAdapter(getOptions: () => TauriAdapterOptions): ChatM
             system: systemPrompt,
             messages: aiMessages,
             abortSignal,
-            ...inferenceParams,
+            ...buildInferenceOptions(inferenceParams),
           });
 
           for await (const chunk of result.textStream) {

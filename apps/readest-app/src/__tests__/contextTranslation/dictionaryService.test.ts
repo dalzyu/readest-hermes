@@ -3,10 +3,8 @@ import type { DictionaryEntry, UserDictionary } from '@/services/contextTranslat
 import {
   deleteUserDictionary,
   findMatches,
-  getUserDictionaryMeta,
   importUserDictionary,
   lookupDefinitions,
-  saveUserDictionaryMeta,
 } from '@/services/contextTranslation/dictionaryService';
 
 const records = new Map<string, unknown>();
@@ -109,79 +107,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   records.clear();
   settingsRef.current = [];
-});
-
-describe('getUserDictionaryMeta', () => {
-  test('returns empty array when no meta exists', async () => {
-    await expect(getUserDictionaryMeta()).resolves.toEqual([]);
-  });
-
-  test('returns stored meta entries', async () => {
-    const meta: UserDictionary[] = [
-      {
-        id: 'user-dict-1',
-        name: 'Test Dictionary',
-        language: 'en',
-        targetLanguage: 'zh',
-        entryCount: 100,
-        source: 'user',
-        importedAt: 1700000000000,
-      },
-    ];
-    settingsRef.current = meta;
-
-    await expect(getUserDictionaryMeta()).resolves.toEqual(meta);
-  });
-});
-
-describe('saveUserDictionaryMeta', () => {
-  test('persists meta array to settings store', async () => {
-    const meta: UserDictionary[] = [
-      {
-        id: 'user-dict-1',
-        name: 'My Dictionary',
-        language: 'de',
-        targetLanguage: 'en',
-        entryCount: 50,
-        source: 'user',
-        importedAt: 1700000000000,
-      },
-    ];
-
-    await saveUserDictionaryMeta(meta);
-
-    expect(setSettingsSpy).toHaveBeenCalledOnce();
-    expect(setSettingsSpy).toHaveBeenCalledWith({ userDictionaryMeta: meta });
-  });
-
-  test('replaces existing meta', async () => {
-    settingsRef.current = [
-      {
-        id: 'old',
-        name: 'Old',
-        language: 'en',
-        targetLanguage: 'de',
-        entryCount: 10,
-        source: 'user',
-        importedAt: 1000,
-      },
-    ];
-    const newMeta: UserDictionary[] = [
-      {
-        id: 'new',
-        name: 'New',
-        language: 'fr',
-        targetLanguage: 'en',
-        entryCount: 200,
-        source: 'user',
-        importedAt: 2000,
-      },
-    ];
-
-    await saveUserDictionaryMeta(newMeta);
-
-    expect(setSettingsSpy).toHaveBeenCalledWith({ userDictionaryMeta: newMeta });
-  });
 });
 
 describe('importUserDictionary', () => {
@@ -339,7 +264,7 @@ describe('lookupDefinitions', () => {
       { headword: '你好', definition: 'custom hello' },
     ]);
 
-    const result = await lookupDefinitions('你好', 'zh', 'en');
+    const result = await lookupDefinitions('你好', 'zh', 'en', settingsRef.current);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.definition).toBe('custom hello');
@@ -363,11 +288,11 @@ describe('lookupDefinitions', () => {
       { headword: '你好', definition: 'disabled hello' },
     ]);
 
-    await expect(lookupDefinitions('你好', 'zh', 'en')).resolves.toEqual([]);
+    await expect(lookupDefinitions('你好', 'zh', 'en', settingsRef.current)).resolves.toEqual([]);
   });
 
   test('returns empty array for empty text', async () => {
-    await expect(lookupDefinitions('', 'zh', 'en')).resolves.toEqual([]);
+    await expect(lookupDefinitions('', 'zh', 'en', settingsRef.current)).resolves.toEqual([]);
   });
 
   test('matches imported Chinese dictionaries across simplified and traditional variants', async () => {
@@ -387,7 +312,7 @@ describe('lookupDefinitions', () => {
       { headword: '計算機軟體', definition: '與電腦相關的程式集合' },
     ]);
 
-    const result = await lookupDefinitions('计算机软件', 'zh', 'en');
+    const result = await lookupDefinitions('计算机软件', 'zh', 'en', settingsRef.current);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.headword).toBe('計算機軟體');
@@ -412,7 +337,7 @@ describe('lookupDefinitions', () => {
       { headword: '一丁不識', definition: '不識一字，形容人不識字或文化程度極低' },
     ]);
 
-    const result = await lookupDefinitions('一丁不识', 'zh', 'en');
+    const result = await lookupDefinitions('一丁不识', 'zh', 'en', settingsRef.current);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.headword).toBe('一丁不識');
@@ -433,8 +358,8 @@ describe('lookupDefinitions', () => {
     ];
     storeDictionaryRecord(settingsRef.current[0]!, [{ headword: '封', definition: '疆域；分界' }]);
 
-    const defaultResult = await lookupDefinitions('封号法师', 'zh', 'en');
-    const exactOnlyResult = await lookupDefinitions('封号法师', 'zh', 'en', {
+    const defaultResult = await lookupDefinitions('封号法师', 'zh', 'en', settingsRef.current);
+    const exactOnlyResult = await lookupDefinitions('封号法师', 'zh', 'en', settingsRef.current, {
       maxMatchTier: 1,
     });
 
@@ -460,7 +385,7 @@ describe('lookupDefinitions', () => {
       { headword: '一丁不識', definition: '不識一字，形容人不識字或文化程度極低' },
     ]);
 
-    const result = await lookupDefinitions('一丁不识', 'zh', 'en');
+    const result = await lookupDefinitions('一丁不识', 'zh', 'en', settingsRef.current);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.headword).toBe('一丁不識');
@@ -481,7 +406,7 @@ describe('lookupDefinitions', () => {
     ];
     storeDictionaryRecord(settingsRef.current[0]!, [{ headword: 'hero', definition: '英雄' }]);
 
-    const result = await lookupDefinitions('hero', 'en', 'zh');
+    const result = await lookupDefinitions('hero', 'en', 'zh', settingsRef.current);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.definition).toBe('英雄');
@@ -501,6 +426,28 @@ describe('findMatches', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]!.headword).toBe('hello');
+  });
+
+  test('reuses cached search index across repeated lookups', () => {
+    const entries = [
+      makeEntry('beta', 'second'),
+      makeEntry('alpha', 'first'),
+      makeEntry('gamma', 'third'),
+    ];
+    const sortSpy = vi.spyOn(Array.prototype, 'sort');
+
+    try {
+      const first = findMatches(entries, 'alpha');
+      const second = findMatches(entries, 'gamma');
+
+      expect(first).toHaveLength(1);
+      expect(first[0]!.headword).toBe('alpha');
+      expect(second).toHaveLength(1);
+      expect(second[0]!.headword).toBe('gamma');
+      expect(sortSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      sortSpy.mockRestore();
+    }
   });
 
   test('returns prefix matches and caps results', () => {

@@ -1,4 +1,10 @@
 import { BookMetadata, EXTS } from '@/libs/document';
+import {
+  AUDIO_SYNC_EPUB3_DIRNAME,
+  AUDIO_SYNC_EPUB3_FILENAME,
+  AUDIO_SYNC_EPUB3_VERSION,
+  AUDIO_SYNC_PACKAGE_PROVENANCE_FILENAME,
+} from '@/services/audioSync/constants';
 import { Book, BookConfig, BookProgress, WritingMode } from '@/types/book';
 import { SUPPORTED_LANGS } from '@/services/constants';
 import { getLocale, getUserLang, makeSafeFilename } from './misc';
@@ -35,6 +41,58 @@ export const getCoverFilename = (book: Book) => {
 export const getConfigFilename = (book: Book) => {
   return `${book.hash}/config.json`;
 };
+export const getBookAudioDir = (book: Book) => {
+  return `${book.hash}/audio`;
+};
+export const getAudioAssetFilename = (book: Book) => {
+  return `${getBookAudioDir(book)}/asset.json`;
+};
+export const getAudioSourceFilename = (book: Book, format: string) => {
+  return `${getBookAudioDir(book)}/source.${format}`;
+};
+export const getNormalizedAudioFilename = (book: Book, format: string) => {
+  return `${getBookAudioDir(book)}/normalized.${format}`;
+};
+export const getAudioChaptersFilename = (book: Book) => {
+  return `${getBookAudioDir(book)}/chapters.json`;
+};
+export const getAudioAlignmentInputFilename = (book: Book) => {
+  return `${getBookAudioDir(book)}/alignment-input.v3.json`;
+};
+export const getAudioSyncMapFilename = (book: Book) => {
+  return `${getBookAudioDir(book)}/sync-map.v2.json`;
+};
+export const getLegacyAudioSyncMapFilename = (book: Book) => {
+  return `${getBookAudioDir(book)}/sync-map.v1.json`;
+};
+export const getAudioAlignmentReportFilename = (book: Book) => {
+  return `${getBookAudioDir(book)}/alignment-report.json`;
+};
+export const getAudioSyncPackageDir = (book: Book) => {
+  return `${getBookAudioDir(book)}/${AUDIO_SYNC_EPUB3_DIRNAME}`;
+};
+export const getAudioSyncPackageVersionDir = (
+  book: Book,
+  version: number = AUDIO_SYNC_EPUB3_VERSION,
+) => {
+  return `${getAudioSyncPackageDir(book)}/v${version}`;
+};
+export const getAudioSyncPackageFilename = (
+  book: Book,
+  version: number = AUDIO_SYNC_EPUB3_VERSION,
+) => {
+  return `${getAudioSyncPackageVersionDir(book, version)}/${AUDIO_SYNC_EPUB3_FILENAME}`;
+};
+export const getAudioSyncPackageProvenanceFilename = (
+  book: Book,
+  version: number = AUDIO_SYNC_EPUB3_VERSION,
+) => {
+  return `${getAudioSyncPackageVersionDir(book, version)}/${AUDIO_SYNC_PACKAGE_PROVENANCE_FILENAME}`;
+};
+export const getAudioSyncCorrectionFilename = (book: Book) => {
+  return `${getBookAudioDir(book)}/alignment-corrections.json`;
+};
+
 export const isBookFile = (filename: string) => {
   return Object.values(EXTS).includes(filename.split('.').pop()!);
 };

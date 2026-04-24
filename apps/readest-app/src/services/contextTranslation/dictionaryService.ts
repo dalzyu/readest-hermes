@@ -55,6 +55,28 @@ type SearchableEntry = {
   normalizedHeadword: string;
 };
 
+/** Dictionary entry arrays are immutable after load, so cache the indexed view by array identity. */
+const searchableEntriesCache = new WeakMap<DictionaryEntry[], SearchableEntry[]>();
+
+function getSearchableEntries(entries: DictionaryEntry[]): SearchableEntry[] {
+  const cached = searchableEntriesCache.get(entries);
+  if (cached) return cached;
+
+  const searchableEntries = entries
+    .map((entry) => ({ entry, normalizedHeadword: normalizeLookupText(entry.headword) }))
+    .filter((entry) => entry.normalizedHeadword.length > 0)
+    .sort((a, b) =>
+      a.normalizedHeadword < b.normalizedHeadword
+        ? -1
+        : a.normalizedHeadword > b.normalizedHeadword
+          ? 1
+          : 0,
+    );
+
+  searchableEntriesCache.set(entries, searchableEntries);
+  return searchableEntries;
+}
+
 type MatchTier = 1 | 2 | 3 | 4;
 
 type MatchResult = {
@@ -69,6 +91,7 @@ export type DictionaryLookupOptions = {
 function findMatchesWithTier(entries: DictionaryEntry[], text: string): MatchResult {
   if (entries.length === 0 || text.length === 0) return { matches: [], tier: null };
 
+  const searchableEntries = getSearchableEntries(entries);
   const normalizedText = normalizeLookupText(text);
   if (!normalizedText) return { matches: [], tier: null };
 
@@ -76,17 +99,6 @@ function findMatchesWithTier(entries: DictionaryEntry[], text: string): MatchRes
   const MAX_FUZZY_DISTANCE = 2;
   const MAX_FUZZY_CANDIDATES = 200;
   const MAX_RESULTS = 3;
-
-  const searchableEntries = entries
-    .map((entry) => ({ entry, normalizedHeadword: normalizeLookupText(entry.headword) }))
-    .filter((entry) => entry.normalizedHeadword.length > 0)
-    .sort((a, b) =>
-      a.normalizedHeadword < b.normalizedHeadword
-        ? -1
-        : a.normalizedHeadword > b.normalizedHeadword
-          ? 1
-          : 0,
-    );
 
   let lo = 0;
   let hi = searchableEntries.length - 1;
@@ -142,7 +154,7 @@ function findMatchesWithTier(entries: DictionaryEntry[], text: string): MatchRes
 
 /**
  * Find matching entries in a single dictionary.
- * Pure function exported for unit testing.
+ * The normalized search index is cached internally for repeated lookups.
  *
  * Tiers (each is exclusive, later tiers only run if earlier found nothing):
  * 1. Exact match via binary search on normalized headwords
@@ -163,22 +175,6 @@ function compressGzip(data: Uint8Array): Promise<Uint8Array> {
       else resolve(compressed);
     });
   });
-}
-
-/** Get all user dictionary metadata from settings. */
-export async function getUserDictionaryMeta(): Promise<UserDictionary[]> {
-  // Access the settings store directly to read userDictionaryMeta
-  // We import lazily to avoid circular deps
-  const { useSettingsStore } = await import('@/store/settingsStore');
-  return useSettingsStore.getState().settings.userDictionaryMeta ?? [];
-}
-
-/** Persist updated user dictionary metadata to settings. */
-export async function saveUserDictionaryMeta(meta: UserDictionary[]): Promise<void> {
-  const { useSettingsStore } = await import('@/store/settingsStore');
-  const current = useSettingsStore.getState().settings;
-  // Use setSettings to update in-memory state; callers responsible for full save
-  useSettingsStore.getState().setSettings({ ...current, userDictionaryMeta: meta });
 }
 
 async function dictionaryDataRecord(id: string): Promise<{
@@ -292,7 +288,8 @@ export async function importUserDictionary(
     };
 
     await aiStore.putRecord(DICTIONARY_STORE, { id, meta: userMeta, blob: compressed });
-    // Cache entries
+    // Ensure any stale cache entry for this id is cleared before setting the new one.
+    memoryCache.delete(id);
     memoryCache.set(id, entries);
 
     return userMeta;
@@ -386,6 +383,7 @@ export async function lookupDefinitions(
   text: string,
   sourceLang: string,
   targetLang: string,
+  userDictionaryMeta: UserDictionary[],
   options: DictionaryLookupOptions = {},
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
@@ -397,7 +395,7 @@ export async function lookupDefinitions(
   const normalizedSourceLang = normalizedLangCode(sourceLang);
   const normalizedTargetLang = normalizedLangCode(targetLang);
 
-  const allUser = (await getUserDictionaryMeta()).filter(
+  const allUser = userDictionaryMeta.filter(
     (dictionary) => dictionary.enabled !== false && dictionary.source === 'user',
   );
   const matching = allUser.filter((dictionary) => {
@@ -410,11 +408,16 @@ export async function lookupDefinitions(
   });
 
   // Rank them
-  const ranked: RankedEntry[] = [];
-  for (const dict of matching) {
-    const entries = await loadDictionaryEntries(dict.id);
-    if (entries.length === 0) continue;
+  const loadedDicts = await Promise.all(
+    matching.map(async (dict) => ({
+      dict,
+      entries: await loadDictionaryEntries(dict.id),
+    })),
+  );
 
+  const ranked: RankedEntry[] = [];
+  for (const { dict, entries } of loadedDicts) {
+    if (entries.length === 0) continue;
     const isMonolingual =
       normalizedLangCode(dict.language) === normalizedLangCode(dict.targetLanguage);
     ranked.push(rankEntry(dict.id, dict.name, dict.importedAt, isMonolingual));

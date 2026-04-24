@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST } from '@/services/ai/capabilities';
 
 vi.mock('@/utils/access', () => ({
   validateUserAndToken: vi.fn().mockResolvedValue({ user: { id: 'u1' }, token: 't' }),
@@ -29,16 +30,19 @@ describe('/api/ai/embed', () => {
     expect(json.error).toMatch(/not allowed/i);
   });
 
-  test('accepts whitelisted embedding model', async () => {
-    const req = new NextRequest('http://localhost/api/ai/embed', {
-      method: 'POST',
-      body: JSON.stringify({
-        texts: ['hello'],
-        model: 'openai/text-embedding-3-small',
-        apiKey: 'test-key',
-      }),
-    });
-    const res = await POST(req);
-    expect(res.status).not.toBe(400);
-  });
+  test.each(AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST)(
+    'accepts whitelisted embedding model %s',
+    async (model) => {
+      const req = new NextRequest('http://localhost/api/ai/embed', {
+        method: 'POST',
+        body: JSON.stringify({
+          texts: ['hello'],
+          model,
+          apiKey: 'test-key',
+        }),
+      });
+      const res = await POST(req);
+      expect(res.status).not.toBe(400);
+    },
+  );
 });

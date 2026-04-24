@@ -68,6 +68,7 @@ export interface FoliateView extends HTMLElement {
   open: (book: BookDoc) => Promise<void>;
   close: () => void;
   init: (options: { lastLocation: string }) => void;
+  startMediaOverlay?: () => Promise<void>;
   goTo: (href: string) => void;
   goToFraction: (fraction: number) => void;
   prev: (distance?: number) => void;
@@ -116,6 +117,16 @@ export interface FoliateView extends HTMLElement {
     clear: () => void;
   };
   renderer: Renderer;
+  mediaOverlay?: EventTarget & {
+    start: (
+      sectionIndex: number,
+      filter?: (item: { text: string; begin: number; end: number }) => boolean,
+    ) => Promise<void>;
+    pause: () => void;
+    resume: () => void;
+    stop: () => void;
+    setRate: (rate: number) => void;
+  };
 }
 
 export const wrappedFoliateView = (originalView: FoliateView): FoliateView => {

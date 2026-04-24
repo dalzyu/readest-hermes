@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { embed, embedMany, createGateway } from 'ai';
 import { validateUserAndToken } from '@/utils/access';
+import {
+  AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST,
+  isAllowedAIGatewayEmbeddingModel,
+} from '@/services/ai/capabilities';
 
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -11,14 +15,14 @@ export async function POST(req: Request): Promise<Response> {
 
     const { texts, single, apiKey, model } = await req.json();
 
-    const ALLOWED_EMBEDDING_MODELS = new Set([
-      'openai/text-embedding-3-small',
-      'openai/text-embedding-3-large',
-      'google/text-embedding-004',
-      'cohere/embed-multilingual-v3',
-    ]);
+    if (model !== undefined && model !== null && typeof model !== 'string') {
+      return NextResponse.json({ error: 'Embedding model not allowed' }, { status: 400 });
+    }
 
-    if (model && !ALLOWED_EMBEDDING_MODELS.has(model as string)) {
+    const embeddingModelName =
+      model || process.env['AI_GATEWAY_EMBEDDING_MODEL'] || AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST[0];
+
+    if (!isAllowedAIGatewayEmbeddingModel(embeddingModelName)) {
       return NextResponse.json({ error: 'Embedding model not allowed' }, { status: 400 });
     }
 
@@ -32,9 +36,7 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const gateway = createGateway({ apiKey: gatewayApiKey });
-    const embeddingModel = gateway.embeddingModel(
-      model || process.env['AI_GATEWAY_EMBEDDING_MODEL'] || 'openai/text-embedding-3-small',
-    );
+    const embeddingModel = gateway.embeddingModel(embeddingModelName);
 
     if (single) {
       const { embedding } = await embed({ model: embeddingModel, value: texts[0] });

@@ -1,13 +1,15 @@
 import clsx from 'clsx';
 import React, { useCallback, useEffect, useRef } from 'react';
-import { FaHeadphones } from 'react-icons/fa6';
+import { FaCirclePause, FaCirclePlay, FaHeadphones } from 'react-icons/fa6';
 import { RiArrowLeftSLine, RiArrowRightSLine } from 'react-icons/ri';
 import { RiArrowGoBackLine, RiArrowGoForwardLine } from 'react-icons/ri';
 import { RiArrowLeftDoubleLine, RiArrowRightDoubleLine } from 'react-icons/ri';
 import { getNavigationIcon, getNavigationLabel, getNavigationHandler } from './utils';
 import { useReaderStore } from '@/store/readerStore';
+import { useAudioSyncStore } from '@/store/audioSyncStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useBookDataStore } from '@/store/bookDataStore';
+import { useAudioSync } from '@/hooks/useAudioSync';
 import { FooterBarChildProps } from './types';
 import { formatProgress } from '@/utils/progress';
 import Button from '@/components/Button';
@@ -23,12 +25,15 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
 }) => {
   const _ = useTranslation();
   const { hoveredBookKey, getView, getViewState, getProgress, getViewSettings } = useReaderStore();
+  const { sessionStates } = useAudioSyncStore();
   const { getBookData } = useBookDataStore();
+  const { controller: audioSyncController, status: audioSyncStatus } = useAudioSync(bookKey);
   const view = getView(bookKey);
   const bookData = getBookData(bookKey);
   const progress = getProgress(bookKey);
   const viewState = getViewState(bookKey);
   const viewSettings = getViewSettings(bookKey);
+  const audioSession = sessionStates[bookKey.split('-')[0]!];
   const progressStyle = viewSettings?.progressStyle || 'percentage';
 
   const [progressValue, setProgressValue] = React.useState(
@@ -64,6 +69,15 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
     },
     [navigationHandlers],
   );
+
+  const handleToggleAudiobook = useCallback(async () => {
+    if (!audioSyncController) return;
+    if (audioSession?.mode === 'playing') {
+      audioSyncController.pause();
+      return;
+    }
+    await audioSyncController.play();
+  }, [audioSession?.mode, audioSyncController]);
 
   const isMobile = window.innerWidth < 640 || window.innerHeight < 640;
 
@@ -136,6 +150,20 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
         value={progressValue}
         onChange={(e) => handleProgressChange(parseInt(e.target.value, 10))}
       />
+      {audioSyncStatus?.playable && (
+        <Button
+          icon={
+            audioSession?.mode === 'playing' ? (
+              <FaCirclePause className='text-blue-500' />
+            ) : (
+              <FaCirclePlay className='text-blue-500' />
+            )
+          }
+          onClick={() => void handleToggleAudiobook()}
+          label={audioSession?.mode === 'playing' ? _('Pause Audiobook') : _('Play Audiobook')}
+          disabled={!audioSyncController}
+        />
+      )}
       <Button
         icon={<FaHeadphones className={viewState?.ttsEnabled ? 'text-blue-500' : ''} />}
         onClick={onSpeakText!}

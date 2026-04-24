@@ -110,6 +110,7 @@ const ttsControllerInstances: unknown[] = [];
 // race ahead and construct a second TTSController. The test releases all
 // pending resolvers once both dispatches have had a chance to interleave.
 const pendingInitResolvers: Array<() => void> = [];
+const pendingOneTimeCallbacks: Array<() => void> = [];
 
 vi.mock('@/services/tts', () => ({
   TTSController: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
@@ -126,11 +127,36 @@ vi.mock('@/services/tts', () => ({
       setRate: vi.fn(),
       setVoice: vi.fn(),
       setTargetLang: vi.fn(),
-      speak: vi.fn(),
-      pause: vi.fn().mockResolvedValue(undefined),
-      resume: vi.fn().mockResolvedValue(undefined),
-      stop: vi.fn().mockResolvedValue(undefined),
-      shutdown: vi.fn().mockResolvedValue(undefined),
+      speak: vi.fn().mockImplementation((...args: unknown[]) => {
+        const [, oneTime, callback] = args as [
+          string,
+          boolean | undefined,
+          (() => void) | undefined,
+        ];
+        if (oneTime && callback) {
+          pendingOneTimeCallbacks.push(callback);
+        }
+      }),
+      pause: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+        this['state'] = 'paused';
+        return Promise.resolve(undefined);
+      }),
+      resume: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+        this['state'] = 'playing';
+        return Promise.resolve(undefined);
+      }),
+      start: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+        this['state'] = 'playing';
+        return Promise.resolve(undefined);
+      }),
+      stop: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+        this['state'] = 'stopped';
+        return Promise.resolve(undefined);
+      }),
+      shutdown: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+        this['state'] = 'stopped';
+        return Promise.resolve(undefined);
+      }),
       forward: vi.fn().mockResolvedValue(undefined),
       backward: vi.fn().mockResolvedValue(undefined),
       getVoices: vi.fn().mockResolvedValue([]),
@@ -200,15 +226,56 @@ vi.mock('@/app/reader/hooks/useTTSMediaSession', () => ({
 import { useTTSControl } from '@/app/reader/hooks/useTTSControl';
 import { eventDispatcher } from '@/utils/event';
 
+type MockTtsController = Record<string, unknown> & {
+  stop: ReturnType<typeof vi.fn>;
+  start: ReturnType<typeof vi.fn>;
+  shutdown: ReturnType<typeof vi.fn>;
+  speak: ReturnType<typeof vi.fn>;
+  state: string;
+};
+
 const Harness = () => {
   useTTSControl({ bookKey: 'book-1' });
   return null;
+};
+
+const flushMicrotasks = async (iterations = 10) => {
+  for (let i = 0; i < iterations; i++) await Promise.resolve();
+};
+
+const startAmbientSpeech = async (): Promise<MockTtsController> => {
+  const ambientDispatch = eventDispatcher.dispatch('tts-speak', { bookKey: 'book-1' });
+  await flushMicrotasks();
+  expect(ttsControllerInstances.length).toBe(1);
+  while (pendingInitResolvers.length > 0) pendingInitResolvers.shift()!();
+  await ambientDispatch;
+
+  const ambientController = ttsControllerInstances[0] as MockTtsController;
+  ambientController.state = 'playing';
+  return ambientController;
+};
+
+const startPopupSpeech = async (text = 'popup text'): Promise<MockTtsController> => {
+  const popupDispatch = eventDispatcher.dispatch('tts-popup-speak', {
+    bookKey: 'book-1',
+    text,
+    lang: 'en',
+  });
+  await flushMicrotasks();
+  expect(ttsControllerInstances.length).toBe(2);
+  while (pendingInitResolvers.length > 0) pendingInitResolvers.shift()!();
+  await popupDispatch;
+
+  const popupController = ttsControllerInstances[1] as MockTtsController;
+  expect(popupController.speak).toHaveBeenCalledTimes(1);
+  return popupController;
 };
 
 describe('useTTSControl concurrent tts-speak events', () => {
   beforeEach(() => {
     ttsControllerInstances.length = 0;
     pendingInitResolvers.length = 0;
+    pendingOneTimeCallbacks.length = 0;
   });
 
   afterEach(() => {
@@ -239,5 +306,68 @@ describe('useTTSControl concurrent tts-speak events', () => {
       while (pendingInitResolvers.length > 0) pendingInitResolvers.shift()!();
       await Promise.all([p1, p2]);
     });
+  });
+
+  it('restores ambient book TTS after popup speech finishes', async () => {
+    render(<Harness />);
+
+    let ambientController!: MockTtsController;
+    await act(async () => {
+      ambientController = await startAmbientSpeech();
+    });
+
+    let popupController!: MockTtsController;
+    await act(async () => {
+      popupController = await startPopupSpeech();
+    });
+
+    expect(ambientController.stop).toHaveBeenCalledTimes(1);
+
+    const popupSpeakCallback = pendingOneTimeCallbacks.shift();
+    expect(popupSpeakCallback).toBeDefined();
+
+    await act(async () => {
+      popupSpeakCallback?.();
+      await flushMicrotasks(5);
+    });
+
+    expect(popupController.shutdown).toHaveBeenCalledTimes(1);
+    expect(ambientController.start).toHaveBeenCalledTimes(1);
+    expect(ambientController.shutdown).not.toHaveBeenCalled();
+  });
+
+  it('stopping popup speech resumes ambient TTS without double-restoring', async () => {
+    render(<Harness />);
+
+    let ambientController!: MockTtsController;
+    await act(async () => {
+      ambientController = await startAmbientSpeech();
+    });
+
+    let popupController!: MockTtsController;
+    await act(async () => {
+      popupController = await startPopupSpeech();
+    });
+
+    expect(ambientController.stop).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await eventDispatcher.dispatch('tts-popup-stop', { bookKey: 'book-1' });
+      await flushMicrotasks(5);
+    });
+
+    expect(popupController.shutdown).toHaveBeenCalledTimes(1);
+    expect(ambientController.stop).toHaveBeenCalledTimes(1);
+
+    const staleCallback = pendingOneTimeCallbacks.shift();
+    expect(staleCallback).toBeDefined();
+
+    await act(async () => {
+      staleCallback?.();
+      await flushMicrotasks(5);
+    });
+
+    expect(ambientController.start).toHaveBeenCalledTimes(1);
+    expect(ambientController.shutdown).not.toHaveBeenCalled();
   });
 });

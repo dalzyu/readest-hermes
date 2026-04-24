@@ -1,16 +1,42 @@
 import type { Book } from '@/types/book';
 import type { BookSeries } from '@/services/contextTranslation/types';
 
+const WORD_TOKEN_PATTERN = /[\p{L}\p{N}\p{M}]+/gu;
+
+const suggestionSegmenter =
+  typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+    ? (() => {
+        try {
+          return new Intl.Segmenter('und', { granularity: 'word' });
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
+function tokenizeSuggestionText(value: string | undefined): string[] {
+  const normalized = (value || '').normalize('NFKC').toLowerCase().trim();
+  if (!normalized) return [];
+
+  if (suggestionSegmenter) {
+    const tokens = Array.from(suggestionSegmenter.segment(normalized))
+      .filter((segment) => segment.isWordLike)
+      .map((segment) => segment.segment)
+      .filter(Boolean);
+
+    if (tokens.length > 0) return tokens;
+  }
+
+  return normalized.match(WORD_TOKEN_PATTERN) ?? [];
+}
+
 /**
  * Normalize text for series-matching comparison.
- * Strips non-ASCII characters (CJK, Arabic, Cyrillic, etc.) so only
- * lowercase a-z and 0-9 remain.
+ * Uses Unicode normalization and word-aware tokenization so non-Latin scripts
+ * stay comparable while ASCII matching behavior remains intact.
  */
 export function normalizeSuggestionText(value: string | undefined): string {
-  return (value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gi, ' ')
-    .trim();
+  return tokenizeSuggestionText(value).join(' ');
 }
 
 /**
@@ -49,7 +75,8 @@ export function buildImportSeriesSuggestions(
   libraryBooks: Book[],
 ): ImportSeriesSuggestion[] {
   return importedBooks.flatMap<ImportSeriesSuggestion>((book) => {
-    const normTitle = normalizeSuggestionText(book.title);
+    const normTitleTokens = tokenizeSuggestionText(book.title);
+    const normTitle = normTitleTokens.join(' ');
     const normAuthor = normalizeSuggestionText(book.author);
 
     const candidates = existingSeries
@@ -67,11 +94,9 @@ export function buildImportSeriesSuggestions(
         const titleMatches =
           (!!normSeriesName && normTitle.includes(normSeriesName)) ||
           seriesBooks.some((sb) => {
-            const existingTitle = normalizeSuggestionText(sb.title);
-            if (!existingTitle) return false;
-            const overlap = existingTitle
-              .split(' ')
-              .filter((tok) => tok && normTitle.includes(tok));
+            const existingTitleTokens = tokenizeSuggestionText(sb.title);
+            if (!existingTitleTokens.length) return false;
+            const overlap = existingTitleTokens.filter((tok) => normTitleTokens.includes(tok));
             return overlap.length >= 2;
           });
 

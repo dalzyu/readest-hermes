@@ -1,7 +1,8 @@
 import clsx from 'clsx';
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { convertBlobUrlToDataUrl, BookDoc, getDirection } from '@/libs/document';
 import { BookConfig, PageInfo } from '@/types/book';
+import type { BookNote } from '@/types/book';
 import { FoliateView, wrappedFoliateView } from '@/types/view';
 import { Insets } from '@/types/misc';
 import { useEnv } from '@/context/EnvContext';
@@ -11,6 +12,7 @@ import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useCustomFontStore } from '@/store/customFontStore';
 import { useParallelViewStore } from '@/store/parallelViewStore';
+import { useAudioSyncStore } from '@/store/audioSyncStore';
 import { useMouseEvent, useTouchEvent, useLongPressEvent } from '../hooks/useIframeEvents';
 import { usePagination } from '../hooks/usePagination';
 import { useFoliateEvents } from '../hooks/useFoliateEvents';
@@ -55,6 +57,11 @@ import { getDirFromUILanguage } from '@/utils/rtl';
 import { isTauriAppPlatform } from '@/services/environment';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
+import type { AudioSyncWord } from '@/services/audioSync/types';
+import {
+  createAudioSyncWordHighlightNote,
+  findAudioSyncWord,
+} from '@/services/audioSync/highlight';
 import { lockScreenOrientation } from '@/utils/bridge';
 import { useTextTranslation } from '../hooks/useTextTranslation';
 import { useBookCoverAutoSave } from '../hooks/useAutoSaveBookCover';
@@ -98,14 +105,27 @@ const FoliateViewer: React.FC<{
   const bookData = getBookData(bookKey);
   const viewState = getViewState(bookKey);
   const viewSettings = getViewSettings(bookKey);
+  const bookHash = bookData?.book?.hash;
+  const activeAudioSyncWordId = useAudioSyncStore((state) =>
+    bookHash ? (state.sessionStates[bookHash]?.activeWordId ?? null) : null,
+  );
+  const audioSyncMap = useAudioSyncStore((state) =>
+    bookHash ? (state.statuses[bookHash]?.map ?? null) : null,
+  );
+  const activeAudioSyncWord = useMemo(
+    () => findAudioSyncWord(audioSyncMap, activeAudioSyncWordId),
+    [audioSyncMap, activeAudioSyncWordId],
+  );
 
   const viewRef = useRef<FoliateView | null>(null);
+  const audioSyncWordHighlightRef = useRef<BookNote | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isViewCreated = useRef(false);
   const doubleClickDisabled = useRef(!!viewSettings?.disableDoubleClick);
   const [toastMessage, setToastMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [scrollMargins, setScrollMargins] = useState({ top: 0, bottom: 0 });
+  const [docLoadVersion, setDocLoadVersion] = useState(0);
   const docLoaded = useRef(false);
 
   useAutoFocus<HTMLDivElement>({ ref: containerRef });
@@ -127,6 +147,99 @@ const FoliateViewer: React.FC<{
   useBookCoverAutoSave(bookKey);
   const { syncState, conflictDetails, resolveWithLocal, resolveWithRemote } = useKOSync(bookKey);
   useTextTranslation(bookKey, viewRef.current);
+
+  const resolveAudioSyncWordCfi = useCallback((word: AudioSyncWord): string | null => {
+    const view = viewRef.current;
+    if (!view) {
+      return null;
+    }
+
+    try {
+      const start = view.resolveCFI(word.cfiStart);
+      const end = view.resolveCFI(word.cfiEnd);
+      if (start.index !== end.index) {
+        return null;
+      }
+
+      const contents = view.renderer.getContents();
+      const content = contents.find((item) => item.index === start.index);
+      const doc = content?.doc;
+      if (!doc) {
+        return null;
+      }
+
+      const startRange = start.anchor(doc);
+      const endRange = end.anchor(doc);
+      const range = doc.createRange();
+      range.setStart(startRange.startContainer, startRange.startOffset);
+      range.setEnd(endRange.endContainer, endRange.endOffset);
+
+      return view.getCFI(start.index, range);
+    } catch (error) {
+      console.warn('Failed to resolve audio sync word highlight', { word, error });
+      return null;
+    }
+  }, []);
+
+  const removeAudioSyncWordHighlight = useCallback(() => {
+    const highlight = audioSyncWordHighlightRef.current;
+    const view = viewRef.current;
+    if (highlight && view) {
+      try {
+        view.addAnnotation(highlight, true);
+      } catch {
+        // Ignore stale annotations when the backing section has been unloaded.
+      }
+    }
+    audioSyncWordHighlightRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!activeAudioSyncWord) {
+      removeAudioSyncWordHighlight();
+      return;
+    }
+
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+
+    const cfi = resolveAudioSyncWordCfi(activeAudioSyncWord);
+    if (!cfi) {
+      removeAudioSyncWordHighlight();
+      return;
+    }
+
+    const currentHighlight = audioSyncWordHighlightRef.current;
+    const nextHighlight = createAudioSyncWordHighlightNote(
+      activeAudioSyncWord,
+      cfi,
+      themeCode.primary,
+    );
+    if (currentHighlight?.id === nextHighlight.id && currentHighlight.cfi === nextHighlight.cfi) {
+      return;
+    }
+
+    removeAudioSyncWordHighlight();
+    audioSyncWordHighlightRef.current = nextHighlight;
+    try {
+      view.addAnnotation(nextHighlight);
+    } catch (error) {
+      audioSyncWordHighlightRef.current = null;
+      console.warn('Failed to add audio sync word highlight', { highlight: nextHighlight, error });
+    }
+  }, [
+    activeAudioSyncWord,
+    docLoadVersion,
+    removeAudioSyncWordHighlight,
+    resolveAudioSyncWordCfi,
+    themeCode.primary,
+  ]);
+
+  useEffect(() => {
+    return () => removeAudioSyncWordHighlight();
+  }, [removeAudioSyncWordHighlight]);
 
   const progressRelocateHandler = (event: Event) => {
     const detail = (event as CustomEvent).detail;
@@ -204,6 +317,7 @@ const FoliateViewer: React.FC<{
     const detail = (event as CustomEvent).detail;
     console.log('doc index loaded:', detail.index);
     if (detail.doc) {
+      setDocLoadVersion((version) => version + 1);
       const renderer = viewRef.current?.renderer;
       const writingDir = renderer?.setStyles && getDirection(detail.doc);
       const viewSettings = getViewSettings(bookKey)!;

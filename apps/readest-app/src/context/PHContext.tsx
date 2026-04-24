@@ -11,12 +11,21 @@ const shouldDisablePostHog = () => {
   return localStorage.getItem(TELEMETRY_OPT_OUT_KEY) === 'true';
 };
 
+function decodeOptionalBase64(value: string | undefined): string {
+  if (!value) return '';
+  try {
+    return atob(value);
+  } catch {
+    return '';
+  }
+}
+
 const posthogUrl =
   process.env['NEXT_PUBLIC_POSTHOG_HOST'] ||
-  atob(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_URL_BASE64']!);
+  decodeOptionalBase64(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_URL_BASE64']);
 const posthogKey =
   process.env['NEXT_PUBLIC_POSTHOG_KEY'] ||
-  atob(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_KEY_BASE64']!);
+  decodeOptionalBase64(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_KEY_BASE64']);
 
 if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'production' && posthogKey) {
   if (!shouldDisablePostHog()) {

@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import type { FoliateView } from '@/types/view';
 import type { Insets } from '@/types/misc';
-import type { ViewSettings } from '@/types/book';
+import type { BookProgress, ViewSettings } from '@/types/book';
 
 vi.mock('@/store/bookDataStore', async () => {
   const { create } = await import('zustand');
@@ -65,12 +65,17 @@ import { useBookDataStore } from '@/store/bookDataStore';
 /**
  * Helper to seed a minimal ViewState in the store for a given key.
  */
-function seedViewState(key: string, overrides: Record<string, unknown> = {}) {
+function seedViewState(
+  key: string,
+  overrides: Record<string, unknown> & { bookHash?: string } = {},
+) {
+  const { bookHash = key, ...viewStateOverrides } = overrides;
   useReaderStore.setState((state) => ({
     viewStates: {
       ...state.viewStates,
       [key]: {
         key,
+        bookHash,
         view: null,
         viewerKey: `${key}-viewer`,
         isPrimary: true,
@@ -85,7 +90,28 @@ function seedViewState(key: string, overrides: Record<string, unknown> = {}) {
         viewSettings: null,
         sessionStartedAt: null,
         sessionStartPage: null,
-        ...overrides,
+        ...viewStateOverrides,
+      },
+    },
+  }));
+}
+
+function setDocumentVisibilityState(visibilityState: 'visible' | 'hidden') {
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    value: visibilityState,
+  });
+}
+
+function setViewCurrentPage(key: string, currentPage: number) {
+  useReaderStore.setState((state) => ({
+    viewStates: {
+      ...state.viewStates,
+      [key]: {
+        ...state.viewStates[key]!,
+        progress: {
+          pageinfo: { current: currentPage },
+        } as BookProgress,
       },
     },
   }));
@@ -102,6 +128,7 @@ describe('readerStore', () => {
     useBookDataStore.setState({ booksData: {} });
     mockReadingStatsRecordSession.mockReset();
     mockReadingStatsRecordSession.mockReturnValue(true);
+    setDocumentVisibilityState('visible');
   });
 
   describe('initial state', () => {
@@ -339,28 +366,36 @@ describe('readerStore', () => {
       vi.useRealTimers();
     });
 
-    test('recordSession persists completed session and clears tracking state', () => {
+    test('recordSession preserves hyphenated bookHash and clears tracking state', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-04-11T20:30:00Z'));
-      seedViewState('book-1', {
+      seedViewState('book-hash-with-hyphen-0', {
+        bookHash: 'book-hash-with-hyphen',
         inited: true,
         sessionStartedAt: new Date('2026-04-11T20:00:00Z').getTime(),
         sessionStartPage: 10,
         progress: { pageinfo: { current: 18 } },
       });
 
-      const recorded = useReaderStore.getState().recordSession('book-1');
+      const recorded = useReaderStore.getState().recordSession('book-hash-with-hyphen-0');
 
       expect(recorded).toBe(true);
       expect(mockReadingStatsRecordSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          bookHash: 'book',
+          bookHash: 'book-hash-with-hyphen',
           secondsRead: 1800,
           pageDelta: 8,
         }),
       );
-      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartedAt).toBeNull();
-      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartPage).toBeNull();
+      expect(mockReadingStatsRecordSession).not.toHaveBeenCalledWith(
+        expect.objectContaining({ bookHash: 'book' }),
+      );
+      expect(
+        useReaderStore.getState().viewStates['book-hash-with-hyphen-0']!.sessionStartedAt,
+      ).toBeNull();
+      expect(
+        useReaderStore.getState().viewStates['book-hash-with-hyphen-0']!.sessionStartPage,
+      ).toBeNull();
       vi.useRealTimers();
     });
 
@@ -372,7 +407,158 @@ describe('readerStore', () => {
       expect(recorded).toBe(false);
       expect(mockReadingStatsRecordSession).not.toHaveBeenCalled();
     });
+
+    test('beforeunload flushes an active session', () => {
+      vi.useFakeTimers();
+      const startedAt = new Date('2026-04-11T20:00:00Z').getTime();
+      vi.setSystemTime(startedAt);
+      seedViewState('book-1', {
+        bookHash: 'book-1',
+        inited: true,
+        sessionStartedAt: startedAt,
+        sessionStartPage: 10,
+        progress: { pageinfo: { current: 14 } },
+      });
+
+      vi.setSystemTime(new Date('2026-04-11T20:30:00Z'));
+      window.dispatchEvent(new Event('beforeunload'));
+
+      expect(mockReadingStatsRecordSession).toHaveBeenCalledTimes(1);
+      expect(mockReadingStatsRecordSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bookHash: 'book-1',
+          startedAt,
+          endedAt: new Date('2026-04-11T20:30:00Z').getTime(),
+          secondsRead: 1800,
+          pageDelta: 4,
+        }),
+      );
+      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartedAt).toBeNull();
+      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartPage).toBeNull();
+      vi.useRealTimers();
+    });
+
+    test('visibility loss checkpoints and visibility return resumes tracking', () => {
+      vi.useFakeTimers();
+      const startedAt = new Date('2026-04-11T20:00:00Z').getTime();
+      vi.setSystemTime(startedAt);
+      seedViewState('book-1', {
+        bookHash: 'book-1',
+        inited: true,
+        sessionStartedAt: startedAt,
+        sessionStartPage: 10,
+        view: { tagName: 'FOLIATE-VIEW' } as unknown as FoliateView,
+        progress: { pageinfo: { current: 12 } },
+      });
+
+      vi.setSystemTime(new Date('2026-04-11T20:30:00Z'));
+      setDocumentVisibilityState('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      expect(mockReadingStatsRecordSession).toHaveBeenCalledTimes(1);
+      expect(mockReadingStatsRecordSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bookHash: 'book-1',
+          startedAt,
+          endedAt: new Date('2026-04-11T20:30:00Z').getTime(),
+          secondsRead: 1800,
+          pageDelta: 2,
+        }),
+      );
+      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartedAt).toBeNull();
+      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartPage).toBeNull();
+
+      vi.setSystemTime(new Date('2026-04-11T20:31:00Z'));
+      setDocumentVisibilityState('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      const resumedState = useReaderStore.getState().viewStates['book-1']!;
+      expect(resumedState.sessionStartedAt).toBe(new Date('2026-04-11T20:31:00Z').getTime());
+      expect(resumedState.sessionStartPage).toBe(12);
+
+      setViewCurrentPage('book-1', 15);
+      vi.setSystemTime(new Date('2026-04-11T20:45:00Z'));
+      const recorded = useReaderStore.getState().recordSession('book-1');
+
+      expect(recorded).toBe(true);
+      expect(mockReadingStatsRecordSession).toHaveBeenCalledTimes(2);
+      expect(mockReadingStatsRecordSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          bookHash: 'book-1',
+          startedAt: new Date('2026-04-11T20:31:00Z').getTime(),
+          endedAt: new Date('2026-04-11T20:45:00Z').getTime(),
+          secondsRead: 840,
+          pageDelta: 3,
+        }),
+      );
+      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartedAt).toBeNull();
+      expect(useReaderStore.getState().viewStates['book-1']!.sessionStartPage).toBeNull();
+      vi.useRealTimers();
+    });
+
+    test('sub-second hidden intervals reset the session boundary before resume', () => {
+      vi.useFakeTimers();
+      try {
+        const startedAt = new Date('2026-04-11T20:00:00Z').getTime();
+        seedViewState('book-1', {
+          bookHash: 'book-1',
+          inited: true,
+          sessionStartedAt: startedAt,
+          sessionStartPage: 10,
+          view: { tagName: 'FOLIATE-VIEW' } as unknown as FoliateView,
+          progress: { pageinfo: { current: 12 } },
+        });
+
+        mockReadingStatsRecordSession.mockReturnValueOnce(false);
+
+        vi.setSystemTime(startedAt + 500);
+        setDocumentVisibilityState('hidden');
+        document.dispatchEvent(new Event('visibilitychange'));
+
+        expect(mockReadingStatsRecordSession).toHaveBeenCalledTimes(1);
+        expect(mockReadingStatsRecordSession).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bookHash: 'book-1',
+            startedAt,
+            endedAt: startedAt + 500,
+            secondsRead: 0,
+            pageDelta: 2,
+          }),
+        );
+
+        const hiddenState = useReaderStore.getState().viewStates['book-1']!;
+        expect(hiddenState.sessionStartedAt).toBeNull();
+        expect(hiddenState.sessionStartPage).toBeNull();
+
+        vi.setSystemTime(new Date('2026-04-11T20:05:00Z'));
+        setDocumentVisibilityState('visible');
+        document.dispatchEvent(new Event('visibilitychange'));
+
+        const resumedState = useReaderStore.getState().viewStates['book-1']!;
+        expect(resumedState.sessionStartedAt).toBe(new Date('2026-04-11T20:05:00Z').getTime());
+        expect(resumedState.sessionStartPage).toBe(12);
+
+        setViewCurrentPage('book-1', 15);
+        vi.setSystemTime(new Date('2026-04-11T20:20:00Z'));
+        const recorded = useReaderStore.getState().recordSession('book-1');
+
+        expect(recorded).toBe(true);
+        expect(mockReadingStatsRecordSession).toHaveBeenCalledTimes(2);
+        expect(mockReadingStatsRecordSession).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            bookHash: 'book-1',
+            startedAt: new Date('2026-04-11T20:05:00Z').getTime(),
+            endedAt: new Date('2026-04-11T20:20:00Z').getTime(),
+            secondsRead: 900,
+            pageDelta: 3,
+          }),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
+
   describe('indexing progress', () => {
     test('tracks run-scoped progress and clears after completion hold', () => {
       vi.useFakeTimers();

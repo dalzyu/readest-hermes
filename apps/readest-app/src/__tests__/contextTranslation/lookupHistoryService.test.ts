@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import {
   clearLookupHistory,
@@ -19,6 +19,10 @@ beforeEach(() => {
   clearLookupHistory();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('lookupHistoryService', () => {
   test('stores completed lookups and returns newest-first history for a book', () => {
     const nowSpy = vi.spyOn(Date, 'now');
@@ -35,7 +39,89 @@ describe('lookupHistoryService', () => {
     expect(history[0]!.recordedAt).toBe(2_000);
     expect(history[1]!.term).toBe('old');
     expect(history[1]!.recordedAt).toBe(1_000);
-    nowSpy.mockRestore();
+  });
+
+  test('deduplicates by normalized signature and refreshes recordedAt and location', () => {
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockReturnValueOnce(1_000).mockReturnValueOnce(2_000);
+
+    saveLookupHistoryEntry(
+      makeEntry({
+        context: 'First context',
+        location: 'epubcfi(/6/2:0)',
+        result: { simpleDefinition: ' companion ', translation: ' close friend ' },
+      }),
+    );
+    saveLookupHistoryEntry(
+      makeEntry({
+        context: 'Second context',
+        location: 'epubcfi(/6/4:10)',
+        result: { translation: 'close friend', simpleDefinition: 'companion' },
+      }),
+    );
+
+    const history = getLookupHistoryForBook('book-1');
+    const stored = JSON.parse(localStorage.getItem('hermes:lookup-history:v2')!);
+
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      recordedAt: 2_000,
+      context: 'Second context',
+      location: 'epubcfi(/6/4:10)',
+      term: '知己',
+      bookHash: 'book-1',
+      mode: 'translation',
+    });
+    expect(history[0]!.result).toEqual({
+      simpleDefinition: 'companion',
+      translation: 'close friend',
+    });
+    expect(stored).toEqual({ version: 2, entries: history });
+  });
+
+  test('migrates legacy v1 arrays into v2 storage without losing entries', () => {
+    localStorage.setItem(
+      'hermes:lookup-history:v1',
+      JSON.stringify([
+        {
+          id: 'legacy-1',
+          recordedAt: 1_000,
+          bookHash: 'book-1',
+          term: 'legacy',
+          context: 'Legacy context',
+          result: { translation: 'legacy value' },
+          mode: 'translation',
+          location: 'epubcfi(/6/2:0)',
+        },
+        {
+          id: 'legacy-2',
+          recordedAt: 2_000,
+          bookHash: 'book-1',
+          term: 'older',
+          context: 'Older context',
+          result: { simpleDefinition: 'fallback' },
+          mode: 'dictionary',
+        },
+      ]),
+    );
+
+    const history = getLookupHistoryForBook('book-1');
+    const stored = JSON.parse(localStorage.getItem('hermes:lookup-history:v2')!);
+
+    expect(history).toHaveLength(2);
+    expect(history[0]).toMatchObject({
+      id: 'legacy-2',
+      recordedAt: 2_000,
+      term: 'older',
+      mode: 'dictionary',
+    });
+    expect(history[1]).toMatchObject({
+      id: 'legacy-1',
+      recordedAt: 1_000,
+      location: 'epubcfi(/6/2:0)',
+    });
+    expect(stored).toEqual({ version: 2, entries: history });
+    expect(localStorage.getItem('hermes:lookup-history:v1')).toBeNull();
   });
 
   test('ignores blank terms and empty result objects', () => {
@@ -60,6 +146,5 @@ describe('lookupHistoryService', () => {
 
     clearLookupHistory();
     expect(getLookupHistoryForBook('book-1')).toEqual([]);
-    nowSpy.mockRestore();
   });
 });

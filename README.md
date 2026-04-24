@@ -4,6 +4,8 @@
   <a href="#license">License</a>
 </p>
 
+Hermes releases do not ship the Readest/KOReader plugin; if you need that integration, follow the upstream [Readest KOReader sync guide][link-kosync-wiki].
+
 ## Contributors
 
 Hermes is open-source, and contributions are welcome! Feel free to open issues, suggest features, or submit pull requests. Please **review our [contributing guidelines](CONTRIBUTING.md) before you start**. We also welcome you to join our [Discord][link-discord] community for either support or contributing guidance.
@@ -77,7 +79,6 @@ We would also like to thank the [Web Chinese Fonts Plan](https://chinese-font.ne
 [link-gh-wiki]: https://github.com/dalzyu/readest-Readest/wiki
 [link-discord]: https://discord.gg/gntyVNk3BJ
 [link-parallel-read]: https://readest.com/#parallel-read
-[link-koreader]: https://github.com/koreader/koreader
 [link-hellogithub]: https://hellogithub.com/repository/8a5b6ade2aee461a8bd94e59200682a7
 [link-deepwiki]: https://deepwiki.com/readest/readest
 [link-locales]: https://github.com/dalzyu/readest-Readest/tree/main/apps/readest-app/public/locales

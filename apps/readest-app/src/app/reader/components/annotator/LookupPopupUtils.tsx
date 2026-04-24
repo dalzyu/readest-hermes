@@ -94,6 +94,11 @@ export function getRetrievalStatusMeta(status: RetrievalStatus): {
   className: string;
 } {
   switch (status) {
+    case 'idle':
+      return {
+        label: 'Not yet retrieved',
+        className: 'border-gray-500/40 bg-gray-500/10 text-gray-400',
+      };
     case 'cross-volume':
       return {
         label: 'Cross-volume context',
@@ -116,6 +121,10 @@ export function buildRetrievalInfoText(
   status: RetrievalStatus,
   hints: PopupRetrievalHints,
 ): string {
+  if (status === 'idle') {
+    return '';
+  }
+
   if (status === 'local-only') {
     if (hints.embeddingUnavailable) {
       return 'Configure an embedding model in AI settings to enable same-book and cross-volume retrieval.';

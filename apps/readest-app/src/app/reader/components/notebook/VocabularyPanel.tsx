@@ -17,6 +17,7 @@ import {
 } from '@/services/contextTranslation/vocabularyService';
 import { getLookupHistoryForBook } from '@/services/contextTranslation/lookupHistoryService';
 import { eventDispatcher } from '@/utils/event';
+import { useLookupHistoryReplay } from '../history/LookupHistoryReplay';
 
 interface VocabularyPanelProps {
   bookKey: string;
@@ -46,7 +47,7 @@ function getTranslationPreview(entry: VocabularyEntry): string {
   );
 }
 
-const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
+const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookKey, bookHash }) => {
   const _ = useTranslation();
   const { appService } = useEnv();
   const { settings } = useSettingsStore();
@@ -65,6 +66,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [isReviewSaving, setIsReviewSaving] = useState(false);
   const [recentLookups, setRecentLookups] = useState<LookupHistoryEntry[]>([]);
+  const { handleHistoryRowClick, replayPopup } = useLookupHistoryReplay(bookKey);
 
   // Quiz mode state
   type QuizMode = 'flashcard' | 'multiple-choice' | 'fill-blank' | 'listening' | 'reverse';
@@ -152,6 +154,31 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
       eventDispatcher.off('lookup-history-updated', handleLookupHistoryUpdated);
     };
   }, [bookHash, loadRecentLookups]);
+
+  useEffect(() => {
+    const handleVocabularyUpdated = async (event: CustomEvent) => {
+      const eventBookHash = (event.detail as { bookHash?: string } | undefined)?.bookHash;
+      if (eventBookHash && eventBookHash !== bookHash) return;
+
+      if (searchQuery.trim().length > 0) {
+        try {
+          const results = await searchVocabulary(searchQuery);
+          setEntries(results.filter((entry) => entry.bookHash === bookHash));
+        } catch {
+          setEntries([]);
+        }
+      } else {
+        await loadEntries();
+      }
+
+      await loadDueCount();
+    };
+
+    eventDispatcher.on('vocabulary-updated', handleVocabularyUpdated);
+    return () => {
+      eventDispatcher.off('vocabulary-updated', handleVocabularyUpdated);
+    };
+  }, [bookHash, loadDueCount, loadEntries, searchQuery]);
 
   const renderEntryFields = (entry: VocabularyEntry) => {
     const enabledFields = ctxSettings.outputFields
@@ -410,20 +437,49 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
     }
   }, [advanceToNext, fillBlankCorrect, fillBlankInput, isReviewSaving, reviewIndex, reviewQueue]);
 
-  const handleSpeakTerm = useCallback((entry: VocabularyEntry) => {
-    eventDispatcher.dispatch('tts-speak', {
-      bookKey: '',
-      text: entry.term,
-      oneTime: true,
-      ...(entry.sourceLanguage ? { lang: entry.sourceLanguage } : {}),
-    });
-  }, []);
+  const handleSpeakTerm = useCallback(
+    (entry: VocabularyEntry) => {
+      eventDispatcher.dispatch('tts-speak', {
+        bookKey,
+        text: entry.term,
+        oneTime: true,
+        ...(entry.sourceLanguage ? { lang: entry.sourceLanguage } : {}),
+      });
+    },
+    [bookKey],
+  );
 
   const enabledFields = ctxSettings.outputFields
     .filter((f) => f.enabled)
     .sort((a, b) => a.order - b.order);
 
   const currentReviewEntry = reviewQueue[reviewIndex] ?? null;
+
+  useEffect(() => {
+    if (
+      !isReviewing ||
+      quizMode !== 'multiple-choice' ||
+      !currentReviewEntry ||
+      mcChoices.length > 0
+    ) {
+      return;
+    }
+
+    let active = true;
+
+    const loadMcChoices = async () => {
+      const allEntries = await getVocabularyForBook(bookHash);
+      if (!active) return;
+      setMcChoices(generateMcChoices(currentReviewEntry, allEntries));
+    };
+
+    void loadMcChoices();
+
+    return () => {
+      active = false;
+    };
+  }, [bookHash, currentReviewEntry, generateMcChoices, isReviewing, mcChoices.length, quizMode]);
+
   const reviewButtonLabel = dueCount > 0 ? `${_('Review')} (${dueCount})` : _('Review vocabulary');
   const showRecentLookups =
     !isReviewing && !isSearching && searchQuery.trim().length === 0 && recentLookups.length > 0;
@@ -669,15 +725,27 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
               <ul className='space-y-1'>
                 {recentLookups.map((entry) => {
                   const preview = getRecentLookupPreview(entry);
+                  const title = entry.location
+                    ? _(
+                        'Click to replay this lookup. Shift/Ctrl/Cmd-click to jump to the saved location.',
+                      )
+                    : _('Click to replay this lookup.');
+
                   return (
-                    <li
-                      key={entry.id}
-                      className='border-base-300 bg-base-100 rounded-lg border px-3 py-2'
-                    >
-                      <p className='truncate text-sm font-medium'>{entry.term}</p>
-                      {preview && (
-                        <p className='text-base-content/50 mt-0.5 truncate text-xs'>{preview}</p>
-                      )}
+                    <li key={entry.id}>
+                      <button
+                        type='button'
+                        className='border-base-300 bg-base-100 hover:bg-base-300/50 block w-full rounded-lg border px-3 py-2 text-left transition-colors'
+                        onClick={(event) => {
+                          handleHistoryRowClick(entry, event);
+                        }}
+                        title={title}
+                      >
+                        <p className='truncate text-sm font-medium'>{entry.term}</p>
+                        {preview && (
+                          <p className='text-base-content/50 mt-0.5 truncate text-xs'>{preview}</p>
+                        )}
+                      </button>
                     </li>
                   );
                 })}
@@ -743,6 +811,7 @@ const VocabularyPanel: React.FC<VocabularyPanelProps> = ({ bookHash }) => {
           </ul>
         </div>
       )}
+      {replayPopup}
     </div>
   );
 };

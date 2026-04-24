@@ -38,6 +38,19 @@ describe('normalizeLookupResponse — plain JSON fallback', () => {
     expect(result['contextualMeaning']).toBe('a trusted companion');
   });
 
+  test('rejects an object with only unknown keys and falls back to raw text', () => {
+    const result = normalizeLookupResponse('{"foo":"bar"}', 'translation');
+    expect(result).toEqual({ translation: '{"foo":"bar"}' });
+  });
+
+  test('rejects an object with mixed known and unknown keys', () => {
+    const result = normalizeLookupResponse(
+      '{"translation":"hello","injected":"bad"}',
+      'translation',
+    );
+    expect(result).toEqual({ translation: '{"translation":"hello","injected":"bad"}' });
+  });
+
   test('parses fenced JSON blocks', () => {
     const result = normalizeLookupResponse(
       '```json\n{"translation":"知己","sourceExamples":["知己难逢", "得一知己足矣"]}\n```',
@@ -56,6 +69,15 @@ describe('normalizeLookupResponse — plain JSON fallback', () => {
     expect(result['translation']).toBe('ally');
     expect(result['contextualMeaning']).toBe('trusted helper');
   });
+
+  test('accepts valid objects with only known keys', () => {
+    const result = normalizeLookupResponse(
+      '{"translation":"hello","sourceExamples":["x","y"]}',
+      'translation',
+    );
+    expect(result['translation']).toBe('hello');
+    expect(result['sourceExamples']).toBe('x\n\ny');
+  });
 });
 
 describe('normalizeLookupResponse — XML tag fallback', () => {
@@ -73,8 +95,15 @@ describe('normalizeLookupResponse — XML tag fallback', () => {
     expect(result['contextualMeaning']).toBe('a greeting');
   });
 
-  test('falls back to raw text as translation when no tags are found', () => {
+  test('falls back to raw text as translation when no tags are found (translation mode)', () => {
     const result = normalizeLookupResponse('just plain text', 'translation');
     expect(result['translation']).toBe('just plain text');
+    expect(result['simpleDefinition']).toBeUndefined();
+  });
+
+  test('falls back to simpleDefinition when no tags are found in dictionary mode', () => {
+    const result = normalizeLookupResponse('just plain text', 'dictionary');
+    expect(result['simpleDefinition']).toBe('just plain text');
+    expect(result['translation']).toBeUndefined();
   });
 });

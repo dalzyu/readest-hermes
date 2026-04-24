@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import LibraryStatsCard from '@/app/library/components/LibraryStatsCard';
@@ -29,6 +29,9 @@ describe('LibraryStatsCard', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
     mockGetDailyStats.mockReset();
+    mockGetGoals.mockReset();
+    mockSetGoals.mockReset();
+    mockGetCurrentStreak.mockReset();
     mockGetGoals.mockReturnValue(NO_GOALS);
     mockSetGoals.mockImplementation((partial) => ({
       timeGoalMinutes: partial.timeGoalMinutes ?? 0,
@@ -106,6 +109,58 @@ describe('LibraryStatsCard', () => {
     // Card should still render so new users can set goals
     expect(screen.getByRole('heading', { name: 'Reading stats' })).toBeTruthy();
     expect(screen.getByTestId('library-stats-edit-goals-btn')).toBeTruthy();
+    expect(screen.getByTestId('library-stats-today').textContent).toBe('0m');
+  });
+
+  test('refreshes stats when storage events fire', () => {
+    mockGetDailyStats.mockReturnValueOnce([
+      { date: '2024-01-15', totalSecondsRead: 60, totalPagesRead: 1, sessions: 1 },
+    ]);
+    mockGetDailyStats.mockReturnValue([
+      { date: '2024-01-15', totalSecondsRead: 3600, totalPagesRead: 5, sessions: 2 },
+    ]);
+
+    render(<LibraryStatsCard />);
+
+    expect(screen.getByTestId('library-stats-today').textContent).toBe('1m');
+
+    fireEvent(window, new Event('storage'));
+
+    expect(screen.getByTestId('library-stats-today').textContent).toBe('1h');
+  });
+
+  test('refreshes goals when visibility changes', () => {
+    mockGetDailyStats.mockReturnValue([
+      { date: '2024-01-15', totalSecondsRead: 1800, totalPagesRead: 10, sessions: 1 },
+    ]);
+    mockGetGoals.mockReturnValueOnce(NO_GOALS);
+    mockGetGoals.mockReturnValue({ timeGoalMinutes: 30, pageGoal: 0 });
+
+    render(<LibraryStatsCard />);
+
+    expect(screen.queryByTestId('library-stats-goals')).toBeNull();
+
+    fireEvent(document, new Event('visibilitychange'));
+
+    expect(screen.getByTestId('library-stats-goals')).toBeTruthy();
+    expect(screen.getByTestId('library-stats-time-goal-pct').getAttribute('value')).toBe('100');
+  });
+
+  test('refreshes the current day at midnight without polling', () => {
+    vi.setSystemTime(new Date(2024, 0, 15, 23, 59, 30));
+
+    mockGetDailyStats.mockImplementation(() => [
+      { date: '2024-01-15', totalSecondsRead: 60, totalPagesRead: 1, sessions: 1 },
+    ]);
+
+    render(<LibraryStatsCard />);
+
+    expect(screen.getByTestId('library-stats-today').textContent).toBe('1m');
+
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
     expect(screen.getByTestId('library-stats-today').textContent).toBe('0m');
   });
 
