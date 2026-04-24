@@ -48,9 +48,11 @@ const AudioSyncStatusDialog: React.FC<AudioSyncStatusDialogProps> = ({
             </p>
           </div>
           <div>
-            <span className='font-bold'>{_('Playback')}</span>
+            <span className='font-bold'>{_('Audio file')}</span>
             <p className='text-neutral-content'>
-              {status?.playable ? _('Ready to play') : _('No attached audiobook')}
+              {status?.playable
+                ? _('Attached \u2014 sync required for highlighting')
+                : _('No audiobook attached')}
             </p>
           </div>
           <div>
