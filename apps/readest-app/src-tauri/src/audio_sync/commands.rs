@@ -671,9 +671,28 @@ fn helper_script_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("audio_sync_helper/whisperx_word_align.py")
 }
 
-fn helper_python_command() -> Option<(String, Vec<String>)> {
-    super::runtime_manager::dev_python_path()
-        .map(|python| (python.to_string_lossy().to_string(), Vec::new()))
+/// How to launch the WhisperX helper.
+enum HelperLaunch {
+    /// Repo dev venv: `python whisperx_word_align.py [args]`
+    Script { python: String },
+    /// App-managed PyInstaller binary: `audio-sync-helper.exe [args]`
+    FrozenExe { exe: String },
+}
+
+fn resolve_helper(app: &tauri::AppHandle) -> Option<HelperLaunch> {
+    // 1. Venv / script mode.
+    if let Some(python) = super::runtime_manager::discover_venv_python() {
+        return Some(HelperLaunch::Script {
+            python: python.to_string_lossy().to_string(),
+        });
+    }
+    // 2. App-managed frozen exe.
+    if let Some(exe) = super::runtime_manager::managed_helper_exe(app) {
+        return Some(HelperLaunch::FrozenExe {
+            exe: exe.to_string_lossy().to_string(),
+        });
+    }
+    None
 }
 
 fn drain_helper_messages(
@@ -725,11 +744,12 @@ fn try_run_whisperx_helper(
     request: &StartAlignmentJobRequest,
     run_id: &str,
     cancel: &Arc<AtomicBool>,
+    app: &tauri::AppHandle,
 ) -> Result<bool, String> {
-    let script = helper_script_path();
-    if !script.exists() {
-        return Ok(false);
-    }
+    let launch = match resolve_helper(app) {
+        Some(l) => l,
+        None => return Ok(false),
+    };
 
     let transcript_path = request
         .transcript_path
@@ -743,14 +763,19 @@ fn try_run_whisperx_helper(
         .report_path
         .as_ref()
         .ok_or_else(|| "Missing alignment report output path".to_string())?;
-    let (program, launcher_args) = match helper_python_command() {
-        Some(cmd) => cmd,
-        None => return Ok(false),
-    };
 
-    let mut command = Command::new(&program);
-    command.args(&launcher_args);
-    command.arg(script);
+    let mut command = match &launch {
+        HelperLaunch::Script { python } => {
+            let script = helper_script_path();
+            if !script.exists() {
+                return Ok(false);
+            }
+            let mut cmd = Command::new(python);
+            cmd.arg(script);
+            cmd
+        }
+        HelperLaunch::FrozenExe { exe } => Command::new(exe),
+    };
     command
         .arg("--input")
         .arg(transcript_path)
@@ -835,6 +860,7 @@ fn run_alignment_job(
     request: StartAlignmentJobRequest,
     run_id: String,
     cancel: Arc<AtomicBool>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
     update_job(
         &run_id,
@@ -856,7 +882,7 @@ fn run_alignment_job(
         return Err(format!("Unsupported alignment input version {}", input.version));
     }
 
-    if try_run_whisperx_helper(&request, &run_id, &cancel)? {
+    if try_run_whisperx_helper(&request, &run_id, &cancel, &app)? {
         return Ok(());
     }
 
@@ -978,13 +1004,14 @@ pub async fn import_audio_metadata(
 
 #[command]
 pub async fn start_alignment_job(
+    app: tauri::AppHandle,
     request: StartAlignmentJobRequest,
 ) -> Result<AudioAlignmentJobHandle, String> {
     let job_id = next_job_id();
     let cancel = create_job(&job_id);
     let run_id = job_id.clone();
     thread::spawn(move || {
-        if let Err(error) = run_alignment_job(request, run_id.clone(), cancel.clone()) {
+        if let Err(error) = run_alignment_job(request, run_id.clone(), cancel.clone(), app) {
             if is_cancelled(&cancel) {
                 update_job(
                     &run_id,

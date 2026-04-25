@@ -8,6 +8,10 @@ import {
   pollAudioAlignmentStatus,
   startAudioAlignment,
 } from '@/services/audioSync/AudioAlignmentService';
+import {
+  getAudioSyncHelperStatus,
+  installAudioSyncHelper,
+} from '@/services/audioSync/nativeBridge';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -192,6 +196,26 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
 
     setIsAudioBusy(true);
     try {
+      // Ensure helper is installed before starting alignment.
+      const helperStatus = await getAudioSyncHelperStatus();
+      if (helperStatus.state.state === 'notInstalled') {
+        const confirmed = window.confirm(
+          _('The WhisperX audio sync helper is not installed.') +
+            '\n\n' +
+            _('Hermes will download it now (~300 MB–2 GB depending on model). Continue?'),
+        );
+        if (!confirmed) return;
+        eventDispatcher.dispatch('toast', {
+          type: 'info',
+          message: _('Installing audio sync helper — this may take a few minutes…'),
+        });
+        await installAudioSyncHelper();
+        eventDispatcher.dispatch('toast', {
+          type: 'success',
+          message: _('Audio sync helper installed.'),
+        });
+      }
+
       const status = await startAudioAlignment(appService, book, { model: selectedModel });
       setBookAudioAsset(status.asset);
       setAudioSyncStatus(status);

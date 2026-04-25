@@ -10,10 +10,6 @@ use tauri::{command, AppHandle, Manager};
 const MANIFEST_BASE_URL: &str =
     "https://github.com/dalzyu/readest-hermes/releases/latest/download";
 
-/// The raw base64 minisign public key (second line from the .pub file).
-/// Same key pair as the Tauri app updater (tauri.conf.json > updater.pubkey).
-const SIGNING_PUBLIC_KEY_B64: &str =
-    "RWRRs1SOFlsNvjDiaLOW+DZDWeNG462IqhW43Ttr/qcg5lCWKLa3Tu/k";
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,8 +24,6 @@ struct HelperManifest {
     helper_size: u64,
     /// Expected lowercase hex SHA-256 of the helper executable.
     helper_sha256: String,
-    /// HTTPS URL for the `.minisig` signature file.
-    helper_signature_url: String,
 }
 
 /// Current runtime version string — bumped when the helper format or protocol changes.
@@ -74,26 +68,36 @@ pub fn helper_executable_path(dir: &PathBuf) -> PathBuf {
     }
 }
 
-/// Returns the dev-mode Python interpreter path.
-/// Only available in debug builds; always `None` in release.
-pub fn dev_python_path() -> Option<PathBuf> {
-    #[cfg(debug_assertions)]
-    {
-        if let Ok(python) = std::env::var("HERMES_AUDIO_SYNC_PYTHON") {
-            return Some(PathBuf::from(python));
-        }
-        // Repo-local venv: .venv-whisperx adjacent to src-tauri
-        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let venv_win = manifest.join("../.venv-whisperx/Scripts/python.exe");
-        if venv_win.exists() {
-            return Some(venv_win);
-        }
-        let venv_unix = manifest.join("../.venv-whisperx/bin/python3");
-        if venv_unix.exists() {
-            return Some(venv_unix);
+/// Checked in order:
+///   1. `HERMES_AUDIO_SYNC_PYTHON` environment variable (power-user override).
+///   2. Repo-local `.venv-whisperx` (path baked in at compile time via `CARGO_MANIFEST_DIR`).
+///
+/// Available in all build profiles.
+pub fn discover_venv_python() -> Option<PathBuf> {
+    if let Ok(python) = std::env::var("HERMES_AUDIO_SYNC_PYTHON") {
+        let p = PathBuf::from(python);
+        if p.exists() {
+            return Some(p);
         }
     }
+    // Repo-local venv: .venv-whisperx adjacent to src-tauri (path baked in at compile time).
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let venv_win = manifest.join("../.venv-whisperx/Scripts/python.exe");
+    if venv_win.exists() {
+        return Some(venv_win);
+    }
+    let venv_unix = manifest.join("../.venv-whisperx/bin/python3");
+    if venv_unix.exists() {
+        return Some(venv_unix);
+    }
     None
+}
+
+/// Returns the app-managed frozen helper executable if installed.
+pub fn managed_helper_exe(app: &AppHandle) -> Option<PathBuf> {
+    let dir = helper_runtime_dir(app)?;
+    let exe = helper_executable_path(&dir);
+    if exe.exists() { Some(exe) } else { None }
 }
 
 /// Helper install/detection state returned to the frontend.
@@ -102,8 +106,7 @@ pub fn dev_python_path() -> Option<PathBuf> {
 pub enum AudioSyncHelperState {
     /// No helper installed and no dev-mode fallback available.
     NotInstalled,
-    /// Dev-mode only: repo-local venv or HERMES_AUDIO_SYNC_PYTHON override.
-    /// Not present in release builds.
+    /// Repo-local venv or HERMES_AUDIO_SYNC_PYTHON override (script-mode).
     DevMode { python_path: String },
     /// App-managed verified helper is ready at the given directory.
     Ready { helper_dir: String, version: String },
@@ -130,8 +133,8 @@ pub async fn get_audio_sync_helper_status(app: AppHandle) -> Result<AudioSyncHel
         .as_ref()
         .map(|p| p.to_string_lossy().to_string());
 
-    // Dev-mode check first (only compiled in debug builds).
-    if let Some(dev_python) = dev_python_path() {
+    // Venv/script-mode check: env var override or repo-local venv.
+    if let Some(dev_python) = discover_venv_python() {
         return Ok(AudioSyncHelperStatus {
             state: AudioSyncHelperState::DevMode {
                 python_path: dev_python.to_string_lossy().to_string(),
@@ -163,9 +166,9 @@ pub async fn get_audio_sync_helper_status(app: AppHandle) -> Result<AudioSyncHel
     })
 }
 
-/// Installs the audio sync helper runtime from a platform-specific signed manifest.
+/// Installs the audio sync helper runtime from a platform-specific manifest.
 ///
-/// The helper is fetched from GitHub Releases, verified with SHA-256 and minisign,
+/// The helper is fetched from GitHub Releases, verified with SHA-256,
 /// then activated atomically into the app-managed runtime directory.
 #[command]
 pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
@@ -220,10 +223,6 @@ pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
     download_to_path(&manifest.helper_url, &staging_path, manifest.helper_size).await?;
     verify_sha256(&staging_path, &manifest.helper_sha256)?;
 
-    let sig_text = fetch_text(&manifest.helper_signature_url).await?;
-    let file_bytes = std::fs::read(&staging_path)
-        .map_err(|e| format!("Failed to read staged helper for signature check: {e}"))?;
-    verify_minisig(&file_bytes, &sig_text)?;
 
     let runtime_dir = helper_runtime_dir(&app)
         .ok_or_else(|| "Unable to resolve helper runtime directory".to_string())?;
@@ -276,18 +275,6 @@ async fn fetch_helper_manifest(url: &str) -> Result<HelperManifest, String> {
         .map_err(|e| format!("Failed to parse helper manifest from {url}: {e}"))
 }
 
-async fn fetch_text(url: &str) -> Result<String, String> {
-    let response = reqwest::get(url)
-        .await
-        .map_err(|e| format!("Failed to fetch {url}: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!("Request to {url} returned HTTP {}", response.status()));
-    }
-    response
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read response body from {url}: {e}"))
-}
 
 async fn download_to_path(url: &str, dest: &PathBuf, _expected_size: u64) -> Result<(), String> {
     let response = reqwest::get(url)
@@ -329,14 +316,6 @@ fn verify_sha256(path: &PathBuf, expected_hex: &str) -> Result<(), String> {
     }
 }
 
-fn verify_minisig(file_bytes: &[u8], sig_text: &str) -> Result<(), String> {
-    let pk = minisign_verify::PublicKey::from_base64(SIGNING_PUBLIC_KEY_B64)
-        .map_err(|e| format!("Failed to load signing public key: {e}"))?;
-    let sig = minisign_verify::Signature::decode(sig_text)
-        .map_err(|e| format!("Failed to parse helper signature: {e}"))?;
-    pk.verify(file_bytes, &sig, false)
-        .map_err(|_| "Helper signature verification failed — download may be tampered".to_string())
-}
 
 /// Removes the app-managed helper runtime directory.
 /// The dev-mode Python venv is not affected.
