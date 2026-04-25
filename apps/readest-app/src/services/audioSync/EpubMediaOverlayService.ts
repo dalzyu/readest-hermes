@@ -215,19 +215,29 @@ function wrapTextRange(doc: Document, range: Range, id: string): Element {
   return span;
 }
 
-function ensureFragmentTarget(doc: Document, entry: OverlayEntry, id: string): string {
-  const range = resolveTargetRange(doc, entry.cfiStart, entry.cfiEnd);
+function ensureFragmentTarget(doc: Document, entry: OverlayEntry, id: string): string | null {
+  let range: Range;
+  try {
+    range = resolveTargetRange(doc, entry.cfiStart, entry.cfiEnd);
+  } catch {
+    return null;
+  }
+
   if (entry.kind === 'word') {
-    return wrapTextRange(doc, range, id).id;
+    try {
+      return wrapTextRange(doc, range, id).id;
+    } catch {
+      const fallback = nearestTargetElement(range.startContainer);
+      if (!fallback) return null;
+      if (!fallback.id) fallback.setAttribute('id', id);
+      fallback.setAttribute('data-audio-sync', 'segment');
+      return fallback.id;
+    }
   }
 
   const element = nearestTargetElement(range.startContainer);
-  if (!element) {
-    throw new Error(`Unable to create fallback fragment target for ${entry.id}`);
-  }
-  if (!element.id) {
-    element.setAttribute('id', id);
-  }
+  if (!element) return null;
+  if (!element.id) element.setAttribute('id', id);
   element.setAttribute('data-audio-sync', 'segment');
   return element.id;
 }
@@ -632,11 +642,12 @@ export async function createEpubMediaOverlayPackage(input: {
       fragmentId: '',
     }));
     for (const target of [...fragmentTargets].reverse()) {
-      target.fragmentId = ensureFragmentTarget(
-        sectionDoc,
-        target.entry,
-        makeFragmentId(sectionPath, target.entry, target.index),
-      );
+      target.fragmentId =
+        ensureFragmentTarget(
+          sectionDoc,
+          target.entry,
+          makeFragmentId(sectionPath, target.entry, target.index),
+        ) || '';
     }
     replacements.set(sectionPath, serializeXml(sectionDoc));
 
@@ -651,6 +662,7 @@ export async function createEpubMediaOverlayPackage(input: {
     const validFragmentIds: string[] = [];
 
     for (const { entry, fragmentId } of fragmentTargets) {
+      if (!fragmentId) continue;
       if (
         entry.audioStartMs < 0 ||
         entry.audioEndMs <= entry.audioStartMs ||
