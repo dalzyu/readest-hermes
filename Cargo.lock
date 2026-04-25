@@ -14,7 +14,6 @@ dependencies = [
  "hex",
  "lofty",
  "log",
- "minisign-verify",
  "mp4ameta",
  "objc",
  "objc-foundation",
