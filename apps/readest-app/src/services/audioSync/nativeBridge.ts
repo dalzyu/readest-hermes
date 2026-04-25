@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 export interface InspectAudioMetadataRequest {
   audioPath: string;
@@ -138,4 +139,22 @@ export async function installAudioSyncHelper(): Promise<void> {
 
 export async function removeAudioSyncHelper(): Promise<void> {
   return invoke<void>('remove_audio_sync_helper');
+}
+
+// ── Helper install progress ────────────────────────────────────────────────
+
+export interface HelperInstallEvent {
+  phase: 'fetching' | 'downloading' | 'verifying' | 'installing';
+  progress: number; // 0-1
+  detail: string;
+}
+
+/**
+ * Subscribe to helper installation progress events emitted by the Rust side.
+ * Returns an unsubscribe function — call it when done to avoid leaks.
+ */
+export async function listenHelperInstallProgress(
+  callback: (event: HelperInstallEvent) => void,
+): Promise<() => void> {
+  return listen<HelperInstallEvent>('audio-sync:helper-install', (e) => callback(e.payload));
 }

@@ -11,6 +11,8 @@ import {
 import {
   getAudioSyncHelperStatus,
   installAudioSyncHelper,
+  listenHelperInstallProgress,
+  type HelperInstallEvent,
 } from '@/services/audioSync/nativeBridge';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
@@ -72,6 +74,7 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
   const [isAudioBusy, setIsAudioBusy] = useState(false);
   const [isAudioStatusDialogOpen, setIsAudioStatusDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(DEFAULT_WHISPERX_MODEL);
+  const [installProgress, setInstallProgress] = useState<HelperInstallEvent | null>(null);
   const { selectFiles } = useFileSelector(appService, _);
 
   // Initialize metadata edit hook
@@ -202,18 +205,18 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
         const confirmed = window.confirm(
           _('The WhisperX audio sync helper is not installed.') +
             '\n\n' +
-            _('Hermes will download it now (~300 MB–2 GB depending on model). Continue?'),
+            _('Hermes will download it now (~2.3 GB). Continue?'),
         );
         if (!confirmed) return;
-        eventDispatcher.dispatch('toast', {
-          type: 'info',
-          message: _('Installing audio sync helper — this may take a few minutes…'),
-        });
-        await installAudioSyncHelper();
-        eventDispatcher.dispatch('toast', {
-          type: 'success',
-          message: _('Audio sync helper installed.'),
-        });
+
+        setInstallProgress({ phase: 'fetching', progress: 0, detail: _('Contacting server…') });
+        const unlisten = await listenHelperInstallProgress((evt) => setInstallProgress(evt));
+        try {
+          await installAudioSyncHelper();
+        } finally {
+          unlisten();
+          setInstallProgress(null);
+        }
       }
 
       const status = await startAudioAlignment(appService, book, { model: selectedModel });
@@ -394,7 +397,7 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
           )}
           contentClassName='!px-6 !py-4'
         >
-          <div className='flex w-full select-text items-start justify-center'>
+          <div className='relative flex w-full select-text items-start justify-center'>
             {editMode && bookMeta ? (
               <BookDetailEdit
                 book={book}
@@ -438,6 +441,30 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
               />
             )}
           </div>
+          {installProgress && (
+            <div className='bg-base-100/95 absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-lg p-8'>
+              <p className='text-neutral-content text-sm font-semibold'>
+                {_('Installing Audio Sync Helper')}
+              </p>
+              <div className='w-full max-w-sm'>
+                <div className='bg-base-300 h-2 w-full overflow-hidden rounded-full'>
+                  <div
+                    className='bg-primary h-2 rounded-full transition-all duration-300'
+                    style={{ width: `${Math.round(installProgress.progress * 100)}%` }}
+                  />
+                </div>
+                <div className='mt-2 flex justify-between text-xs'>
+                  <span className='text-neutral-content/70 capitalize'>
+                    {installProgress.phase}
+                  </span>
+                  <span className='text-neutral-content/70'>
+                    {Math.round(installProgress.progress * 100)}%
+                  </span>
+                </div>
+              </div>
+              <p className='text-neutral-content/60 text-xs'>{installProgress.detail}</p>
+            </div>
+          )}
         </Dialog>
 
         <AudioSyncStatusDialog

@@ -3,13 +3,21 @@ use std::path::PathBuf;
 
 use futures_util::TryStreamExt;
 use serde::{Deserialize, Serialize};
-use tauri::{command, AppHandle, Manager};
+use tauri::{command, AppHandle, Emitter, Manager};
 
 /// Manifest URL pattern for the audio sync helper bundles.
 /// Fetches from GitHub Releases at the given tag.
 const MANIFEST_BASE_URL: &str =
     "https://github.com/dalzyu/readest-hermes/releases/latest/download";
 
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HelperInstallEvent {
+    phase: &'static str,
+    progress: f32,
+    detail: String,
+}
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -174,6 +182,14 @@ pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
     let manifest_url = format!("{MANIFEST_BASE_URL}/audio-sync-helper-manifest-{platform}.json");
 
     let manifest = fetch_helper_manifest(&manifest_url).await?;
+    let _ = app.emit(
+        "audio-sync:helper-install",
+        &HelperInstallEvent {
+            phase: "fetching",
+            progress: 0.02,
+            detail: "Manifest fetched — starting download".to_string(),
+        },
+    );
     if manifest.platform != platform {
         return Err(format!(
             "Manifest platform '{}' does not match expected '{}'",
@@ -218,9 +234,24 @@ pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
         active: true,
     };
 
-    download_to_path(&manifest.helper_url, &staging_path, manifest.helper_size).await?;
+    download_to_path(&manifest.helper_url, &staging_path, manifest.helper_size, &app).await?;
+    let _ = app.emit(
+        "audio-sync:helper-install",
+        &HelperInstallEvent {
+            phase: "verifying",
+            progress: 0.94,
+            detail: "Verifying download integrity".to_string(),
+        },
+    );
     verify_sha256(&staging_path, &manifest.helper_sha256)?;
-
+    let _ = app.emit(
+        "audio-sync:helper-install",
+        &HelperInstallEvent {
+            phase: "installing",
+            progress: 0.98,
+            detail: "Installing helper".to_string(),
+        },
+    );
 
     let runtime_dir = helper_runtime_dir(&app)
         .ok_or_else(|| "Unable to resolve helper runtime directory".to_string())?;
@@ -274,7 +305,7 @@ async fn fetch_helper_manifest(url: &str) -> Result<HelperManifest, String> {
 }
 
 
-async fn download_to_path(url: &str, dest: &PathBuf, _expected_size: u64) -> Result<(), String> {
+async fn download_to_path(url: &str, dest: &PathBuf, expected_size: u64, app: &AppHandle) -> Result<(), String> {
     let response = reqwest::get(url)
         .await
         .map_err(|e| format!("Failed to start download from {url}: {e}"))?;
@@ -286,6 +317,7 @@ async fn download_to_path(url: &str, dest: &PathBuf, _expected_size: u64) -> Res
         .map_err(|e| format!("Failed to create staging file at {}: {e}", dest.display()))?;
 
     let mut stream = response.bytes_stream();
+    let mut downloaded: u64 = 0;
     while let Some(chunk) = stream
         .try_next()
         .await
@@ -293,6 +325,20 @@ async fn download_to_path(url: &str, dest: &PathBuf, _expected_size: u64) -> Res
     {
         file.write_all(&chunk)
             .map_err(|e| format!("Failed to write download chunk: {e}"))?;
+        downloaded += chunk.len() as u64;
+        if expected_size > 0 {
+            let progress = (downloaded as f32 / expected_size as f32).min(0.93);
+            let dl_mb = downloaded / 1_048_576;
+            let total_mb = expected_size / 1_048_576;
+            let _ = app.emit(
+                "audio-sync:helper-install",
+                &HelperInstallEvent {
+                    phase: "downloading",
+                    progress,
+                    detail: format!("{dl_mb} MB / {total_mb} MB"),
+                },
+            );
+        }
     }
     file.flush()
         .map_err(|e| format!("Failed to flush download file: {e}"))?;

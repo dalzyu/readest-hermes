@@ -4,6 +4,17 @@ import Dialog from '@/components/Dialog';
 import { AudioSyncStatus } from '@/services/audioSync/types';
 import { useTranslation } from '@/hooks/useTranslation';
 
+const PHASE_LABELS: Record<string, string> = {
+  pending: 'Queued',
+  importing: 'Loading input',
+  matching: 'Matching chapters',
+  aligning: 'Transcribing & aligning',
+  compacting: 'Writing sync map',
+  ready: 'Complete',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+};
+
 interface AudioSyncStatusDialogProps {
   isOpen: boolean;
   status: AudioSyncStatus | null;
@@ -61,9 +72,36 @@ const AudioSyncStatusDialog: React.FC<AudioSyncStatusDialogProps> = ({
           </div>
           <div>
             <span className='font-bold'>{_('Job')}</span>
-            <p className='text-neutral-content'>{status?.job?.phase || _('Idle')}</p>
+            <p className='text-neutral-content'>
+              {status?.job ? (PHASE_LABELS[status.job.phase] ?? status.job.phase) : _('Idle')}
+            </p>
           </div>
         </div>
+
+        {status?.job && !['ready', 'failed', 'cancelled'].includes(status.job.phase) && (
+          <div>
+            <div className='bg-base-300 h-1.5 w-full overflow-hidden rounded-full'>
+              <div
+                className='bg-primary h-1.5 rounded-full transition-all duration-500'
+                style={{ width: `${status.job.progress}%` }}
+              />
+            </div>
+            {status.job.message && (
+              <p className='text-neutral-content/60 mt-1 text-xs'>{status.job.message}</p>
+            )}
+          </div>
+        )}
+
+        {status?.job?.phase === 'failed' && (
+          <div className='bg-error/10 border-error/20 rounded border p-3'>
+            <p className='text-error text-xs font-semibold'>{_('Sync failed')}</p>
+            <p className='text-error/80 mt-1 break-all text-xs'>
+              {status.job.message ||
+                status.job.error ||
+                _('Unknown error — check that the audio file is accessible.')}
+            </p>
+          </div>
+        )}
 
         {status?.map && (
           <div className='grid grid-cols-2 gap-4'>
