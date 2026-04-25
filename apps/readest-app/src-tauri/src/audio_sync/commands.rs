@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     io::{BufRead, BufReader, Read},
-    path::{Path, PathBuf},
+    path::Path,
     process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -11,6 +11,8 @@ use std::{
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+#[cfg(debug_assertions)]
+use std::path::PathBuf;
 
 use mp4ameta::Tag;
 use serde::{Deserialize, Serialize};
@@ -667,12 +669,14 @@ enum HelperMessage {
     Stderr(String),
 }
 
+#[cfg(debug_assertions)]
 fn helper_script_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("audio_sync_helper/whisperx_word_align.py")
 }
 
 /// How to launch the WhisperX helper.
 enum HelperLaunch {
+    #[cfg(debug_assertions)]
     /// Repo dev venv: `python whisperx_word_align.py [args]`
     Script { python: String },
     /// App-managed PyInstaller binary: `audio-sync-helper.exe [args]`
@@ -680,19 +684,17 @@ enum HelperLaunch {
 }
 
 fn resolve_helper(app: &tauri::AppHandle) -> Option<HelperLaunch> {
-    // 1. Venv / script mode.
+    // Debug only: use repo dev venv if present.
+    #[cfg(debug_assertions)]
     if let Some(python) = super::runtime_manager::discover_venv_python() {
         return Some(HelperLaunch::Script {
             python: python.to_string_lossy().to_string(),
         });
     }
-    // 2. App-managed frozen exe.
-    if let Some(exe) = super::runtime_manager::managed_helper_exe(app) {
-        return Some(HelperLaunch::FrozenExe {
-            exe: exe.to_string_lossy().to_string(),
-        });
-    }
-    None
+    // Release (and debug fallback): app-managed frozen exe.
+    super::runtime_manager::managed_helper_exe(app).map(|exe| HelperLaunch::FrozenExe {
+        exe: exe.to_string_lossy().to_string(),
+    })
 }
 
 fn drain_helper_messages(
@@ -765,6 +767,7 @@ fn try_run_whisperx_helper(
         .ok_or_else(|| "Missing alignment report output path".to_string())?;
 
     let mut command = match &launch {
+        #[cfg(debug_assertions)]
         HelperLaunch::Script { python } => {
             let script = helper_script_path();
             if !script.exists() {

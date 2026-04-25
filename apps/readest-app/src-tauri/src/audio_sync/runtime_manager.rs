@@ -68,11 +68,9 @@ pub fn helper_executable_path(dir: &PathBuf) -> PathBuf {
     }
 }
 
-/// Checked in order:
-///   1. `HERMES_AUDIO_SYNC_PYTHON` environment variable (power-user override).
-///   2. Repo-local `.venv-whisperx` (path baked in at compile time via `CARGO_MANIFEST_DIR`).
-///
-/// Available in all build profiles.
+/// Returns a Python interpreter from the local dev venv.
+/// Only available in debug builds — release builds use the app-managed helper.
+#[cfg(debug_assertions)]
 pub fn discover_venv_python() -> Option<PathBuf> {
     if let Ok(python) = std::env::var("HERMES_AUDIO_SYNC_PYTHON") {
         let p = PathBuf::from(python);
@@ -80,7 +78,6 @@ pub fn discover_venv_python() -> Option<PathBuf> {
             return Some(p);
         }
     }
-    // Repo-local venv: .venv-whisperx adjacent to src-tauri (path baked in at compile time).
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let venv_win = manifest.join("../.venv-whisperx/Scripts/python.exe");
     if venv_win.exists() {
@@ -133,7 +130,8 @@ pub async fn get_audio_sync_helper_status(app: AppHandle) -> Result<AudioSyncHel
         .as_ref()
         .map(|p| p.to_string_lossy().to_string());
 
-    // Venv/script-mode check: env var override or repo-local venv.
+    // Debug only: check for dev venv before the managed helper.
+    #[cfg(debug_assertions)]
     if let Some(dev_python) = discover_venv_python() {
         return Ok(AudioSyncHelperStatus {
             state: AudioSyncHelperState::DevMode {
