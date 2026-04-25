@@ -22,6 +22,10 @@ import {
   AudioSyncPackageValidationDiagnostic,
   BookAudioAsset,
 } from './types';
+import type {
+  SectionProcessorRequest,
+  SectionProcessorResponse,
+} from './audio-sync-worker-protocol';
 
 const EPUB_MEDIA_OVERLAY_GENERATOR = 'hermes/readest-epub3-media-overlays@v1';
 const XHTML_NS = 'http://www.w3.org/1999/xhtml';
@@ -584,6 +588,144 @@ async function validateGeneratedPackage(
   );
 }
 
+type OverlaySectionInput = {
+  sectionPath: string;
+  content: string;
+  entries: OverlayEntry[];
+};
+
+type ProcessedOverlaySection = {
+  processedContent: string;
+  fragmentIds: string[];
+};
+
+function shouldUseSectionProcessorWorkers(): boolean {
+  const isTestEnv =
+    typeof process !== 'undefined' &&
+    (process.env.NODE_ENV === 'test' || Boolean(process.env['VITEST']));
+  return !isTestEnv && typeof Worker !== 'undefined';
+}
+
+function getSectionProcessorWorkerCount(): number {
+  const cpuCount = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : 1;
+  if (!cpuCount || cpuCount <= 2) return 1;
+  return Math.min(4, Math.max(1, cpuCount - 1));
+}
+
+function createSectionProcessorWorker(): Worker {
+  return new Worker(
+    new URL('../../workers/audio-sync-section-processor.worker.ts', import.meta.url),
+    { type: 'module' },
+  );
+}
+
+async function processOverlaySectionInWorker(
+  worker: Worker,
+  section: OverlaySectionInput,
+): Promise<ProcessedOverlaySection> {
+  const request: SectionProcessorRequest = {
+    type: 'process-section',
+    payload: {
+      sectionPath: section.sectionPath,
+      content: section.content,
+      mimeType: 'application/xhtml+xml',
+      entries: section.entries.map((entry) => ({
+        id: entry.id,
+        cfiStart: entry.cfiStart,
+        cfiEnd: entry.cfiEnd,
+        audioStartMs: entry.audioStartMs,
+        audioEndMs: entry.audioEndMs,
+        kind: entry.kind,
+      })),
+    },
+  };
+
+  const response = await new Promise<SectionProcessorResponse>((resolve, reject) => {
+    const onMessage = (event: MessageEvent<SectionProcessorResponse>) => {
+      cleanup();
+      resolve(event.data);
+    };
+    const onError = (event: ErrorEvent) => {
+      cleanup();
+      reject(event.error || new Error(event.message));
+    };
+    const cleanup = () => {
+      worker.removeEventListener('message', onMessage);
+      worker.removeEventListener('error', onError);
+    };
+
+    worker.addEventListener('message', onMessage);
+    worker.addEventListener('error', onError);
+    worker.postMessage(request);
+  });
+
+  if (response.type === 'success') {
+    return {
+      processedContent: response.payload.content,
+      fragmentIds: response.payload.fragmentIds,
+    };
+  }
+
+  throw new Error(response.payload.message);
+}
+
+function processOverlaySectionSynchronously(section: OverlaySectionInput): ProcessedOverlaySection {
+  const doc = parseXml(section.content, 'application/xhtml+xml');
+  const fragmentIds = new Array(section.entries.length).fill('');
+
+  for (let index = section.entries.length - 1; index >= 0; index--) {
+    const entry = section.entries[index]!;
+    fragmentIds[index] =
+      ensureFragmentTarget(doc, entry, makeFragmentId(section.sectionPath, entry, index)) || '';
+  }
+
+  return {
+    processedContent: serializeXml(doc),
+    fragmentIds,
+  };
+}
+
+async function processOverlaySections(
+  sections: OverlaySectionInput[],
+): Promise<ProcessedOverlaySection[]> {
+  if (!shouldUseSectionProcessorWorkers()) {
+    return sections.map(processOverlaySectionSynchronously);
+  }
+
+  const workerCount = getSectionProcessorWorkerCount();
+  const workers = new Array(workerCount).fill(null).map(createSectionProcessorWorker);
+  const results: ProcessedOverlaySection[] = new Array(sections.length);
+  let nextIndex = 0;
+
+  await Promise.all(
+    workers.map(async (worker) => {
+      try {
+        while (true) {
+          const currentIndex = nextIndex;
+          nextIndex += 1;
+          const section = sections[currentIndex];
+          if (!section) break;
+          try {
+            results[currentIndex] = await processOverlaySectionInWorker(worker, section);
+          } catch (error) {
+            // Worker DOM is a best-effort performance optimization. If it fails, fall back
+            // to the in-thread implementation to preserve correctness.
+            try {
+              results[currentIndex] = processOverlaySectionSynchronously(section);
+            } catch {
+              throw error;
+            }
+          }
+        }
+      } finally {
+        worker.terminate();
+      }
+    }),
+  );
+
+  return results;
+}
+
 export async function createEpubMediaOverlayPackage(input: {
   book: Book;
   sourceFile: File;
@@ -623,6 +765,13 @@ export async function createEpubMediaOverlayPackage(input: {
   );
   let mediaOverlayIndex = 0;
 
+  const sectionsToProcess: Array<{
+    sectionPath: string;
+    manifestItem: ManifestItemRecord;
+    entries: OverlayEntry[];
+    content: string;
+  }> = [];
+
   for (const [sectionPath, entriesForSection] of overlayEntries.entries()) {
     const manifestItem = manifestByPath.get(sectionPath);
     if (!manifestItem) {
@@ -635,24 +784,33 @@ export async function createEpubMediaOverlayPackage(input: {
       continue;
     }
 
-    const sectionDoc = parseXml(await readText(sectionPath), 'application/xhtml+xml');
-    const fragmentTargets = entriesForSection.map((entry, index) => ({
-      entry,
-      index,
-      fragmentId: '',
-    }));
-    for (const target of [...fragmentTargets].reverse()) {
-      target.fragmentId =
-        ensureFragmentTarget(
-          sectionDoc,
-          target.entry,
-          makeFragmentId(sectionPath, target.entry, target.index),
-        ) || '';
-    }
-    replacements.set(sectionPath, serializeXml(sectionDoc));
+    sectionsToProcess.push({
+      sectionPath,
+      manifestItem,
+      entries: entriesForSection,
+      content: await readText(sectionPath),
+    });
+  }
 
-    const smilPath = resolveZipPath(opfPath, `smil/${sanitizeFragmentSegment(sectionPath)}.smil`);
-    const smilId = `mo-${manifestItem.id || sanitizeFragmentSegment(sectionPath)}-${mediaOverlayIndex}`;
+  const processedSections = await processOverlaySections(
+    sectionsToProcess.map((section) => ({
+      sectionPath: section.sectionPath,
+      content: section.content,
+      entries: section.entries,
+    })),
+  );
+
+  for (let sectionIndex = 0; sectionIndex < sectionsToProcess.length; sectionIndex++) {
+    const section = sectionsToProcess[sectionIndex]!;
+    const processed = processedSections[sectionIndex]!;
+
+    replacements.set(section.sectionPath, processed.processedContent);
+
+    const smilPath = resolveZipPath(
+      opfPath,
+      `smil/${sanitizeFragmentSegment(section.sectionPath)}.smil`,
+    );
+    const smilId = `mo-${section.manifestItem.id || sanitizeFragmentSegment(section.sectionPath)}-${mediaOverlayIndex}`;
     mediaOverlayIndex += 1;
     const smilDoc = parseXml(
       `<smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><seq/></body></smil>`,
@@ -661,7 +819,9 @@ export async function createEpubMediaOverlayPackage(input: {
     const seq = smilDoc.getElementsByTagName('seq')[0]!;
     const validFragmentIds: string[] = [];
 
-    for (const { entry, fragmentId } of fragmentTargets) {
+    for (let index = 0; index < section.entries.length; index++) {
+      const entry = section.entries[index]!;
+      const fragmentId = processed.fragmentIds[index] || '';
       if (!fragmentId) continue;
       if (
         entry.audioStartMs < 0 ||
@@ -672,7 +832,7 @@ export async function createEpubMediaOverlayPackage(input: {
           code: 'invalid-audio-clip',
           message: `Invalid clip range for ${entry.id}`,
           severity: 'error',
-          path: sectionPath,
+          path: section.sectionPath,
         });
         continue;
       }
@@ -681,7 +841,7 @@ export async function createEpubMediaOverlayPackage(input: {
       par.setAttribute('id', `${smilId}-${entry.id}`);
 
       const text = smilDoc.createElementNS(smilDoc.documentElement.namespaceURI, 'text');
-      text.setAttribute('src', `${relativeZipPath(smilPath, sectionPath)}#${fragmentId}`);
+      text.setAttribute('src', `${relativeZipPath(smilPath, section.sectionPath)}#${fragmentId}`);
       par.appendChild(text);
 
       const audio = smilDoc.createElementNS(smilDoc.documentElement.namespaceURI, 'audio');
@@ -696,21 +856,21 @@ export async function createEpubMediaOverlayPackage(input: {
     if (validFragmentIds.length === 0) {
       diagnostics.push({
         code: 'empty-media-overlay-section',
-        message: `Generated section ${sectionPath} does not contain any valid overlay entries`,
+        message: `Generated section ${section.sectionPath} does not contain any valid overlay entries`,
         severity: 'error',
-        path: sectionPath,
+        path: section.sectionPath,
       });
     }
 
     smilEntries.set(smilPath, serializeXml(smilDoc));
-    validationSections.set(sectionPath, {
+    validationSections.set(section.sectionPath, {
       fragmentIds: validFragmentIds,
       overlayCount: validFragmentIds.length,
     });
 
-    const existingOverlay = manifestItem.element.getAttribute('media-overlay');
+    const existingOverlay = section.manifestItem.element.getAttribute('media-overlay');
     const finalSmilId = existingOverlay || smilId;
-    manifestItem.element.setAttribute('media-overlay', finalSmilId);
+    section.manifestItem.element.setAttribute('media-overlay', finalSmilId);
 
     if (!existingOverlay) {
       const item = opf.createElementNS(OPF_NS, 'item');
