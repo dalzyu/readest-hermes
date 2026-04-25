@@ -937,7 +937,10 @@ export async function createEpubMediaOverlayPackage(input: {
     await writer.add(path, new TextReader(content), zipWriteOptions);
   }
 
-  await writer.add(audioPackagePath, new BlobReader(input.audioFile), zipWriteOptions);
+  await writer.add(audioPackagePath, new BlobReader(input.audioFile), {
+    ...zipWriteOptions,
+    level: 0,
+  });
   const blob = await writer.close();
   const file = new File([blob], AUDIO_SYNC_EPUB3_FILENAME, { type: 'application/epub+zip' });
   const validation = await validateGeneratedPackage(
