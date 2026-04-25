@@ -5,11 +5,14 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Iterable
+
+SAMPLE_RATE = 16000  # Hz; must match whisperx expected input rate
 
 LANGUAGES_WITHOUT_SPACES = {"ja", "zh"}
 CONTROL_CHARS_RE = re.compile(r"[\u0000-\u001f]+")
@@ -361,18 +364,46 @@ def resolve_span_for_token_range(context: ChapterContext, token_start: BookToken
     )
 
 
+def load_audio_slice(audio_path: str, start_ms: int, end_ms: int) -> Any:
+    """Load only the requested time slice of an audio file into a float32 numpy array.
+
+    Uses ffmpeg input-seeking so only the needed segment is decoded, keeping RAM
+    proportional to chapter length rather than total audiobook length.
+    """
+    import numpy as np
+
+    duration_ms = max(0, end_ms - start_ms)
+    if duration_ms == 0:
+        return np.zeros(0, dtype=np.float32)
+
+    cmd = [
+        "ffmpeg", "-nostdin", "-threads", "0",
+        "-ss", f"{start_ms / 1000.0:.3f}",
+        "-i", audio_path,
+        "-t", f"{duration_ms / 1000.0:.3f}",
+        "-f", "s16le", "-ac", "1", "-acodec", "pcm_s16le",
+        "-ar", str(SAMPLE_RATE), "-",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        raise HelperError(
+            f"Failed to load audio slice {start_ms}-{end_ms} ms from {audio_path!r}: "
+            f"{exc.stderr.decode(errors='replace')!r}"
+        ) from exc
+    return np.frombuffer(result.stdout, np.int16).flatten().astype(np.float32) / 32768.0
+
+
+
 def transcribe_audio_chunk(
     asr_model: Any,
-    audio: Any,
+    audio_path: str,
     chapter: ChapterContext,
     language: str | None,
     batch_size: int,
     chunk_size: int,
 ) -> tuple[Any, dict[str, Any]]:
-    sample_rate = 16000
-    start_idx = int(chapter.audio_start_ms * sample_rate / 1000)
-    end_idx = int(chapter.audio_end_ms * sample_rate / 1000)
-    audio_chunk = audio[start_idx:end_idx]
+    audio_chunk = load_audio_slice(audio_path, chapter.audio_start_ms, chapter.audio_end_ms)
     if len(audio_chunk) == 0:
         return audio_chunk, {"segments": []}
 
@@ -594,8 +625,6 @@ def run(args: argparse.Namespace) -> None:
     emit_progress("transcribing", 0.02, f"Loading WhisperX model '{args.model}' on {device} ({compute_type})")
     model = whisperx.load_model(args.model, device, compute_type=compute_type, download_root=model_dir, language=payload.get("language"))
 
-    emit_progress("importing", 0.08, "Loading audiobook audio")
-    audio = whisperx.load_audio(args.audio)
     chapter_contexts = build_chapter_contexts(payload)
     limit_chapters = args.limit_chapters or 0
     if limit_chapters > 0:
@@ -617,7 +646,7 @@ def run(args: argparse.Namespace) -> None:
         emit_progress("transcribing", 0.1 + chapter_progress_base * 0.25, f"Transcribing {context.title}")
         audio_chunk, transcription = transcribe_audio_chunk(
             model,
-            audio,
+            args.audio,
             context,
             payload.get("language"),
             args.batch_size,
