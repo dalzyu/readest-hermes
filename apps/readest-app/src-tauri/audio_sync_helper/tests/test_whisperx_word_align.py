@@ -10,7 +10,9 @@ from whisperx_word_align import (
     BookToken,
     TranscriptWord,
     align_transcript_to_book,
+    apply_bundled_nltk_data,
     chapter_progress,
+    write_json_atomic,
 )
 
 
@@ -49,6 +51,64 @@ class WhisperxWordAlignTests(unittest.TestCase):
         self.assertIs(mapping[1][1], book_tokens[1])
         self.assertIs(mapping[2][1], book_tokens[2])
 
+
+    def test_apply_bundled_nltk_data_appends_to_existing_paths(self) -> None:
+        import os
+
+        original = os.environ.get("NLTK_DATA")
+        try:
+            os.environ["NLTK_DATA"] = "/user/preferred/nltk_data"
+            bundled = Path("/bundled/nltk_data")
+            apply_bundled_nltk_data(bundled)
+            value = os.environ["NLTK_DATA"]
+            self.assertIn("/user/preferred/nltk_data", value)
+            self.assertIn(str(bundled), value)
+            self.assertTrue(
+                value.startswith(str(bundled)),
+                f"bundled path must come first, got {value!r}",
+            )
+        finally:
+            if original is None:
+                os.environ.pop("NLTK_DATA", None)
+            else:
+                os.environ["NLTK_DATA"] = original
+
+    def test_apply_bundled_nltk_data_sets_when_unset(self) -> None:
+        import os
+
+        original = os.environ.pop("NLTK_DATA", None)
+        try:
+            apply_bundled_nltk_data(Path("/only/bundled"))
+            self.assertEqual(os.environ["NLTK_DATA"], str(Path("/only/bundled")))
+        finally:
+            os.environ.pop("NLTK_DATA", None)
+            if original is not None:
+                os.environ["NLTK_DATA"] = original
+
+    def test_write_json_atomic_writes_via_tmp_then_renames(self) -> None:
+        import json
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "nested" / "out.json"
+            payload = {"hello": "world", "version": 2}
+            write_json_atomic(target, payload)
+            self.assertTrue(target.exists())
+            self.assertFalse(target.with_suffix(target.suffix + ".tmp").exists())
+            self.assertEqual(json.loads(target.read_text(encoding="utf-8")), payload)
+
+    def test_write_json_atomic_does_not_leave_partial_file_on_failure(self) -> None:
+        import tempfile
+
+        class Unserializable:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "out.json"
+            with self.assertRaises(TypeError):
+                write_json_atomic(target, {"bad": Unserializable()})
+            self.assertFalse(target.exists())
+            self.assertFalse(target.with_suffix(target.suffix + ".tmp").exists())
 
 if __name__ == "__main__":
     unittest.main()

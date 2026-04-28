@@ -130,6 +130,34 @@ def chapter_progress(chapter_index: int, phase: str, chapter_count: int) -> floa
     return SETUP_BUDGET + ((chapter_index + offset) / chapter_count) * ALIGN_BUDGET
 
 
+def apply_bundled_nltk_data(bundled_dir: Path) -> None:
+    """Prepend a bundled nltk_data directory to the NLTK_DATA path list.
+
+    `os.environ.setdefault` is not enough: NLTK accepts a path *list* in
+    NLTK_DATA, and a user with their own override would otherwise lose access
+    to the bundled corpora (e.g. punkt_tab) we ship with the frozen helper.
+    """
+    bundled = str(bundled_dir)
+    existing = os.environ.get("NLTK_DATA")
+    if existing:
+        os.environ["NLTK_DATA"] = f"{bundled}{os.pathsep}{existing}"
+    else:
+        os.environ["NLTK_DATA"] = bundled
+
+
+def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    """Write JSON to `path` atomically: serialize first, write a sibling .tmp,
+    then os.replace into place. A SIGTERM/Job-object kill mid-write therefore
+    cannot leave a half-written JSON document where storage validation expects
+    a complete one.
+    """
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(serialized, encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def load_alignment_input(path: str) -> dict[str, Any]:
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -617,8 +645,7 @@ def build_outputs(payload: dict[str, Any], model_name: str, device: str, segment
 def run(args: argparse.Namespace) -> None:
     ffmpeg_executable = ensure_ffmpeg_on_path()
     if hasattr(sys, "_MEIPASS"):
-        bundled_nltk = Path(getattr(sys, "_MEIPASS")) / "nltk_data"
-        os.environ.setdefault("NLTK_DATA", str(bundled_nltk))
+        apply_bundled_nltk_data(Path(getattr(sys, "_MEIPASS")) / "nltk_data")
 
     import torch
     import whisperx
@@ -712,10 +739,8 @@ def run(args: argparse.Namespace) -> None:
 
     emit_progress("compacting", 1.0 - COMPACT_BUDGET, "Writing sync artifacts")
     map_payload, report_payload = build_outputs(payload, args.model, device, segments, by_chapter, matched_chars, total_chars, warnings)
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.output).write_text(json.dumps(map_payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    Path(args.report).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.report).write_text(json.dumps(report_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_json_atomic(Path(args.output), map_payload)
+    write_json_atomic(Path(args.report), report_payload)
     emit_progress("ready", 1.0, "Generated WhisperX audiobook sync")
 
 

@@ -52,6 +52,15 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
+          # Install CUDA-enabled torch first on platforms that support it so the
+          # bundled helper has GPU acceleration. The CPU torch wheel from PyPI is
+          # the WhisperX dependency default and would otherwise win the resolver.
+          case "${{ runner.os }}" in
+            Linux|Windows)
+              python -m pip install --index-url https://download.pytorch.org/whl/cu121 \
+                torch torchaudio
+              ;;
+          esac
           python -m pip install -r apps/readest-app/src-tauri/audio_sync_helper/requirements.txt
           python -m pip install pyinstaller
 
@@ -80,9 +89,32 @@ jobs:
       - name: Build helper binary with PyInstaller
         shell: bash
         run: |
+          # PyInstaller's static analysis cannot follow torch / whisperx /
+          # transformers dynamic imports and resource loading, so we collect each
+          # required package wholesale and copy package metadata that
+          # `importlib.metadata.version(...)` lookups depend on at runtime.
           pyinstaller --noconfirm --clean --onefile \
             --name "audio-sync-helper-${{ matrix.platform }}" \
             --add-data "$RUNNER_TEMP/nltk_data${{ matrix.data_sep }}nltk_data" \
+            --collect-all torch \
+            --collect-all torchaudio \
+            --collect-all whisperx \
+            --collect-all transformers \
+            --collect-all faster_whisper \
+            --collect-all ctranslate2 \
+            --collect-all nltk \
+            --copy-metadata torch \
+            --copy-metadata torchaudio \
+            --copy-metadata transformers \
+            --copy-metadata tokenizers \
+            --copy-metadata regex \
+            --copy-metadata requests \
+            --copy-metadata packaging \
+            --copy-metadata filelock \
+            --copy-metadata numpy \
+            --copy-metadata tqdm \
+            --copy-metadata huggingface-hub \
+            --copy-metadata pyyaml \
             apps/readest-app/src-tauri/audio_sync_helper/whisperx_word_align.py
 
       - name: Prepare helper artifact
