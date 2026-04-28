@@ -89,3 +89,9 @@ Available gstack skills:
 - `/document-release` — Post-ship documentation update
 
 If gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
+
+### Audio Sync Helper Release
+
+> Scope: `apps/readest-app/src-tauri/audio_sync_helper/` runtime helper bundle.
+>
+> Use `.github/workflows/audio-sync-helper-release.yml` to build the frozen helper, bundle `nltk_data/punkt_tab`, sign the binary with the existing Tauri signing key, and upload `{helper, helper.minisig, audio-sync-helper-manifest-<platform>.json}` assets to a GitHub release.

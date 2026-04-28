@@ -63,6 +63,7 @@ export type NativeAudioAlignmentJobPhase =
   | 'importing'
   | 'matching'
   | 'aligning'
+  | 'transcribing'
   | 'compacting'
   | 'ready'
   | 'failed'
@@ -157,4 +158,14 @@ export async function listenHelperInstallProgress(
   callback: (event: HelperInstallEvent) => void,
 ): Promise<() => void> {
   return listen<HelperInstallEvent>('audio-sync:helper-install', (e) => callback(e.payload));
+}
+
+/**
+ * Subscribe to audio-sync job status events emitted by the Rust side.
+ * Returns an unsubscribe function — call it when done to avoid leaks.
+ */
+export async function listenAudioSyncJobStatus(
+  callback: (status: NativeAudioAlignmentJobStatus) => void,
+): Promise<() => void> {
+  return listen<NativeAudioAlignmentJobStatus>('audio-sync:job-status', (e) => callback(e.payload));
 }

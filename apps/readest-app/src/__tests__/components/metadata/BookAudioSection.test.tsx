@@ -74,6 +74,7 @@ describe('BookAudioSection', () => {
         busy={false}
         isDesktop
         model='large-v3'
+        helperState={{ state: 'ready', helperDir: '/tmp', version: '1' }}
         onAttach={vi.fn()}
         onGenerateSync={vi.fn()}
         onRemove={vi.fn()}
@@ -119,6 +120,7 @@ describe('BookAudioSection', () => {
         busy={false}
         isDesktop
         model='large-v3'
+        helperState={{ state: 'ready', helperDir: '/tmp', version: '1' }}
         onAttach={vi.fn()}
         onGenerateSync={vi.fn()}
         onRemove={vi.fn()}

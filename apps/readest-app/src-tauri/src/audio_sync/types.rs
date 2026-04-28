@@ -67,7 +67,7 @@ pub struct ReadAlignmentJobStatusRequest {
     pub job_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum AudioAlignmentJobState {
     Queued,

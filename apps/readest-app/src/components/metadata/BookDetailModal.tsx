@@ -1,18 +1,21 @@
 import clsx from 'clsx';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { Book } from '@/types/book';
 import { BookMetadata } from '@/libs/document';
 import { AudioSyncStatus, BookAudioAsset } from '@/services/audioSync/types';
 import {
-  pollAudioAlignmentStatus,
+  ensureAudioSyncPackage,
   startAudioAlignment,
 } from '@/services/audioSync/AudioAlignmentService';
 import {
   getAudioSyncHelperStatus,
   installAudioSyncHelper,
+  listenAudioSyncJobStatus,
   listenHelperInstallProgress,
+  type AudioSyncHelperState,
   type HelperInstallEvent,
+  type NativeAudioAlignmentJobStatus,
 } from '@/services/audioSync/nativeBridge';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
@@ -75,7 +78,9 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
   const [isAudioStatusDialogOpen, setIsAudioStatusDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(DEFAULT_WHISPERX_MODEL);
   const [installProgress, setInstallProgress] = useState<HelperInstallEvent | null>(null);
+  const [helperState, setHelperState] = useState<AudioSyncHelperState | null>(null);
   const { selectFiles } = useFileSelector(appService, _);
+  const packagedRunIdsRef = useRef<Set<string>>(new Set());
 
   // Initialize metadata edit hook
   const {
@@ -118,17 +123,23 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
     if (!currentAppService?.isDesktopApp) {
       setBookAudioAsset(null);
       setAudioSyncStatus(null);
+      setHelperState(null);
       return;
     }
 
     try {
-      const status = await currentAppService.getAudioSyncStatus(book);
+      const [status, helperStatus] = await Promise.all([
+        currentAppService.getAudioSyncStatus(book),
+        getAudioSyncHelperStatus(),
+      ]);
       setBookAudioAsset(status.asset);
       setAudioSyncStatus(status);
+      setHelperState(helperStatus.state);
     } catch (error) {
       console.warn('Failed to load audio sync status', error);
       setBookAudioAsset(null);
       setAudioSyncStatus(null);
+      setHelperState(null);
     }
   };
 
@@ -194,32 +205,43 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
     }
   };
 
+  const handleInstallHelper = async (): Promise<boolean> => {
+    if (!appService?.isDesktopApp) return false;
+
+    const confirmed = await appService.ask(
+      _('The WhisperX audio sync helper is not installed.') +
+        '\n\n' +
+        _('Hermes will download it now (~2.3 GB). Continue?'),
+    );
+    if (!confirmed) return false;
+
+    setInstallProgress({ phase: 'fetching', progress: 0, detail: _('Contacting server…') });
+    const unlisten = await listenHelperInstallProgress((evt) => setInstallProgress(evt));
+    try {
+      await installAudioSyncHelper();
+      const helperStatus = await getAudioSyncHelperStatus();
+      setHelperState(helperStatus.state);
+      return helperStatus.state.state === 'ready' || helperStatus.state.state === 'devMode';
+    } finally {
+      unlisten();
+      setInstallProgress(null);
+    }
+  };
+
   const handleGenerateAudioSync = async () => {
     if (!appService?.isDesktopApp || !bookAudioAsset) return;
 
     setIsAudioBusy(true);
     try {
-      // Ensure helper is installed before starting alignment.
-      const helperStatus = await getAudioSyncHelperStatus();
-      if (helperStatus.state.state === 'notInstalled') {
-        const confirmed = window.confirm(
-          _('The WhisperX audio sync helper is not installed.') +
-            '\n\n' +
-            _('Hermes will download it now (~2.3 GB). Continue?'),
-        );
-        if (!confirmed) return;
-
-        setInstallProgress({ phase: 'fetching', progress: 0, detail: _('Contacting server…') });
-        const unlisten = await listenHelperInstallProgress((evt) => setInstallProgress(evt));
-        try {
-          await installAudioSyncHelper();
-        } finally {
-          unlisten();
-          setInstallProgress(null);
-        }
+      const currentHelperState =
+        helperState?.state ?? (await getAudioSyncHelperStatus()).state.state;
+      if (currentHelperState === 'notInstalled' || currentHelperState === 'failed') {
+        const installed = await handleInstallHelper();
+        if (!installed) return;
       }
 
       const status = await startAudioAlignment(appService, book, { model: selectedModel });
+      packagedRunIdsRef.current.delete(status.job?.runId || '');
       setBookAudioAsset(status.asset);
       setAudioSyncStatus(status);
       setIsAudioStatusDialogOpen(true);
@@ -239,52 +261,64 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
 
   useEffect(() => {
     const runId = audioSyncStatus?.job?.runId;
-    const phase = audioSyncStatus?.job?.phase;
-    if (
-      !appService?.isDesktopApp ||
-      !runId ||
-      !phase ||
-      ['ready', 'failed', 'cancelled'].includes(phase)
-    ) {
+    if (!appService?.isDesktopApp || !runId) {
       return;
     }
 
     let disposed = false;
-    let timer: number | undefined;
+    let unlisten: (() => void) | undefined;
 
-    const pollStatus = async () => {
-      try {
-        const status = await pollAudioAlignmentStatus(appService, book, runId);
-        if (disposed) return;
-        setBookAudioAsset(status.asset);
-        setAudioSyncStatus(status);
-        if (
-          status.job?.phase &&
-          ['ready', 'failed', 'cancelled'].includes(status.job.phase) &&
-          timer
-        ) {
-          window.clearInterval(timer);
-        }
-      } catch (error) {
-        if (!disposed) {
-          console.warn('Failed to poll audio sync status', error);
+    const isTerminal = (phase?: NativeAudioAlignmentJobStatus['phase']): boolean =>
+      phase === 'ready' || phase === 'failed' || phase === 'cancelled';
+
+    const updateFromNativeStatus = async (job: NativeAudioAlignmentJobStatus) => {
+      if (disposed) return;
+      setAudioSyncStatus((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          job: {
+            runId: job.jobId,
+            phase: job.phase ?? current.job?.phase ?? 'pending',
+            progress: Math.round((job.progress ?? 0) * 100),
+            updatedAt: Date.now(),
+            message: job.detail || current.job?.message,
+            error: job.state === 'failed' ? job.detail : undefined,
+          },
+        };
+      });
+
+      if (job.phase === 'ready' && !packagedRunIdsRef.current.has(job.jobId)) {
+        packagedRunIdsRef.current.add(job.jobId);
+        try {
+          const status = await appService.getAudioSyncStatus(book, job.jobId);
+          const withPackage = await ensureAudioSyncPackage(appService, book, status, job.jobId);
+          if (disposed) return;
+          setBookAudioAsset(withPackage.asset);
+          setAudioSyncStatus(withPackage);
+        } catch (error) {
+          console.warn('Failed to finalize audio sync package', error);
         }
       }
     };
 
-    timer = window.setInterval(() => {
-      void pollStatus();
-    }, 1000);
-    void pollStatus();
+    void listenAudioSyncJobStatus((job) => {
+      if (job.jobId !== runId) return;
+      void updateFromNativeStatus(job);
+      if (isTerminal(job.phase) && unlisten) {
+        unlisten();
+      }
+    }).then((listener) => {
+      unlisten = listener;
+    });
 
     return () => {
       disposed = true;
-      if (timer) {
-        window.clearInterval(timer);
+      if (unlisten) {
+        unlisten();
       }
     };
-  }, [appService, audioSyncStatus?.job?.phase, audioSyncStatus?.job?.runId, book]);
-
+  }, [appService, audioSyncStatus?.job?.runId, book]);
   useEffect(() => {
     const fetchBookDetails = async () => {
       const appService = await envConfig.getAppService();
@@ -308,6 +342,8 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
     setBookMeta(null);
     setBookAudioAsset(null);
     setAudioSyncStatus(null);
+    setHelperState(null);
+    packagedRunIdsRef.current.clear();
     setEditMode(false);
     setActiveDeleteAction(null);
     setIsAudioStatusDialogOpen(false);
@@ -438,6 +474,10 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 onGenerateAudioSync={handleGenerateAudioSync}
                 onViewAudioSyncStatus={() => setIsAudioStatusDialogOpen(true)}
                 onAudioModelChange={setSelectedModel}
+                audioHelperState={helperState}
+                onInstallAudioSyncHelper={() => {
+                  void handleInstallHelper();
+                }}
               />
             )}
           </div>

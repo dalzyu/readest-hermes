@@ -7,7 +7,11 @@ import { AudioSyncMap, BookAudioAsset } from '@/services/audioSync/types';
 import { Book } from '@/types/book';
 import { configureZip } from '@/utils/zip';
 
-async function createFixtureEpub(): Promise<File> {
+type FixtureOptions = {
+  withExistingMediaOverlay?: boolean;
+};
+
+async function createFixtureEpub(options: FixtureOptions = {}): Promise<File> {
   await configureZip();
   const { BlobWriter, TextReader, ZipWriter } = await import('@zip.js/zip.js');
   const writer = new ZipWriter(new BlobWriter('application/epub+zip'), {
@@ -17,6 +21,16 @@ async function createFixtureEpub(): Promise<File> {
     lastAccessDate: new Date(0),
     lastModDate: new Date(0),
   };
+
+  const chapterItem = options.withExistingMediaOverlay
+    ? '<item id="chapter-1" href="text/chapter1.xhtml" media-type="application/xhtml+xml" media-overlay="legacy-mo"/>'
+    : '<item id="chapter-1" href="text/chapter1.xhtml" media-type="application/xhtml+xml"/>';
+  const existingOverlayItems = options.withExistingMediaOverlay
+    ? `
+          <item id="legacy-mo" href="smil/legacy.smil" media-type="application/smil+xml"/>
+          <item id="mo-chapter-1-0" href="smil/stale.smil" media-type="application/smil+xml"/>
+          <item id="unrelated-overlay" href="smil/unrelated.smil" media-type="application/smil+xml"/>`
+    : '';
 
   await writer.add('mimetype', new TextReader('application/epub+zip'), zipWriteOptions);
   await writer.add(
@@ -39,7 +53,7 @@ async function createFixtureEpub(): Promise<File> {
           <dc:language>en</dc:language>
         </metadata>
         <manifest>
-          <item id="chapter-1" href="text/chapter1.xhtml" media-type="application/xhtml+xml"/>
+          ${chapterItem}${existingOverlayItems}
         </manifest>
         <spine>
           <itemref idref="chapter-1"/>
@@ -56,9 +70,48 @@ async function createFixtureEpub(): Promise<File> {
       </html>`),
     zipWriteOptions,
   );
+  if (options.withExistingMediaOverlay) {
+    await writer.add(
+      'OEBPS/smil/legacy.smil',
+      new TextReader(
+        '<smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><seq/></body></smil>',
+      ),
+      zipWriteOptions,
+    );
+    await writer.add(
+      'OEBPS/smil/stale.smil',
+      new TextReader(
+        '<smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><seq/></body></smil>',
+      ),
+      zipWriteOptions,
+    );
+    await writer.add(
+      'OEBPS/smil/unrelated.smil',
+      new TextReader(
+        '<smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><seq/></body></smil>',
+      ),
+      zipWriteOptions,
+    );
+  }
 
   const blob = await writer.close();
   return new File([blob], 'fixture.epub', { type: 'application/epub+zip' });
+}
+
+async function readZipText(file: File, path: string): Promise<string> {
+  await configureZip();
+  const { BlobReader, TextWriter, ZipReader } = await import('@zip.js/zip.js');
+  const reader = new ZipReader(new BlobReader(file));
+  try {
+    const entries = await reader.getEntries();
+    const entry = entries.find((candidate) => candidate.filename === path);
+    if (!entry || entry.directory) {
+      throw new Error(`Missing ZIP file entry: ${path}`);
+    }
+    return await entry.getData(new TextWriter());
+  } finally {
+    await reader.close();
+  }
 }
 
 function makeBook(): Book {
@@ -171,7 +224,44 @@ describe('createEpubMediaOverlayPackage', () => {
 
     const generatedDoc = await generatedSection.createDocument();
     const serialized = generatedDoc.documentElement.outerHTML;
-    expect(serialized).toContain('cfi-inert');
     expect(serialized).toContain('data-audio-sync="word"');
+    expect(serialized).toContain('Hello</span> <span');
+    expect(serialized).toContain('brave</span>');
+  });
+
+  it('replaces stale media-overlay manifest wiring and removes duplicate regenerated SMIL id', async () => {
+    const sourceFile = await createFixtureEpub({ withExistingMediaOverlay: true });
+    const book = makeBook();
+    const audioFile = new File(['audio'], 'asset.mp3', { type: 'audio/mpeg' });
+    const asset: BookAudioAsset = {
+      id: 'asset-1',
+      bookHash: book.hash,
+      audioHash: 'audio-hash',
+      originalPath: `${book.hash}/audio/source.mp3`,
+      originalFilename: 'source.mp3',
+      normalizedPath: `${book.hash}/audio/normalized.mp3`,
+      format: 'mp3',
+      normalizedFormat: 'mp3',
+      durationMs: 2_000,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const map = await buildMap(sourceFile, book, asset);
+
+    const result = await createEpubMediaOverlayPackage({
+      book,
+      sourceFile,
+      audioFile,
+      asset,
+      map,
+    });
+
+    const opf = await readZipText(result.file, 'OEBPS/content.opf');
+    expect(opf).toContain(
+      'id="chapter-1" href="text/chapter1.xhtml" media-type="application/xhtml+xml" media-overlay="mo-chapter-1-0"',
+    );
+    expect((opf.match(/id="mo-chapter-1-0"/g) || []).length).toBe(1);
+    expect(opf).toContain('id="mo-chapter-1-0" href="smil/oebps-text-chapter1-xhtml.smil"');
+    expect(opf).toContain('id="unrelated-overlay" href="smil/unrelated.smil"');
   });
 });

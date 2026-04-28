@@ -93,7 +93,7 @@ function resolveTargetRange(doc: Document, startCfi: string, endCfi: string): Ra
   const end = resolvePointRange(doc, endCfi);
   const range = doc.createRange();
   range.setStart(start.startContainer, start.startOffset);
-  range.setEnd(end.startContainer, end.startOffset);
+  range.setEnd(end.endContainer, end.endOffset);
   return range;
 }
 

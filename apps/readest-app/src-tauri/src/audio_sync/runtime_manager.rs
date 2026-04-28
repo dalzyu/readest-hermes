@@ -1,15 +1,21 @@
-use std::io::Write;
-use std::path::PathBuf;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use futures_util::TryStreamExt;
+use minisign_verify::{PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 use tauri::{command, AppHandle, Emitter, Manager};
 
 /// Manifest URL pattern for the audio sync helper bundles.
 /// Fetches from GitHub Releases at the given tag.
-const MANIFEST_BASE_URL: &str =
-    "https://github.com/dalzyu/readest-hermes/releases/latest/download";
-
+const MANIFEST_BASE_URL: &str = "https://github.com/dalzyu/readest-hermes/releases/latest/download";
+const SIGNING_PUBLIC_KEY_B64: &str = "RWRRs1SOFlsNvjDiaLOW+DZDWeNG462IqhW43Ttr/qcg5lCWKLa3Tu/k";
+const MANIFEST_FETCH_RETRIES: usize = 3;
+const DOWNLOAD_RETRIES: usize = 3;
+const NETWORK_RETRY_BASE_DELAY_MS: u64 = 500;
+const DOWNLOAD_CHUNK_STALL_TIMEOUT: Duration = Duration::from_secs(30);
+const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,6 +34,8 @@ struct HelperManifest {
     platform: String,
     /// HTTPS URL for the helper executable (PyInstaller single-file).
     helper_url: String,
+    /// HTTPS URL for the helper minisign signature.
+    helper_signature_url: String,
     /// Expected byte size of the helper executable.
     helper_size: u64,
     /// Expected lowercase hex SHA-256 of the helper executable.
@@ -68,7 +76,7 @@ pub fn helper_runtime_dir(app: &AppHandle) -> Option<PathBuf> {
 }
 
 /// Canonical helper executable path within the app-managed runtime dir.
-pub fn helper_executable_path(dir: &PathBuf) -> PathBuf {
+pub fn helper_executable_path(dir: &Path) -> PathBuf {
     if cfg!(target_os = "windows") {
         dir.join("audio-sync-helper.exe")
     } else {
@@ -102,7 +110,11 @@ pub fn discover_venv_python() -> Option<PathBuf> {
 pub fn managed_helper_exe(app: &AppHandle) -> Option<PathBuf> {
     let dir = helper_runtime_dir(app)?;
     let exe = helper_executable_path(&dir);
-    if exe.exists() { Some(exe) } else { None }
+    if exe.exists() {
+        Some(exe)
+    } else {
+        None
+    }
 }
 
 /// Helper install/detection state returned to the frontend.
@@ -180,8 +192,9 @@ pub async fn get_audio_sync_helper_status(app: AppHandle) -> Result<AudioSyncHel
 pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
     let platform = platform_label();
     let manifest_url = format!("{MANIFEST_BASE_URL}/audio-sync-helper-manifest-{platform}.json");
+    let client = build_http_client()?;
 
-    let manifest = fetch_helper_manifest(&manifest_url).await?;
+    let manifest = fetch_helper_manifest(&client, &manifest_url).await?;
     let _ = app.emit(
         "audio-sync:helper-install",
         &HelperInstallEvent {
@@ -190,6 +203,7 @@ pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
             detail: "Manifest fetched — starting download".to_string(),
         },
     );
+
     if manifest.platform != platform {
         return Err(format!(
             "Manifest platform '{}' does not match expected '{}'",
@@ -201,6 +215,9 @@ pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
             "Manifest helper runtime version '{}' is not compatible with '{}'",
             manifest.helper_runtime_version, HELPER_RUNTIME_VERSION
         ));
+    }
+    if manifest.helper_signature_url.trim().is_empty() {
+        return Err("Manifest missing helperSignatureUrl".to_string());
     }
 
     let cache_dir = app
@@ -234,7 +251,15 @@ pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
         active: true,
     };
 
-    download_to_path(&manifest.helper_url, &staging_path, manifest.helper_size, &app).await?;
+    download_to_path(
+        &client,
+        &manifest.helper_url,
+        &staging_path,
+        manifest.helper_size,
+        &app,
+    )
+    .await?;
+
     let _ = app.emit(
         "audio-sync:helper-install",
         &HelperInstallEvent {
@@ -244,6 +269,16 @@ pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
         },
     );
     verify_sha256(&staging_path, &manifest.helper_sha256)?;
+
+    let sig_text = fetch_text_with_retry(
+        &client,
+        &manifest.helper_signature_url,
+        MANIFEST_FETCH_RETRIES,
+        "helper signature",
+    )
+    .await?;
+    verify_minisig_path(&staging_path, &sig_text)?;
+
     let _ = app.emit(
         "audio-sync:helper-install",
         &HelperInstallEvent {
@@ -258,6 +293,7 @@ pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
     std::fs::create_dir_all(&runtime_dir)
         .map_err(|e| format!("Failed to create runtime dir: {e}"))?;
     let final_path = helper_executable_path(&runtime_dir);
+    let temp_final_path = final_path.with_extension("tmp");
 
     #[cfg(unix)]
     {
@@ -266,51 +302,138 @@ pub async fn install_audio_sync_helper(app: AppHandle) -> Result<(), String> {
             .map_err(|e| format!("Failed to set executable permission: {e}"))?;
     }
 
-    match std::fs::rename(&staging_path, &final_path) {
-        Ok(()) => {
-            cleanup.active = false;
-            Ok(())
-        }
-        Err(rename_err) => {
-            std::fs::copy(&staging_path, &final_path).map_err(|copy_err| {
-                format!(
-                    "Failed to activate helper (rename {} → {}: {rename_err}; copy fallback also failed: {copy_err})",
-                    staging_path.display(),
-                    final_path.display()
-                )
-            })?;
-            std::fs::remove_file(&staging_path).map_err(|e| {
-                format!("Failed to remove staging file after copy fallback: {e}")
-            })?;
-            cleanup.active = false;
-            Ok(())
-        }
-    }
+    std::fs::copy(&staging_path, &temp_final_path).map_err(|e| {
+        format!(
+            "Failed to copy helper into runtime directory ({} → {}): {e}",
+            staging_path.display(),
+            temp_final_path.display()
+        )
+    })?;
+
+    let mut tmp = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&temp_final_path)
+        .map_err(|e| format!("Failed to open temporary runtime helper for sync: {e}"))?;
+    tmp.flush()
+        .map_err(|e| format!("Failed to flush temporary runtime helper: {e}"))?;
+    tmp.sync_all()
+        .map_err(|e| format!("Failed to sync temporary runtime helper: {e}"))?;
+
+    std::fs::rename(&temp_final_path, &final_path).map_err(|e| {
+        format!(
+            "Failed to atomically activate helper ({} → {}): {e}",
+            temp_final_path.display(),
+            final_path.display()
+        )
+    })?;
+
+    sync_parent_dir(&final_path)?;
+    verify_sha256(&final_path, &manifest.helper_sha256)?;
+
+    cleanup.active = false;
+    Ok(())
 }
 
-async fn fetch_helper_manifest(url: &str) -> Result<HelperManifest, String> {
-    let response = reqwest::get(url)
-        .await
-        .map_err(|e| format!("Failed to fetch helper manifest from {url}: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!(
-            "Helper manifest request to {url} returned HTTP {}",
-            response.status()
-        ));
-    }
-    response
-        .json::<HelperManifest>()
-        .await
+fn build_http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .connect_timeout(HTTP_CONNECT_TIMEOUT)
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))
+}
+
+async fn fetch_helper_manifest(
+    client: &reqwest::Client,
+    url: &str,
+) -> Result<HelperManifest, String> {
+    let body =
+        fetch_text_with_retry(client, url, MANIFEST_FETCH_RETRIES, "helper manifest").await?;
+    serde_json::from_str::<HelperManifest>(&body)
         .map_err(|e| format!("Failed to parse helper manifest from {url}: {e}"))
 }
 
+async fn fetch_text_with_retry(
+    client: &reqwest::Client,
+    url: &str,
+    attempts: usize,
+    label: &str,
+) -> Result<String, String> {
+    let mut last_err = String::new();
+    for attempt in 1..=attempts {
+        match client.get(url).send().await {
+            Ok(response) => {
+                if !response.status().is_success() {
+                    last_err = format!(
+                        "{label} request to {url} returned HTTP {}",
+                        response.status()
+                    );
+                } else {
+                    match response.text().await {
+                        Ok(text) => return Ok(text),
+                        Err(e) => {
+                            last_err = format!("Failed to read {label} response from {url}: {e}")
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                last_err = format!("Failed to fetch {label} from {url}: {e}");
+            }
+        }
+        if attempt < attempts {
+            tokio::time::sleep(Duration::from_millis(
+                NETWORK_RETRY_BASE_DELAY_MS * (1_u64 << (attempt - 1)),
+            ))
+            .await;
+        }
+    }
+    Err(last_err)
+}
 
-async fn download_to_path(url: &str, dest: &PathBuf, expected_size: u64, app: &AppHandle) -> Result<(), String> {
-    let response = reqwest::get(url)
+async fn download_to_path(
+    client: &reqwest::Client,
+    url: &str,
+    dest: &Path,
+    expected_size: u64,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut last_err = String::new();
+    for attempt in 1..=DOWNLOAD_RETRIES {
+        let result = download_to_path_once(client, url, dest, expected_size, app).await;
+        match result {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                last_err = err;
+                let _ = std::fs::remove_file(dest);
+                if attempt < DOWNLOAD_RETRIES {
+                    tokio::time::sleep(Duration::from_millis(
+                        NETWORK_RETRY_BASE_DELAY_MS * (1_u64 << (attempt - 1)),
+                    ))
+                    .await;
+                }
+            }
+        }
+    }
+    Err(last_err)
+}
+
+async fn download_to_path_once(
+    client: &reqwest::Client,
+    url: &str,
+    dest: &Path,
+    expected_size: u64,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let response = client
+        .get(url)
+        .send()
         .await
         .map_err(|e| format!("Failed to start download from {url}: {e}"))?;
     if !response.status().is_success() {
-        return Err(format!("Download from {url} returned HTTP {}", response.status()));
+        return Err(format!(
+            "Download from {url} returned HTTP {}",
+            response.status()
+        ));
     }
 
     let mut file = std::fs::File::create(dest)
@@ -318,11 +441,18 @@ async fn download_to_path(url: &str, dest: &PathBuf, expected_size: u64, app: &A
 
     let mut stream = response.bytes_stream();
     let mut downloaded: u64 = 0;
-    while let Some(chunk) = stream
-        .try_next()
-        .await
-        .map_err(|e| format!("Download stream error from {url}: {e}"))?
-    {
+    loop {
+        let chunk = tokio::time::timeout(DOWNLOAD_CHUNK_STALL_TIMEOUT, stream.try_next())
+            .await
+            .map_err(|_| {
+                format!(
+                    "Download stalled for more than {:?} from {url}",
+                    DOWNLOAD_CHUNK_STALL_TIMEOUT
+                )
+            })?
+            .map_err(|e| format!("Download stream error from {url}: {e}"))?;
+        let Some(chunk) = chunk else { break };
+
         file.write_all(&chunk)
             .map_err(|e| format!("Failed to write download chunk: {e}"))?;
         downloaded += chunk.len() as u64;
@@ -342,14 +472,28 @@ async fn download_to_path(url: &str, dest: &PathBuf, expected_size: u64, app: &A
     }
     file.flush()
         .map_err(|e| format!("Failed to flush download file: {e}"))?;
+    file.sync_all()
+        .map_err(|e| format!("Failed to sync download file: {e}"))?;
     Ok(())
 }
 
-fn verify_sha256(path: &PathBuf, expected_hex: &str) -> Result<(), String> {
+fn verify_sha256(path: &Path, expected_hex: &str) -> Result<(), String> {
     use sha2::{Digest, Sha256};
-    let bytes = std::fs::read(path).map_err(|e| format!("Failed to read file for SHA-256 check: {e}"))?;
+
+    let mut file = std::fs::File::open(path)
+        .map_err(|e| format!("Failed to open file for SHA-256 check: {e}"))?;
     let mut hasher = Sha256::new();
-    hasher.update(&bytes);
+    let mut buf = vec![0u8; 1024 * 1024];
+    loop {
+        let n = file
+            .read(&mut buf)
+            .map_err(|e| format!("Failed to read file for SHA-256 check: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+
     let computed = hex::encode(hasher.finalize());
     if computed.eq_ignore_ascii_case(expected_hex) {
         Ok(())
@@ -360,6 +504,50 @@ fn verify_sha256(path: &PathBuf, expected_hex: &str) -> Result<(), String> {
     }
 }
 
+fn verify_minisig_path(path: &Path, sig_text: &str) -> Result<(), String> {
+    let public_key = PublicKey::from_base64(SIGNING_PUBLIC_KEY_B64)
+        .map_err(|e| format!("Failed to decode helper signing public key: {e}"))?;
+    verify_minisig_with_key(path, sig_text, &public_key)
+}
+
+fn verify_minisig_with_key(
+    path: &Path,
+    sig_text: &str,
+    public_key: &PublicKey,
+) -> Result<(), String> {
+    let signature = Signature::decode(sig_text)
+        .map_err(|e| format!("Failed to decode minisign signature: {e}"))?;
+    let mut verifier = public_key
+        .verify_stream(&signature)
+        .map_err(|e| format!("Failed to initialize minisign verification: {e}"))?;
+    let mut file = std::fs::File::open(path)
+        .map_err(|e| format!("Failed to open helper for minisign verification: {e}"))?;
+    let mut buffer = vec![0u8; 1024 * 1024];
+    loop {
+        let n = file
+            .read(&mut buffer)
+            .map_err(|e| format!("Failed to read helper for minisign verification: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        verifier.update(&buffer[..n]);
+    }
+    verifier
+        .finalize()
+        .map_err(|e| format!("Minisign verification failed: {e}"))
+}
+
+fn sync_parent_dir(path: &Path) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Missing parent directory for {}", path.display()))?;
+    let dir = std::fs::OpenOptions::new()
+        .read(true)
+        .open(parent)
+        .map_err(|e| format!("Failed to open runtime directory for sync: {e}"))?;
+    dir.sync_all()
+        .map_err(|e| format!("Failed to sync runtime directory: {e}"))
+}
 
 /// Removes the app-managed helper runtime directory.
 /// The dev-mode Python venv is not affected.
@@ -386,13 +574,6 @@ mod tests {
             label.contains('-'),
             "expected platform-arch format, got {label}"
         );
-    }
-
-    #[test]
-    fn dev_python_path_is_none_in_release() {
-        // In release builds the function must always return None.
-        #[cfg(not(debug_assertions))]
-        assert!(dev_python_path().is_none());
     }
 
     #[test]
@@ -429,8 +610,38 @@ mod tests {
     }
 
     #[test]
+    fn verify_minisig_accepts_valid_signature() {
+        let public_key =
+            PublicKey::from_base64("RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3")
+                .unwrap();
+        let signature = "untrusted comment: signature from minisign secret key
+RUQf6LRCGA9i559r3g7V1qNyJDApGip8MfqcadIgT9CuhV3EMhHoN1mGTkUidF/z7SrlQgXdy8ofjb7bNJJylDOocrCo8KLzZwo=
+trusted comment: timestamp:1633700835\tfile:test\tprehashed
+wLMDjy9FLAuxZ3q4NlEvkgtyhrr0gtTu6KC4KBJdITbbOeAi1zBIYo0v4iTgt8jJpIidRJnp94ABQkJAgAooBQ==";
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("hermes-test-minisig-valid.bin");
+        std::fs::write(&path, b"test").unwrap();
+        let result = verify_minisig_with_key(&path, signature, &public_key);
+        assert!(result.is_ok());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
     fn verify_minisig_rejects_tampered_bytes() {
-        let result = verify_minisig(b"some data", "not a valid sig");
+        let public_key =
+            PublicKey::from_base64("RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3")
+                .unwrap();
+        let signature = "untrusted comment: signature from minisign secret key
+RUQf6LRCGA9i559r3g7V1qNyJDApGip8MfqcadIgT9CuhV3EMhHoN1mGTkUidF/z7SrlQgXdy8ofjb7bNJJylDOocrCo8KLzZwo=
+trusted comment: timestamp:1633700835\tfile:test\tprehashed
+wLMDjy9FLAuxZ3q4NlEvkgtyhrr0gtTu6KC4KBJdITbbOeAi1zBIYo0v4iTgt8jJpIidRJnp94ABQkJAgAooBQ==";
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("hermes-test-minisig-check.bin");
+        std::fs::write(&path, b"test!").unwrap();
+        let result = verify_minisig_with_key(&path, signature, &public_key);
         assert!(result.is_err());
+        let _ = std::fs::remove_file(&path);
     }
 }

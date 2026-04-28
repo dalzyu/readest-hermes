@@ -140,7 +140,7 @@ function resolveTargetRange(doc: Document, startCfi: string, endCfi: string): Ra
   const end = resolvePointRange(doc, endCfi);
   const range = doc.createRange();
   range.setStart(start.startContainer, start.startOffset);
-  range.setEnd(end.startContainer, end.startOffset);
+  range.setEnd(end.endContainer, end.endOffset);
   return range;
 }
 
@@ -599,6 +599,8 @@ type ProcessedOverlaySection = {
   fragmentIds: string[];
 };
 
+const WORKER_SECTION_TIMEOUT_MS = 30_000;
+
 function shouldUseSectionProcessorWorkers(): boolean {
   const isTestEnv =
     typeof process !== 'undefined' &&
@@ -641,6 +643,11 @@ async function processOverlaySectionInWorker(
   };
 
   const response = await new Promise<SectionProcessorResponse>((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timeout);
+      worker.removeEventListener('message', onMessage);
+      worker.removeEventListener('error', onError);
+    };
     const onMessage = (event: MessageEvent<SectionProcessorResponse>) => {
       cleanup();
       resolve(event.data);
@@ -649,10 +656,11 @@ async function processOverlaySectionInWorker(
       cleanup();
       reject(event.error || new Error(event.message));
     };
-    const cleanup = () => {
-      worker.removeEventListener('message', onMessage);
-      worker.removeEventListener('error', onError);
-    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      worker.terminate();
+      reject(new Error(`Section processing timed out after ${WORKER_SECTION_TIMEOUT_MS}ms`));
+    }, WORKER_SECTION_TIMEOUT_MS);
 
     worker.addEventListener('message', onMessage);
     worker.addEventListener('error', onError);
@@ -868,17 +876,20 @@ export async function createEpubMediaOverlayPackage(input: {
       overlayCount: validFragmentIds.length,
     });
 
-    const existingOverlay = section.manifestItem.element.getAttribute('media-overlay');
-    const finalSmilId = existingOverlay || smilId;
-    section.manifestItem.element.setAttribute('media-overlay', finalSmilId);
+    section.manifestItem.element.setAttribute('media-overlay', smilId);
 
-    if (!existingOverlay) {
-      const item = opf.createElementNS(OPF_NS, 'item');
-      item.setAttribute('id', finalSmilId);
-      item.setAttribute('href', relativeZipPath(opfPath, smilPath));
-      item.setAttribute('media-type', 'application/smil+xml');
-      manifest.appendChild(item);
+    const duplicateSmilManifestItem = manifestItems.find(
+      (item) => item.id === smilId && item.element !== section.manifestItem.element,
+    );
+    if (duplicateSmilManifestItem) {
+      duplicateSmilManifestItem.element.remove();
     }
+
+    const item = opf.createElementNS(OPF_NS, 'item');
+    item.setAttribute('id', smilId);
+    item.setAttribute('href', relativeZipPath(opfPath, smilPath));
+    item.setAttribute('media-type', 'application/smil+xml');
+    manifest.appendChild(item);
   }
 
   const audioItem = opf.createElementNS(OPF_NS, 'item');

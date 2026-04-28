@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { AudioSyncHelperState } from '@/services/audioSync/nativeBridge';
 import { BookAudioAsset, AudioSyncStatus } from '@/services/audioSync/types';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -27,9 +28,11 @@ interface BookAudioSectionProps {
   busy: boolean;
   isDesktop: boolean;
   model: string;
+  helperState?: AudioSyncHelperState | null;
   onAttach?: () => void;
   onRemove?: () => void;
   onGenerateSync?: () => void;
+  onInstallHelper?: () => void;
   onViewStatus?: () => void;
   onModelChange?: (model: string) => void;
 }
@@ -69,9 +72,11 @@ const BookAudioSection: React.FC<BookAudioSectionProps> = ({
   busy,
   isDesktop,
   model,
+  helperState,
   onAttach,
   onRemove,
   onGenerateSync,
+  onInstallHelper,
   onViewStatus,
   onModelChange,
 }) => {
@@ -82,6 +87,9 @@ const BookAudioSection: React.FC<BookAudioSectionProps> = ({
   }
 
   const statusLabel = getStatusLabel(status, _);
+  const helperReady = helperState?.state === 'ready' || helperState?.state === 'devMode';
+  const requiresHelperInstall =
+    helperState?.state === 'notInstalled' || helperState?.state === 'failed';
 
   return (
     <div className='border-base-300/60 mt-4 border-t px-4 py-4'>
@@ -94,7 +102,11 @@ const BookAudioSection: React.FC<BookAudioSectionProps> = ({
           <button className='btn btn-sm' disabled={busy} onClick={onAttach}>
             {asset ? _('Replace Audiobook') : _('Attach Audiobook')}
           </button>
-          <button className='btn btn-sm' disabled={!asset || busy} onClick={onGenerateSync}>
+          <button
+            className='btn btn-sm'
+            disabled={!asset || busy || !helperReady}
+            onClick={onGenerateSync}
+          >
             {_('Generate Sync')}
           </button>
           <button className='btn btn-sm' disabled={!asset} onClick={onViewStatus}>
@@ -106,6 +118,14 @@ const BookAudioSection: React.FC<BookAudioSectionProps> = ({
         </div>
       </div>
 
+      {asset && !helperReady && requiresHelperInstall && (
+        <div className='bg-base-200/60 mb-3 rounded-md px-3 py-2 text-sm'>
+          <p className='text-neutral-content mb-2'>{_('Audio sync helper is not installed.')}</p>
+          <button className='btn btn-sm' disabled={busy} onClick={onInstallHelper}>
+            {_('Install helper')}
+          </button>
+        </div>
+      )}
       {asset ? (
         <>
           <div className='grid grid-cols-2 gap-4 sm:grid-cols-4'>

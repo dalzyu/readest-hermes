@@ -15,6 +15,7 @@ import {
 } from '@/services/audioSync/AudioAlignmentService';
 import { useAlignmentJobStore } from '@/services/audioSync/alignmentJobStore';
 import { generateEpubMediaOverlayPackage } from '@/services/audioSync/EpubMediaOverlayService';
+import { listenAudioSyncJobStatus } from '@/services/audioSync/nativeBridge';
 import {
   AudioSyncGeneratedPackage,
   AudioSyncJobStatus,
@@ -22,6 +23,10 @@ import {
   AudioSyncStatus,
   BookAudioAsset,
 } from '@/services/audioSync/types';
+
+vi.mock('@/services/audioSync/nativeBridge', () => ({
+  listenAudioSyncJobStatus: vi.fn(),
+}));
 
 function makeBook(overrides: Partial<Book> = {}): Book {
   return {
@@ -107,6 +112,8 @@ describe('AudioAlignmentService', () => {
     useAudioSyncStore.setState({ sessionStates: {}, statuses: {} });
     useAlignmentJobStore.setState({ activeRuns: {}, polling: {} });
 
+    (listenAudioSyncJobStatus as ReturnType<typeof vi.fn>).mockResolvedValue(() => undefined);
+
     appService = {
       startAudioSync: vi.fn().mockResolvedValue({
         runId: 'run-1',
@@ -124,8 +131,11 @@ describe('AudioAlignmentService', () => {
   });
 
   it('starts alignment and stores the active run', async () => {
-    const status = await startAudioAlignment(appService as AppService, book);
+    (appService.getAudioSyncStatus as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      makeStatus({ runId: 'run-1', phase: 'aligning', progress: 50, updatedAt: 2 }),
+    );
 
+    const status = await startAudioAlignment(appService as AppService, book);
     expect(appService.startAudioSync).toHaveBeenCalledWith(book, undefined);
     expect(appService.getAudioSyncStatus).toHaveBeenCalledWith(book, 'run-1');
     expect(status.job?.phase).toBe('aligning');
@@ -147,23 +157,34 @@ describe('AudioAlignmentService', () => {
 
   it('generates the EPUB3 package and refreshes status when alignment reaches ready without one', async () => {
     const intermediateStatus: AudioSyncStatus = {
-      ...makeStatus({ runId: 'run-1', phase: 'ready', progress: 100, updatedAt: 3 }),
+      ...makeStatus({ runId: 'run-1', phase: 'aligning', progress: 100, updatedAt: 3 }),
       map: makeMap(),
       syncStage: 'intermediate',
     };
-    const readyStatus: AudioSyncStatus = {
+    const terminalStatus: AudioSyncStatus = {
       ...intermediateStatus,
+      job: { runId: 'run-1', phase: 'ready', progress: 100, updatedAt: 4 },
+    };
+    const readyStatus: AudioSyncStatus = {
+      ...terminalStatus,
       package: makePackage(),
       synced: true,
       syncStage: 'ready',
     };
     (appService.getAudioSyncStatus as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(intermediateStatus)
+      .mockResolvedValueOnce(terminalStatus)
       .mockResolvedValueOnce(readyStatus);
     (generateEpubMediaOverlayPackage as ReturnType<typeof vi.fn>).mockResolvedValue(
       readyStatus.package,
     );
 
+    (listenAudioSyncJobStatus as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      async (callback) => {
+        callback({ jobId: 'run-1', state: 'running', phase: 'ready' });
+        return () => undefined;
+      },
+    );
     const status = await pollAudioAlignmentStatus(appService as AppService, book, 'run-1');
 
     expect(generateEpubMediaOverlayPackage).toHaveBeenCalledWith(
@@ -173,7 +194,7 @@ describe('AudioAlignmentService', () => {
       intermediateStatus.map,
       intermediateStatus.report,
     );
-    expect(appService.getAudioSyncStatus).toHaveBeenNthCalledWith(2, book, 'run-1');
+    expect(appService.getAudioSyncStatus).toHaveBeenNthCalledWith(3, book, 'run-1');
     expect(status.package).toEqual(readyStatus.package);
     expect(useAudioSyncStore.getState().statuses[book.hash]?.package).toEqual(readyStatus.package);
     expect(useAudioSyncStore.getState().statuses[book.hash]?.syncStage).toBe('ready');

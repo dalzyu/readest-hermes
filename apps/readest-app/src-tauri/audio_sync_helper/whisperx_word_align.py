@@ -4,9 +4,9 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -31,6 +31,12 @@ CHARACTER_NORMALIZATIONS: tuple[tuple[str, str], ...] = (
     ('—', '-'),
     ('…', '...'),
 )
+
+SETUP_BUDGET = 0.05
+ALIGN_BUDGET = 0.90
+COMPACT_BUDGET = 0.05
+PHASE_OFFSETS = {"transcribing": 0.0, "aligning": 0.4, "matching": 0.7}
+
 
 
 @dataclass
@@ -112,12 +118,16 @@ def ensure_ffmpeg_on_path() -> str:
 
     ffmpeg_path = str(Path(ffmpeg_path).resolve())
     ffmpeg_file = Path(ffmpeg_path)
-    alias_path = ffmpeg_file.with_name("ffmpeg.exe") if ffmpeg_file.name.lower() != "ffmpeg.exe" else ffmpeg_file
-    if alias_path != ffmpeg_file and not alias_path.exists():
-        shutil.copy2(ffmpeg_file, alias_path)
-    ffmpeg_dir = str(alias_path.parent)
+    ffmpeg_dir = str(ffmpeg_file.parent)
     os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
-    return str(alias_path)
+    return str(ffmpeg_file)
+
+
+def chapter_progress(chapter_index: int, phase: str, chapter_count: int) -> float:
+    if chapter_count <= 0:
+        return SETUP_BUDGET
+    offset = PHASE_OFFSETS[phase]
+    return SETUP_BUDGET + ((chapter_index + offset) / chapter_count) * ALIGN_BUDGET
 
 
 def load_alignment_input(path: str) -> dict[str, Any]:
@@ -364,7 +374,7 @@ def resolve_span_for_token_range(context: ChapterContext, token_start: BookToken
     )
 
 
-def load_audio_slice(audio_path: str, start_ms: int, end_ms: int) -> Any:
+def load_audio_slice(ffmpeg_executable: str, audio_path: str, start_ms: int, end_ms: int) -> Any:
     """Load only the requested time slice of an audio file into a float32 numpy array.
 
     Uses ffmpeg input-seeking so only the needed segment is decoded, keeping RAM
@@ -377,7 +387,7 @@ def load_audio_slice(audio_path: str, start_ms: int, end_ms: int) -> Any:
         return np.zeros(0, dtype=np.float32)
 
     cmd = [
-        "ffmpeg", "-nostdin", "-threads", "0",
+        ffmpeg_executable, "-nostdin", "-threads", "0",
         "-ss", f"{start_ms / 1000.0:.3f}",
         "-i", audio_path,
         "-t", f"{duration_ms / 1000.0:.3f}",
@@ -397,13 +407,14 @@ def load_audio_slice(audio_path: str, start_ms: int, end_ms: int) -> Any:
 
 def transcribe_audio_chunk(
     asr_model: Any,
+    ffmpeg_executable: str,
     audio_path: str,
     chapter: ChapterContext,
     language: str | None,
     batch_size: int,
     chunk_size: int,
 ) -> tuple[Any, dict[str, Any]]:
-    audio_chunk = load_audio_slice(audio_path, chapter.audio_start_ms, chapter.audio_end_ms)
+    audio_chunk = load_audio_slice(ffmpeg_executable, audio_path, chapter.audio_start_ms, chapter.audio_end_ms)
     if len(audio_chunk) == 0:
         return audio_chunk, {"segments": []}
 
@@ -465,16 +476,19 @@ def flatten_transcript_words(aligned_segments: list[dict[str, Any]], chapter_off
     return words, by_segment
 
 
-def align_transcript_to_book(book_tokens: list[BookToken], transcript_words: list[TranscriptWord]) -> dict[int, BookToken]:
+def align_transcript_to_book(
+    book_tokens: list[BookToken], transcript_words: list[TranscriptWord]
+ ) -> dict[int, tuple[int, BookToken]]:
     book_sequence = [token.token for token in book_tokens]
     transcript_sequence = [word.token for word in transcript_words]
     matcher = SequenceMatcher(None, book_sequence, transcript_sequence, autojunk=False)
-    mapping: dict[int, BookToken] = {}
+    mapping: dict[int, tuple[int, BookToken]] = {}
     for book_start, transcript_start, size in matcher.get_matching_blocks():
         if size <= 0:
             continue
         for offset in range(size):
-            mapping[transcript_start + offset] = book_tokens[book_start + offset]
+            book_index = book_start + offset
+            mapping[transcript_start + offset] = (book_index, book_tokens[book_index])
     return mapping
 
 
@@ -485,16 +499,17 @@ def build_word_segments(context: ChapterContext, aligned: dict[str, Any], langua
 
     mapping = align_transcript_to_book(context.book_tokens, transcript_words)
     matched_indices = set(mapping.keys())
-    unique_book_indices = {context.book_tokens.index(mapping[idx]) for idx in matched_indices}
+    unique_book_indices = {book_index for book_index, _ in mapping.values()}
     total_chars = len(context.combined_text)
 
     segments: list[dict[str, Any]] = []
     for segment_idx, segment in enumerate(aligned.get("segments") or []):
         transcript_indices = words_by_segment.get(segment_idx, [])
-        matched_words = [(index, mapping[index], transcript_words[index]) for index in transcript_indices if index in mapping]
+        matched_words = [
+            (index, mapping[index][1], transcript_words[index]) for index in transcript_indices if index in mapping
+        ]
         if not matched_words:
             continue
-
         first_book = matched_words[0][1]
         last_book = matched_words[-1][1]
         section_href, cfi_start, cfi_end, text_start_offset, text_end_offset = resolve_span_for_token_range(context, first_book, last_book)
@@ -600,8 +615,11 @@ def build_outputs(payload: dict[str, Any], model_name: str, device: str, segment
 
 
 def run(args: argparse.Namespace) -> None:
-    ensure_ffmpeg_on_path()
-    import nltk
+    ffmpeg_executable = ensure_ffmpeg_on_path()
+    if hasattr(sys, "_MEIPASS"):
+        bundled_nltk = Path(getattr(sys, "_MEIPASS")) / "nltk_data"
+        os.environ.setdefault("NLTK_DATA", str(bundled_nltk))
+
     import torch
     import whisperx
 
@@ -611,18 +629,23 @@ def run(args: argparse.Namespace) -> None:
     payload["runId"] = args.run_id
     payload["inputPath"] = args.input
 
-    nltk.download("punkt_tab", quiet=True)
-
     device = args.device
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
     if device == "cpu":
         emit_progress("transcribing", 0.01, "WARNING: Running on CPU — install CUDA PyTorch for GPU acceleration (see docs)")
     compute_type = args.compute_type or ("float16" if device == "cuda" else "int8")
-    model_dir = args.model_dir or str((Path.home() / ".cache" / "hermes-audio-sync").resolve())
+    warnings: list[str] = []
+    if args.model_dir:
+        model_dir = args.model_dir
+    else:
+        model_dir = str((Path(tempfile.gettempdir()) / "hermes-audio-sync-models").resolve())
+        warning = f"Model directory not provided; falling back to temporary directory {model_dir}"
+        warnings.append(warning)
+        emit_progress("transcribing", 0.02, warning)
     Path(model_dir).mkdir(parents=True, exist_ok=True)
 
-    emit_progress("transcribing", 0.02, f"Loading WhisperX model '{args.model}' on {device} ({compute_type})")
+    emit_progress("transcribing", 0.03, f"Loading WhisperX model '{args.model}' on {device} ({compute_type})")
     model = whisperx.load_model(args.model, device, compute_type=compute_type, download_root=model_dir, language=payload.get("language"))
 
     chapter_contexts = build_chapter_contexts(payload)
@@ -635,17 +658,17 @@ def run(args: argparse.Namespace) -> None:
 
     align_model = None
     align_metadata = None
-    warnings: list[str] = []
     by_chapter: dict[str, float] = {}
     segments: list[dict[str, Any]] = []
     matched_chars = 0
     total_chars = sum(len(context.combined_text) for context in chapter_contexts)
+    chapter_count = len(chapter_contexts)
 
     for index, context in enumerate(chapter_contexts):
-        chapter_progress_base = index / len(chapter_contexts);
-        emit_progress("transcribing", 0.1 + chapter_progress_base * 0.25, f"Transcribing {context.title}")
+        emit_progress("transcribing", chapter_progress(index, "transcribing", chapter_count), f"Transcribing {context.title}")
         audio_chunk, transcription = transcribe_audio_chunk(
             model,
+            ffmpeg_executable,
             args.audio,
             context,
             payload.get("language"),
@@ -653,7 +676,6 @@ def run(args: argparse.Namespace) -> None:
             args.chunk_size,
         )
         if align_model is None and transcription.get("segments"):
-            emit_progress("aligning", 0.2 + chapter_progress_base * 0.2, "Loading alignment model")
             align_model, align_metadata = whisperx.load_align_model(
                 language_code=payload.get("language") or transcription.get("language") or "en",
                 device=device,
@@ -665,7 +687,7 @@ def run(args: argparse.Namespace) -> None:
             segments.append(build_chapter_fallback_segment(context))
             continue
 
-        emit_progress("aligning", 0.35 + chapter_progress_base * 0.2, f"Aligning words for {context.title}")
+        emit_progress("aligning", chapter_progress(index, "aligning", chapter_count), f"Aligning words for {context.title}")
         aligned = align_transcription(
             whisperx,
             align_model,
@@ -675,7 +697,7 @@ def run(args: argparse.Namespace) -> None:
             device,
         )
 
-        emit_progress("matching", 0.55 + chapter_progress_base * 0.35, f"Matching transcript to book text for {context.title}")
+        emit_progress("matching", chapter_progress(index, "matching", chapter_count), f"Matching transcript to book text for {context.title}")
         chapter_segments, matched_ratio, unique_book_indices, _ = build_word_segments(context, aligned, payload.get("language"))
         if not chapter_segments or matched_ratio < args.min_word_match_ratio:
             warnings.append(f"Low-confidence word alignment for {context.title}; using chapter fallback.")
@@ -688,7 +710,7 @@ def run(args: argparse.Namespace) -> None:
         matched_chars += chapter_matched_chars
         by_chapter[context.id] = matched_ratio
 
-    emit_progress("compacting", 0.96, "Writing sync artifacts")
+    emit_progress("compacting", 1.0 - COMPACT_BUDGET, "Writing sync artifacts")
     map_payload, report_payload = build_outputs(payload, args.model, device, segments, by_chapter, matched_chars, total_chars, warnings)
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(map_payload, ensure_ascii=False, indent=2), encoding="utf-8")

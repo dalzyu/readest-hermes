@@ -12,6 +12,7 @@ import {
 
 import { Book } from '@/types/book';
 import { BookMetadata } from '@/libs/document';
+import { AudioSyncHelperState } from '@/services/audioSync/nativeBridge';
 import { AudioSyncStatus, BookAudioAsset } from '@/services/audioSync/types';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -45,9 +46,11 @@ interface BookDetailViewProps {
   audioSyncStatus?: AudioSyncStatus | null;
   audioBusy?: boolean;
   audioModel?: string;
+  audioHelperState?: AudioSyncHelperState | null;
   onAttachAudio?: () => void;
   onRemoveAudio?: () => void;
   onGenerateAudioSync?: () => void;
+  onInstallAudioSyncHelper?: () => void;
   onViewAudioSyncStatus?: () => void;
   onAudioModelChange?: (model: string) => void;
 }
@@ -67,9 +70,11 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
   audioSyncStatus,
   audioBusy = false,
   audioModel = 'large-v3',
+  audioHelperState,
   onAttachAudio,
   onRemoveAudio,
   onGenerateAudioSync,
+  onInstallAudioSyncHelper,
   onViewAudioSyncStatus,
   onAudioModelChange,
 }) => {
@@ -252,9 +257,11 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
           busy={audioBusy}
           isDesktop={Boolean(appService?.isDesktopApp)}
           model={audioModel}
+          helperState={audioHelperState}
           onAttach={onAttachAudio}
           onRemove={onRemoveAudio}
           onGenerateSync={onGenerateAudioSync}
+          onInstallHelper={onInstallAudioSyncHelper}
           onViewStatus={onViewAudioSyncStatus}
           onModelChange={onAudioModelChange}
         />

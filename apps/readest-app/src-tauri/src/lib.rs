@@ -22,8 +22,8 @@ use tauri_plugin_fs::FsExt;
 
 #[cfg(desktop)]
 use tauri::{Listener, Url};
-mod dir_scanner;
 mod audio_sync;
+mod dir_scanner;
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 mod discord_rpc;
 #[cfg(target_os = "macos")]

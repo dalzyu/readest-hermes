@@ -2,6 +2,7 @@ import { Book } from '@/types/book';
 import { AppService } from '@/types/system';
 import { useAudioSyncStore } from '@/store/audioSyncStore';
 
+import { listenAudioSyncJobStatus } from './nativeBridge';
 import { generateEpubMediaOverlayPackage } from './EpubMediaOverlayService';
 import { useAlignmentJobStore } from './alignmentJobStore';
 import { AudioSyncStartRequest, AudioSyncStatus } from './types';
@@ -95,7 +96,9 @@ export async function startAudioAlignment(
   const job = await appService.startAudioSync(book, request);
   useAlignmentJobStore.getState().setActiveRun(book.hash, job.runId);
   useAudioSyncStore.getState().setAudioSyncJob(book.hash, job);
-  return await pollAudioAlignmentStatus(appService, book, job.runId);
+  const status = await appService.getAudioSyncStatus(book, job.runId);
+  useAudioSyncStore.getState().setStatus(book.hash, status);
+  return status;
 }
 
 export async function pollAudioAlignmentStatus(
@@ -105,13 +108,56 @@ export async function pollAudioAlignmentStatus(
 ): Promise<AudioSyncStatus> {
   useAlignmentJobStore.getState().setPolling(book.hash, true);
   try {
-    let status = await appService.getAudioSyncStatus(book, runId);
-    status = await ensureAudioSyncPackage(appService, book, status, runId);
-    useAudioSyncStore.getState().setStatus(book.hash, status);
-    if (status.job?.phase && TERMINAL_PHASES.has(status.job.phase)) {
+    const currentStatus = await appService.getAudioSyncStatus(book, runId);
+    if (currentStatus.job?.phase && TERMINAL_PHASES.has(currentStatus.job.phase)) {
+      const terminalStatus = await ensureAudioSyncPackage(appService, book, currentStatus, runId);
+      useAudioSyncStore.getState().setStatus(book.hash, terminalStatus);
+      useAlignmentJobStore.getState().clearActiveRun(book.hash);
+      return terminalStatus;
+    }
+
+    await new Promise<void>((resolve) => {
+      let done = false;
+      let unsubscribe: (() => void) | null = null;
+
+      const finalize = () => {
+        if (done) return;
+        done = true;
+        if (unsubscribe) {
+          unsubscribe();
+        }
+        resolve();
+      };
+
+      void listenAudioSyncJobStatus((status) => {
+        if (status.jobId !== runId) return;
+        if (status.phase && TERMINAL_PHASES.has(status.phase)) {
+          finalize();
+        }
+      })
+        .then(async (unlisten) => {
+          if (done) {
+            unlisten();
+            return;
+          }
+          unsubscribe = unlisten;
+          const status = await appService.getAudioSyncStatus(book, runId);
+          if (status.job?.phase && TERMINAL_PHASES.has(status.job.phase)) {
+            finalize();
+          }
+        })
+        .catch(() => {
+          finalize();
+        });
+    });
+
+    const terminalStatus = await appService.getAudioSyncStatus(book, runId);
+    const nextStatus = await ensureAudioSyncPackage(appService, book, terminalStatus, runId);
+    useAudioSyncStore.getState().setStatus(book.hash, nextStatus);
+    if (nextStatus.job?.phase && TERMINAL_PHASES.has(nextStatus.job.phase)) {
       useAlignmentJobStore.getState().clearActiveRun(book.hash);
     }
-    return status;
+    return nextStatus;
   } finally {
     useAlignmentJobStore.getState().setPolling(book.hash, false);
   }

@@ -5,9 +5,10 @@ import {
   getAudioAlignmentReportFilename,
   getAudioAssetFilename,
   getAudioSyncCorrectionFilename,
+  getAudioSyncMapFilename,
   getAudioSyncPackageFilename,
   getAudioSyncPackageProvenanceFilename,
-  getAudioSyncMapFilename,
+  getAudioSyncPackageVersionDir,
   getBookAudioDir,
   getLegacyAudioSyncMapFilename,
 } from '@/utils/book';
@@ -208,11 +209,7 @@ export async function saveAudioSyncGeneratedPackage(
   generatedPackage: AudioSyncGeneratedPackage,
 ): Promise<void> {
   await ensureBookAudioDir(fs, book);
-  await fs.createDir(
-    getAudioSyncPackageFilename(book).split('/').slice(0, -1).join('/'),
-    'Books',
-    true,
-  );
+  await fs.createDir(getAudioSyncPackageVersionDir(book), 'Books', true);
   await safeSaveJSON(fs, getAudioSyncPackageProvenanceFilename(book), 'Books', generatedPackage);
 }
 

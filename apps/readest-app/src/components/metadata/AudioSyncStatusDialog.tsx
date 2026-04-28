@@ -8,6 +8,7 @@ const PHASE_LABELS: Record<string, string> = {
   pending: 'Queued',
   importing: 'Loading input',
   matching: 'Matching chapters',
+  transcribing: 'Transcribing',
   aligning: 'Transcribing & aligning',
   compacting: 'Writing sync map',
   ready: 'Complete',
