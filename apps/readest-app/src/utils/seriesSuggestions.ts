@@ -1,5 +1,5 @@
 import type { Book } from '@/types/book';
-import type { BookSeries } from '@/services/contextTranslation/types';
+import type { BookSeries } from '@/services/learning/types';
 
 const WORD_TOKEN_PATTERN = /[\p{L}\p{N}\p{M}]+/gu;
 

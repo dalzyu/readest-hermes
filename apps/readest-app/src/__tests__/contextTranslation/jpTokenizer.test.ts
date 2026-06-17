@@ -3,7 +3,7 @@ import {
   getReadingRomaji,
   isTokenizerReady,
   _setTokenizerForTest,
-} from '@/services/contextTranslation/plugins/jpTokenizer';
+} from '@/services/learning/plugins/jpTokenizer';
 import type { Tokenizer, IpadicToken } from 'kuromoji';
 
 /**

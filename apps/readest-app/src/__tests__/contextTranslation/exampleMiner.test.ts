@@ -17,7 +17,7 @@ vi.mock('@/services/ai/utils/chunker', () => ({
   extractTextFromDocument: (doc: Document) => mockExtractTextFromDocument(doc),
 }));
 
-import { mineCorpusExamples } from '@/services/contextTranslation/exampleMiner';
+import { mineCorpusExamples } from '@/services/learning/exampleMiner';
 import type { BookDocType } from '@/services/ai/ragService';
 
 describe('mineCorpusExamples', () => {

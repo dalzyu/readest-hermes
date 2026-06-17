@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { runPromptEval } from '@/services/contextTranslation/promptTestHarness';
+import { runPromptEval } from '@/services/learning/promptTestHarness';
 
 describe('runPromptEval', () => {
   test('does not request an LLM phonetic field in the eval harness prompt', async () => {

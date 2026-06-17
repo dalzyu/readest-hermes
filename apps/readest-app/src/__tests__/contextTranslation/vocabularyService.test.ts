@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { VocabularyEntry } from '@/services/contextTranslation/types';
+import type { VocabularyEntry } from '@/services/learning/types';
 
 vi.mock('@/services/ai/storage/aiStore', () => ({
   aiStore: {
@@ -12,7 +12,7 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
 }));
 
 import { aiStore } from '@/services/ai/storage/aiStore';
-import { VOCABULARY_SCHEMA_VERSION } from '@/services/contextTranslation/types';
+import { VOCABULARY_SCHEMA_VERSION } from '@/services/learning/types';
 import {
   saveVocabularyEntry,
   getVocabularyForBook,
@@ -22,7 +22,7 @@ import {
   markVocabularyEntryReviewed,
   sm2Update,
   getDueVocabularyForBook,
-} from '@/services/contextTranslation/vocabularyService';
+} from '@/services/learning/vocabularyService';
 
 const mockStore = vi.mocked(aiStore);
 const DAY_MS = 24 * 60 * 60 * 1000;

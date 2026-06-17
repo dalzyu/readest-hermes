@@ -3,9 +3,9 @@ import { PiTrash, PiDownloadSimple, PiMagnifyingGlass, PiSpeakerHigh } from 'rea
 import { useTranslation } from '@/hooks/useTranslation';
 import { useEnv } from '@/context/EnvContext';
 import { useSettingsStore } from '@/store/settingsStore';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
-import type { VocabularyEntry } from '@/services/contextTranslation/types';
-import type { LookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
+import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/learning/defaults';
+import type { VocabularyEntry } from '@/services/learning/types';
+import type { LookupHistoryEntry } from '@/services/learning/lookupHistoryService';
 import {
   getVocabularyForBook,
   getDueVocabularyForBook,
@@ -14,8 +14,8 @@ import {
   exportAsAnkiTSV,
   exportAsCSV,
   markVocabularyEntryReviewed,
-} from '@/services/contextTranslation/vocabularyService';
-import { getLookupHistoryForBook } from '@/services/contextTranslation/lookupHistoryService';
+} from '@/services/learning/vocabularyService';
+import { getLookupHistoryForBook } from '@/services/learning/lookupHistoryService';
 import { eventDispatcher } from '@/utils/event';
 import { useLookupHistoryReplay } from '../history/LookupHistoryReplay';
 

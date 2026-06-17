@@ -4,8 +4,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import LookupHistoryView from '@/app/reader/components/sidebar/LookupHistoryView';
 import VocabularyPanel from '@/app/reader/components/notebook/VocabularyPanel';
 import { eventDispatcher } from '@/utils/event';
-import type { VocabularyEntry } from '@/services/contextTranslation/types';
-import type { LookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
+import type { VocabularyEntry } from '@/services/learning/types';
+import type { LookupHistoryEntry } from '@/services/learning/lookupHistoryService';
 
 const mockGetBookData = vi.fn();
 const mockGetView = vi.fn();
@@ -93,11 +93,11 @@ vi.mock('@/store/readerStore', () => ({
   useReaderStore: () => ({ getView: mockGetView }),
 }));
 
-vi.mock('@/services/contextTranslation/lookupHistoryService', () => ({
+vi.mock('@/services/learning/lookupHistoryService', () => ({
   getLookupHistoryForBook: (...args: unknown[]) => mockGetLookupHistoryForBook(...args),
 }));
 
-vi.mock('@/services/contextTranslation/vocabularyService', () => ({
+vi.mock('@/services/learning/vocabularyService', () => ({
   getVocabularyForBook: (...args: unknown[]) => mockGetVocabularyForBook(...args),
   getDueVocabularyForBook: (...args: unknown[]) => mockGetDueVocabularyForBook(...args),
   deleteVocabularyEntry: (...args: unknown[]) => mockDeleteVocabularyEntry(...args),

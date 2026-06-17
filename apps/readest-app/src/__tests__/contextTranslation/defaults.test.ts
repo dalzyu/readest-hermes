@@ -7,12 +7,12 @@ import {
   CONTEXT_TRANSLATION_HARNESS_PRESETS,
   getContextDictionaryOutputFields,
   resolveContextTranslationFieldSources,
-} from '@/services/contextTranslation/defaults';
+} from '@/services/learning/defaults';
 import type {
   BookSeries,
   ContextTranslationSettings,
   TranslationOutputField,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/types';
 
 describe('DEFAULT_CONTEXT_TRANSLATION_SETTINGS', () => {
   const s: ContextTranslationSettings = DEFAULT_CONTEXT_TRANSLATION_SETTINGS;

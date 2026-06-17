@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { isBookIndexed } from '@/services/ai/ragService';
-import { getSeriesForBook } from '@/services/contextTranslation/seriesService';
+import { getSeriesForBook } from '@/services/learning/seriesService';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useReaderStore } from '@/store/readerStore';

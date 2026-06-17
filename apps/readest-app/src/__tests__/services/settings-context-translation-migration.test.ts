@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { migrateContextTranslationSource } from '@/services/settingsService';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
+import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/learning/defaults';
 import type { SystemSettings } from '@/types/settings';
 
 function makeSettings(overrides?: Partial<SystemSettings>): SystemSettings {

@@ -187,7 +187,7 @@ vi.mock('@/utils/window', () => ({
 vi.mock('@/services/environment', () => ({
   isTauriAppPlatform: () => false,
 }));
-vi.mock('@/services/contextTranslation/sourceRouter', () => ({
+vi.mock('@/services/learning/sourceRouter', () => ({
   detectAIAvailability: () => ({ chat: true, embedding: true }),
 }));
 

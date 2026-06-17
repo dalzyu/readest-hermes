@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import type { IpadicToken, Tokenizer } from 'kuromoji';
 
-import { getJapaneseGrammarHint } from '@/services/contextTranslation/grammarHints';
-import { _setTokenizerForTest } from '@/services/contextTranslation/plugins/jpTokenizer';
+import { getJapaneseGrammarHint } from '@/services/learning/grammarHints';
+import { _setTokenizerForTest } from '@/services/learning/plugins/jpTokenizer';
 
 function makeToken(overrides: Partial<IpadicToken>): IpadicToken {
   return {

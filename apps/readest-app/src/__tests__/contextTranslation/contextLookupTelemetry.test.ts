@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-vi.mock('@/services/contextTranslation/llmClient', () => ({
+vi.mock('@/services/learning/llmClient', () => ({
   callLLM: vi.fn(),
 }));
 
@@ -8,10 +8,10 @@ vi.mock('@/utils/telemetry', () => ({
   captureEvent: vi.fn(),
 }));
 
-import { callLLM } from '@/services/contextTranslation/llmClient';
-import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
-import type { PopupContextBundle } from '@/services/contextTranslation/types';
+import { callLLM } from '@/services/learning/llmClient';
+import { runContextLookup } from '@/services/learning/contextLookupService';
+import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/learning/defaults';
+import type { PopupContextBundle } from '@/services/learning/types';
 import { captureEvent } from '@/utils/telemetry';
 
 const popupContext: PopupContextBundle = {

@@ -22,9 +22,9 @@ import {
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
-} from '@/services/contextTranslation/types';
-import { getJapaneseGrammarHint } from '@/services/contextTranslation/grammarHints';
-import { getFrequencyBadge } from '@/services/contextTranslation/frequencyService';
+} from '@/services/learning/types';
+import { getJapaneseGrammarHint } from '@/services/learning/grammarHints';
+import { getFrequencyBadge } from '@/services/learning/frequencyService';
 import { Position } from '@/utils/sel';
 
 interface ContextDictionaryPopupProps {

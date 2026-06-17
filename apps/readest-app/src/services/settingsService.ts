@@ -27,7 +27,7 @@ import type { AISettings, AITaskType, ModelEntry, ProviderConfig } from './ai/ty
 import { getTargetLang, isCJKEnv } from '@/utils/misc';
 import { safeLoadJSON, safeSaveJSON } from './persistence';
 
-import { resolveContextTranslationFieldSources } from '@/services/contextTranslation/defaults';
+import { resolveContextTranslationFieldSources } from '@/services/learning/defaults';
 export interface Context {
   fs: FileSystem;
   isMobile: boolean;

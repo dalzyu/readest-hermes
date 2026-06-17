@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { enPlugin } from '@/services/contextTranslation/plugins/enPlugin';
+import { enPlugin } from '@/services/learning/plugins/enPlugin';
 
 describe('enPlugin', () => {
   test('english plugin is a no-op for v1 annotations', () => {

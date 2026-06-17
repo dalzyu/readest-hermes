@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { getLanguagePairHints } from '@/services/contextTranslation/languagePairHints';
+import { getLanguagePairHints } from '@/services/learning/languagePairHints';
 
 describe('getLanguagePairHints', () => {
   test('emits exact, source wildcard, then target wildcard hints in order', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { normalizeLookupResponse } from '@/services/contextTranslation/normalizer';
+import { normalizeLookupResponse } from '@/services/learning/normalizer';
 
 describe('normalizeLookupResponse — sentinel JSON path', () => {
   test('normalizes sentinel-delimited JSON-in-text into the translation model', () => {

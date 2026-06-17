@@ -8,7 +8,7 @@ import {
   buildRetrievalInfoText,
   buildAskAboutThisMessage,
 } from '@/app/reader/components/annotator/LookupPopupUtils';
-import type { PopupContextBundle } from '@/services/contextTranslation/types';
+import type { PopupContextBundle } from '@/services/learning/types';
 
 describe('LookupPopupUtils', () => {
   describe('HAN_REGEX', () => {

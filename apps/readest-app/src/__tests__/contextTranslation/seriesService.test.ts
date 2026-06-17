@@ -29,14 +29,14 @@ vi.mock('@/services/ai/storage/aiStore', async (importOriginal) => {
   };
 });
 
-import type { BookSeries } from '@/services/contextTranslation/types';
+import type { BookSeries } from '@/services/learning/types';
 import { normalizeSeriesRecord, normalizeSeriesRecords } from '@/services/ai/storage/aiStore';
 import {
   getPriorVolumes,
   getSeriesForBook,
   migrateLegacySeriesRecords,
   updateSeriesVolume,
-} from '@/services/contextTranslation/seriesService';
+} from '@/services/learning/seriesService';
 
 describe('seriesService', () => {
   beforeEach(() => {

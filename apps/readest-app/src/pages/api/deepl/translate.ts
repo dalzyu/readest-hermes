@@ -7,7 +7,7 @@ import {
   getSubscriptionPlan,
   validateUserAndToken,
 } from '@/utils/access';
-import { ErrorCodes } from '@/services/translators';
+import { ErrorCodes } from '@/services/learning/translator';
 import { UsageStatsManager } from '@/utils/usage';
 
 const DEFAULT_DEEPL_FREE_API = 'https://api-free.deepl.com/v2/translate';

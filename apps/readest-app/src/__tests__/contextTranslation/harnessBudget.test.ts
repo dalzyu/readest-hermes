@@ -1,18 +1,15 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type {
-  TranslationOutputField,
-  TranslationRequest,
-} from '@/services/contextTranslation/types';
-import { resolveContextTranslationHarnessSettings } from '@/services/contextTranslation/defaults';
+import type { TranslationOutputField, TranslationRequest } from '@/services/learning/types';
+import { resolveContextTranslationHarnessSettings } from '@/services/learning/defaults';
 
-vi.mock('@/services/contextTranslation/llmClient', () => ({
+vi.mock('@/services/learning/llmClient', () => ({
   callLLM: vi.fn(),
   streamLLM: vi.fn(),
 }));
 
-import { callLLM } from '@/services/contextTranslation/llmClient';
-import { translateWithContext } from '@/services/contextTranslation/translationService';
+import { callLLM } from '@/services/learning/llmClient';
+import { translateWithContext } from '@/services/learning/translationService';
 
 const mockCallLLM = vi.mocked(callLLM);
 

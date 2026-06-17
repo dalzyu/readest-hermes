@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import type { PromptTestFixture } from '@/services/contextTranslation/promptTestHarness';
+import type { PromptTestFixture } from '@/services/learning/promptTestHarness';
 import {
   collectWeakClusterPairs,
   freezeWeakClusterFixtures,

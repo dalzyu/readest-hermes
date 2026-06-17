@@ -1,4 +1,4 @@
-import { getCJKLanguage } from '@/services/contextTranslation/utils';
+import { getCJKLanguage } from '@/services/learning/languageUtils';
 
 interface RerankChunk {
   text: string;
@@ -26,7 +26,7 @@ function includesLiteral(text: string, literals: string[]): boolean {
 
 async function getJapaneseDictionaryForm(term: string): Promise<string | null> {
   try {
-    const { getDictionaryForm } = await import('@/services/contextTranslation/plugins/jpTokenizer');
+    const { getDictionaryForm } = await import('@/services/learning/plugins/jpTokenizer');
     const dictionaryForm = getDictionaryForm(term);
     const normalized = normalizeLiteral(dictionaryForm);
     if (!normalized || normalized === normalizeLiteral(term)) {

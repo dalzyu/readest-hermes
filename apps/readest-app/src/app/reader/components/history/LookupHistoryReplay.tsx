@@ -8,8 +8,8 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
-import type { LookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
+import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/learning/defaults';
+import type { LookupHistoryEntry } from '@/services/learning/lookupHistoryService';
 import { eventDispatcher } from '@/utils/event';
 import type { Position } from '@/utils/sel';
 

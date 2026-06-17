@@ -8,7 +8,7 @@ vi.mock('ai', () => ({
   streamText: (...args: unknown[]) => mockStreamText(...args),
 }));
 
-import { callLLM, streamLLM } from '@/services/contextTranslation/llmClient';
+import { callLLM, streamLLM } from '@/services/learning/llmClient';
 
 describe('llmClient reasoning provider options', () => {
   beforeEach(() => {

@@ -1,8 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-  classifyExampleMatch,
-  findExampleMatchRanges,
-} from '@/services/contextTranslation/exampleMatcher';
+import { classifyExampleMatch, findExampleMatchRanges } from '@/services/learning/exampleMatcher';
 
 describe('exampleMatcher', () => {
   test('classifies literal substring matches as exact', () => {

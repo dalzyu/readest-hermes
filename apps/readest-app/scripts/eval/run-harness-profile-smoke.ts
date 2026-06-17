@@ -2,24 +2,21 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import type { PromptTestFixture } from '@/services/contextTranslation/promptTestHarness';
+import type { PromptTestFixture } from '@/services/learning/promptTestHarness';
 import {
   CONTEXT_TRANSLATION_HARNESS_PRESETS,
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
-} from '@/services/contextTranslation/defaults';
-import {
-  buildPerFieldPrompt,
-  buildTranslationPrompt,
-} from '@/services/contextTranslation/promptBuilder';
-import { parseTranslationResponse } from '@/services/contextTranslation/responseParser';
+} from '@/services/learning/defaults';
+import { buildPerFieldPrompt, buildTranslationPrompt } from '@/services/learning/promptBuilder';
+import { parseTranslationResponse } from '@/services/learning/responseParser';
 import {
   sanitizeFieldContent,
   sanitizeTranslationResult,
-} from '@/services/contextTranslation/translationSanitizer';
+} from '@/services/learning/translationSanitizer';
 import type {
   ContextTranslationHarnessSettings,
   TranslationOutputField,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/types';
 import { sampleFixturesByPair } from './evalHarnessUtils';
 
 type HarnessPresetId = keyof typeof CONTEXT_TRANSLATION_HARNESS_PRESETS;

@@ -270,7 +270,7 @@ vi.mock('@/store/settingsStore', () => {
   return { useSettingsStore };
 });
 
-vi.mock('@/services/contextTranslation/dictionaryService', () => ({
+vi.mock('@/services/learning/dictionaryService', () => ({
   SUPPORTED_DICTIONARY_IMPORT_EXTENSIONS: [
     '.zip',
     '.dsl',
@@ -608,8 +608,7 @@ describe('AIPanel', () => {
   });
 
   test('importing a dictionary persists a single metadata entry', async () => {
-    const { importUserDictionary } =
-      await import('@/services/contextTranslation/dictionaryService');
+    const { importUserDictionary } = await import('@/services/learning/dictionaryService');
     vi.mocked(importUserDictionary).mockResolvedValue({
       id: 'user-imported',
       name: 'TestDict',

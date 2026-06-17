@@ -2,16 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuth } from '@/context/AuthContext';
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
-import { detectLookupLanguage } from '@/services/contextTranslation/languagePolicy';
-import { KNOWN_TRANSLATORS } from '@/services/contextTranslation/defaults';
+import { detectLookupLanguage } from '@/services/learning/languagePolicy';
+import { KNOWN_TRANSLATORS } from '@/services/learning/defaults';
 import {
   runLookupPipeline,
   type LookupAvailabilityHint,
   type LookupPipelineDebugInfo,
-} from '@/services/contextTranslation/lookupPipeline';
-import type { LookupFieldProvenance } from '@/services/contextTranslation/types';
-import { saveLookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
-import { saveVocabularyEntry } from '@/services/contextTranslation/vocabularyService';
+} from '@/services/learning/lookupPipeline';
+import type { LookupFieldProvenance } from '@/services/learning/types';
+import { saveLookupHistoryEntry } from '@/services/learning/lookupHistoryService';
+import { saveVocabularyEntry } from '@/services/learning/vocabularyService';
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
@@ -21,9 +21,9 @@ import type {
   PopupRetrievalHints,
   RetrievalStatus,
   TranslationResult,
-} from '@/services/contextTranslation/types';
-import type { ValidationDecision } from '@/services/contextTranslation/validator';
-import type { TranslatorName } from '@/services/translators/providers';
+} from '@/services/learning/types';
+import type { ValidationDecision } from '@/services/learning/validator';
+import type { TranslatorName } from '@/services/learning/translator/providers';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useReaderStore } from '@/store/readerStore';
 import { eventDispatcher } from '@/utils/event';

@@ -13,7 +13,7 @@ import { useLibraryIndexingStore } from '@/store/libraryIndexingStore';
 import type { AISettings, IndexResult } from '@/services/ai/types';
 import type { Book } from '@/types/book';
 import type { AppService } from '@/types/system';
-import type { BookSeries } from '@/services/contextTranslation/types';
+import type { BookSeries } from '@/services/learning/types';
 
 type SeriesIndexSummary = {
   indexed: number;

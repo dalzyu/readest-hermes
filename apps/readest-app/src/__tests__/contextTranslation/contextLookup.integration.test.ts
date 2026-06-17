@@ -41,14 +41,14 @@ vi.mock('@/utils/simplecc', () => ({
   }),
 }));
 
-vi.mock('@/services/contextTranslation/plugins/jpTokenizer', () => ({
+vi.mock('@/services/learning/plugins/jpTokenizer', () => ({
   getDictionaryForm: vi.fn((text: string) => text),
   getReadingRomaji: vi.fn(() => null),
   initJapaneseTokenizer: vi.fn().mockResolvedValue(undefined),
   isTokenizerReady: vi.fn(() => false),
 }));
 
-vi.mock('@/services/contextTranslation/llmClient', () => ({
+vi.mock('@/services/learning/llmClient', () => ({
   callLLM: vi.fn(),
 }));
 
@@ -56,10 +56,10 @@ vi.mock('@/utils/telemetry', () => ({
   captureEvent: vi.fn(),
 }));
 
-import { callLLM } from '@/services/contextTranslation/llmClient';
-import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
-import type { PopupContextBundle, UserDictionary } from '@/services/contextTranslation/types';
+import { callLLM } from '@/services/learning/llmClient';
+import { runContextLookup } from '@/services/learning/contextLookupService';
+import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/learning/defaults';
+import type { PopupContextBundle, UserDictionary } from '@/services/learning/types';
 
 const popupContext: PopupContextBundle = {
   localPastContext: 'A compact bit of local context.',

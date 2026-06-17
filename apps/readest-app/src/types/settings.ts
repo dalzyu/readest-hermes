@@ -4,11 +4,12 @@ import { CustomTexture } from '@/styles/textures';
 import { HighlightColor, HighlightStyle, UserHighlightColor, ViewSettings } from './book';
 import { OPDSCatalog } from './opds';
 import type { AISettings } from '@/services/ai/types';
+import type { DictionarySettings, LookupSettings } from '@/services/learning/settings';
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
   UserDictionary,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/types';
 import type { NotebookTab } from '@/store/notebookStore';
 
 export type ThemeType = 'light' | 'dark' | 'auto';
@@ -59,6 +60,9 @@ export interface ReadSettings {
   customTtsHighlightColors: string[];
   customThemes: CustomTheme[];
 
+  lookup?: LookupSettings;
+  dictionary?: DictionarySettings;
+  /** Legacy settings kept readable until lookup UI migration is complete. */
   contextTranslation?: ContextTranslationSettings;
   contextDictionary?: ContextDictionarySettings;
   autoIndexOnOpen?: boolean;
@@ -77,12 +81,6 @@ export interface KOSyncSettings {
 }
 
 export interface ReadwiseSettings {
-  enabled: boolean;
-  accessToken: string;
-  lastSyncedAt: number;
-}
-
-export interface HardcoverSettings {
   enabled: boolean;
   accessToken: string;
   lastSyncedAt: number;
@@ -127,7 +125,6 @@ export interface SystemSettings {
 
   kosync: KOSyncSettings;
   readwise: ReadwiseSettings;
-  hardcover: HardcoverSettings;
 
   lastSyncedAtBooks: number;
   lastSyncedAtConfigs: number;

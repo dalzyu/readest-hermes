@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import SeriesModal from '@/app/library/components/SeriesModal';
-import type { BookSeries } from '@/services/contextTranslation/types';
+import type { BookSeries } from '@/services/learning/types';
 import type { Book } from '@/types/book';
 import { eventDispatcher } from '@/utils/event';
 
@@ -73,7 +73,7 @@ vi.mock('@/store/settingsStore', () => ({
   }),
 }));
 
-vi.mock('@/services/contextTranslation/seriesService', () => ({
+vi.mock('@/services/learning/seriesService', () => ({
   getAllSeries: (...args: unknown[]) => mockGetAllSeries(...args),
   createSeries: (...args: unknown[]) => mockCreateSeries(...args),
   addBookToSeries: (...args: unknown[]) => mockAddBookToSeries(...args),

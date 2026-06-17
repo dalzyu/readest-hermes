@@ -41,7 +41,7 @@ vi.mock('@/services/ai/ragService', () => ({
   isBookIndexed: vi.fn(async () => testState.indexed),
 }));
 
-vi.mock('@/services/contextTranslation/seriesService', () => ({
+vi.mock('@/services/learning/seriesService', () => ({
   getSeriesForBook: vi.fn(async () => testState.series),
 }));
 

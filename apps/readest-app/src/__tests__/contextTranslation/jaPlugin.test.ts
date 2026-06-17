@@ -4,18 +4,18 @@ const { mockInitJapaneseTokenizer } = vi.hoisted(() => ({
   mockInitJapaneseTokenizer: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/services/contextTranslation/plugins/jpTokenizer', async () => {
-  const actual = await vi.importActual<
-    typeof import('@/services/contextTranslation/plugins/jpTokenizer')
-  >('@/services/contextTranslation/plugins/jpTokenizer');
+vi.mock('@/services/learning/plugins/jpTokenizer', async () => {
+  const actual = await vi.importActual<typeof import('@/services/learning/plugins/jpTokenizer')>(
+    '@/services/learning/plugins/jpTokenizer',
+  );
   return {
     ...actual,
     initJapaneseTokenizer: mockInitJapaneseTokenizer,
   };
 });
 
-import { jaPlugin } from '@/services/contextTranslation/plugins/jaPlugin';
-import { _setTokenizerForTest } from '@/services/contextTranslation/plugins/jpTokenizer';
+import { jaPlugin } from '@/services/learning/plugins/jaPlugin';
+import { _setTokenizerForTest } from '@/services/learning/plugins/jpTokenizer';
 import type { IpadicToken, Tokenizer } from 'kuromoji';
 
 function mockTokenizer(tokenMap: Record<string, IpadicToken[]>): Tokenizer {

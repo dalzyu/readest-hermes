@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { validateLookupResult } from '@/services/contextTranslation/validator';
+import { validateLookupResult } from '@/services/learning/validator';
 
 describe('validateLookupResult', () => {
   test('accepts a result with a non-empty translation', () => {

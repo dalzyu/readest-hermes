@@ -7,11 +7,8 @@ import {
   buildLookupPrompt,
   buildPerFieldPrompt,
   getMissingPromptTemplateVariables,
-} from '@/services/contextTranslation/promptBuilder';
-import type {
-  TranslationOutputField,
-  TranslationRequest,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/promptBuilder';
+import type { TranslationOutputField, TranslationRequest } from '@/services/learning/types';
 
 const baseFields: TranslationOutputField[] = [
   {

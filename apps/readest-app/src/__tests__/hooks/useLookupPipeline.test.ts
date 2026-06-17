@@ -19,7 +19,7 @@ const {
   mockEventDispatcherDispatch: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/services/contextTranslation/lookupPipeline', () => ({
+vi.mock('@/services/learning/lookupPipeline', () => ({
   runLookupPipeline: (...args: unknown[]) => mockRunLookupPipeline(...args),
 }));
 
@@ -35,11 +35,11 @@ vi.mock('@/context/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-vi.mock('@/services/contextTranslation/lookupHistoryService', () => ({
+vi.mock('@/services/learning/lookupHistoryService', () => ({
   saveLookupHistoryEntry: (...args: unknown[]) => mockSaveLookupHistoryEntry(...args),
 }));
 
-vi.mock('@/services/contextTranslation/vocabularyService', () => ({
+vi.mock('@/services/learning/vocabularyService', () => ({
   saveVocabularyEntry: (...args: unknown[]) => mockSaveVocabularyEntry(...args),
 }));
 
@@ -53,7 +53,7 @@ import { useLookupPipeline } from '@/hooks/useLookupPipeline';
 import {
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
-} from '@/services/contextTranslation/defaults';
+} from '@/services/learning/defaults';
 import type { AISettings } from '@/services/ai/types';
 
 const aiSettings: AISettings = {

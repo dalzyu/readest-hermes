@@ -1,19 +1,19 @@
 import { performance } from 'node:perf_hooks';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '../../src/services/contextTranslation/defaults';
+import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '../../src/services/learning/defaults';
 import {
   buildPerFieldPrompt,
   buildTranslationPrompt,
-} from '../../src/services/contextTranslation/promptBuilder';
-import { parseTranslationResponse } from '../../src/services/contextTranslation/responseParser';
+} from '../../src/services/learning/promptBuilder';
+import { parseTranslationResponse } from '../../src/services/learning/responseParser';
 import {
   sanitizeFieldContent,
   sanitizeTranslationResult,
-} from '../../src/services/contextTranslation/translationSanitizer';
+} from '../../src/services/learning/translationSanitizer';
 import type {
   PromptEvalReport,
   PromptTestFixture,
   PromptTestResult,
-} from '../../src/services/contextTranslation/promptTestHarness';
+} from '../../src/services/learning/promptTestHarness';
 
 export type ProductionPromptTestResult = PromptTestResult & {
   structuralFlags: {

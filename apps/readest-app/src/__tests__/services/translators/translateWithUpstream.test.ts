@@ -5,13 +5,13 @@ const { mockGetTranslators, mockIsTranslatorAvailable } = vi.hoisted(() => ({
   mockIsTranslatorAvailable: vi.fn(),
 }));
 
-vi.mock('@/services/translators/providers', () => ({
+vi.mock('@/services/learning/translator/providers', () => ({
   getTranslators: () => mockGetTranslators(),
   isTranslatorAvailable: (translator: MockTranslator, hasToken: boolean) =>
     mockIsTranslatorAvailable(translator, hasToken),
 }));
 
-import { translateWithUpstream } from '@/services/translators/translateWithUpstream';
+import { translateWithUpstream } from '@/services/learning/translator/translateWithUpstream';
 
 type MockTranslator = {
   name: string;

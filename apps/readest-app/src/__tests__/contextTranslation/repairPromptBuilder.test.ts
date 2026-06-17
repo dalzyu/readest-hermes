@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { buildRepairPrompt } from '@/services/contextTranslation/repairPromptBuilder';
+import { buildRepairPrompt } from '@/services/learning/repairPromptBuilder';
 
 describe('buildRepairPrompt', () => {
   test('generates a repair prompt referencing the original issue', () => {

@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { UserDictionary } from '@/services/contextTranslation/types';
+import type { UserDictionary } from '@/services/learning/types';
 
 // ---------------------------------------------------------------------------
 // In-memory store replaces aiStore so IndexedDB is not required
@@ -76,7 +76,7 @@ vi.mock('@/utils/simplecc', () => ({
   }),
 }));
 
-vi.mock('@/services/contextTranslation/plugins/jpTokenizer', () => ({
+vi.mock('@/services/learning/plugins/jpTokenizer', () => ({
   getDictionaryForm: vi.fn((text: string) => text),
   isTokenizerReady: vi.fn(() => false),
 }));
@@ -97,7 +97,7 @@ function readDictZip(): Uint8Array {
 // Import the subject under test *after* mocks are registered
 // ---------------------------------------------------------------------------
 const { importUserDictionary, deleteUserDictionary, lookupDefinitions, findMatches } =
-  await import('@/services/contextTranslation/dictionaryService');
+  await import('@/services/learning/dictionaryService');
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -110,7 +110,7 @@ beforeEach(() => {
 
 describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — full StarDict import', () => {
   test('parseDictionary returns 362k+ entries and correct dictionary name', async () => {
-    const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
+    const { parseDictionary } = await import('@/services/learning/parsers/formatRouter');
     const zip = readDictZip();
     const { entries, name } = await parseDictionary('hanyudacidian-2.0-stardict.zip', zip);
     expect(name).toBe('HanYuDaCiDian');
@@ -154,7 +154,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — findMatches lookup
 
   // Tier 1: exact match
   test('exact match — 婀娜 returns headword and classical definition', async () => {
-    const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
+    const { parseDictionary } = await import('@/services/learning/parsers/formatRouter');
     const zip = readDictZip();
     const { entries } = await parseDictionary('hanyudacidian-2.0-stardict.zip', zip);
 
@@ -165,7 +165,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — findMatches lookup
   }, 120_000);
 
   test('reuses cached search index across repeated lookups', async () => {
-    const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
+    const { parseDictionary } = await import('@/services/learning/parsers/formatRouter');
     const zip = readDictZip();
     const { entries } = await parseDictionary('hanyudacidian-2.0-stardict.zip', zip);
     const sortSpy = vi.spyOn(Array.prototype, 'sort');
@@ -185,7 +185,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — findMatches lookup
   }, 120_000);
 
   test('exact match — 穿越 is present in the dictionary', async () => {
-    const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
+    const { parseDictionary } = await import('@/services/learning/parsers/formatRouter');
     const zip = readDictZip();
     const { entries } = await parseDictionary('hanyudacidian-2.0-stardict.zip', zip);
 
@@ -195,7 +195,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — findMatches lookup
   }, 120_000);
 
   test('exact match — 魔王 includes classical definition', async () => {
-    const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
+    const { parseDictionary } = await import('@/services/learning/parsers/formatRouter');
     const zip = readDictZip();
     const { entries } = await parseDictionary('hanyudacidian-2.0-stardict.zip', zip);
 
@@ -207,7 +207,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — findMatches lookup
 
   // Tier 2: prefix fallback — compound not a headword → returns leading character
   test('prefix fallback — 封号法师 returns a 封-prefix entry', async () => {
-    const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
+    const { parseDictionary } = await import('@/services/learning/parsers/formatRouter');
     const zip = readDictZip();
     const { entries } = await parseDictionary('hanyudacidian-2.0-stardict.zip', zip);
 
@@ -218,7 +218,7 @@ describe.skipIf(!hasRealDictionaryFixture)('HanYuDaCiDian — findMatches lookup
 
   // Traditional character lookup — dictionary has traditional headwords
   test('exact match of traditional headword — 一丁不識 found directly', async () => {
-    const { parseDictionary } = await import('@/services/contextTranslation/parsers/formatRouter');
+    const { parseDictionary } = await import('@/services/learning/parsers/formatRouter');
     const zip = readDictZip();
     const { entries } = await parseDictionary('hanyudacidian-2.0-stardict.zip', zip);
 

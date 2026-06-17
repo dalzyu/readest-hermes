@@ -82,7 +82,7 @@ import {
   addBookToSeries,
   getAllSeries,
   updateSeriesVolume,
-} from '@/services/contextTranslation/seriesService';
+} from '@/services/learning/seriesService';
 import { buildImportSeriesSuggestions } from '@/utils/seriesSuggestions';
 import type { ImportSeriesSuggestion } from '@/utils/seriesSuggestions';
 

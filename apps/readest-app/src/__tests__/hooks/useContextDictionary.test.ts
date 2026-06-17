@@ -14,7 +14,7 @@ import type {
   PopupContextBundle,
   PopupRetrievalHints,
   RetrievalStatus,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/types';
 import type { UseContextLookupResult } from '@/hooks/useLookupPipeline';
 
 const retrievalHints: PopupRetrievalHints = {

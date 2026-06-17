@@ -4,7 +4,7 @@ import { useBookDataStore } from '@/store/bookDataStore';
 import {
   getLookupHistoryForBook,
   type LookupHistoryEntry,
-} from '@/services/contextTranslation/lookupHistoryService';
+} from '@/services/learning/lookupHistoryService';
 import { eventDispatcher } from '@/utils/event';
 import { useLookupHistoryReplay } from '../history/LookupHistoryReplay';
 

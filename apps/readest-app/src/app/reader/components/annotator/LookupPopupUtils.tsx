@@ -1,21 +1,15 @@
 import React from 'react';
 import { pinyin as pinyinPro } from 'pinyin-pro';
 import { toRomaji } from 'wanakana';
-import {
-  getReadingRomaji,
-  isTokenizerReady,
-} from '@/services/contextTranslation/plugins/jpTokenizer';
+import { getReadingRomaji, isTokenizerReady } from '@/services/learning/plugins/jpTokenizer';
 import type {
   LookupAnnotations,
   PopupContextBundle,
   PopupRetrievalHints,
   RetrievalStatus,
   TranslationResult,
-} from '@/services/contextTranslation/types';
-import {
-  type ExampleMatchRange,
-  findExampleMatchRanges,
-} from '@/services/contextTranslation/exampleMatcher';
+} from '@/services/learning/types';
+import { type ExampleMatchRange, findExampleMatchRanges } from '@/services/learning/exampleMatcher';
 import {
   HAN_REGEX,
   HIRAGANA_REGEX,
@@ -24,7 +18,7 @@ import {
   getCJKLanguage,
   isJapaneseText,
   isChineseText,
-} from '@/services/contextTranslation/utils';
+} from '@/services/learning/utils';
 
 export { type ExampleMatchRange, findExampleMatchRanges };
 export type { CJKLanguage };

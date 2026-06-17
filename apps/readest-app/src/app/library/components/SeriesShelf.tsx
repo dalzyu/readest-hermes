@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import { eventDispatcher } from '@/utils/event';
-import { getAllSeries } from '@/services/contextTranslation/seriesService';
+import { getAllSeries } from '@/services/learning/seriesService';
 import type { Book } from '@/types/book';
-import type { BookSeries } from '@/services/contextTranslation/types';
+import type { BookSeries } from '@/services/learning/types';
 
 import SeriesCard from './SeriesCard';
 

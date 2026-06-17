@@ -2,8 +2,8 @@ import { describe, test, expect } from 'vitest';
 import {
   parseStreamingTranslationResponse,
   parseTranslationResponse,
-} from '@/services/contextTranslation/responseParser';
-import type { TranslationOutputField } from '@/services/contextTranslation/types';
+} from '@/services/learning/responseParser';
+import type { TranslationOutputField } from '@/services/learning/types';
 
 const fields: TranslationOutputField[] = [
   { id: 'translation', label: 'Translation', enabled: true, order: 0, promptInstruction: '' },

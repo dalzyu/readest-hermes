@@ -24,7 +24,7 @@ vi.mock('@/store/readerStore', () => ({
 }));
 
 import { aiStore } from '@/services/ai/storage/aiStore';
-import { getPopupLocalContext } from '@/services/contextTranslation/pageContextService';
+import { getPopupLocalContext } from '@/services/learning/pageContextService';
 
 const mockAiStore = vi.mocked(aiStore);
 

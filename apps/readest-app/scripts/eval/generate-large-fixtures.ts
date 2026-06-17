@@ -1556,7 +1556,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = __filename.slice(0, __filename.lastIndexOf('\\'));
 const outputPath = resolve(
   __dirname,
-  '../../src/services/contextTranslation/fixtures/handwrittenLong30x50Fixtures.json',
+  '../../src/services/learning/fixtures/handwrittenLong30x50Fixtures.json',
 );
 
 writeFileSync(outputPath, JSON.stringify(fixtures, null, 2));

@@ -20,9 +20,9 @@ import {
   HighlightedText,
   renderExamplePhonetic,
 } from './LookupPopupUtils';
-import type { ContextTranslationSettings } from '@/services/contextTranslation/types';
-import { getJapaneseGrammarHint } from '@/services/contextTranslation/grammarHints';
-import { getFrequencyBadge } from '@/services/contextTranslation/frequencyService';
+import type { ContextTranslationSettings } from '@/services/learning/types';
+import { getJapaneseGrammarHint } from '@/services/learning/grammarHints';
+import { getFrequencyBadge } from '@/services/learning/frequencyService';
 import { Position } from '@/utils/sel';
 
 interface ContextTranslationPopupProps {

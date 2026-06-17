@@ -4,17 +4,17 @@ const { mockInitJapaneseTokenizer } = vi.hoisted(() => ({
   mockInitJapaneseTokenizer: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/services/contextTranslation/plugins/jpTokenizer', async () => {
-  const actual = await vi.importActual<
-    typeof import('@/services/contextTranslation/plugins/jpTokenizer')
-  >('@/services/contextTranslation/plugins/jpTokenizer');
+vi.mock('@/services/learning/plugins/jpTokenizer', async () => {
+  const actual = await vi.importActual<typeof import('@/services/learning/plugins/jpTokenizer')>(
+    '@/services/learning/plugins/jpTokenizer',
+  );
   return {
     ...actual,
     initJapaneseTokenizer: mockInitJapaneseTokenizer,
   };
 });
 
-import { resolveLookupPlugins } from '@/services/contextTranslation/plugins/registry';
+import { resolveLookupPlugins } from '@/services/learning/plugins/registry';
 
 describe('resolveLookupPlugins', () => {
   test('does not eagerly start tokenizer loading when registry is imported', () => {

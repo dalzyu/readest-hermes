@@ -5,7 +5,7 @@ import {
   parseDictionary,
   SUPPORTED_DICTIONARY_IMPORT_EXTENSIONS,
   SUPPORTED_DICTIONARY_IMPORT_FORMATS,
-} from '@/services/contextTranslation/parsers/formatRouter';
+} from '@/services/learning/parsers/formatRouter';
 
 const encoder = new TextEncoder();
 

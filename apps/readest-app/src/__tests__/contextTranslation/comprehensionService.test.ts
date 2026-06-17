@@ -3,7 +3,7 @@ import {
   buildShortAnswerGradingPrompt,
   parseComprehensionResponse,
   parseShortAnswerGradingResponse,
-} from '@/services/contextTranslation/comprehensionService';
+} from '@/services/learning/comprehensionService';
 
 describe('comprehensionService', () => {
   test('parses comprehension questions from fenced JSON', () => {

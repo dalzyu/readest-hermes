@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { formatTranslationResult } from '@/services/contextTranslation/exampleFormatter';
-import type { TranslationOutputField } from '@/services/contextTranslation/types';
+import { formatTranslationResult } from '@/services/learning/exampleFormatter';
+import type { TranslationOutputField } from '@/services/learning/types';
 
 const fields: TranslationOutputField[] = [
   {

@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { startBookIndexing, subscribeToIndexingRun } from '@/services/ai/indexingRuntime';
 import { cancelBookIndexing } from '@/services/ai/ragService';
-import { detectAIAvailability } from '@/services/contextTranslation/sourceRouter';
+import { detectLearningAIAvailability } from '@/services/learning/lookupService';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -34,7 +34,7 @@ const IndexBookButton: React.FC<IndexBookButtonProps> = ({ bookKey }) => {
   const activeRunRef = useRef<ActiveRunHandle | null>(null);
 
   const embeddingAvailable = useMemo(
-    () => detectAIAvailability(settings.aiSettings).embedding,
+    () => detectLearningAIAvailability(settings.aiSettings).enabled,
     [settings.aiSettings],
   );
 

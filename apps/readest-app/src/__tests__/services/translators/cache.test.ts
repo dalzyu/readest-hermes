@@ -47,7 +47,7 @@ import {
   storeInCache,
   clearCache,
   getCacheStats,
-} from '@/services/translators/cache';
+} from '@/services/learning/translator/cache';
 
 // ---------------------------------------------------------------------------
 // Helpers

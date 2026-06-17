@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import ContextTranslationPopup from '@/app/reader/components/annotator/ContextTranslationPopup';
-import type { ContextTranslationSettings } from '@/services/contextTranslation/types';
+import type { ContextTranslationSettings } from '@/services/learning/types';
 
 const mockDispatch = vi.fn();
 vi.mock('@/utils/event', () => ({

@@ -1,8 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-  resolvePluginLanguage,
-  detectLookupLanguage,
-} from '@/services/contextTranslation/languagePolicy';
+import { resolvePluginLanguage, detectLookupLanguage } from '@/services/learning/languagePolicy';
 
 describe('resolvePluginLanguage', () => {
   test('normalizes locale tags for plugin lookup', () => {

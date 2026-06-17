@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { assemblePopupLocalContext } from '@/services/contextTranslation/contextAssembler';
+import { assemblePopupLocalContext } from '@/services/learning/contextAssembler';
 
 describe('assemblePopupLocalContext', () => {
   const pages = [

@@ -1,7 +1,5 @@
 import type { LanguageModel, EmbeddingModel } from 'ai';
 
-import type { ContextTranslationHarnessSettings } from '@/services/contextTranslation/types';
-
 // ---------------------------------------------------------------------------
 // Provider type taxonomy
 // ---------------------------------------------------------------------------
@@ -77,7 +75,6 @@ export interface AIProfile {
   name: string;
   modelAssignments: ModelAssignments;
   inferenceParamsByTask: Partial<Record<AITaskType, InferenceParams>>;
-  harness?: Partial<ContextTranslationHarnessSettings>;
 }
 
 // ---------------------------------------------------------------------------

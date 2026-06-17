@@ -70,7 +70,7 @@ describe('googleProvider', () => {
   });
 
   it('returns empty array for empty input', async () => {
-    const { googleProvider } = await import('@/services/translators/providers/google');
+    const { googleProvider } = await import('@/services/learning/translator/providers/google');
     const result = await googleProvider.translate([], 'en', 'fr');
     expect(result).toEqual([]);
     expect(mockFetch).not.toHaveBeenCalled();
@@ -82,7 +82,7 @@ describe('googleProvider', () => {
       json: async () => [[['Bonjour', 'Hello']]],
     });
 
-    const { googleProvider } = await import('@/services/translators/providers/google');
+    const { googleProvider } = await import('@/services/learning/translator/providers/google');
     const result = await googleProvider.translate(['Hello'], 'en', 'fr');
     expect(result).toEqual(['Bonjour']);
     expect(mockFetch).toHaveBeenCalledOnce();
@@ -94,7 +94,7 @@ describe('googleProvider', () => {
       json: async () => [[['translated', 'original']]],
     });
 
-    const { googleProvider } = await import('@/services/translators/providers/google');
+    const { googleProvider } = await import('@/services/learning/translator/providers/google');
     const result = await googleProvider.translate(['', 'Hello'], 'en', 'fr');
     expect(result[0]).toBe('');
     expect(result[1]).toBe('translated');
@@ -106,7 +106,7 @@ describe('googleProvider', () => {
       status: 500,
     });
 
-    const { googleProvider } = await import('@/services/translators/providers/google');
+    const { googleProvider } = await import('@/services/learning/translator/providers/google');
     await expect(googleProvider.translate(['Hello'], 'en', 'fr')).rejects.toThrow(
       'Translation failed with status 500',
     );
@@ -118,13 +118,13 @@ describe('googleProvider', () => {
       json: async () => ({}),
     });
 
-    const { googleProvider } = await import('@/services/translators/providers/google');
+    const { googleProvider } = await import('@/services/learning/translator/providers/google');
     const result = await googleProvider.translate(['Hello'], 'en', 'fr');
     expect(result).toEqual(['Hello']);
   });
 
   it('has correct provider metadata', async () => {
-    const { googleProvider } = await import('@/services/translators/providers/google');
+    const { googleProvider } = await import('@/services/learning/translator/providers/google');
     expect(googleProvider.name).toBe('google');
     expect(googleProvider.label).toBe('Google Translate');
   });
@@ -143,7 +143,7 @@ describe('yandexProvider', () => {
   });
 
   it('returns empty array for empty input', async () => {
-    const { yandexProvider } = await import('@/services/translators/providers/yandex');
+    const { yandexProvider } = await import('@/services/learning/translator/providers/yandex');
     const result = await yandexProvider.translate([], 'en', 'fr');
     expect(result).toEqual([]);
     expect(mockFetch).not.toHaveBeenCalled();
@@ -157,7 +157,7 @@ describe('yandexProvider', () => {
       }),
     });
 
-    const { yandexProvider } = await import('@/services/translators/providers/yandex');
+    const { yandexProvider } = await import('@/services/learning/translator/providers/yandex');
     const result = await yandexProvider.translate(['Hello'], 'en', 'fr');
     expect(result).toEqual(['Bonjour']);
 
@@ -178,7 +178,7 @@ describe('yandexProvider', () => {
       }),
     });
 
-    const { yandexProvider } = await import('@/services/translators/providers/yandex');
+    const { yandexProvider } = await import('@/services/learning/translator/providers/yandex');
     await yandexProvider.translate(['Hello'], 'AUTO', 'fr');
 
     const body = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -192,7 +192,7 @@ describe('yandexProvider', () => {
       json: async () => ({ error: 'rate limited' }),
     });
 
-    const { yandexProvider } = await import('@/services/translators/providers/yandex');
+    const { yandexProvider } = await import('@/services/learning/translator/providers/yandex');
     await expect(yandexProvider.translate(['Hello'], 'en', 'fr')).rejects.toThrow(
       'yandexgpt failed with status 429',
     );
@@ -204,13 +204,13 @@ describe('yandexProvider', () => {
       json: async () => ({}),
     });
 
-    const { yandexProvider } = await import('@/services/translators/providers/yandex');
+    const { yandexProvider } = await import('@/services/learning/translator/providers/yandex');
     const result = await yandexProvider.translate(['Hello'], 'en', 'fr');
     expect(result).toEqual(['Hello']);
   });
 
   it('has correct provider metadata', async () => {
-    const { yandexProvider } = await import('@/services/translators/providers/yandex');
+    const { yandexProvider } = await import('@/services/learning/translator/providers/yandex');
     expect(yandexProvider.name).toBe('yandex');
     expect(yandexProvider.label).toBe('Yandex Translate');
     expect(yandexProvider.authRequired).toBe(false);
@@ -224,7 +224,7 @@ describe('yandexProvider', () => {
       }),
     });
 
-    const { yandexProvider } = await import('@/services/translators/providers/yandex');
+    const { yandexProvider } = await import('@/services/learning/translator/providers/yandex');
     const result = await yandexProvider.translate(['Hello', 'World'], 'en', 'fr');
     expect(result).toEqual(['Translated', 'Translated']);
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -261,7 +261,7 @@ describe('azureProvider', () => {
   }
 
   it('returns empty array for empty input', async () => {
-    const { azureProvider } = await import('@/services/translators/providers/azure');
+    const { azureProvider } = await import('@/services/learning/translator/providers/azure');
     const result = await azureProvider.translate([], 'en', 'fr');
     expect(result).toEqual([]);
     expect(mockFetch).not.toHaveBeenCalled();
@@ -270,7 +270,7 @@ describe('azureProvider', () => {
   it('translates text with token authentication', async () => {
     mockTokenAndTranslation([{ translations: [{ text: 'Bonjour' }] }]);
 
-    const { azureProvider } = await import('@/services/translators/providers/azure');
+    const { azureProvider } = await import('@/services/learning/translator/providers/azure');
     const result = await azureProvider.translate(['Hello'], 'en', 'fr');
     expect(result).toEqual(['Bonjour']);
   });
@@ -278,7 +278,7 @@ describe('azureProvider', () => {
   it('preserves empty strings', async () => {
     mockTokenAndTranslation([{ translations: [{ text: 'Monde' }] }]);
 
-    const { azureProvider } = await import('@/services/translators/providers/azure');
+    const { azureProvider } = await import('@/services/learning/translator/providers/azure');
     const result = await azureProvider.translate(['', 'World'], 'en', 'fr');
     expect(result[0]).toBe('');
     expect(result[1]).toBe('Monde');
@@ -290,7 +290,7 @@ describe('azureProvider', () => {
       status: 403,
     });
 
-    const { azureProvider } = await import('@/services/translators/providers/azure');
+    const { azureProvider } = await import('@/services/learning/translator/providers/azure');
     await expect(azureProvider.translate(['Hello'], 'en', 'fr')).rejects.toThrow(
       'Failed to get auth token: 403',
     );
@@ -308,7 +308,7 @@ describe('azureProvider', () => {
         json: async () => ({}),
       });
 
-    const { azureProvider } = await import('@/services/translators/providers/azure');
+    const { azureProvider } = await import('@/services/learning/translator/providers/azure');
     await expect(azureProvider.translate(['Hello'], 'en', 'fr')).rejects.toThrow(
       'Translation failed with status 500',
     );
@@ -317,13 +317,13 @@ describe('azureProvider', () => {
   it('falls back to original text when response format is unexpected', async () => {
     mockTokenAndTranslation([]);
 
-    const { azureProvider } = await import('@/services/translators/providers/azure');
+    const { azureProvider } = await import('@/services/learning/translator/providers/azure');
     const result = await azureProvider.translate(['Hello'], 'en', 'fr');
     expect(result).toEqual(['Hello']);
   });
 
   it('has correct provider metadata', async () => {
-    const { azureProvider } = await import('@/services/translators/providers/azure');
+    const { azureProvider } = await import('@/services/learning/translator/providers/azure');
     expect(azureProvider.name).toBe('azure');
     expect(azureProvider.label).toBe('Azure Translator');
   });
@@ -339,13 +339,13 @@ describe('provider registry disabled handling', () => {
   // state for no benefit.
 
   it('keeps yandex in getTranslators() so the UI can render it', async () => {
-    const { getTranslators } = await import('@/services/translators/providers');
+    const { getTranslators } = await import('@/services/learning/translator/providers');
     const names = getTranslators().map((t) => t.name);
     expect(names).toContain('yandex');
   });
 
   it('exposes yandex as disabled so callers can grey it out', async () => {
-    const { getTranslator } = await import('@/services/translators/providers');
+    const { getTranslator } = await import('@/services/learning/translator/providers');
     const yandex = getTranslator('yandex');
     expect(yandex).toBeDefined();
     expect(yandex!.disabled).toBe(true);
@@ -353,35 +353,35 @@ describe('provider registry disabled handling', () => {
 
   it('isTranslatorAvailable returns false for disabled providers', async () => {
     const { getTranslator, isTranslatorAvailable } =
-      await import('@/services/translators/providers');
+      await import('@/services/learning/translator/providers');
     const yandex = getTranslator('yandex')!;
     expect(isTranslatorAvailable(yandex, true)).toBe(false);
     expect(isTranslatorAvailable(yandex, false)).toBe(false);
   });
 
   it('isTranslatorAvailable returns false for authRequired without token', async () => {
-    const { isTranslatorAvailable } = await import('@/services/translators/providers');
+    const { isTranslatorAvailable } = await import('@/services/learning/translator/providers');
     const authed = { name: 'x', label: 'X', authRequired: true, translate: async () => [] };
     expect(isTranslatorAvailable(authed, false)).toBe(false);
     expect(isTranslatorAvailable(authed, true)).toBe(true);
   });
 
   it('isTranslatorAvailable returns false when quota is exceeded', async () => {
-    const { isTranslatorAvailable } = await import('@/services/translators/providers');
+    const { isTranslatorAvailable } = await import('@/services/learning/translator/providers');
     const exhausted = { name: 'x', label: 'X', quotaExceeded: true, translate: async () => [] };
     expect(isTranslatorAvailable(exhausted, true)).toBe(false);
   });
 
   it('getTranslatorDisplayLabel appends a Unavailable suffix for disabled providers', async () => {
     const { getTranslator, getTranslatorDisplayLabel } =
-      await import('@/services/translators/providers');
+      await import('@/services/learning/translator/providers');
     const yandex = getTranslator('yandex')!;
     const label = getTranslatorDisplayLabel(yandex, true, (s) => s);
     expect(label).toBe('Yandex Translate (Unavailable)');
   });
 
   it('getTranslatorDisplayLabel prefers the disabled suffix over other statuses', async () => {
-    const { getTranslatorDisplayLabel } = await import('@/services/translators/providers');
+    const { getTranslatorDisplayLabel } = await import('@/services/learning/translator/providers');
     const both = {
       name: 'x',
       label: 'X',
@@ -395,7 +395,7 @@ describe('provider registry disabled handling', () => {
 
   it('getTranslatorDisplayLabel returns the plain label for healthy providers', async () => {
     const { getTranslator, getTranslatorDisplayLabel } =
-      await import('@/services/translators/providers');
+      await import('@/services/learning/translator/providers');
     const google = getTranslator('google')!;
     expect(getTranslatorDisplayLabel(google, true, (s) => s)).toBe('Google Translate');
   });

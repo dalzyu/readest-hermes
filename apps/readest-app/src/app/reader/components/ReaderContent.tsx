@@ -35,7 +35,7 @@ import SettingsDialog from '@/components/settings/SettingsDialog';
 
 import { startBookIndexing, subscribeToIndexingRun } from '@/services/ai/indexingRuntime';
 import { isBookIndexed } from '@/services/ai/ragService';
-import { detectAIAvailability } from '@/services/contextTranslation/sourceRouter';
+import { detectLearningAIAvailability } from '@/services/learning/lookupService';
 const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ ids, settings }) => {
   const _ = useTranslation();
   const router = useRouter();
@@ -249,7 +249,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
     const run = async () => {
       try {
         const latestAiSettings = useSettingsStore.getState().settings.aiSettings;
-        if (!detectAIAvailability(latestAiSettings).embedding) {
+        if (!detectLearningAIAvailability(latestAiSettings).enabled) {
           return;
         }
 

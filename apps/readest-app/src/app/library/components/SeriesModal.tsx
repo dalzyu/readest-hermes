@@ -7,7 +7,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { eventDispatcher } from '@/utils/event';
 import { aiStore } from '@/services/ai/storage/aiStore';
-import type { BookSeries } from '@/services/contextTranslation/types';
+import type { BookSeries } from '@/services/learning/types';
 import {
   addBookToSeries,
   createSeries,
@@ -16,7 +16,7 @@ import {
   getSeriesForBook,
   removeBookFromSeries,
   updateSeriesVolume,
-} from '@/services/contextTranslation/seriesService';
+} from '@/services/learning/seriesService';
 
 import { buildSeriesIndexMessage, indexSeriesVolumes } from './SeriesCard';
 

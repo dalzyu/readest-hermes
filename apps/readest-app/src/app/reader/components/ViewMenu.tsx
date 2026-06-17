@@ -95,11 +95,6 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
     }
   };
 
-  const handleStartRSVP = () => {
-    setIsDropdownOpen?.(false);
-    eventDispatcher.dispatch('rsvp-start', { bookKey });
-  };
-
   useEffect(() => {
     if (isScrolledMode === viewSettings!.scrolled) return;
     viewSettings!.scrolled = isScrolledMode;
@@ -295,12 +290,6 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
         shortcut='Shift+P'
         Icon={isParagraphMode ? MdCheck : undefined}
         onClick={toggleParagraphMode}
-        disabled={bookData.isFixedLayout}
-      />
-
-      <MenuItem
-        label={_('Speed Reading Mode')}
-        onClick={handleStartRSVP}
         disabled={bookData.isFixedLayout}
       />
 

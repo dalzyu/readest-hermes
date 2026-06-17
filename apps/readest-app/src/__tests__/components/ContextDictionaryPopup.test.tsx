@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, test, vi, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { LookupAnnotationSlots } from '@/services/contextTranslation/types';
+import type { LookupAnnotationSlots } from '@/services/learning/types';
 import { eventDispatcher } from '@/utils/event';
 import ContextDictionaryPopup from '@/app/reader/components/annotator/ContextDictionaryPopup';
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/types';
 import {
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
-} from '@/services/contextTranslation/defaults';
+} from '@/services/learning/defaults';
 
 vi.mock('@/components/Popup', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

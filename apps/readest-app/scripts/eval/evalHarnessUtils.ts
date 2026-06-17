@@ -1,4 +1,4 @@
-import type { PromptTestFixture } from '@/services/contextTranslation/promptTestHarness';
+import type { PromptTestFixture } from '@/services/learning/promptTestHarness';
 
 type InventoryModel = {
   id: string;

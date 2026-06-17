@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { DictionaryEntry, UserDictionary } from '@/services/contextTranslation/types';
+import type { DictionaryEntry, UserDictionary } from '@/services/learning/types';
 import {
   deleteUserDictionary,
   findMatches,
   importUserDictionary,
   lookupDefinitions,
-} from '@/services/contextTranslation/dictionaryService';
+} from '@/services/learning/dictionaryService';
 
 const records = new Map<string, unknown>();
 const settingsRef = { current: [] as UserDictionary[] };
@@ -53,7 +53,7 @@ vi.mock('@/store/settingsStore', () => ({
   }),
 }));
 
-vi.mock('@/services/contextTranslation/dictionaryParser', () => {
+vi.mock('@/services/learning/dictionaryParser', () => {
   const encoder = new TextEncoder();
   return {
     extractFromZip: vi.fn(async () => ({
@@ -84,7 +84,7 @@ vi.mock('@/services/contextTranslation/dictionaryParser', () => {
   };
 });
 
-vi.mock('@/services/contextTranslation/plugins/jpTokenizer', () => ({
+vi.mock('@/services/learning/plugins/jpTokenizer', () => ({
   getDictionaryForm: vi.fn((text: string) => text),
   isTokenizerReady: vi.fn(() => false),
 }));
@@ -150,7 +150,7 @@ describe('importUserDictionary', () => {
   });
 
   test('throws when dictionary has zero entries', async () => {
-    vi.doMock('@/services/contextTranslation/dictionaryParser', () => ({
+    vi.doMock('@/services/learning/dictionaryParser', () => ({
       extractFromZip: vi.fn(async () => ({
         ifo: new Uint8Array(),
         idx: new Uint8Array(),
@@ -161,7 +161,7 @@ describe('importUserDictionary', () => {
     }));
     vi.resetModules();
     const { importUserDictionary: reimport } =
-      await import('@/services/contextTranslation/dictionaryService');
+      await import('@/services/learning/dictionaryService');
 
     await expect(
       reimport(fakeZipBuffer(), {

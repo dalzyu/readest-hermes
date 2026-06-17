@@ -4,7 +4,7 @@ import { SystemSettings } from '@/types/settings';
 import { EnvConfigType } from '@/services/environment';
 import { initDayjs } from '@/utils/time';
 import { DEFAULT_AI_PROFILE } from '@/services/ai/constants';
-import { resolveContextTranslationFieldSources } from '@/services/contextTranslation/defaults';
+import { normalizeDictionarySettings, normalizeLookupSettings } from '@/services/learning/settings';
 
 export type FontPanelView = 'main-fonts' | 'custom-fonts';
 
@@ -29,17 +29,11 @@ interface SettingsState {
 function normalizeSettings(settings: SystemSettings): SystemSettings {
   const migrated: SystemSettings = { ...settings };
 
-  const contextTranslation = migrated.globalReadSettings?.contextTranslation;
-  if (contextTranslation) {
-    migrated.globalReadSettings = {
-      ...migrated.globalReadSettings,
-      contextTranslation: {
-        ...contextTranslation,
-        fieldSources: resolveContextTranslationFieldSources(contextTranslation),
-      },
-    };
-    delete (migrated.globalReadSettings.contextTranslation as { source?: unknown }).source;
-  }
+  migrated.globalReadSettings = {
+    ...migrated.globalReadSettings,
+    lookup: normalizeLookupSettings(migrated.globalReadSettings?.lookup),
+    dictionary: normalizeDictionarySettings(migrated.globalReadSettings?.dictionary),
+  };
 
   const aiSettings = migrated.aiSettings;
   if (!aiSettings) return migrated;

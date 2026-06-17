@@ -1,10 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { describe, expect, test } from 'vitest';
-import {
-  extractFromZip,
-  parseIfo,
-  parseStarDict,
-} from '@/services/contextTranslation/dictionaryParser';
+import { extractFromZip, parseIfo, parseStarDict } from '@/services/learning/dictionaryParser';
 
 const textEncoder = new TextEncoder();
 

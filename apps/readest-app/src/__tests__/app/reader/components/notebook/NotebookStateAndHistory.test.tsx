@@ -6,7 +6,7 @@ import NotebookTabNavigation from '@/app/reader/components/notebook/NotebookTabN
 import LookupHistoryView from '@/app/reader/components/sidebar/LookupHistoryView';
 import { eventDispatcher } from '@/utils/event';
 import { useNotebookStore } from '@/store/notebookStore';
-import type { LookupHistoryEntry } from '@/services/contextTranslation/lookupHistoryService';
+import type { LookupHistoryEntry } from '@/services/learning/lookupHistoryService';
 
 type MockBookConfig = {
   updatedAt?: number;
@@ -192,7 +192,7 @@ vi.mock('@/app/reader/components/notebook/VocabularyPanel', () => ({
 
 const mockGetLookupHistoryForBook = vi.fn();
 
-vi.mock('@/services/contextTranslation/lookupHistoryService', () => ({
+vi.mock('@/services/learning/lookupHistoryService', () => ({
   getLookupHistoryForBook: (...args: unknown[]) => mockGetLookupHistoryForBook(...args),
 }));
 

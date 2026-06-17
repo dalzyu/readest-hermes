@@ -4,7 +4,7 @@ const { mockGetDictionaryForm } = vi.hoisted(() => ({
   mockGetDictionaryForm: vi.fn((value: string) => value),
 }));
 
-vi.mock('@/services/contextTranslation/plugins/jpTokenizer', () => ({
+vi.mock('@/services/learning/plugins/jpTokenizer', () => ({
   getDictionaryForm: (value: string) => mockGetDictionaryForm(value),
 }));
 

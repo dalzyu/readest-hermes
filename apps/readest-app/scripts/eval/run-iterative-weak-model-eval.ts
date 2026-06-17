@@ -2,11 +2,8 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import type {
-  PromptTestFixture,
-  PromptTestResult,
-} from '@/services/contextTranslation/promptTestHarness';
-import { runPromptEval } from '@/services/contextTranslation/promptTestHarness';
+import type { PromptTestFixture, PromptTestResult } from '@/services/learning/promptTestHarness';
+import { runPromptEval } from '@/services/learning/promptTestHarness';
 import { runProductionPromptEval } from './productionTranslationEval';
 import { getFixturePair, sampleFixturesByPair, selectTranslationModels } from './evalHarnessUtils';
 

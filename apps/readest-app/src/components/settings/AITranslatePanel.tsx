@@ -13,7 +13,7 @@ import {
   deleteUserDictionary,
   SUPPORTED_DICTIONARY_IMPORT_EXTENSIONS,
   SUPPORTED_DICTIONARY_IMPORT_FORMATS,
-} from '@/services/contextTranslation/dictionaryService';
+} from '@/services/learning/dictionaryService';
 import { getTranslatorLanguageOptions } from '@/services/translatorLanguages';
 import type {
   ContextDictionarySettings,
@@ -21,7 +21,7 @@ import type {
   ContextTranslationSettings,
   UserDictionary,
   ContextDictionaryFieldSource,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/types';
 import {
   DEFAULT_CONTEXT_DICTIONARY_FIELD_SOURCES,
   DEFAULT_CONTEXT_DICTIONARY_OUTPUT_FIELDS,
@@ -30,18 +30,18 @@ import {
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
   resolveContextDictionaryFieldSources,
   resolveContextTranslationFieldSources,
-} from '@/services/contextTranslation/defaults';
+} from '@/services/learning/defaults';
 import {
   DICTIONARY_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
   TRANSLATION_SYSTEM_PROMPT_TEMPLATE_VARIABLES,
   getMissingPromptTemplateVariables,
-} from '@/services/contextTranslation/promptBuilder';
+} from '@/services/learning/promptBuilder';
 import {
   getTranslators,
   getTranslatorDisplayLabel,
   isTranslatorAvailable,
   type TranslatorName,
-} from '@/services/translators/providers';
+} from '@/services/learning/translator/providers';
 
 const DEFAULT_BY_ID: Record<string, string> = Object.fromEntries(
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS.outputFields.map((f) => [f.id, f.promptInstruction]),

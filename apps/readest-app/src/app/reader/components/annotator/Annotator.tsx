@@ -19,7 +19,6 @@ import { useDeviceControlStore } from '@/store/deviceStore';
 import { useFoliateEvents } from '../../hooks/useFoliateEvents';
 import { useNotesSync } from '../../hooks/useNotesSync';
 import { useReadwiseSync } from '../../hooks/useReadwiseSync';
-import { useHardcoverSync } from '../../hooks/useHardcoverSync';
 import { useTextSelector } from '../../hooks/useTextSelector';
 import { Point, Position, TextSelection } from '@/utils/sel';
 import { getPopupPosition, getPosition, getTextFromRange } from '@/utils/sel';
@@ -31,13 +30,12 @@ import { getWordCount } from '@/utils/word';
 import { getIndexFromCfi, isCfiInLocation } from '@/utils/cfi';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
-import { startPrefetch } from '@/services/contextTranslation/prefetchService';
+import { startPrefetch } from '@/services/learning/prefetchService';
 import { getHighlightColorHex } from '../../utils/annotatorUtil';
 import { annotationToolButtons } from './AnnotationTools';
 import AnnotationRangeEditor from './AnnotationRangeEditor';
 import AnnotationPopup from './AnnotationPopup';
-import ContextTranslationPopup from './ContextTranslationPopup';
-import ContextDictionaryPopup from './ContextDictionaryPopup';
+import LearningLookupPopup from './LearningLookupPopup';
 import useShortcuts from '@/hooks/useShortcuts';
 import ProofreadPopup from './ProofreadPopup';
 import ExportMarkdownDialog from './ExportMarkdownDialog';
@@ -54,7 +52,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   useNotesSync(bookKey);
   useReadwiseSync(bookKey);
-  useHardcoverSync(bookKey);
 
   const osPlatform = getOSPlatform();
   const config = getConfig(bookKey)!;
@@ -597,14 +594,14 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
       // Prefetch RAG context while the annotation toolbar is visible, so that
       // if the user taps "Context Translate" or "Dictionary", data is warm.
-      const ctxSettings = settings.globalReadSettings.contextTranslation;
-      if (ctxSettings?.enabled) {
+      const lookupSettings = settings.globalReadSettings.lookup;
+      if (lookupSettings?.enabled && settings.globalReadSettings.contextTranslation) {
         startPrefetch({
           bookKey,
           bookHash: bookData.book?.hash ?? '',
           currentPage: progress.page,
           selectedText: selection.text,
-          settings: ctxSettings,
+          settings: settings.globalReadSettings.contextTranslation,
           aiSettings: settings.aiSettings ?? {
             enabled: false,
             providers: [],
@@ -1003,14 +1000,14 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           tooltipText: _(label),
           Icon,
           onClick: handleContextTranslation,
-          disabled: !settings.globalReadSettings.contextTranslation?.enabled,
+          disabled: !settings.globalReadSettings.lookup?.enabled,
         };
       case 'ctx-dictionary':
         return {
           tooltipText: _(label),
           Icon,
           onClick: handleDictionaryLookup,
-          disabled: !settings.globalReadSettings.contextDictionary?.enabled,
+          disabled: !settings.globalReadSettings.dictionary?.enabled,
         };
       default:
         return { tooltipText: '', Icon, onClick: () => {} };
@@ -1052,19 +1049,17 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         trianglePosition &&
         contextTranslationPopupPosition &&
         selection &&
-        settings.globalReadSettings.contextTranslation?.enabled && (
-          <ContextTranslationPopup
+        settings.globalReadSettings.lookup?.enabled && (
+          <LearningLookupPopup
             key={selection.cfi || `${selection.index}-${selection.page}-${selection.text}`}
             bookKey={bookKey}
             bookHash={bookData.book?.hash ?? ''}
             selectedText={selection.text}
-            currentPage={progress.page}
-            settings={settings.globalReadSettings.contextTranslation}
+            mode='translation'
             position={contextTranslationPopupPosition}
             trianglePosition={trianglePosition}
             popupWidth={ctxTransPopupWidth}
             popupHeight={ctxTransPopupHeight}
-            bookLanguage={primaryLang}
             onDismiss={handleDismissPopupAndSelection}
           />
         )}
@@ -1072,21 +1067,17 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         trianglePosition &&
         contextDictionaryPopupPosition &&
         selection &&
-        settings.globalReadSettings.contextDictionary?.enabled &&
-        settings.globalReadSettings.contextTranslation && (
-          <ContextDictionaryPopup
+        settings.globalReadSettings.dictionary?.enabled && (
+          <LearningLookupPopup
             key={`dict-${selection.cfi || `${selection.index}-${selection.page}-${selection.text}`}`}
             bookKey={bookKey}
             bookHash={bookData.book?.hash ?? ''}
             selectedText={selection.text}
-            currentPage={progress.page}
-            translationSettings={settings.globalReadSettings.contextTranslation}
-            dictionarySettings={settings.globalReadSettings.contextDictionary}
+            mode='dictionary'
             position={contextDictionaryPopupPosition}
             trianglePosition={trianglePosition}
             popupWidth={ctxDictPopupWidth}
             popupHeight={ctxDictPopupHeight}
-            bookLanguage={primaryLang}
             onDismiss={handleDismissPopupAndSelection}
           />
         )}

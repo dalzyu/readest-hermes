@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { basicPolish, getPolisher, polish } from '@/services/translators/polish';
+import { basicPolish, getPolisher, polish } from '@/services/learning/translator/polish';
 
 describe('basicPolish', () => {
   it('collapses multiple spaces into a single space', () => {

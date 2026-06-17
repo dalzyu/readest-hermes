@@ -24,7 +24,7 @@ import type { SystemSettings } from '@/types/settings';
 import useShortcuts from '@/hooks/useShortcuts';
 import BooknoteItem from '../sidebar/BooknoteItem';
 import AIAssistant from './AIAssistant';
-import VocabularyPanel from './VocabularyPanel';
+import QuizPanel from './QuizPanel';
 import NotebookHeader from './Header';
 import NoteEditor from './NoteEditor';
 import SearchBar from './SearchBar';
@@ -420,7 +420,11 @@ const Notebook: React.FC = ({}) => {
           </div>
         ) : effectiveNotebookActiveTab === 'vocabulary' ? (
           <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-            <VocabularyPanel bookKey={sideBarBookKey} bookHash={bookData.book?.hash ?? ''} />
+            <QuizPanel
+              bookKey={sideBarBookKey}
+              bookHash={bookData.book?.hash ?? ''}
+              initialMode='vocabulary'
+            />
           </div>
         ) : (
           <div className='flex-grow overflow-y-auto px-3'>

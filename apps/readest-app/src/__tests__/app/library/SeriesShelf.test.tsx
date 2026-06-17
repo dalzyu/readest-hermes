@@ -23,7 +23,7 @@ vi.mock('@/store/settingsStore', () => ({
   }),
 }));
 
-vi.mock('@/services/contextTranslation/seriesService', () => ({
+vi.mock('@/services/learning/seriesService', () => ({
   getAllSeries: () => mockGetAllSeries(),
 }));
 

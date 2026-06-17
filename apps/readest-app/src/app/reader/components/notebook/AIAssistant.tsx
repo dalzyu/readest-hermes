@@ -1,291 +1,46 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import {
-  AssistantRuntimeProvider,
-  useLocalRuntime,
-  useAssistantRuntime,
-  useComposerRuntime,
-  type ThreadMessage,
-  type ThreadHistoryAdapter,
-} from '@assistant-ui/react';
-
-import { useTranslation } from '@/hooks/useTranslation';
-import { useSettingsStore } from '@/store/settingsStore';
-import { useBookDataStore } from '@/store/bookDataStore';
-import { useReaderStore } from '@/store/readerStore';
-import { useAIChatStore } from '@/store/aiChatStore';
-import { eventDispatcher } from '@/utils/event';
-import {
-  indexBook,
-  isBookIndexed,
-  aiStore,
-  aiLogger,
-  createTauriAdapter,
-  getLastSources,
-  clearLastSources,
-} from '@/services/ai';
-import type { EmbeddingProgress, AISettings, AIMessage, IndexResult } from '@/services/ai/types';
+import { useCallback, useEffect, useState } from 'react';
+import { BookOpenIcon, Loader2Icon } from 'lucide-react';
+import ChatInput from '@/components/chat/ChatInput';
+import ChatThread from '@/components/chat/ChatThread';
 import { useEnv } from '@/context/EnvContext';
-
-import { Button } from '@/components/ui/button';
-import { Loader2Icon, BookOpenIcon } from 'lucide-react';
-import { Thread } from '@/components/assistant/Thread';
-
-// Helper function to convert AIMessage array to ExportedMessageRepository format
-// Each message needs to be wrapped with { message, parentId } structure
-function convertToExportedMessages(
-  aiMessages: AIMessage[],
-): { message: ThreadMessage; parentId: string | null }[] {
-  return aiMessages.map((msg, idx) => {
-    const baseMessage = {
-      id: msg.id,
-      content: [{ type: 'text' as const, text: msg.content }],
-      createdAt: new Date(msg.createdAt),
-      metadata: { custom: {} },
-    };
-
-    // Build role-specific message to satisfy ThreadMessage union type
-    const threadMessage: ThreadMessage =
-      msg.role === 'user'
-        ? ({
-            ...baseMessage,
-            role: 'user' as const,
-            attachments: [] as const,
-          } as unknown as ThreadMessage)
-        : ({
-            ...baseMessage,
-            role: 'assistant' as const,
-            status: { type: 'complete' as const, reason: 'stop' as const },
-          } as unknown as ThreadMessage);
-
-    return {
-      message: threadMessage,
-      parentId: idx > 0 ? (aiMessages[idx - 1]?.id ?? null) : null,
-    };
-  });
-}
+import { useTranslation } from '@/hooks/useTranslation';
+import { indexBook, isBookIndexed } from '@/services/ai/ragService';
+import { aiStore } from '@/services/ai/storage/aiStore';
+import type { EmbeddingProgress, IndexResult } from '@/services/ai/types';
+import { aiLogger } from '@/services/ai/logger';
+import { streamChat } from '@/services/ai/adapters/ChatStreamAdapter';
+import type { AIMessage } from '@/services/ai/types';
+import { useAIChatStore } from '@/store/aiChatStore';
+import { useBookDataStore } from '@/store/bookDataStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { eventDispatcher } from '@/utils/event';
 
 interface AIAssistantProps {
   bookKey: string;
 }
-
-// inner component that uses the runtime hook
-const AIAssistantChat = ({
-  aiSettings,
-  bookHash,
-  bookTitle,
-  authorName,
-  currentPage,
-  onResetIndex,
-}: {
-  aiSettings: AISettings;
-  bookHash: string;
-  bookTitle: string;
-  authorName: string;
-  currentPage: number;
-  onResetIndex: () => void;
-}) => {
-  const {
-    activeConversationId,
-    messages: storedMessages,
-    addMessage,
-    isLoadingHistory,
-    createConversationWithFirstMessage,
-  } = useAIChatStore();
-
-  // use a ref to keep up-to-date options without triggering re-renders of the runtime
-  const optionsRef = useRef({
-    settings: aiSettings,
-    bookHash,
-    bookTitle,
-    authorName,
-    currentPage,
-  });
-
-  // update ref on every render with latest values
-  useEffect(() => {
-    optionsRef.current = {
-      settings: aiSettings,
-      bookHash,
-      bookTitle,
-      authorName,
-      currentPage,
-    };
-  });
-
-  const handleRecap = useCallback(async () => {
-    if (currentPage <= 0) return;
-    const recapPrompt = `Please give me a spoiler-safe recap of "${bookTitle}" by ${authorName} up to page ${currentPage}. Only summarize events and information that have been revealed up to that point. Do not include any content beyond page ${currentPage}.`;
-    await createConversationWithFirstMessage(bookHash, 'Recap so far', recapPrompt);
-  }, [bookHash, bookTitle, authorName, currentPage, createConversationWithFirstMessage]);
-
-  // create adapter ONCE and keep it stable
-  const adapter = useMemo(() => {
-    // eslint-disable-next-line react-hooks/refs -- intentional: we read optionsRef inside a deferred callback, not during render
-    return createTauriAdapter(() => optionsRef.current);
-  }, []);
-
-  // Create history adapter to load/persist messages
-  const historyAdapter = useMemo<ThreadHistoryAdapter | undefined>(() => {
-    if (!activeConversationId) return undefined;
-
-    return {
-      async load() {
-        // storedMessages are already loaded by aiChatStore when conversation is selected
-        return {
-          messages: convertToExportedMessages(storedMessages),
-        };
-      },
-      async append(item) {
-        // item is ExportedMessageRepositoryItem - access the actual message via .message
-        const msg = item.message;
-        // Persist new messages to our store
-        if (activeConversationId && msg.role !== 'system') {
-          const textContent = msg.content
-            .filter(
-              (part): part is { type: 'text'; text: string } =>
-                'type' in part && part.type === 'text',
-            )
-            .map((part) => part.text)
-            .join('\n');
-
-          if (textContent) {
-            await addMessage({
-              conversationId: activeConversationId,
-              role: msg.role as 'user' | 'assistant',
-              content: textContent,
-            });
-          }
-        }
-      },
-    };
-  }, [activeConversationId, storedMessages, addMessage]);
-
-  return (
-    <AIAssistantWithRuntime
-      adapter={adapter}
-      historyAdapter={historyAdapter}
-      onResetIndex={onResetIndex}
-      onRecap={handleRecap}
-      isLoadingHistory={isLoadingHistory}
-      hasActiveConversation={!!activeConversationId}
-    />
-  );
-};
-
-const AIAssistantWithRuntime = ({
-  adapter,
-  historyAdapter,
-  onResetIndex,
-  onRecap,
-  isLoadingHistory,
-  hasActiveConversation,
-}: {
-  adapter: NonNullable<ReturnType<typeof createTauriAdapter>>;
-  historyAdapter?: ThreadHistoryAdapter;
-  onResetIndex: () => void;
-  onRecap?: () => void;
-  isLoadingHistory: boolean;
-  hasActiveConversation: boolean;
-}) => {
-  const runtime = useLocalRuntime(adapter, {
-    adapters: historyAdapter ? { history: historyAdapter } : undefined,
-  });
-
-  if (!runtime) return null;
-
-  return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <ThreadWrapper
-        onResetIndex={onResetIndex}
-        onRecap={onRecap}
-        isLoadingHistory={isLoadingHistory}
-        hasActiveConversation={hasActiveConversation}
-      />
-    </AssistantRuntimeProvider>
-  );
-};
-
-const ThreadWrapper = ({
-  onResetIndex,
-  onRecap,
-  isLoadingHistory,
-  hasActiveConversation,
-}: {
-  onResetIndex: () => void;
-  onRecap?: () => void;
-  isLoadingHistory: boolean;
-  hasActiveConversation: boolean;
-}) => {
-  const [sources, setSources] = useState(getLastSources());
-  const assistantRuntime = useAssistantRuntime();
-  const composerRuntime = useComposerRuntime();
-  const {
-    activeConversationId,
-    pendingSeedMessage,
-    clearPendingSeedMessage,
-    setActiveConversation,
-  } = useAIChatStore();
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSources(getLastSources());
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (!activeConversationId || !pendingSeedMessage || isLoadingHistory) {
-      return;
-    }
-    if (pendingSeedMessage.conversationId !== activeConversationId) {
-      return;
-    }
-
-    composerRuntime.setText(pendingSeedMessage.content);
-    composerRuntime.send();
-    clearPendingSeedMessage(activeConversationId);
-  }, [
-    activeConversationId,
-    clearPendingSeedMessage,
-    composerRuntime,
-    isLoadingHistory,
-    pendingSeedMessage,
-  ]);
-
-  const handleClear = useCallback(() => {
-    clearLastSources();
-    setSources([]);
-    setActiveConversation(null);
-    assistantRuntime.switchToNewThread();
-  }, [assistantRuntime, setActiveConversation]);
-
-  return (
-    <Thread
-      sources={sources}
-      onClear={handleClear}
-      onResetIndex={onResetIndex}
-      onRecap={onRecap}
-      isLoadingHistory={isLoadingHistory}
-      hasActiveConversation={hasActiveConversation}
-    />
-  );
-};
 
 const AIAssistant = ({ bookKey }: AIAssistantProps) => {
   const _ = useTranslation();
   const { appService } = useEnv();
   const { settings } = useSettingsStore();
   const { getBookData } = useBookDataStore();
-  const { getProgress } = useReaderStore();
+  const {
+    activeConversationId,
+    messages,
+    loadConversations,
+    setActiveConversation,
+    createConversation,
+    addMessage,
+  } = useAIChatStore();
   const bookData = getBookData(bookKey);
-  const progress = getProgress(bookKey);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState<EmbeddingProgress | null>(null);
   const [indexed, setIndexed] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState<AIMessage | null>(null);
   const [indexNotice, setIndexNotice] = useState<{
     type: 'warning' | 'error';
     message: string;
@@ -293,21 +48,19 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
 
   const bookHash = bookKey.split('-')[0] || '';
   const bookTitle = bookData?.book?.title || 'Unknown';
-  const authorName = bookData?.book?.author || '';
-  const currentPage = progress?.pageinfo?.current ?? 0;
   const aiSettings = settings?.aiSettings;
 
-  // check if book is indexed on mount
   useEffect(() => {
-    if (bookHash) {
-      isBookIndexed(bookHash).then((result) => {
-        setIndexed(result);
-        setIsLoading(false);
-      });
-    } else {
+    if (!bookHash) {
       setIsLoading(false);
+      return;
     }
-  }, [bookHash]);
+    void loadConversations(bookHash);
+    isBookIndexed(bookHash).then((result) => {
+      setIndexed(result);
+      setIsLoading(false);
+    });
+  }, [bookHash, loadConversations]);
 
   const handleIndex = useCallback(async () => {
     if (!bookData?.bookDoc || !aiSettings) return;
@@ -327,15 +80,6 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
       ) {
         setIndexed(true);
       }
-
-      if (result.status === 'complete' || result.status === 'already-indexed') {
-        void eventDispatcher.dispatch('toast', {
-          message: _('Book indexed successfully'),
-          type: 'success',
-        });
-        return;
-      }
-
       if (result.status === 'partial') {
         void eventDispatcher.dispatch('toast', {
           message: _('Book indexed with warnings. {{count}} section(s) could not be processed.', {
@@ -343,18 +87,14 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
           }),
           type: 'warning',
         });
-        return;
       }
-
-      const emptyMessage = _('No indexable content was found in this book.');
-      setIndexNotice({ type: 'warning', message: emptyMessage });
-      aiLogger.rag.indexError(bookHash, 'No indexable content found');
-      void eventDispatcher.dispatch('toast', {
-        message: emptyMessage,
-        type: 'warning',
-      });
-    } catch (e) {
-      const message = (e as Error).message;
+      if (result.status === 'empty') {
+        const message = _('No indexable content was found in this book.');
+        setIndexNotice({ type: 'warning', message });
+        aiLogger.rag.indexError(bookHash, 'No indexable content found');
+      }
+    } catch (error) {
+      const message = (error as Error).message;
       aiLogger.rag.indexError(bookHash, message);
       setIndexNotice({ type: 'error', message });
       void eventDispatcher.dispatch('toast', {
@@ -365,7 +105,7 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
       setIsIndexing(false);
       setIndexProgress(null);
     }
-  }, [bookData?.bookDoc, bookHash, aiSettings]);
+  }, [bookData?.bookDoc, bookHash, aiSettings, _]);
 
   const handleResetIndex = useCallback(async () => {
     if (!appService) return;
@@ -374,18 +114,58 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
     setIndexed(false);
   }, [bookHash, appService, _]);
 
+  const handleSend = useCallback(
+    async (content: string) => {
+      if (!aiSettings) return;
+      let conversationId = activeConversationId;
+      if (!conversationId) {
+        conversationId = await createConversation(bookHash, content);
+        await setActiveConversation(conversationId);
+      }
+      const userMessage = { conversationId, role: 'user' as const, content };
+      await addMessage(userMessage);
+      const baseMessages = [
+        ...messages,
+        { ...userMessage, id: crypto.randomUUID(), createdAt: Date.now() },
+      ];
+      const draft: AIMessage = {
+        id: crypto.randomUUID(),
+        conversationId,
+        role: 'assistant',
+        content: '',
+        createdAt: Date.now(),
+      };
+      setStreamingMessage(draft);
+      const final = await streamChat(
+        { messages: baseMessages, bookHash, bookTitle, aiSettings },
+        (token) =>
+          setStreamingMessage((current) =>
+            current ? { ...current, content: current.content + token } : current,
+          ),
+      );
+      await addMessage({ conversationId, role: 'assistant', content: final.content });
+      setStreamingMessage(null);
+    },
+    [
+      activeConversationId,
+      addMessage,
+      aiSettings,
+      bookHash,
+      bookTitle,
+      createConversation,
+      messages,
+      setActiveConversation,
+    ],
+  );
+
   if (!aiSettings?.enabled) {
     return (
-      <div className='flex h-full items-center justify-center p-4'>
-        <p className='text-muted-foreground text-sm'>{_('Enable AI in Settings')}</p>
+      <div className='flex h-full items-center justify-center p-4 text-sm'>
+        {_('Enable AI in Settings')}
       </div>
     );
   }
-
-  // show nothing while checking index status to prevent flicker
-  if (isLoading) {
-    return null;
-  }
+  if (isLoading) return null;
 
   const progressPercent =
     indexProgress?.phase === 'embedding' && indexProgress.total > 0
@@ -395,30 +175,13 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
   if (!indexed && !isIndexing) {
     return (
       <div className='flex h-full flex-col items-center justify-center gap-3 p-4 text-center'>
-        <div className='bg-primary/10 rounded-full p-3'>
-          <BookOpenIcon className='text-primary size-6' />
-        </div>
-        <div>
-          <h3 className='text-foreground mb-0.5 text-sm font-medium'>{_('Index This Book')}</h3>
-          <p className='text-muted-foreground text-xs'>
-            {_('Enable AI search and chat for this book')}
-          </p>
-        </div>
-        {indexNotice && (
-          <div
-            className={`w-full rounded-lg border px-3 py-2 text-left text-xs ${
-              indexNotice.type === 'error'
-                ? 'border-error/20 bg-error/10 text-base-content'
-                : 'border-warning/20 bg-warning/10 text-base-content'
-            }`}
-          >
-            {indexNotice.message}
-          </div>
-        )}
-        <Button onClick={handleIndex} size='sm' className='h-8 text-xs'>
-          <BookOpenIcon className='mr-1.5 size-3.5' />
+        <BookOpenIcon className='text-primary size-6' />
+        <h3 className='text-sm font-medium'>{_('Index This Book')}</h3>
+        <p className='text-xs opacity-70'>{_('Enable AI search and chat for this book')}</p>
+        {indexNotice ? <p className='text-error text-xs'>{indexNotice.message}</p> : null}
+        <button type='button' className='btn btn-primary btn-sm' onClick={handleIndex}>
           {_('Start Indexing')}
-        </Button>
+        </button>
       </div>
     );
   }
@@ -427,14 +190,7 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
     return (
       <div className='flex h-full flex-col items-center justify-center gap-3 p-4 text-center'>
         <Loader2Icon className='text-primary size-6 animate-spin' />
-        <div>
-          <p className='text-foreground mb-1 text-sm font-medium'>{_('Indexing book...')}</p>
-          <p className='text-muted-foreground text-xs'>
-            {indexProgress?.phase === 'embedding'
-              ? `${indexProgress.current} / ${indexProgress.total} chunks`
-              : _('Preparing...')}
-          </p>
-        </div>
+        <p className='text-sm'>{_('Indexing book...')}</p>
         <div className='bg-muted h-1.5 w-32 overflow-hidden rounded-full'>
           <div
             className='bg-primary h-full transition-all duration-300'
@@ -446,14 +202,19 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
   }
 
   return (
-    <AIAssistantChat
-      aiSettings={aiSettings}
-      bookHash={bookHash}
-      bookTitle={bookTitle}
-      authorName={authorName}
-      currentPage={currentPage}
-      onResetIndex={handleResetIndex}
-    />
+    <div className='flex h-full flex-col'>
+      <div className='border-base-300 flex justify-end border-b p-2'>
+        <button
+          type='button'
+          className='btn btn-ghost btn-xs'
+          onClick={() => void handleResetIndex()}
+        >
+          {_('Reset index')}
+        </button>
+      </div>
+      <ChatThread messages={messages} streamingMessage={streamingMessage} />
+      <ChatInput disabled={Boolean(streamingMessage)} onSend={handleSend} />
+    </div>
   );
 };
 

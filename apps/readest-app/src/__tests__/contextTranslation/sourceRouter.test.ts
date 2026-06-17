@@ -8,14 +8,11 @@ vi.mock('@/services/ai/providers', () => ({
   getProviderForTask: (...args: unknown[]) => mockGetProviderForTask(...args),
 }));
 
-import {
-  detectAIAvailability,
-  resolveFieldSources,
-} from '@/services/contextTranslation/sourceRouter';
+import { detectAIAvailability, resolveFieldSources } from '@/services/learning/sourceRouter';
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/types';
 import type { AISettings, AITaskType } from '@/services/ai/types';
 
 const aiSettings: AISettings = {

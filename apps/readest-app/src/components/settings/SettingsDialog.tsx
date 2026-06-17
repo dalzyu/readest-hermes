@@ -24,8 +24,7 @@ import DialogMenu from './DialogMenu';
 import ControlPanel from './ControlPanel';
 import LangPanel from './LangPanel';
 import MiscPanel from './MiscPanel';
-import AIPanel from './AIPanel';
-import AITranslatePanel from './AITranslatePanel';
+import AISettingsPanel from './AISettingsPanel';
 import TTSPanel from './TTSPanel';
 
 export type SettingsPanelType =
@@ -399,8 +398,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
             onRegisterReset={(fn) => registerResetFunction('Language', fn)}
           />
         )}
-        {activePanel === 'AI' && <AIPanel />}
-        {activePanel === 'AiTranslate' && <AITranslatePanel />}
+        {(activePanel === 'AI' || activePanel === 'AiTranslate') && <AISettingsPanel />}
         {activePanel === 'Custom' && (
           <MiscPanel
             bookKey={bookKey}

@@ -1,5 +1,5 @@
 import { TextChunk, ScoredChunk, BookIndexMeta, AIConversation, AIMessage } from '../types';
-import type { VocabularyEntry, BookSeries } from '@/services/contextTranslation/types';
+import type { VocabularyEntry, BookSeries } from '@/services/learning/types';
 import { aiLogger } from '../logger';
 
 const DB_NAME = 'hermes-ai';

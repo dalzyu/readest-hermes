@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Book } from '@/types/book';
-import type { BookSeries } from '@/services/contextTranslation/types';
+import type { BookSeries } from '@/services/learning/types';
 import LibraryPage from '@/app/library/page';
 import { buildImportSeriesSuggestions } from '@/utils/seriesSuggestions';
 const mockSelectFiles = vi.fn();
@@ -167,9 +167,8 @@ vi.mock('overlayscrollbars-react', () => ({
   ),
 }));
 
-vi.mock('@/services/contextTranslation/seriesService', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@/services/contextTranslation/seriesService')>();
+vi.mock('@/services/learning/seriesService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/learning/seriesService')>();
   return {
     __esModule: true,
     ...actual,

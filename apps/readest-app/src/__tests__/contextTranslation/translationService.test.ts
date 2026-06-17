@@ -4,21 +4,21 @@ import type {
   TranslationOutputField,
   TranslationRequest,
   TranslationStreamResult,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/types';
 
-vi.mock('@/services/contextTranslation/llmClient', () => ({
+vi.mock('@/services/learning/llmClient', () => ({
   callLLM: vi.fn(),
   streamLLM: vi.fn(),
 }));
 
-import { callLLM, streamLLM } from '@/services/contextTranslation/llmClient';
+import { callLLM, streamLLM } from '@/services/learning/llmClient';
 import {
   streamLookupWithContext,
   streamPerFieldTranslation,
   streamTranslationWithContext,
   translateWithContext,
-} from '@/services/contextTranslation/translationService';
-import type { ContextLookupMode } from '@/services/contextTranslation/modes';
+} from '@/services/learning/translationService';
+import type { ContextLookupMode } from '@/services/learning/modes';
 
 const mockCallLLM = vi.mocked(callLLM);
 const mockStreamLLM = vi.mocked(streamLLM);

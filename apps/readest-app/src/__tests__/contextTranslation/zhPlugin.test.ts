@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { zhPlugin } from '@/services/contextTranslation/plugins/zhPlugin';
+import { zhPlugin } from '@/services/learning/plugins/zhPlugin';
 
 describe('zhPlugin', () => {
   test('provides pinyin annotation for Chinese selected text', () => {

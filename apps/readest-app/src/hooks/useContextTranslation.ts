@@ -1,5 +1,5 @@
 import { useLookupPipeline, type UseContextLookupResult } from './useLookupPipeline';
-import type { ContextTranslationSettings } from '@/services/contextTranslation/types';
+import type { ContextTranslationSettings } from '@/services/learning/types';
 
 interface UseContextTranslationOptions {
   bookKey: string;

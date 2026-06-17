@@ -3,7 +3,7 @@ import { supabase } from '@/utils/supabase';
 import { UserPlan } from '@/types/quota';
 import { DEFAULT_DAILY_TRANSLATION_QUOTA, DEFAULT_STORAGE_QUOTA } from '@/services/constants';
 import { isWebAppPlatform } from '@/services/environment';
-import { getDailyUsage } from '@/services/translators/utils';
+import { getDailyUsage } from '@/services/learning/translator/utils';
 
 interface Token {
   plan: UserPlan;

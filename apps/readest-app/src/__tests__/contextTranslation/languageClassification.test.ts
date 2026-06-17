@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { getCJKLanguage } from '@/services/contextTranslation/utils';
+import { getCJKLanguage } from '@/services/learning/utils';
 
 describe('getCJKLanguage', () => {
   test('with bookLanguage=ja returns japanese for pure kanji', () => {

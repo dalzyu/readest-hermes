@@ -16,7 +16,7 @@ const {
   mockDetectAIAvailability: vi.fn(),
 }));
 
-vi.mock('@/services/contextTranslation/pageContextService', () => ({
+vi.mock('@/services/learning/pageContextService', () => ({
   getPopupLocalContext: mockGetPopupLocalContext,
 }));
 
@@ -24,7 +24,7 @@ vi.mock('@/services/ai/ragService', () => ({
   vectorSearch: mockVectorSearch,
 }));
 
-vi.mock('@/services/contextTranslation/seriesService', () => ({
+vi.mock('@/services/learning/seriesService', () => ({
   getPriorVolumes: mockGetPriorVolumes,
   getSeriesForBook: mockGetSeriesForBook,
 }));
@@ -34,17 +34,17 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
     isIndexed: mockIsIndexed,
   },
 }));
-vi.mock('@/services/contextTranslation/sourceRouter', () => ({
+vi.mock('@/services/learning/sourceRouter', () => ({
   detectAIAvailability: mockDetectAIAvailability,
 }));
 
 import type { AISettings, ScoredChunk } from '@/services/ai/types';
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/contextTranslation/defaults';
+import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/learning/defaults';
 import {
   buildPopupContextBundle,
   invalidatePageCache,
-} from '@/services/contextTranslation/popupRetrievalService';
+} from '@/services/learning/popupRetrievalService';
 
 function makeChunk(bookHash: string, text: string, score = 0.9): ScoredChunk {
   return {

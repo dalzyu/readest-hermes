@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { upgradeSavedVocabularyEntry } from '@/services/contextTranslation/vocabularyCompatibility';
-import type { VocabularyEntry } from '@/services/contextTranslation/types';
+import { upgradeSavedVocabularyEntry } from '@/services/learning/vocabularyCompatibility';
+import type { VocabularyEntry } from '@/services/learning/types';
 
 const legacyEntry = {
   id: 'leg-001',

@@ -4,7 +4,7 @@ import {
   clearLookupHistory,
   getLookupHistoryForBook,
   saveLookupHistoryEntry,
-} from '@/services/contextTranslation/lookupHistoryService';
+} from '@/services/learning/lookupHistoryService';
 
 const makeEntry = (overrides: Partial<Parameters<typeof saveLookupHistoryEntry>[0]> = {}) => ({
   bookHash: 'book-1',

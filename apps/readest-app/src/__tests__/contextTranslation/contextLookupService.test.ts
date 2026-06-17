@@ -1,17 +1,17 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 
-vi.mock('@/services/contextTranslation/llmClient', () => ({
+vi.mock('@/services/learning/llmClient', () => ({
   callLLM: vi.fn(),
 }));
 
-import { callLLM } from '@/services/contextTranslation/llmClient';
-import { runContextLookup } from '@/services/contextTranslation/contextLookupService';
-import type { PopupContextBundle } from '@/services/contextTranslation/types';
+import { callLLM } from '@/services/learning/llmClient';
+import { runContextLookup } from '@/services/learning/contextLookupService';
+import type { PopupContextBundle } from '@/services/learning/types';
 import {
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
   getContextDictionaryOutputFields,
-} from '@/services/contextTranslation/defaults';
+} from '@/services/learning/defaults';
 
 const popupContext: PopupContextBundle = {
   localPastContext: 'He had finally found a true 知己.',

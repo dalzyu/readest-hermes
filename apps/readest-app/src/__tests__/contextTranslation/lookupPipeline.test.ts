@@ -34,28 +34,28 @@ const {
   mockGetPriorVolumes: vi.fn(),
 }));
 
-vi.mock('@/services/contextTranslation/popupRetrievalService', () => ({
+vi.mock('@/services/learning/popupRetrievalService', () => ({
   buildPopupContextBundle: (...args: unknown[]) => mockBuildPopupContextBundle(...args),
 }));
 
-vi.mock('@/services/contextTranslation/prefetchService', () => ({
+vi.mock('@/services/learning/prefetchService', () => ({
   consumePrefetch: (...args: unknown[]) => mockConsumePrefetch(...args),
 }));
 
-vi.mock('@/services/contextTranslation/dictionaryService', () => ({
+vi.mock('@/services/learning/dictionaryService', () => ({
   lookupDefinitions: (...args: unknown[]) => mockLookupDefinitions(...args),
 }));
 
-vi.mock('@/services/contextTranslation/sourceRouter', () => ({
+vi.mock('@/services/learning/sourceRouter', () => ({
   detectAIAvailability: (...args: unknown[]) => mockDetectAIAvailability(...args),
   resolveFieldSources: (...args: unknown[]) => mockResolveFieldSources(...args),
 }));
 
-vi.mock('@/services/translators/translateWithUpstream', () => ({
+vi.mock('@/services/learning/translator/translateWithUpstream', () => ({
   translateWithUpstream: (...args: unknown[]) => mockTranslateWithUpstream(...args),
 }));
 
-vi.mock('@/services/contextTranslation/exampleMiner', () => ({
+vi.mock('@/services/learning/exampleMiner', () => ({
   mineCorpusExamples: (...args: unknown[]) => mockMineCorpusExamples(...args),
 }));
 
@@ -63,7 +63,7 @@ vi.mock('@/services/ai/providers', () => ({
   getProviderForTask: (...args: unknown[]) => mockGetProviderForTask(...args),
 }));
 
-vi.mock('@/services/contextTranslation/translationService', () => ({
+vi.mock('@/services/learning/translationService', () => ({
   streamTranslationWithContext: (...args: unknown[]) => mockStreamTranslationWithContext(...args),
   streamLookupWithContext: (...args: unknown[]) => mockStreamLookupWithContext(...args),
   streamPerFieldTranslation: (...args: unknown[]) => mockStreamPerFieldTranslation(...args),
@@ -71,7 +71,7 @@ vi.mock('@/services/contextTranslation/translationService', () => ({
     mockFinalizeTranslationWithContext(...args),
 }));
 
-vi.mock('@/services/contextTranslation/contextLookupService', () => ({
+vi.mock('@/services/learning/contextLookupService', () => ({
   runContextLookup: (...args: unknown[]) => mockRunContextLookup(...args),
 }));
 
@@ -81,17 +81,17 @@ vi.mock('@/services/ai/storage/aiStore', () => ({
   },
 }));
 
-vi.mock('@/services/contextTranslation/seriesService', () => ({
+vi.mock('@/services/learning/seriesService', () => ({
   getPriorVolumes: (...args: unknown[]) => mockGetPriorVolumes(...args),
 }));
 
-import { runLookupPipeline } from '@/services/contextTranslation/lookupPipeline';
+import { runLookupPipeline } from '@/services/learning/lookupPipeline';
 import {
   DEFAULT_CONTEXT_DICTIONARY_SETTINGS,
   DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
-} from '@/services/contextTranslation/defaults';
+} from '@/services/learning/defaults';
 import type { AISettings } from '@/services/ai/types';
-import type { PopupContextBundle } from '@/services/contextTranslation/types';
+import type { PopupContextBundle } from '@/services/learning/types';
 
 const aiSettings: AISettings = {
   enabled: true,

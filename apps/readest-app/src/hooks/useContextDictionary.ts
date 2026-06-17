@@ -2,7 +2,7 @@ import { useLookupPipeline, type UseContextLookupResult } from './useLookupPipel
 import type {
   ContextDictionarySettings,
   ContextTranslationSettings,
-} from '@/services/contextTranslation/types';
+} from '@/services/learning/types';
 
 export interface UseContextDictionaryInput {
   bookKey: string;

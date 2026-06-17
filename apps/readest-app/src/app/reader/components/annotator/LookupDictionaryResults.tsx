@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
-import type { DictionaryDisplayEntry } from '@/services/contextTranslation/types';
+import type { DictionaryDisplayEntry } from '@/services/learning/types';
 
 interface LookupDictionaryResultsProps {
   dictionaryResults: DictionaryDisplayEntry[];

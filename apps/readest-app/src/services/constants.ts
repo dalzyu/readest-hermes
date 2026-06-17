@@ -16,7 +16,6 @@ import {
   ViewSettings,
 } from '@/types/book';
 import {
-  HardcoverSettings,
   KOSyncSettings,
   LibraryGroupByType,
   LibrarySortByType,
@@ -29,7 +28,7 @@ import { getDefaultMaxBlockSize, getDefaultMaxInlineSize } from '@/utils/config'
 import { stubTranslation as _ } from '@/utils/misc';
 import { getAppVersion } from '@/utils/version';
 import { DEFAULT_AI_SETTINGS } from './ai/constants';
-import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from './contextTranslation/defaults';
+import { DEFAULT_DICTIONARY_SETTINGS, DEFAULT_LOOKUP_SETTINGS } from './learning/settings';
 
 export const DATA_SUBDIR = 'Hermes';
 export const LOCAL_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
@@ -78,12 +77,6 @@ export const DEFAULT_READWISE_SETTINGS = {
   lastSyncedAt: 0,
 } as ReadwiseSettings;
 
-export const DEFAULT_HARDCOVER_SETTINGS = {
-  enabled: false,
-  accessToken: '',
-  lastSyncedAt: 0,
-} as HardcoverSettings;
-
 export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   keepLogin: false,
   autoUpload: true,
@@ -114,7 +107,6 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
 
   kosync: DEFAULT_KOSYNC_SETTINGS,
   readwise: DEFAULT_READWISE_SETTINGS,
-  hardcover: DEFAULT_HARDCOVER_SETTINGS,
   aiSettings: DEFAULT_AI_SETTINGS,
 
   lastSyncedAtBooks: 0,
@@ -163,7 +155,8 @@ export const DEFAULT_READSETTINGS: ReadSettings = {
   userHighlightColors: [],
   defaultHighlightLabels: {},
   customTtsHighlightColors: [],
-  contextTranslation: DEFAULT_CONTEXT_TRANSLATION_SETTINGS,
+  lookup: DEFAULT_LOOKUP_SETTINGS,
+  dictionary: DEFAULT_DICTIONARY_SETTINGS,
   autoIndexOnOpen: false,
 };
 
