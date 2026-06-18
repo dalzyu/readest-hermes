@@ -4,7 +4,6 @@ import { lookupDefinitions } from './dictionaryService';
 import { getFrequencyBadge } from './frequencyService';
 import { detectLookupLanguage } from './languagePolicy';
 import type { DictionaryEntry, LookupRequest, LookupResult } from './types';
-import { useSettingsStore } from '@/store/settingsStore';
 
 export function detectLearningAIAvailability(aiSettings: AISettings): {
   enabled: boolean;
@@ -35,9 +34,8 @@ export async function lookup(request: LookupRequest): Promise<LookupResult> {
   const detected = detectLookupLanguage(term);
   const sourceLanguage = detected.language ?? 'auto';
   const provenance: LookupResult['provenance'] = {};
-  const installedDictionaries =
-    useSettingsStore.getState().settings?.globalReadSettings?.dictionary?.dictionaries ?? [];
-  const lookupSettings = useSettingsStore.getState().settings?.globalReadSettings?.lookup;
+  const installedDictionaries = request.installedDictionaries ?? [];
+  const lookupSettings = request.lookupSettings;
 
   if (request.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   let translation: string | undefined;
@@ -68,10 +66,10 @@ export async function lookup(request: LookupRequest): Promise<LookupResult> {
     if ((error as { name?: string })?.name === 'AbortError') throw error;
     dictionaryEntries = [];
   }
-  if (request.signal?.aborted) throw new Error('Aborted');
+  if (request.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   const frequencyBadge = await getFrequencyBadge(term, sourceLanguage);
   if (frequencyBadge) provenance.frequencyBadge = 'corpus';
-  if (request.signal?.aborted) throw new Error('Aborted');
+  if (request.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
   return {
     term,

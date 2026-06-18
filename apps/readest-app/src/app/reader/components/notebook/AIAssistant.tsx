@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpenIcon, Loader2Icon } from 'lucide-react';
 import ChatInput from '@/components/chat/ChatInput';
 import ChatThread from '@/components/chat/ChatThread';
@@ -176,25 +176,27 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
     ],
   );
 
+  const handleSendRef = useRef(handleSend);
   useEffect(() => {
-    if (pendingSeedMessage) {
-      const content = pendingSeedMessage.content;
-      if (pendingSeedMessage.conversationId !== activeConversationId) {
-        setActiveConversation(pendingSeedMessage.conversationId).then(() => {
-          handleSend(content);
-        });
-      } else {
-        handleSend(content);
-      }
-      clearPendingSeedMessage(pendingSeedMessage.conversationId);
+    handleSendRef.current = handleSend;
+  });
+  const handledSeedIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const seed = pendingSeedMessage;
+    if (!seed) return;
+    if (handledSeedIdsRef.current.has(seed.conversationId)) return;
+    handledSeedIdsRef.current.add(seed.conversationId);
+    const content = seed.content;
+    clearPendingSeedMessage(seed.conversationId);
+    if (seed.conversationId !== activeConversationId) {
+      setActiveConversation(seed.conversationId).then(() => {
+        handleSendRef.current(content);
+      });
+    } else {
+      handleSendRef.current(content);
     }
-  }, [
-    pendingSeedMessage,
-    activeConversationId,
-    setActiveConversation,
-    handleSend,
-    clearPendingSeedMessage,
-  ]);
+  }, [pendingSeedMessage, activeConversationId, setActiveConversation, clearPendingSeedMessage]);
 
   if (!aiSettings?.enabled) {
     return (

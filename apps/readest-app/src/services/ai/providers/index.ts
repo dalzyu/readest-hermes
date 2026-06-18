@@ -137,6 +137,17 @@ function assertProviderSupportsTask(config: ProviderConfig, task: AITaskType): v
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Pure availability check: does the active profile have a provider for the given task? */
+export function hasProviderForTask(settings: AISettings, task: AITaskType): boolean {
+  try {
+    const { config } = resolveTaskSelection(settings, task);
+    assertProviderSupportsTask(config, task);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Get the provider for a specific task, with model id and merged inference params. */
 export function getProviderForTask(
   settings: AISettings,

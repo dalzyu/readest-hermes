@@ -20,13 +20,16 @@ export interface UseLearningLookupResult {
   saveToVocabulary: () => Promise<void>;
   retry: () => void;
 }
-
 export function useLearningLookup(input: UseLearningLookupInput): UseLearningLookupResult {
   const targetLanguage = useSettingsStore(
     (state) =>
       state.settings.globalReadSettings?.lookup?.targetLanguage ??
       state.settings.globalReadSettings?.translateTargetLang ??
       'en',
+  );
+  const lookupSettings = useSettingsStore((state) => state.settings.globalReadSettings?.lookup);
+  const installedDictionaries = useSettingsStore(
+    (state) => state.settings.globalReadSettings?.dictionary?.dictionaries ?? [],
   );
   const [result, setResult] = useState<LookupResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,6 +52,8 @@ export function useLearningLookup(input: UseLearningLookupInput): UseLearningLoo
       mode: input.mode,
       targetLanguage,
       signal: controller.signal,
+      lookupSettings,
+      installedDictionaries,
     })
       .then((next) => {
         if (controller.signal.aborted) return;
@@ -74,7 +79,16 @@ export function useLearningLookup(input: UseLearningLookupInput): UseLearningLoo
       });
 
     return () => controller.abort();
-  }, [input.bookKey, input.bookHash, input.mode, input.selectedText, targetLanguage, nonce]);
+  }, [
+    input.bookKey,
+    input.bookHash,
+    input.mode,
+    input.selectedText,
+    targetLanguage,
+    nonce,
+    lookupSettings,
+    installedDictionaries,
+  ]);
 
   const saveToVocabulary = useCallback(async () => {
     if (!result) return;

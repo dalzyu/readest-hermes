@@ -1,5 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { useSettingsStore } from '@/store/settingsStore';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { detectLearningAIAvailability, lookup } from '@/services/learning/lookupService';
 import { DEFAULT_AI_SETTINGS } from '@/services/ai/constants';
 
@@ -25,10 +24,6 @@ describe('lookupService', () => {
 });
 
 describe('lookupService signal handling', () => {
-  beforeEach(() => {
-    useSettingsStore.setState({ settings: {} as never });
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
   });

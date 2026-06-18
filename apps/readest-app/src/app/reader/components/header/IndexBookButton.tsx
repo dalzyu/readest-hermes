@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { startBookIndexing, subscribeToIndexingRun } from '@/services/ai/indexingRuntime';
 import { cancelBookIndexing } from '@/services/ai/ragService';
-import { getProviderForTask } from '@/services/ai/providers';
+import { hasProviderForTask } from '@/services/ai/providers';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -33,15 +33,11 @@ const IndexBookButton: React.FC<IndexBookButtonProps> = ({ bookKey }) => {
   const progress = indexingProgress[bookKey];
   const activeRunRef = useRef<ActiveRunHandle | null>(null);
 
-  const embeddingAvailable = useMemo(() => {
-    if (!settings.aiSettings?.enabled) return false;
-    try {
-      getProviderForTask(settings.aiSettings, 'embedding');
-      return true;
-    } catch {
-      return false;
-    }
-  }, [settings.aiSettings]);
+  const embeddingAvailable = useMemo(
+    () =>
+      settings.aiSettings?.enabled ? hasProviderForTask(settings.aiSettings, 'embedding') : false,
+    [settings.aiSettings],
+  );
 
   useEffect(() => {
     return () => {

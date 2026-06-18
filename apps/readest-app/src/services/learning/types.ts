@@ -1,6 +1,7 @@
 import type { InferenceParams } from '@/services/ai/types';
 
 export type { InferenceParams };
+import type { LookupSettings } from './settings';
 
 export type LookupSource = 'ai' | 'translator' | 'dictionary' | 'corpus';
 export type LookupMode = 'translation' | 'dictionary';
@@ -335,6 +336,10 @@ export interface LookupRequest {
   targetLanguage: string;
   context?: LookupContext;
   signal?: AbortSignal;
+  /** Caller-resolved lookup settings; when omitted, no preferred translator is used. */
+  lookupSettings?: LookupSettings;
+  /** Caller-resolved installed dictionaries; when omitted, no user dictionaries are searched. */
+  installedDictionaries?: UserDictionary[];
 }
 
 export interface LookupHistoryEntry {

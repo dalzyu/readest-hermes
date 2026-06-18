@@ -188,6 +188,7 @@ vi.mock('@/services/environment', () => ({
   isTauriAppPlatform: () => false,
 }));
 vi.mock('@/services/ai/providers', () => ({
+  hasProviderForTask: vi.fn(() => true),
   getProviderForTask: vi.fn(() => ({
     provider: {},
     modelId: 'test',
