@@ -15,7 +15,7 @@ import { viewPagination } from './usePagination';
 import { getStyles } from '@/utils/style';
 import useShortcuts from '@/hooks/useShortcuts';
 import useBooksManager from './useBooksManager';
-import { getReadingRulerMoveDirection } from '../utils/readingRuler';
+import { getReadingRulerMoveDirection, isReadingRulerMoveKey } from '../utils/readingRuler';
 
 interface UseBookShortcutsProps {
   sideBarBookKey: string | null;
@@ -41,6 +41,8 @@ const useBookShortcuts = ({ sideBarBookKey, bookKeys }: UseBookShortcutsProps) =
 
     const viewSettings = getViewSettings(sideBarBookKey);
     if (!viewSettings?.readingRulerEnabled) return false;
+    // In vertical layout, only Up/Down move the ruler; Left/Right turn pages.
+    if (!isReadingRulerMoveKey(side, !!viewSettings.vertical)) return false;
 
     return eventDispatcher.dispatchSync('reading-ruler-move', {
       bookKey: sideBarBookKey,
