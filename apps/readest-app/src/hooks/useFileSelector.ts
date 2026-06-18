@@ -2,12 +2,7 @@ import { AppService } from '@/types/system';
 import { isTauriAppPlatform } from '@/services/environment';
 import { basename } from '@tauri-apps/api/path';
 import { stubTranslation as _ } from '@/utils/misc';
-import {
-  AUDIO_ACCEPT_FORMATS,
-  BOOK_ACCEPT_FORMATS,
-  SUPPORTED_AUDIO_EXTS,
-  SUPPORTED_BOOK_EXTS,
-} from '@/services/constants';
+import { BOOK_ACCEPT_FORMATS, SUPPORTED_BOOK_EXTS } from '@/services/constants';
 
 export interface FileSelectorOptions {
   type: SelectionType;
@@ -130,8 +125,8 @@ export const FILE_SELECTION_PRESETS = {
     dialogTitle: _('Select Video'),
   },
   audio: {
-    accept: AUDIO_ACCEPT_FORMATS,
-    extensions: SUPPORTED_AUDIO_EXTS,
+    accept: 'audio/*',
+    extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a'],
     dialogTitle: _('Select Audio'),
   },
   books: {
@@ -143,6 +138,11 @@ export const FILE_SELECTION_PRESETS = {
     accept: '.ttf, .otf, .woff, .woff2',
     extensions: ['ttf', 'otf', 'woff', 'woff2'],
     dialogTitle: _('Select Fonts'),
+  },
+  dictionaries: {
+    accept: '.mdx, .mdd, .ifo, .idx, .dict, .dz, .syn, .index, .slob, .css',
+    extensions: ['mdx', 'mdd', 'ifo', 'idx', 'dict', 'dz', 'syn', 'index', 'slob', 'css'],
+    dialogTitle: _('Select Dictionary Files'),
   },
   covers: {
     accept: '.png, .jpg, .jpeg, .gif',

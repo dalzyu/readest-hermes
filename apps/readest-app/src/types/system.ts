@@ -1,22 +1,20 @@
-import {
-  AudioSyncStartRequest,
-  AudioSyncJobStatus,
-  AudioSyncStatus,
-  BookAudioAsset,
-} from '@/services/audioSync/types';
 import { SystemSettings } from './settings';
-import { Book, BookConfig, BookContent, LoadBookContentOptions, ViewSettings } from './book';
+import { Book, BookConfig, BookContent, ImportBookOptions, ViewSettings } from './book';
 import { BookMetadata } from '@/libs/document';
+import type { BookNav } from '@/services/nav';
 import { ProgressHandler } from '@/utils/transfer';
 import { CustomFont, CustomFontInfo } from '@/styles/fonts';
 import { CustomTextureInfo } from '@/styles/textures';
 import { DatabaseOpts, DatabaseService } from './database';
 import { SchemaType } from '@/services/database/migrate';
+import type { ImportedDictionary } from '@/services/dictionaries/types';
+import type { ImportDictionariesResult } from '@/services/dictionaries/dictionaryService';
+import type { SelectedFile } from '@/hooks/useFileSelector';
 
 export type AppPlatform = 'web' | 'tauri' | 'node';
 export type OsPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'linux' | 'unknown';
 // prettier-ignore
-export type BaseDir = | 'Books' | 'Settings' | 'Data' | 'Fonts' | 'Images' | 'Log' | 'Cache' | 'Temp' | 'None';
+export type BaseDir = | 'Books' | 'Settings' | 'Data' | 'Fonts' | 'Images' | 'Dictionaries' | 'Log' | 'Cache' | 'Temp' | 'None';
 export type DeleteAction = 'cloud' | 'local' | 'both';
 export type SelectDirectoryMode = 'read' | 'write';
 export type DistChannel = 'readest' | 'playstore' | 'appstore' | 'unknown';
@@ -97,6 +95,7 @@ export interface AppService {
   isEink: boolean;
   canCustomizeRootDir: boolean;
   canReadExternalDir: boolean;
+  supportsCanvasContext2DFilter: boolean;
   distChannel: DistChannel;
   storefrontRegionCode: string | null;
   isOnlineCatalogsAccessible: boolean;
@@ -132,14 +131,12 @@ export interface AppService {
   deleteFont(font: CustomFont): Promise<void>;
   importImage(file?: string | File): Promise<CustomTextureInfo | null>;
   deleteImage(texture: CustomTextureInfo): Promise<void>;
-  importBook(
-    file: string | File,
-    books: Book[],
-    saveBook?: boolean,
-    saveCover?: boolean,
-    overwrite?: boolean,
-    transient?: boolean,
-  ): Promise<Book | null>;
+  importDictionaries(
+    files: SelectedFile[],
+    existingDictionaries?: ImportedDictionary[],
+  ): Promise<ImportDictionariesResult>;
+  deleteDictionary(dict: ImportedDictionary): Promise<void>;
+  importBook(file: string | File, books: Book[], options?: ImportBookOptions): Promise<Book | null>;
   refreshBookMetadata(book: Book): Promise<boolean>;
   deleteBook(book: Book, deleteAction: DeleteAction): Promise<void>;
   uploadBook(book: Book, onProgress?: ProgressHandler): Promise<void>;
@@ -164,20 +161,15 @@ export interface AppService {
   loadBookConfig(book: Book, settings: SystemSettings): Promise<BookConfig>;
   fetchBookDetails(book: Book): Promise<BookMetadata>;
   saveBookConfig(book: Book, config: BookConfig, settings?: SystemSettings): Promise<void>;
-  loadBookContent(book: Book, options?: LoadBookContentOptions): Promise<BookContent>;
+  loadBookNav(book: Book): Promise<BookNav | null>;
+  saveBookNav(book: Book, nav: BookNav): Promise<void>;
+  loadBookContent(book: Book): Promise<BookContent>;
   loadLibraryBooks(): Promise<Book[]>;
   saveLibraryBooks(books: Book[]): Promise<void>;
   getCoverImageUrl(book: Book): string;
   getCoverImageBlobUrl(book: Book): Promise<string>;
   generateCoverImageUrl(book: Book): Promise<string>;
   updateCoverImage(book: Book, imageUrl?: string, imageFile?: string): Promise<void>;
-  attachBookAudio(book: Book, file: string | File): Promise<BookAudioAsset>;
-  getBookAudioAsset(book: Book): Promise<BookAudioAsset | null>;
-  removeBookAudio(book: Book): Promise<void>;
-  startAudioSync(book: Book, request?: AudioSyncStartRequest): Promise<AudioSyncJobStatus>;
-  generateCorrectedAudioSyncPackage(book: Book): Promise<void>;
-  getAudioSyncStatus(book: Book, runId?: string): Promise<AudioSyncStatus>;
-  cancelAudioSync(book: Book, runId: string): Promise<void>;
   ask(message: string): Promise<boolean>;
   openDatabase(
     schema: SchemaType,
