@@ -14,6 +14,7 @@ import { debounce } from '@/utils/debounce';
 import { viewPagination } from '../../hooks/usePagination';
 import MobileFooterBar from './MobileFooterBar';
 import DesktopFooterBar from './DesktopFooterBar';
+import { getFooterBarPosition } from './position';
 import TTSControl from '../tts/TTSControl';
 
 const FooterBar: React.FC<FooterBarProps> = ({
@@ -29,7 +30,7 @@ const FooterBar: React.FC<FooterBarProps> = ({
   const { getConfig, setConfig, getBookData } = useBookDataStore();
   const { hoveredBookKey, setHoveredBookKey } = useReaderStore();
   const { getView, getViewState, getProgress, getViewSettings } = useReaderStore();
-  const { isSideBarVisible, setSideBarVisible } = useSidebarStore();
+  const { isSideBarVisible, isSideBarPinned, setSideBarVisible } = useSidebarStore();
   const { acquireBackKeyInterception, releaseBackKeyInterception } = useDeviceControlStore();
 
   const view = getView(bookKey);
@@ -222,7 +223,7 @@ const FooterBar: React.FC<FooterBarProps> = ({
     !forceMobileLayout && 'sm:h-[52px] sm:bg-base-100 sm:border-none',
     'border-base-300/50 border-t',
     'transition-[opacity,transform] duration-300',
-    forceMobileLayout || window.innerWidth < 640 ? 'fixed' : 'absolute',
+    getFooterBarPosition(forceMobileLayout || window.innerWidth < 640, isSideBarPinned),
     appService?.hasRoundedWindow && 'rounded-window-bottom-right',
     !isSideBarVisible && appService?.hasRoundedWindow && 'rounded-window-bottom-left',
     isHoveredAnim && 'hover-bar-anim',
