@@ -25,6 +25,7 @@ import { OPDSFeed, OPDSPublication, OPDSSearch } from '@/types/opds';
 import {
   getFileExtFromPath,
   isSearchLink,
+  looksLikeXMLContent,
   MIME,
   parseMediaType,
   resolveURL,
@@ -214,7 +215,7 @@ export default function BrowserPage() {
         const responseURL = res.url;
         const text = await res.text();
 
-        if (text.startsWith('<')) {
+        if (looksLikeXMLContent(text)) {
           const doc = new DOMParser().parseFromString(text, MIME.XML as DOMParserSupportedType);
           const {
             documentElement: { localName },
