@@ -27,7 +27,6 @@ import {
 import { type as osType } from '@tauri-apps/plugin-os';
 import { shareFile } from '@choochmeque/tauri-plugin-sharekit-api';
 
-import { Book } from '@/types/book';
 import {
   FileSystem,
   BaseDir,
@@ -41,28 +40,6 @@ import { getDirPath, getFilename } from '@/utils/path';
 import { NativeFile, RemoteFile } from '@/utils/file';
 import { copyURIToPath, getStorefrontRegionCode } from '@/utils/bridge';
 import { copyFiles } from '@/utils/files';
-import { getAudioAlignmentReportFilename, getAudioSyncMapFilename } from '@/utils/book';
-import {
-  AudioSyncJobStatus,
-  AudioSyncStartRequest,
-  AudioSyncStatus,
-  BookAudioAsset,
-} from '@/services/audioSync/types';
-import { prepareAudioAlignmentInput } from '@/services/audioSync/alignmentInput';
-import {
-  loadAudioSyncCorrectionSidecar,
-  loadAudioSyncMap,
-  saveBookAudioAsset,
-} from '@/services/audioSync/storage';
-import { applyAudioSyncCorrections } from '@/services/audioSync/corrections';
-import { generateEpubMediaOverlayPackage } from '@/services/audioSync/EpubMediaOverlayService';
-import {
-  cancelAlignmentJob,
-  inspectAudioMetadata,
-  NativeAudioAlignmentJobStatus,
-  readAlignmentJobStatus,
-  startAlignmentJob,
-} from '@/services/audioSync/nativeBridge';
 
 import { BaseAppService } from './appService';
 import { DatabaseOpts, DatabaseService } from '@/types/database';
@@ -70,6 +47,7 @@ import { SchemaType } from '@/services/database/migrate';
 import {
   DATA_SUBDIR,
   LOCAL_BOOKS_SUBDIR,
+  LOCAL_DICTIONARIES_SUBDIR,
   LOCAL_FONTS_SUBDIR,
   LOCAL_IMAGES_SUBDIR,
   SETTINGS_FILENAME,
@@ -77,9 +55,9 @@ import {
 
 declare global {
   interface Window {
-    __HERMES_IS_EINK?: boolean;
-    __HERMES_IS_APPIMAGE?: boolean;
-    __HERMES_UPDATER_DISABLED?: boolean;
+    __READEST_IS_EINK?: boolean;
+    __READEST_IS_APPIMAGE?: boolean;
+    __READEST_UPDATER_DISABLED?: boolean;
   }
 }
 
@@ -115,7 +93,7 @@ const getPathResolver = ({
   const getCustomBasePrefixSync = isCustomBaseDir
     ? (baseDir: BaseDir) => {
         return () => {
-          const dataDirs = ['Settings', 'Data', 'Books', 'Fonts', 'Images'];
+          const dataDirs = ['Settings', 'Data', 'Books', 'Fonts', 'Images', 'Dictionaries'];
           const leafDir = dataDirs.includes(baseDir) ? '' : baseDir;
           return leafDir ? `${customRootDir}/${leafDir}` : customRootDir!;
         };
@@ -185,6 +163,15 @@ const getPathResolver = ({
           fp: customBasePrefixSync
             ? `${customBasePrefixSync()}/${LOCAL_IMAGES_SUBDIR}${path ? `/${path}` : ''}`
             : `${LOCAL_IMAGES_SUBDIR}${path ? `/${path}` : ''}`,
+          base,
+        };
+      case 'Dictionaries':
+        return {
+          baseDir: customBaseDir ?? BaseDirectory.AppData,
+          basePrefix: customBasePrefix || appDataDir,
+          fp: customBasePrefixSync
+            ? `${customBasePrefixSync()}/${LOCAL_DICTIONARIES_SUBDIR}${path ? `/${path}` : ''}`
+            : `${LOCAL_DICTIONARIES_SUBDIR}${path ? `/${path}` : ''}`,
           base,
         };
       case 'None':
@@ -272,16 +259,16 @@ export const nativeFileSystem: FileSystem = {
       }
     }
   },
-  async copyFile(srcPath: string, dstPath: string, base: BaseDir) {
+  async copyFile(srcPath: string, srcBase: BaseDir, dstPath: string, dstBase: BaseDir) {
     try {
-      if (!(await this.exists(getDirPath(dstPath), base))) {
-        await this.createDir(getDirPath(dstPath), base, true);
+      if (!(await this.exists(getDirPath(dstPath), dstBase))) {
+        await this.createDir(getDirPath(dstPath), dstBase, true);
       }
     } catch (error) {
       console.log('Failed to create directory for copying file:', error);
     }
     if (isContentURI(srcPath)) {
-      const prefix = await this.getPrefix(base);
+      const prefix = await this.getPrefix(dstBase);
       if (!prefix) {
         throw new Error('Invalid base directory');
       }
@@ -294,8 +281,12 @@ export const nativeFileSystem: FileSystem = {
         throw new Error('Failed to copy file');
       }
     } else {
-      const { fp, baseDir } = this.resolvePath(dstPath, base);
-      await copyFile(srcPath, fp, baseDir ? { toPathBaseDir: baseDir } : undefined);
+      const { fp: srcFp, baseDir: srcBaseDir } = this.resolvePath(srcPath, srcBase);
+      const { fp: dstFp, baseDir: dstBaseDir } = this.resolvePath(dstPath, dstBase);
+      const opts: { fromPathBaseDir?: number; toPathBaseDir?: number } = {};
+      if (srcBaseDir) opts.fromPathBaseDir = srcBaseDir;
+      if (dstBaseDir) opts.toPathBaseDir = dstBaseDir;
+      await copyFile(srcFp, dstFp, Object.keys(opts).length > 0 ? opts : undefined);
     }
   },
   async readFile(path: string, base: BaseDir, mode: 'text' | 'binary') {
@@ -316,6 +307,22 @@ export const nativeFileSystem: FileSystem = {
     if (typeof content === 'string') {
       return writeTextFile(fp, content, baseDir ? { baseDir } : undefined);
     } else if (content instanceof File) {
+      // Fast path for NativeFile inputs (e.g. user-picked source on import):
+      // do a native filesystem copy at the Rust side rather than pumping
+      // ~1 MB chunks through the Tauri IPC bridge. On Android the stream
+      // path costs ~400 ms per IPC round-trip, which puts a 250 MB file
+      // at ~100 s; the native copy is bound by disk throughput instead.
+      try {
+        if (content instanceof NativeFile) {
+          const src = content.getNativeLocation();
+          const opts: { fromPathBaseDir?: number; toPathBaseDir?: number } = {};
+          if (src.baseDir != null) opts.fromPathBaseDir = src.baseDir;
+          if (baseDir) opts.toPathBaseDir = baseDir;
+          return await copyFile(src.path, fp, Object.keys(opts).length > 0 ? opts : undefined);
+        }
+      } catch (error) {
+        console.warn('Native copy failed, falling back to stream copy:', error);
+      }
       const writeOptions = {
         write: true,
         create: true,
@@ -426,28 +433,6 @@ export const nativeFileSystem: FileSystem = {
   },
 };
 
-function mapNativeAudioSyncJob(status: NativeAudioAlignmentJobStatus): AudioSyncJobStatus {
-  const phase =
-    status.phase ||
-    (status.state === 'queued'
-      ? 'pending'
-      : status.state === 'running'
-        ? 'aligning'
-        : status.state === 'succeeded'
-          ? 'ready'
-          : status.state === 'failed'
-            ? 'failed'
-            : 'cancelled');
-
-  return {
-    runId: status.jobId,
-    phase,
-    progress: Math.round((status.progress ?? 0) * 100),
-    updatedAt: Date.now(),
-    message: status.detail,
-  };
-}
-
 const DIST_CHANNEL = (process.env['NEXT_PUBLIC_DIST_CHANNEL'] || 'readest') as DistChannel;
 
 export class NativeAppService extends BaseAppService {
@@ -459,10 +444,11 @@ export class NativeAppService extends BaseAppService {
   override isIOSApp = OS_TYPE === 'ios';
   override isMacOSApp = OS_TYPE === 'macos';
   override isLinuxApp = OS_TYPE === 'linux';
+  override isWindowsApp = OS_TYPE === 'windows';
   override isMobileApp = ['android', 'ios'].includes(OS_TYPE);
   override isDesktopApp = ['macos', 'windows', 'linux'].includes(OS_TYPE);
-  override isAppImage = Boolean(window.__HERMES_IS_APPIMAGE);
-  override isEink = Boolean(window.__HERMES_IS_EINK);
+  override isAppImage = Boolean(window.__READEST_IS_APPIMAGE);
+  override isEink = Boolean(window.__READEST_IS_EINK);
   override hasTrafficLight = OS_TYPE === 'macos';
   override hasWindow = !(OS_TYPE === 'ios' || OS_TYPE === 'android');
   override hasWindowBar = !(OS_TYPE === 'ios' || OS_TYPE === 'android');
@@ -473,7 +459,7 @@ export class NativeAppService extends BaseAppService {
   override hasUpdater =
     OS_TYPE !== 'ios' &&
     !process.env['NEXT_PUBLIC_DISABLE_UPDATER'] &&
-    !window.__HERMES_UPDATER_DISABLED;
+    !window.__READEST_UPDATER_DISABLED;
   // orientation lock is not supported on iPad
   override hasOrientationLock =
     (OS_TYPE === 'ios' && getOSPlatform() === 'ios') || OS_TYPE === 'android';
@@ -483,6 +469,8 @@ export class NativeAppService extends BaseAppService {
   // See: https://github.com/tauri-apps/tauri/issues/3716
   override canCustomizeRootDir = DIST_CHANNEL !== 'appstore';
   override canReadExternalDir = DIST_CHANNEL !== 'appstore' && DIST_CHANNEL !== 'playstore';
+  override supportsCanvasContext2DFilter =
+    OS_TYPE !== 'ios' && OS_TYPE !== 'macos' && OS_TYPE !== 'linux';
   override distChannel = DIST_CHANNEL;
   override storefrontRegionCode: string | null = null;
   override isOnlineCatalogsAccessible = true;
@@ -521,9 +509,18 @@ export class NativeAppService extends BaseAppService {
     }
     if (this.isIOSApp) {
       this.isOnlineCatalogsAccessible = this.distChannel !== 'appstore';
-      const res = await getStorefrontRegionCode();
-      if (res.regionCode) {
-        this.storefrontRegionCode = res.regionCode;
+      try {
+        const res = await getStorefrontRegionCode();
+        if (res?.regionCode) {
+          this.storefrontRegionCode = res.regionCode;
+        }
+      } catch (err) {
+        // Storefront.current is nil on simulators without a signed-in
+        // App Store account, and may also fail on real devices with no
+        // StoreKit configuration. Treat as "unknown region" — we leave
+        // storefrontRegionCode as null and let downstream features that
+        // depend on region degrade gracefully.
+        console.warn('[nativeAppService] getStorefrontRegionCode failed:', err);
       }
     }
     await this.prepareBooksDir();
@@ -570,11 +567,39 @@ export class NativeAppService extends BaseAppService {
   }
 
   async selectDirectory(): Promise<string> {
+    // On mobile, Tauri's dialog plugin rejects folder picks with
+    // "FolderPickerNotImplemented" — neither iOS nor Android ship a
+    // folder picker via that surface. Route through the native-bridge
+    // plugin instead, where each platform has a native implementation
+    // (Android: ACTION_OPEN_DOCUMENT_TREE, iOS:
+    // UIDocumentPickerViewController with `.folder`). The bridge
+    // returns `{ path, uri, cancelled }`; we surface the path string
+    // so the rest of the app can treat it like any local directory.
+    if (this.isIOSApp || this.isAndroidApp) {
+      const { selectDirectory } = await import('@/utils/bridge');
+      const result = await selectDirectory();
+      const path = result.path ?? '';
+      if (path) {
+        // Match the desktop branch — make sure both fs_scope and the
+        // asset-protocol scope can read from the chosen directory.
+        await this.allowPathsInScopes([path], true);
+      }
+      return path;
+    }
+
     const selected = await openDialog({
       directory: true,
       multiple: false,
       recursive: true,
     });
+    if (selected) {
+      // Tauri's dialog plugin only auto-grants fs_scope; the asset
+      // protocol scope still needs an explicit allow before
+      // RemoteFile / convertFileSrc-based reads can succeed against
+      // arbitrary user paths. Persisted-scope plugin makes this
+      // sticky across restarts.
+      await this.allowPathsInScopes([selected as string], true);
+    }
     return selected as string;
   }
 
@@ -584,32 +609,87 @@ export class NativeAppService extends BaseAppService {
       filters: [{ name, extensions }],
     });
     const files = Array.isArray(selected) ? selected : selected ? [selected] : [];
-    return OS_TYPE === 'ios' ? files.map((f) => safeDecodePath(f)) : files;
+    const decoded = OS_TYPE === 'ios' ? files.map((f) => safeDecodePath(f)) : files;
+    if (decoded.length > 0) {
+      // See the note in selectDirectory above.
+      await this.allowPathsInScopes(decoded, false);
+    }
+    return decoded;
+  }
+
+  /**
+   * Best-effort: ask the Rust side to extend `fs_scope` and
+   * `asset_protocol_scope` to cover the given paths. Errors are logged
+   * and swallowed because the import path can still succeed via the
+   * NativeFile fallback even when scope extension fails.
+   */
+  async allowPathsInScopes(paths: string[], isDirectory: boolean): Promise<void> {
+    try {
+      await invoke('allow_paths_in_scopes', { paths, isDirectory });
+    } catch (e) {
+      console.warn('allow_paths_in_scopes failed:', e);
+    }
   }
 
   async saveFile(
     filename: string,
     content: string | ArrayBuffer,
-    options?: { filePath?: string; mimeType?: string },
+    options?: {
+      filePath?: string;
+      mimeType?: string;
+      share?: boolean;
+      sharePosition?: { x: number; y: number; preferredEdge?: 'top' | 'bottom' | 'left' | 'right' };
+    },
   ): Promise<boolean> {
     try {
       const ext = filename.split('.').pop() || '';
-      if (this.isIOSApp && options?.filePath) {
-        await shareFile(options.filePath, {
-          mimeType: options?.mimeType || 'application/octet-stream',
-        });
-      } else {
-        const filePath = await saveDialog({
-          defaultPath: filename,
-          filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
-        });
-        if (!filePath) return false;
-
-        if (typeof content === 'string') {
-          await writeTextFile(filePath, content);
-        } else {
-          await writeFile(filePath, new Uint8Array(content));
+      // Linux desktop has no system share sheet; Windows WebView2's native
+      // share UI (via tauri-plugin-sharekit) blocks the main thread waiting
+      // on complete/cancel callbacks that may never fire when the user
+      // dismisses the picker, freezing the app (issue #4343). Both fall
+      // through to saveDialog instead.
+      const wantShare = !this.isLinuxApp && !this.isWindowsApp && (this.isIOSApp || options?.share);
+      if (wantShare) {
+        let shareablePath = options?.filePath;
+        if (!shareablePath) {
+          shareablePath = await this.resolveFilePath(filename, 'Temp');
+          if (typeof content === 'string') {
+            await writeTextFile(shareablePath, content);
+          } else {
+            await writeFile(shareablePath, new Uint8Array(content));
+          }
         }
+        try {
+          await shareFile(shareablePath, {
+            mimeType: options?.mimeType || 'application/octet-stream',
+            // Anchor the macOS NSSharingServicePicker / iPad popover to
+            // the trigger button. Without this, the picker pops at the
+            // WebView's top-left corner.
+            ...(options?.sharePosition ? { position: options.sharePosition } : {}),
+          });
+        } catch (error) {
+          // The plugin throws on user cancellation (e.g. dismissing the
+          // Android share sheet returns "Share cancelled"). That's not a
+          // failure — the user explicitly chose not to share, so we must
+          // NOT fall back to saveDialog and pop a "Save As..." prompt.
+          // Same goes for any other share error: the caller asked for a
+          // share sheet, fulfilled or not, the saveDialog flow is a
+          // completely different user intent.
+          console.warn('shareFile did not complete:', error);
+        }
+        return true;
+      }
+
+      const filePath = await saveDialog({
+        defaultPath: filename,
+        filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+      });
+      if (!filePath) return false;
+
+      if (typeof content === 'string') {
+        await writeTextFile(filePath, content);
+      } else {
+        await writeFile(filePath, new Uint8Array(content));
       }
       return true;
     } catch (error) {
@@ -637,114 +717,25 @@ export class NativeAppService extends BaseAppService {
     return db;
   }
 
-  override async attachBookAudio(book: Book, file: string | File): Promise<BookAudioAsset> {
-    const asset = await super.attachBookAudio(book, file);
-    try {
-      const summary = await inspectAudioMetadata({
-        audioPath: await this.resolveFilePath(asset.originalPath, 'Books'),
-      });
-      const enrichedAsset: BookAudioAsset = {
-        ...asset,
-        title: summary.title ?? asset.title,
-        durationMs: summary.durationMs ?? asset.durationMs,
-        chapterCount: summary.chapterCount ?? summary.chapters.length ?? asset.chapterCount,
-        chapters: summary.chapters.length > 0 ? summary.chapters : asset.chapters,
-        updatedAt: Date.now(),
-      };
-      await saveBookAudioAsset(this.fs, book, enrichedAsset);
-      return enrichedAsset;
-    } catch (error) {
-      console.info('Audio metadata inspection unavailable:', error);
-      return asset;
-    }
-  }
-
-  override async startAudioSync(
-    book: Book,
-    request?: AudioSyncStartRequest,
-  ): Promise<AudioSyncJobStatus> {
-    const asset = await this.getBookAudioAsset(book);
-    if (!asset) {
-      throw new Error('No audiobook is attached to this book');
-    }
-
-    const transcriptPath =
-      request?.transcriptPath || (await prepareAudioAlignmentInput(this, book, asset));
-    const handle = await startAlignmentJob({
-      bookHash: book.hash,
-      audioHash: asset.audioHash,
-      audioPath: await this.resolveFilePath(asset.normalizedPath || asset.originalPath, 'Books'),
-      transcriptPath,
-      outputPath:
-        request?.outputPath || (await this.resolveFilePath(getAudioSyncMapFilename(book), 'Books')),
-      reportPath: await this.resolveFilePath(getAudioAlignmentReportFilename(book), 'Books'),
-      model: request?.model,
-    });
-
-    return {
-      runId: handle.jobId,
-      phase: 'pending',
-      progress: 0,
-      updatedAt: Date.now(),
-    };
-  }
-
-  override async generateCorrectedAudioSyncPackage(book: Book): Promise<void> {
-    const asset = await this.getBookAudioAsset(book);
-    if (!asset) throw new Error('No audiobook attached to this book');
-
-    const [map, sidecar] = await Promise.all([
-      loadAudioSyncMap(this.fs, book),
-      loadAudioSyncCorrectionSidecar(this.fs, book),
-    ]);
-    if (!map) throw new Error('No sync map found — run Generate Sync first');
-    if (!sidecar || sidecar.corrections.length === 0) {
-      throw new Error('No corrections sidecar found — apply corrections before regenerating');
-    }
-
-    const correctedMap = applyAudioSyncCorrections(map, sidecar, asset);
-    await generateEpubMediaOverlayPackage(this, book, asset, correctedMap);
-  }
-
-  override async getAudioSyncStatus(book: Book, runId?: string): Promise<AudioSyncStatus> {
-    const status = await super.getAudioSyncStatus(book, runId);
-    if (!runId) {
-      return status;
-    }
-
-    try {
-      const job = mapNativeAudioSyncJob(await readAlignmentJobStatus({ jobId: runId }));
-      return { ...status, job };
-    } catch (error) {
-      return {
-        ...status,
-        job: {
-          runId,
-          phase: 'failed',
-          progress: 0,
-          updatedAt: Date.now(),
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
-    }
-  }
-
-  override async cancelAudioSync(_book: Book, runId: string): Promise<void> {
-    const result = await cancelAlignmentJob({ jobId: runId });
-    if (!result.cancelled) {
-      throw new Error(`Failed to cancel audio sync job ${runId}`);
-    }
-  }
-
   async migrate20251029() {
     console.log('Running migration 20251029 to update paths in Images dir...');
     const rootPath = await this.resolveFilePath('..', 'Data');
     const newDir = await this.fs.getPrefix('Images');
     const oldDir = await join(rootPath, 'Images', 'Readest', 'Images');
+    const dirToDelete = await join(rootPath, 'Images', 'Readest');
+
+    // Skip silently on fresh installs that never had the legacy layout.
+    // copyFiles / deleteDir would otherwise throw `os error 2` when the
+    // old directory does not exist, which is harmless but noisy.
+    if (!(await this.fs.exists(oldDir, 'None'))) {
+      console.log('Migration 20251029: legacy Images/Readest/Images not found, skipping.');
+      return;
+    }
 
     await copyFiles(this, oldDir, newDir);
 
-    const dirToDelete = await join(rootPath, 'Images', 'Readest');
-    await this.deleteDir(dirToDelete, 'None', true);
+    if (await this.fs.exists(dirToDelete, 'None')) {
+      await this.deleteDir(dirToDelete, 'None', true);
+    }
   }
 }
