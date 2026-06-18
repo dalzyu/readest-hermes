@@ -39,6 +39,7 @@ import { useBookDataStore } from '@/store/bookDataStore';
 import { useTransferStore } from '@/store/transferStore';
 import { useScreenWakeLock } from '@/hooks/useScreenWakeLock';
 import { useOpenWithBooks } from '@/hooks/useOpenWithBooks';
+import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { SelectedFile, useFileSelector } from '@/hooks/useFileSelector';
 import { lockScreenOrientation, selectDirectory } from '@/utils/bridge';
 import { requestStoragePermission } from '@/utils/permission';
@@ -62,7 +63,6 @@ import { BackupWindow } from './components/BackupWindow';
 import { useDragDropImport } from './hooks/useDragDropImport';
 import { useTransferQueue } from '@/hooks/useTransferQueue';
 import { useAppRouter } from '@/hooks/useAppRouter';
-import { useLibraryNavigation } from './hooks/useLibraryNavigation';
 import { Toast } from '@/components/Toast';
 import {
   createBookGroups,
@@ -79,13 +79,6 @@ import DropIndicator from '@/components/DropIndicator';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import ModalPortal from '@/components/ModalPortal';
 import TransferQueuePanel from './components/TransferQueuePanel';
-import {
-  addBookToSeries,
-  getAllSeries,
-  updateSeriesVolume,
-} from '@/services/learning/seriesService';
-import { buildImportSeriesSuggestions } from '@/utils/seriesSuggestions';
-import type { ImportSeriesSuggestion } from '@/utils/seriesSuggestions';
 
 const LibraryPageWithSearchParams = () => {
   const searchParams = useSearchParams();
@@ -128,15 +121,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const [showDetailsBook, setShowDetailsBook] = useState<Book | null>(null);
   const [currentGroupPath, setCurrentGroupPath] = useState<string | undefined>(undefined);
   const [currentSeriesAuthorGroup, setCurrentSeriesAuthorGroup] = useState<{
-    groupBy: typeof LibraryGroupByType.Author;
+    groupBy: typeof LibraryGroupByType.Series | typeof LibraryGroupByType.Author;
     groupName: string;
   } | null>(null);
   const [booksTransferProgress, setBooksTransferProgress] = useState<{
     [key: string]: number | null;
   }>({});
-  const [pendingSeriesSuggestions, setPendingSeriesSuggestions] = useState<
-    ImportSeriesSuggestion[]
-  >([]);
   const [pendingNavigationBookIds, setPendingNavigationBookIds] = useState<string[] | null>(null);
   const isInitiating = useRef(false);
 
@@ -161,16 +151,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       scrollRef.current.scrollTop = parseInt(savedPosition, 10);
     }
   }, []);
-
-  // Unified navigation function that handles scroll position and direction.
-  // Uses a plain Next.js router (via useLibraryNavigation) instead of the
-  // view-transition-wrapped useAppRouter, because next-view-transitions@0.3.5
-  // is incompatible with Next.js 16.2 RSC navigation when only search params
-  // change for the same pathname (e.g. /library?group=foo -> /library), which
-  // previously broke the breadcrumb "All" button on the first click after
-  // entering a group. See https://github.com/readest/readest/issues/3782 and
-  // https://github.com/shuding/next-view-transitions/issues/65.
-  const handleLibraryNavigation = useLibraryNavigation(searchParams, saveScrollPosition);
 
   useTheme({ systemUIVisible: true, appThemeColor: 'base-200' });
   useUICSS();
@@ -215,6 +195,74 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   useEffect(() => {
     sessionStorage.setItem('lastLibraryParams', searchParams?.toString() || '');
   }, [searchParams]);
+
+  // Strip the empty `group=` param that `handleLibraryNavigation` sets as a
+  // workaround for a Next.js 16.2 static-export regression (see the NOTE
+  // above `handleLibraryNavigation` for full context). This effect runs
+  // after the router.replace() has committed, so React has already
+  // re-rendered with the new (empty) group state; we're only rewriting the
+  // URL cosmetically via window.history.replaceState — Next.js' patched
+  // replaceState will pick up the new canonical URL without triggering
+  // another navigation.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (searchParams?.get('group') !== '') return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('group');
+    const cleanHref = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(null, '', cleanHref);
+  }, [searchParams]);
+
+  // Unified navigation function that handles scroll position and direction.
+  // Workaround for a Next.js 16.2 static-export regression: navigating to a
+  // same-pathname URL with an empty search string causes `router.replace()`
+  // to silently no-op (e.g. `/library?group=foo` -> `/library`), which broke
+  // the breadcrumb "All" button. By always calling `params.set('group',
+  // targetGroup)` — including when `targetGroup` is an empty string — the
+  // resulting URL becomes `/library?group=` instead of `/library`, which
+  // Next.js does commit. The trailing empty `group=` is stripped via a
+  // cleanup effect below (purely cosmetic URL rewrite). See
+  // https://github.com/readest/readest/issues/3782.
+  const handleLibraryNavigation = useCallback(
+    (targetGroup: string) => {
+      const currentGroup = searchParams?.get('group') || '';
+
+      // Save current scroll position BEFORE navigation
+      saveScrollPosition(currentGroup);
+
+      // Detect and set navigation direction
+      const direction = currentGroup && !targetGroup ? 'back' : 'forward';
+      document.documentElement.setAttribute('data-nav-direction', direction);
+
+      // Build query params — always `set` so the search string is non-empty
+      // even when targetGroup is '' (the Next.js 16.2 workaround).
+      const params = new URLSearchParams(searchParams?.toString());
+      params.set('group', targetGroup);
+
+      navigateToLibrary(router, `${params.toString()}`);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchParams, router],
+  );
+
+  const handleBackUpOneGroupLevel = () => {
+    if (!currentGroupPath) return;
+    const segments = currentGroupPath.split('/');
+    const parentPath = segments.length > 1 ? segments.slice(0, -1).join('/') : undefined;
+    const parentGroupId = parentPath ? getGroupId(parentPath) || '' : '';
+    setIsSelectAll(false);
+    setIsSelectNone(false);
+    handleLibraryNavigation(parentGroupId);
+  };
+
+  const handleBackUpOneGroupLevelRef = useRef(handleBackUpOneGroupLevel);
+  handleBackUpOneGroupLevelRef.current = handleBackUpOneGroupLevel;
+  const triggerBackUpOneGroupLevel = useCallback(() => handleBackUpOneGroupLevelRef.current(), []);
+
+  useKeyDownActions({
+    onCancel: triggerBackUpOneGroupLevel,
+    enabled: !!appService?.isAndroidApp && !!currentGroupPath,
+  });
 
   useEffect(() => {
     const doCheckAppUpdates = async () => {
@@ -423,23 +471,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   }, [searchParams]);
 
   useEffect(() => {
-    const surface = searchParams?.get('surface');
-    if (surface) return;
-    if (searchParams?.get('groupBy') !== LibraryGroupByType.Series) return;
-
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('groupBy');
-    params.delete('group');
-    params.set('surface', 'series');
-    navigateToLibrary(router, params.toString());
-  }, [router, searchParams]);
-
-  useEffect(() => {
     const group = searchParams?.get('group') || '';
-    if (searchParams?.get('surface') === 'series') {
-      setCurrentGroupPath(undefined);
-      return;
-    }
     const groupName = getGroupName(group);
     setCurrentGroupPath(groupName);
   }, [libraryBooks, searchParams, getGroupName]);
@@ -455,12 +487,10 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     const groupByParam = searchParams?.get('groupBy');
     const groupBy = ensureLibraryGroupByType(groupByParam, settings.libraryGroupBy);
 
-    if (searchParams?.get('surface') === 'series') {
-      setCurrentSeriesAuthorGroup(null);
-      return;
-    }
-
-    if (groupId && groupBy === LibraryGroupByType.Author) {
+    if (
+      groupId &&
+      (groupBy === LibraryGroupByType.Series || groupBy === LibraryGroupByType.Author)
+    ) {
       // Find the group to get its name
       const allGroups = createBookGroups(
         libraryBooks.filter((b) => !b.deletedAt),
@@ -498,19 +528,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoBooks, libraryLoaded]);
 
-  const queueSeriesSuggestions = useCallback(async (importedBooks: Book[]) => {
-    if (importedBooks.length === 0) return;
-
-    const allSeries = await getAllSeries();
-    if (allSeries.length === 0) return;
-
-    const librarySnapshot = useLibraryStore.getState().library;
-    const suggestions = buildImportSeriesSuggestions(importedBooks, allSeries, librarySnapshot);
-    if (suggestions.length > 0) {
-      setPendingSeriesSuggestions((current) => [...current, ...suggestions]);
-    }
-  }, []);
-
   const importBooks = async (files: SelectedFile[], groupId?: string) => {
     setLoading(true);
     const { library } = useLibraryStore.getState();
@@ -521,7 +538,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     const lookupIndex = buildBookLookupIndex(library);
     const failedImports: Array<{ filename: string; errorMessage: string }> = [];
     const successfulImports: string[] = [];
-    const importedBooksForSuggestions: Book[] = [];
 
     const processFile = async (selectedFile: SelectedFile): Promise<Book | null> => {
       const file = selectedFile.file || selectedFile.path;
@@ -545,7 +561,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           transferManager.queueUpload(book);
         }
         successfulImports.push(book.title);
-        importedBooksForSuggestions.push(book);
         return book;
       } catch (error) {
         const filename = typeof file === 'string' ? file : file.name;
@@ -600,26 +615,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     }
 
     setLoading(false);
-    await queueSeriesSuggestions(importedBooksForSuggestions);
-  };
-
-  const handleAcceptSeriesSuggestion = async () => {
-    const currentSuggestion = pendingSeriesSuggestions[0];
-    if (!currentSuggestion) return;
-
-    await addBookToSeries(currentSuggestion.series.id, currentSuggestion.book.hash);
-    if (currentSuggestion.suggestedVolumeIndex) {
-      await updateSeriesVolume(currentSuggestion.series.id, currentSuggestion.book.hash, {
-        volumeIndex: currentSuggestion.suggestedVolumeIndex,
-        label: `Vol. ${currentSuggestion.suggestedVolumeIndex}`,
-      });
-    }
-
-    setPendingSeriesSuggestions((current) => current.slice(1));
-  };
-
-  const handleDismissSeriesSuggestion = () => {
-    setPendingSeriesSuggestions((current) => current.slice(1));
   };
 
   const updateBookTransferProgress = throttle((bookHash: string, progress: ProgressPayload) => {
@@ -953,10 +948,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           >
             <div
               ref={containerRef}
-              className={clsx(
-                'scroll-container drop-zone flex h-full min-h-full flex-col',
-                isDragging && 'drag-over',
-              )}
+              className={clsx('scroll-container drop-zone flex-grow', isDragging && 'drag-over')}
               style={{
                 paddingTop: '0px',
                 paddingRight: `${insets.right}px`,
@@ -1012,44 +1004,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           handleBookDeleteLocalCopy={handleBookDelete('local')}
           handleBookMetadataUpdate={handleUpdateMetadata}
         />
-      )}
-      {pendingSeriesSuggestions[0] && (
-        <ModalPortal>
-          <dialog open className='modal modal-open z-[120]'>
-            <div className='modal-box max-w-md'>
-              <h3 className='text-base font-semibold'>{_('Add to series?')}</h3>
-              <p className='text-base-content/70 mt-2 text-sm'>
-                {_('{{title}} looks like it belongs in {{series}}.', {
-                  title: pendingSeriesSuggestions[0].book.title,
-                  series: pendingSeriesSuggestions[0].series.name,
-                })}
-              </p>
-              <div className='border-base-300 mt-4 rounded-lg border px-3 py-2 text-sm'>
-                <div className='font-medium'>{pendingSeriesSuggestions[0].series.name}</div>
-                {pendingSeriesSuggestions[0].suggestedVolumeIndex ? (
-                  <div className='text-base-content/60 mt-1'>
-                    {_('Suggested volume: {{volume}}', {
-                      volume: pendingSeriesSuggestions[0].suggestedVolumeIndex,
-                    })}
-                  </div>
-                ) : null}
-              </div>
-              <div className='modal-action'>
-                <button className='btn btn-ghost btn-sm' onClick={handleDismissSeriesSuggestion}>
-                  {_('Not now')}
-                </button>
-                <button className='btn btn-primary btn-sm' onClick={handleAcceptSeriesSuggestion}>
-                  {_('Add to series')}
-                </button>
-              </div>
-            </div>
-            <button
-              className='modal-backdrop'
-              onClick={handleDismissSeriesSuggestion}
-              aria-label={_('Close')}
-            />
-          </dialog>
-        </ModalPortal>
       )}
       {isTransferQueueOpen && (
         <ModalPortal>
