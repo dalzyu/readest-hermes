@@ -453,6 +453,7 @@ export type BookContextMenuItemId =
   | 'clearStatus'
   | 'showDetails'
   | 'showInFinder'
+  | 'searchGoodreads'
   | 'download'
   | 'upload'
   | 'share'
@@ -473,7 +474,7 @@ export const getBookContextMenuItemIds = (book: Book): BookContextMenuItemId[] =
   if (book.readingStatus === 'finished' || book.readingStatus === 'unread') {
     ids.push('clearStatus');
   }
-  ids.push('showDetails', 'showInFinder');
+  ids.push('showDetails', 'showInFinder', 'searchGoodreads');
   if (book.uploadedAt && !book.downloadedAt) ids.push('download');
   if (!book.uploadedAt && book.downloadedAt) ids.push('upload');
   // Share is offered for any local-or-uploaded book; the dialog uploads first

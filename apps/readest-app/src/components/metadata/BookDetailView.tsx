@@ -9,11 +9,12 @@ import {
   MdExpandMore,
   MdExpandLess,
 } from 'react-icons/md';
+import { FaGoodreads } from 'react-icons/fa';
 
 import { Book } from '@/types/book';
 import { BookMetadata } from '@/libs/document';
-import { AudioSyncHelperState } from '@/services/audioSync/nativeBridge';
-import { AudioSyncStatus, BookAudioAsset } from '@/services/audioSync/types';
+import { openExternalUrl } from '@/utils/open';
+import { getBookGoodreadsQuery, getGoodreadsSearchUrl } from '@/utils/goodreads';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
@@ -29,7 +30,6 @@ import { saveSysSettings } from '@/helpers/settings';
 import BookCover from '@/components/BookCover';
 import Dropdown from '../Dropdown';
 import MenuItem from '../MenuItem';
-import BookAudioSection from './BookAudioSection';
 
 interface BookDetailViewProps {
   book: Book;
@@ -42,17 +42,6 @@ interface BookDetailViewProps {
   onDownload?: () => void;
   onUpload?: () => void;
   onExport?: () => void;
-  audioAsset?: BookAudioAsset | null;
-  audioSyncStatus?: AudioSyncStatus | null;
-  audioBusy?: boolean;
-  audioModel?: string;
-  audioHelperState?: AudioSyncHelperState | null;
-  onAttachAudio?: () => void;
-  onRemoveAudio?: () => void;
-  onGenerateAudioSync?: () => void;
-  onInstallAudioSyncHelper?: () => void;
-  onViewAudioSyncStatus?: () => void;
-  onAudioModelChange?: (model: string) => void;
 }
 
 const BookDetailView: React.FC<BookDetailViewProps> = ({
@@ -66,20 +55,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
   onDownload,
   onUpload,
   onExport,
-  audioAsset,
-  audioSyncStatus,
-  audioBusy = false,
-  audioModel = 'large-v3',
-  audioHelperState,
-  onAttachAudio,
-  onRemoveAudio,
-  onGenerateAudioSync,
-  onInstallAudioSyncHelper,
-  onViewAudioSyncStatus,
-  onAudioModelChange,
 }) => {
   const _ = useTranslation();
-  const { envConfig, appService } = useEnv();
+  const { envConfig } = useEnv();
   const { settings } = useSettingsStore();
 
   const toggleSeriesCollapse = () => {
@@ -123,16 +101,22 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                 <MdOutlineEdit className='hover:fill-blue-500' />
               </button>
             )}
+            <button
+              onClick={() => openExternalUrl(getGoodreadsSearchUrl(getBookGoodreadsQuery(book)))}
+              title={_('Search on Goodreads')}
+            >
+              <FaGoodreads className='fill-base-content' />
+            </button>
             {onDelete && (
               <Dropdown
                 label={_('Delete Book Options')}
-                className='dropdown-bottom flex justify-center'
+                className='dropdown-bottom dropdown-center flex justify-center'
                 buttonClassName='btn btn-ghost h-8 min-h-8 w-8 p-0'
                 toggleButton={<MdOutlineDelete className='fill-red-500' />}
               >
                 <div
                   className={clsx(
-                    'delete-menu dropdown-content dropdown-center no-triangle',
+                    'delete-menu dropdown-content no-triangle !relative',
                     'border-base-300 !bg-base-200 z-20 mt-1 max-w-[90vw] shadow-2xl',
                   )}
                 >
@@ -266,21 +250,6 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
             </div>
           )}
         </div>
-        <BookAudioSection
-          asset={audioAsset || null}
-          status={audioSyncStatus || null}
-          busy={audioBusy}
-          isDesktop={Boolean(appService?.isDesktopApp)}
-          model={audioModel}
-          helperState={audioHelperState}
-          onAttach={onAttachAudio}
-          onRemove={onRemoveAudio}
-          onGenerateSync={onGenerateAudioSync}
-          onInstallHelper={onInstallAudioSyncHelper}
-          onViewStatus={onViewAudioSyncStatus}
-          onModelChange={onAudioModelChange}
-        />
-
         <div className='metadata-series'>
           <button
             className={clsx(
