@@ -64,6 +64,12 @@ const resetTransferManager = () => {
   mgr['updateBook'] = null;
   mgr['_'] = null;
   (mgr['abortControllers'] as Map<string, AbortController>).clear();
+  // Re-arm the readyPromise so each test starts with a pending one.
+  let resolveReady: () => void = () => {};
+  mgr['readyPromise'] = new Promise<void>((res) => {
+    resolveReady = res;
+  });
+  mgr['readyResolve'] = resolveReady;
 };
 
 const resetTransferStore = () => {
@@ -128,6 +134,43 @@ describe('TransferManager', () => {
       const appService = makeAppService();
       await transferManager.initialize(appService as never, () => [], vi.fn(), translationFn);
       expect(transferManager.isReady()).toBe(true);
+    });
+  });
+
+  // ── waitUntilReady ───────────────────────────────────────────────
+  describe('waitUntilReady', () => {
+    test('does not resolve before initialize', async () => {
+      let resolved = false;
+      void transferManager.waitUntilReady().then(() => {
+        resolved = true;
+      });
+      // Yield to the microtask queue so any spurious early resolution would land.
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(resolved).toBe(false);
+    });
+
+    test('resolves once initialize completes', async () => {
+      let resolved = false;
+      void transferManager.waitUntilReady().then(() => {
+        resolved = true;
+      });
+      const appService = makeAppService();
+      await transferManager.initialize(appService as never, () => [], vi.fn(), translationFn);
+      await Promise.resolve();
+      expect(resolved).toBe(true);
+    });
+
+    test('returns an already-resolved promise after initialize', async () => {
+      const appService = makeAppService();
+      await transferManager.initialize(appService as never, () => [], vi.fn(), translationFn);
+      // After init this should resolve in the next microtask, not block.
+      let resolved = false;
+      void transferManager.waitUntilReady().then(() => {
+        resolved = true;
+      });
+      await Promise.resolve();
+      expect(resolved).toBe(true);
     });
   });
 
@@ -702,6 +745,7 @@ describe('TransferManager', () => {
         'Webster',
         dictFiles,
         'Dictionaries',
+        { reincarnation: 'epoch-1' },
       );
       expect(id).toBeTruthy();
       const t = useTransferStore.getState().transfers[id!]!;
@@ -710,6 +754,7 @@ describe('TransferManager', () => {
       expect(t.replicaId).toBe('d1');
       expect(t.replicaFiles).toEqual(dictFiles);
       expect(t.replicaBase).toBe('Dictionaries');
+      expect(t.replicaReincarnation).toBe('epoch-1');
       expect(t.totalBytes).toBe(5000);
     });
 
@@ -772,6 +817,35 @@ describe('TransferManager', () => {
       const t = useTransferStore.getState().transfers[id!]!;
       expect(t.type).toBe('download');
       expect(t.replicaFiles).toEqual(dictFiles);
+    });
+
+    test('executing a replica download passes the transfer base to downloadReplicaFile', async () => {
+      const appService = makeAppService();
+      const downloadSpy = vi.fn().mockResolvedValue(undefined);
+      appService['downloadReplicaFile'] = downloadSpy;
+      await transferManager.initialize(appService as never, () => [], vi.fn(), translationFn);
+
+      transferManager.queueReplicaDownload(
+        'dictionary',
+        'content-hash-abc',
+        'Webster',
+        [{ logical: 'webster.mdx', lfp: 'bundle-1/webster.mdx', byteSize: 1000 }],
+        'Dictionaries',
+      );
+
+      // Drain the queue.
+      await vi.runAllTimersAsync();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(downloadSpy).toHaveBeenCalledOnce();
+      // Args: (kind, replicaId, filename, lfp, base, onProgress)
+      const call = downloadSpy.mock.calls[0]!;
+      expect(call[0]).toBe('dictionary');
+      expect(call[1]).toBe('content-hash-abc');
+      expect(call[2]).toBe('webster.mdx');
+      expect(call[3]).toBe('bundle-1/webster.mdx');
+      expect(call[4]).toBe('Dictionaries');
     });
 
     test('queueReplicaDelete creates a delete-typed transfer with filename list', async () => {

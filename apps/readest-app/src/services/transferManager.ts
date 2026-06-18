@@ -4,6 +4,7 @@ import { useTransferStore, TransferItem, ReplicaTransferFile } from '@/store/tra
 import { TranslationFunc } from '@/hooks/useTranslation';
 import { ProgressHandler, ProgressPayload } from '@/utils/transfer';
 import { eventDispatcher } from '@/utils/event';
+import { getTransferMessages } from './transferMessages';
 
 const TRANSFER_QUEUE_KEY = 'hermes_transfer_queue';
 const RETRY_DELAY_BASE_MS = 2000;
@@ -22,6 +23,10 @@ class TransferManager {
   private getLibrary: (() => Book[]) | null = null;
   private updateBook: ((book: Book) => Promise<void>) | null = null;
   private _: TranslationFunc | null = null;
+  private readyResolve: () => void = () => {};
+  private readyPromise: Promise<void> = new Promise<void>((resolve) => {
+    this.readyResolve = resolve;
+  });
 
   private constructor() {}
 
@@ -46,6 +51,7 @@ class TransferManager {
     this._ = translationFn;
     await this.loadPersistedQueue();
     this.isInitialized = true;
+    this.readyResolve();
 
     // Start processing queue
     this.processQueue();
@@ -53,6 +59,16 @@ class TransferManager {
 
   isReady(): boolean {
     return this.isInitialized && this.appService !== null;
+  }
+
+  /**
+   * Resolves once `initialize()` has completed. Lets callers that need
+   * to enqueue transfers (e.g., the boot-time replica pull) defer until
+   * the manager is wired up — the manager only inits after the library
+   * is loaded, which can lag well behind app boot.
+   */
+  waitUntilReady(): Promise<void> {
+    return this.readyPromise;
   }
 
   queueUpload(book: Book, priority: number = 10): string | null {
@@ -125,7 +141,7 @@ class TransferManager {
     displayTitle: string,
     files: ReplicaTransferFile[],
     base: BaseDir,
-    opts: { priority?: number; isBackground?: boolean } = {},
+    opts: { priority?: number; isBackground?: boolean; reincarnation?: string } = {},
   ): string | null {
     if (!this.isReady()) {
       console.warn('TransferManager not initialized');
@@ -140,6 +156,7 @@ class TransferManager {
       isBackground: opts.isBackground,
       files,
       base,
+      reincarnation: opts.reincarnation,
     });
     this.persistQueue();
     this.processQueue();
@@ -317,17 +334,13 @@ class TransferManager {
 
       useTransferStore.getState().setTransferStatus(transfer.id, 'completed');
 
-      const successMessages = {
-        upload: _('Book uploaded: {{title}}', { title: transfer.bookTitle }),
-        download: _('Book downloaded: {{title}}', { title: transfer.bookTitle }),
-        delete: _('Deleted cloud backup of the book: {{title}}', { title: transfer.bookTitle }),
-      };
+      const messages = getTransferMessages(transfer, _);
 
       if (!transfer.isBackground) {
         eventDispatcher.dispatch('toast', {
           type: 'info',
           timeout: 2000,
-          message: successMessages[transfer.type],
+          message: messages.success[transfer.type],
         });
       }
     } catch (error) {
@@ -365,13 +378,7 @@ class TransferManager {
             message: _('Insufficient storage quota'),
           });
         } else {
-          const errorMessages = {
-            upload: _('Failed to upload book: {{title}}', { title: transfer.bookTitle }),
-            download: _('Failed to download book: {{title}}', { title: transfer.bookTitle }),
-            delete: _('Failed to delete cloud backup of the book: {{title}}', {
-              title: transfer.bookTitle,
-            }),
-          };
+          const errorMessages = getTransferMessages(transfer, _).failure;
 
           eventDispatcher.dispatch('toast', {
             type: 'error',
@@ -478,6 +485,7 @@ class TransferManager {
       eventDispatcher.dispatch('replica-transfer-complete', {
         kind,
         replicaId,
+        reincarnation: transfer.replicaReincarnation,
         type: 'upload',
         files,
       });
@@ -485,12 +493,14 @@ class TransferManager {
     }
 
     if (transfer.type === 'download') {
+      const base = transfer.replicaBase!;
       for (const file of files) {
         await this.appService!.downloadReplicaFile(
           kind,
           replicaId,
           file.logical,
           file.lfp,
+          base,
           fileProgressHandler(file.byteSize),
         );
         bytesAlreadyDone += file.byteSize;
