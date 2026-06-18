@@ -91,6 +91,7 @@ export interface AppService {
   isIOSApp: boolean;
   isMacOSApp: boolean;
   isLinuxApp: boolean;
+  isWindowsApp: boolean;
   isPortableApp: boolean;
   isDesktopApp: boolean;
   isAppImage: boolean;
