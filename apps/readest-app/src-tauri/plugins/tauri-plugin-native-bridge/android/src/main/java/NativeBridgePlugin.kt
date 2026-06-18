@@ -66,6 +66,8 @@ class SetSystemUIVisibilityRequestArgs {
 class InterceptKeysRequestArgs {
     var volumeKeys: Boolean? = null
     var backKey: Boolean? = null
+    var pageTurnerKeys: Boolean? = null
+    var learnMode: Boolean? = null
 }
 
 @InvokeArg
@@ -81,6 +83,11 @@ class SetScreenBrightnessRequestArgs {
 @InvokeArg
 class OpenExternalUrlArgs {
     var url: String? = null
+}
+
+@InvokeArg
+class ShowLookupPopoverArgs {
+    var word: String? = null
 }
 
 @InvokeArg
@@ -115,6 +122,8 @@ data class PurchaseData(
 interface KeyDownInterceptor {
     fun interceptVolumeKeys(enabled: Boolean)
     fun interceptBackKey(enabled: Boolean)
+    fun interceptPageTurnerKeys(enabled: Boolean)
+    fun setKeyLearnMode(enabled: Boolean)
 }
 
 @TauriPlugin(
@@ -124,8 +133,8 @@ interface KeyDownInterceptor {
 )
 class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
     private val implementation = NativeBridge()
-    private val redirectScheme = "hermes"
-    private val redirectHost = "auth-callback"
+    private var redirectScheme = "readest"
+    private var redirectHost = "auth-callback"
     private val billingManager by lazy {
         BillingManager(activity)
     }
@@ -150,29 +159,98 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
     }
 
     private fun handleIntent(intent: Intent?) {
-        val uri = intent?.data ?: return
-        Log.e("NativeBridgePlugin", "Received intent: $uri")
-        when {
-          uri.scheme == redirectScheme &&
-            uri.host == redirectHost -> {
-              val result = JSObject().apply {
-                  put("redirectUrl", uri.toString())
-              }
-              pendingInvoke?.resolve(result)
-              pendingInvoke = null
-          }
+        if (intent == null) return
+        Log.d("NativeBridgePlugin", "Received intent: action=${intent.action} data=${intent.data}")
 
-          intent.action == Intent.ACTION_VIEW -> {
-              try {
-                activity.contentResolver.takePersistableUriPermission(
-                      uri,
-                      Intent.FLAG_GRANT_READ_URI_PERMISSION
-                  )
-              } catch (e: SecurityException) {
-                Log.e("NativeBridgePlugin", "Failed to take persistable URI permission: ${e.message}")
-              }
-          }
+        // OAuth callback uses a custom scheme on intent.data and is handled
+        // separately from any user-shared content.
+        intent.data?.let { uri ->
+            if (uri.scheme == "readest" && uri.host == "auth-callback") {
+                val result = JSObject().apply {
+                    put("redirectUrl", uri.toString())
+                }
+                pendingInvoke?.resolve(result)
+                pendingInvoke = null
+                return
+            }
         }
+
+        when (intent.action) {
+            Intent.ACTION_VIEW -> {
+                // "Open with Readest": the OS hands us a single content://
+                // (or file://) URI on `intent.data`. Take the persistable
+                // permission so we can read it through any subsequent app
+                // launch, then forward it to the JS side via the existing
+                // shared-intent channel — without this trigger, the URI
+                // silently dies in Kotlin and the user just sees the
+                // library splash with nothing happening.
+                val uri = intent.data ?: return
+                tryTakePersistableReadPermission(uri)
+                emitSharedIntent("VIEW", listOf(uri))
+            }
+
+            Intent.ACTION_SEND -> {
+                // System share-sheet → "Send to Readest" (single file).
+                // The URI lives on EXTRA_STREAM, not on intent.data, which
+                // is why the previous data-only handler never saw share
+                // captures at all.
+                val uri = getExtraStream(intent) ?: return
+                tryTakePersistableReadPermission(uri)
+                emitSharedIntent("SEND", listOf(uri))
+            }
+
+            Intent.ACTION_SEND_MULTIPLE -> {
+                val uris = getExtraStreamList(intent)
+                if (uris.isEmpty()) return
+                uris.forEach { tryTakePersistableReadPermission(it) }
+                emitSharedIntent("SEND", uris)
+            }
+        }
+    }
+
+    private fun tryTakePersistableReadPermission(uri: Uri) {
+        // Only content:// URIs support persistable permissions; file://
+        // URIs are accessible directly and would throw SecurityException
+        // here. Skip the call rather than swallow noisy logs.
+        if (uri.scheme != "content") return
+        try {
+            activity.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (e: SecurityException) {
+            Log.w("NativeBridgePlugin", "takePersistableUriPermission failed for $uri: ${e.message}")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getExtraStream(intent: Intent): Uri? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getExtraStreamList(intent: Intent): List<Uri> {
+        val list: ArrayList<Uri>? =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+            }
+        return list ?: emptyList()
+    }
+
+    private fun emitSharedIntent(action: String, uris: List<Uri>) {
+        val payload = JSObject().apply {
+            put("action", action)
+            val arr = JSArray()
+            uris.forEach { arr.put(it.toString()) }
+            put("urls", arr)
+        }
+        triggerEvent("shared-intent", payload)
     }
 
     @Command
@@ -402,16 +480,11 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
     fun intercept_keys(invoke: Invoke) {
         val args = invoke.parseArgs(InterceptKeysRequestArgs::class.java)
         if (activity is KeyDownInterceptor) {
-          when (args.backKey) {
-              true -> (activity as KeyDownInterceptor).interceptBackKey(true)
-              false -> (activity as KeyDownInterceptor).interceptBackKey(false)
-              else -> {}
-          }
-          when (args.volumeKeys) {
-              true -> (activity as KeyDownInterceptor).interceptVolumeKeys(true)
-              false -> (activity as KeyDownInterceptor).interceptVolumeKeys(false)
-              else -> {}
-          }
+            val interceptor = activity as KeyDownInterceptor
+            args.backKey?.let { interceptor.interceptBackKey(it) }
+            args.volumeKeys?.let { interceptor.interceptVolumeKeys(it) }
+            args.pageTurnerKeys?.let { interceptor.interceptPageTurnerKeys(it) }
+            args.learnMode?.let { interceptor.setKeyLearnMode(it) }
         } else {
             Log.e("NativeBridgePlugin", "Activity does not implement KeyDownInterceptor")
         }
@@ -443,7 +516,6 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
 
             if (windowInsets != null) {
                 val insets = windowInsets.getInsets(
-                    WindowInsetsCompat.Type.systemBars() or
                     WindowInsetsCompat.Type.displayCutout()
                 )
                 val density = activity.resources.displayMetrics.density
@@ -794,4 +866,193 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
             trigger(eventName, payload)
         }
     }
+
+    // ── Sync passphrase keychain ──────────────────────────────────────
+    // Backed by EncryptedSharedPreferences, which derives an AES-GCM
+    // master key from AndroidKeystore and stores the value-of-keys map
+    // in a private SharedPreferences file. The TS-side CryptoSession
+    // reads/writes via these commands so the user's sync passphrase
+    // persists across app launches.
+
+    private val syncPrefsName = "readest_sync_passphrase_v1"
+    private val syncPrefsKey = "passphrase"
+
+    private fun openSyncPrefs(): android.content.SharedPreferences {
+        val masterKey = androidx.security.crypto.MasterKey.Builder(activity)
+            .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        return androidx.security.crypto.EncryptedSharedPreferences.create(
+            activity,
+            syncPrefsName,
+            masterKey,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
+    }
+
+    @Command
+    fun set_sync_passphrase(invoke: Invoke) {
+        val args = invoke.parseArgs(SyncPassphraseSetArgs::class.java)
+        val ret = JSObject()
+        try {
+            val prefs = openSyncPrefs()
+            prefs.edit().putString(syncPrefsKey, args.passphrase).apply()
+            ret.put("success", true)
+        } catch (e: Exception) {
+            Log.e("NativeBridgePlugin", "set_sync_passphrase failed", e)
+            ret.put("success", false)
+            ret.put("error", e.message ?: "unknown")
+        }
+        invoke.resolve(ret)
+    }
+
+    @Command
+    fun get_sync_passphrase(invoke: Invoke) {
+        val ret = JSObject()
+        try {
+            val prefs = openSyncPrefs()
+            val value = prefs.getString(syncPrefsKey, null)
+            if (value != null) ret.put("passphrase", value)
+        } catch (e: Exception) {
+            Log.e("NativeBridgePlugin", "get_sync_passphrase failed", e)
+            ret.put("error", e.message ?: "unknown")
+        }
+        invoke.resolve(ret)
+    }
+
+    @Command
+    fun clear_sync_passphrase(invoke: Invoke) {
+        val ret = JSObject()
+        try {
+            val prefs = openSyncPrefs()
+            prefs.edit().remove(syncPrefsKey).apply()
+            ret.put("success", true)
+        } catch (e: Exception) {
+            Log.e("NativeBridgePlugin", "clear_sync_passphrase failed", e)
+            ret.put("success", false)
+            ret.put("error", e.message ?: "unknown")
+        }
+        invoke.resolve(ret)
+    }
+
+    @Command
+    fun is_sync_keychain_available(invoke: Invoke) {
+        val ret = JSObject()
+        try {
+            // Probe by opening the prefs file. Failure surfaces as
+            // available=false with the underlying error string so the
+            // TS layer can fall back to the ephemeral store.
+            openSyncPrefs()
+            ret.put("available", true)
+        } catch (e: Exception) {
+            Log.e("NativeBridgePlugin", "is_sync_keychain_available failed", e)
+            ret.put("available", false)
+            ret.put("error", e.message ?: "unknown")
+        }
+        invoke.resolve(ret)
+    }
+
+    /**
+     * Hand a selected word off to whatever dictionary / lookup app the
+     * user has installed, via the standard `ACTION_PROCESS_TEXT`
+     * intent (Android 6.0+). This is the same dispatch the system
+     * "selection toolbar" uses for "Translate" / "Define" actions, so
+     * any third-party dictionary that registers the intent (ColorDict,
+     * GoldenDict, 欧路, Pleco, etc.) shows up without extra work on
+     * our side.
+     *
+     * Important: we deliberately do NOT wrap the intent with
+     * `Intent.createChooser`. Chooser-style dialogs always re-prompt
+     * (no "Always use this app" affordance), which the user found
+     * annoying when they have a single preferred dictionary. Plain
+     * `startActivity(intent)` instead surfaces the standard system
+     * disambiguation dialog with the "Just once / Always" buttons —
+     * picking "Always" makes subsequent lookups go straight to that
+     * app. When only one app handles the intent, Android skips the
+     * picker entirely and launches it directly.
+     *
+     * If no app is installed that responds to the intent, returns
+     * `unavailable: true` instead of throwing — the TS layer surfaces
+     * a hint rather than a generic error in that case.
+     */
+    @Command
+    fun show_lookup_popover(invoke: Invoke) {
+        val args = invoke.parseArgs(ShowLookupPopoverArgs::class.java)
+        val word = args.word?.trim().orEmpty()
+        if (word.isEmpty()) {
+            return invoke.reject("empty word")
+        }
+
+        try {
+            val intent = Intent(Intent.ACTION_PROCESS_TEXT).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_PROCESS_TEXT, word)
+                // Read-only — we don't want third-party apps writing
+                // back into a clipboard or selection slot we don't own.
+                putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
+            }
+
+            // Probe for handlers before dispatching. An ActivityNotFound
+            // crash is a worse UX than a quiet "no dictionary app"
+            // result; surface the empty case explicitly.
+            val pm = activity.packageManager
+            val handlers = pm.queryIntentActivities(intent, 0)
+            if (handlers.isEmpty()) {
+                val ret = JSObject()
+                ret.put("success", false)
+                ret.put("unavailable", true)
+                return invoke.resolve(ret)
+            }
+
+            // FLAG_ACTIVITY_NEW_TASK is required because `activity`
+            // here is the plugin's host activity context — without it,
+            // some OEM ROMs reject the dispatch with "Calling
+            // startActivity() from outside of an Activity context".
+            // The system disambiguation dialog still appears (with the
+            // Always/Just once buttons) for multi-handler cases; for
+            // single-handler cases it goes straight through.
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+
+            val ret = JSObject()
+            ret.put("success", true)
+            invoke.resolve(ret)
+        } catch (e: Exception) {
+            Log.e("NativeBridgePlugin", "show_lookup_popover failed", e)
+            invoke.reject("Failed to look up word: ${e.message}")
+        }
+    }
+
+    /**
+     * Open a full-screen `WebView` at the supplied URL, capture
+     * `document.documentElement.outerHTML` once the page settles, and
+     * resolve with `{ html }`. Implements the Android half of the
+     * `clip_url` command — see `clip_url.rs` for the desktop half and
+     * `ClipUrlController.kt` for the actual lifecycle.
+     */
+    @Command
+    fun clip_url(invoke: Invoke) {
+        val args = try {
+            invoke.parseArgs(ClipUrlArgs::class.java)
+        } catch (e: Exception) {
+            invoke.reject(e.message ?: "Invalid clip_url args")
+            return
+        }
+        val controller = ClipUrlController(activity, args) { result ->
+            when (result) {
+                is ClipUrlResult.Success -> {
+                    val ret = JSObject()
+                    ret.put("html", result.html)
+                    invoke.resolve(ret)
+                }
+                is ClipUrlResult.Failure -> invoke.reject(result.message)
+            }
+        }
+        controller.show()
+    }
+}
+
+@app.tauri.annotation.InvokeArg
+class SyncPassphraseSetArgs {
+    lateinit var passphrase: String
 }
