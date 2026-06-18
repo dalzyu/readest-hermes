@@ -23,8 +23,8 @@ pnpm test:tauri            # Run Tauri integration tests
 
 # Linting & Formatting
 pnpm lint                  # Biome (linter) + tsgo (type check)
-pnpm format                # Prettier (runs from monorepo root)
-pnpm format:check          # Check formatting without writing
+pnpm format                # Biome formatter (runs from monorepo root)
+pnpm format:check          # Check formatting without writing (Biome)
 
 # Rust
 pnpm fmt:check             # Check formatting Rust code (src-tauri)
@@ -56,9 +56,26 @@ pnpm clippy:check          # Lint Rust code (src-tauri)
 
 Platform-specific code lives in `src-tauri/src/{macos,windows,android,ios}/`. Custom Tauri plugins are in `src-tauri/plugins/`.
 
+## Git Worktrees
+
+Always use `pnpm worktree:new <branch-name|pr-number>` to create worktrees. Never use `git worktree add` directly — the script handles submodule initialization (simplecc WASM, foliate-js), dependency installation, `.env` copying, vendor assets, and Tauri gen symlinks that are required for lint and tests to pass.
+
+```bash
+pnpm worktree:new feat/my-feature   # New branch from origin/main
+pnpm worktree:new 3837              # Checkout PR #3837 with push access to fork
+```
+
+## Agent Workspace
+
+Project-related agent context lives under `.agents/`, which is a symlink to `.claude/`. Treat `.agents/` as the canonical path when looking for or updating local agent material:
+
+- `.agents/memory/` — persistent project memory and recurring context
+- `.agents/plans/` — active or archived implementation plans
+- `.agents/rules/` — project rules for test-first work, TypeScript, verification, and related workflows
+
 ## Project Rules
 
-Rules are in `.claude/rules/`: test-first, typescript, verification.
+Rules are in `.agents/rules/`: test-first, typescript, verification.
 
 ### i18n
 
@@ -68,30 +85,18 @@ See [docs/i18n.md](docs/i18n.md) for the key-as-content translation approach, `s
 
 See [docs/safe-area-insets.md](docs/safe-area-insets.md) for rules on handling top/bottom insets for UI elements near screen edges.
 
-## Web Browsing & QA (gstack)
+### Design System
 
-For all web browsing, QA testing, and site interaction, use the `/browse` skill from gstack. **Never use `mcp__claude-in-chrome__*` tools directly.**
+UI/UX rules — surface tiers, action vocabulary, settings primitives (`BoxedList`, `SettingsRow`, `SettingsSwitchRow`, `SettingsSelect`, `NavigationRow`, `Tips`, etc.), boxed-list anatomy, RTL conventions, e-ink overlay, and anti-patterns — live in [DESIGN.md](DESIGN.md). Codify recurring decisions there so they persist for the team and future contributors. Reach for the primitives in `src/components/settings/primitives/` instead of inlining chassis classes.
 
-Available gstack skills:
+### E-ink mode
 
-- `/plan-ceo-review` — CEO/founder-mode plan review
-- `/plan-eng-review` — Eng manager-mode plan review
-- `/plan-design-review` — Designer's eye review of a live site
-- `/design-consultation` — Design system consultation
-- `/review` — Pre-landing PR review
-- `/ship` — Ship workflow (merge, test, review, bump, PR)
-- `/browse` — Fast headless browser for QA and site interaction
-- `/qa` — QA test and fix bugs
-- `/qa-only` — QA report only (no fixes)
-- `/qa-design-review` — Designer's eye QA with fixes
-- `/setup-browser-cookies` — Import cookies for authenticated testing
-- `/retro` — Weekly engineering retrospective
-- `/document-release` — Post-ship documentation update
+Every new UI widget must look right under `[data-eink='true']`. E-ink screens have no shadows, no gradients, slow refresh, and need crisp 1px borders for delineation. The conventions live in `src/styles/globals.css` — reuse the existing classes instead of inventing new ones:
 
-If gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
+- **Surfaces / inputs** — add `eink-bordered`. In eink mode it swaps to `bg-base-100` + 1px `base-content` border. Use it on inputs, custom button backgrounds, ghost-styled cancel buttons, and any container that needs a visible boundary.
+- **Primary action buttons** — add `btn-primary` (alongside whatever Tailwind classes you use for color themes). The `[data-eink] .btn-primary` rule inverts to `base-content` bg + `base-100` text so the primary CTA stays distinct from secondary actions.
+- **`.modal-box`** picks up no-shadow + 1px border automatically; dialogs that use it don't need additions.
+- **Don't rely on color/shadow alone for hierarchy.** Two same-tone buttons differ only by hover on color themes, and hover doesn't exist on e-ink touchscreens. Pair a borderless ghost (cancel) with a solid CTA (submit) so eink can invert one without flattening the difference.
 
-### Audio Sync Helper Release
+When in doubt, toggle E-ink in Settings → Misc and check. The rules in `globals.css` cover most cases automatically, but composite components (custom buttons, layered cards) often need `eink-bordered` on the right element to stay legible.
 
-> Scope: `apps/readest-app/src-tauri/audio_sync_helper/` runtime helper bundle.
->
-> Use `.github/workflows/audio-sync-helper-release.yml` to build the frozen helper, bundle `nltk_data/punkt_tab`, sign the binary with the existing Tauri signing key, and upload `{helper, helper.minisig, audio-sync-helper-manifest-<platform>.json}` assets to a GitHub release.
