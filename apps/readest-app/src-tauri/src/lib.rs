@@ -22,13 +22,15 @@ use tauri_plugin_fs::FsExt;
 
 #[cfg(desktop)]
 use tauri::{Listener, Url};
-mod audio_sync;
+mod clip_url;
 mod dir_scanner;
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 mod discord_rpc;
 #[cfg(target_os = "macos")]
 mod macos;
 mod transfer_file;
+#[cfg(target_os = "windows")]
+use tauri::webview::ScrollBarStyle;
 use tauri::{command, Emitter, WebviewUrl, WebviewWindowBuilder, Window};
 #[cfg(target_os = "android")]
 use tauri_plugin_native_bridge::register_select_directory_callback;
@@ -72,6 +74,57 @@ fn allow_dir_in_scopes(app: &AppHandle, dir: &PathBuf) {
     }
 }
 
+/// Frontend-callable shim around [`allow_file_in_scopes`] /
+/// [`allow_dir_in_scopes`]. Used after dialog-based file/folder pickers
+/// because the Tauri `dialog` plugin only auto-grants `fs_scope`, not
+/// `asset_protocol_scope` — and our importer relies on the asset
+/// protocol (`RemoteFile`) to read user-selected files. Without this,
+/// importing a book from e.g. `~/Downloads/...` fails with
+/// "asset protocol not configured to allow the path".
+///
+/// Granted scopes are persisted across app restarts thanks to
+/// `tauri_plugin_persisted_scope`, so re-picking the same file isn't
+/// required after the first allow call.
+///
+/// Security: this command refuses to extend `asset_protocol_scope` for
+/// any path that is not already allowed in `fs_scope`. The `fs_scope`
+/// is populated only by the Tauri `dialog` plugin (when the user picks
+/// through the OS picker) or by `tauri_plugin_persisted_scope` (which
+/// restores prior dialog grants on startup). That gate constrains the
+/// command to user-selected paths only — otherwise any frontend code
+/// (including a future XSS via book content, OPDS HTML, dictionary
+/// lookups, or a compromised dependency) could invoke it with an
+/// arbitrary path like `/` or `~/.ssh` and gain persistent read access
+/// to the entire user home directory via the asset protocol.
+#[command]
+fn allow_paths_in_scopes(_app: AppHandle, _paths: Vec<String>, _is_directory: bool) {
+    #[cfg(desktop)]
+    {
+        let fs_scope = _app.fs_scope();
+        for raw in _paths {
+            if raw.is_empty() {
+                continue;
+            }
+            let path = PathBuf::from(&raw);
+            if !fs_scope.is_allowed(&path) {
+                log::warn!("allow_paths_in_scopes refused (path not in fs_scope): {path:?}");
+                continue;
+            }
+            if _is_directory {
+                allow_dir_in_scopes(&_app, &path);
+            } else {
+                allow_file_in_scopes(&_app, vec![path]);
+            }
+        }
+    }
+    #[cfg(target_os = "android")]
+    {
+        // Android picker already routes through register_select_directory_callback
+        // for directories; files go through SAF / content-URIs and don't use
+        // asset_protocol_scope. Nothing to do here.
+    }
+}
+
 #[cfg(desktop)]
 fn get_files_from_argv(argv: Vec<String>) -> Vec<PathBuf> {
     let mut files = Vec::new();
@@ -110,10 +163,7 @@ fn set_window_open_with_files(app: &AppHandle, files: Vec<PathBuf>) {
         })
         .collect::<Vec<_>>()
         .join(",");
-    let Some(window) = app.get_webview_window("main") else {
-        log::warn!("Main window not ready when attempting to pass open-with files");
-        return;
-    };
+    let window = app.get_webview_window("main").unwrap();
     let script = format!("window.OPEN_WITH_FILES = [{files}];");
     if let Err(e) = window.eval(&script) {
         eprintln!("Failed to set open files variable: {e}");
@@ -170,25 +220,21 @@ pub fn run() {
             upload_file,
             get_environment_variable,
             get_executable_dir,
+            allow_paths_in_scopes,
             dir_scanner::read_dir,
-            audio_sync::commands::inspect_audio_metadata,
-            audio_sync::commands::import_audio_metadata,
-            audio_sync::commands::start_alignment_job,
-            audio_sync::commands::read_alignment_job_status,
-            audio_sync::commands::cancel_alignment_job,
-            audio_sync::runtime_manager::get_audio_sync_helper_status,
-            audio_sync::runtime_manager::install_audio_sync_helper,
-            audio_sync::runtime_manager::remove_audio_sync_helper,
             #[cfg(target_os = "macos")]
             macos::safari_auth::auth_with_safari,
             #[cfg(target_os = "macos")]
             macos::apple_auth::start_apple_sign_in,
             #[cfg(target_os = "macos")]
             macos::traffic_light::set_traffic_lights,
+            #[cfg(target_os = "macos")]
+            macos::system_dictionary::show_lookup_popover,
             #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
             discord_rpc::update_book_presence,
             #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
             discord_rpc::clear_book_presence,
+            clip_url::clip_url,
         ])
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
@@ -198,53 +244,25 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_sharekit::init())
+        .plugin(tauri_plugin_device_info::init())
+        .plugin(tauri_plugin_turso::init())
         .plugin(tauri_plugin_native_bridge::init())
-        .plugin(tauri_plugin_native_tts::init());
-
-    #[cfg(not(all(target_os = "windows", target_arch = "x86")))]
-    let builder = builder.plugin(tauri_plugin_device_info::init());
-
-    #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_turso::init());
+        .plugin(tauri_plugin_native_tts::init())
+        .plugin(tauri_plugin_webview_upgrade::init());
 
     #[cfg(desktop)]
     let builder = builder.plugin(
         tauri_plugin_single_instance::Builder::new()
             .callback(move |app, argv, cwd| {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_focus();
+                }
                 let files = get_files_from_argv(argv.clone());
                 if !files.is_empty() {
                     allow_file_in_scopes(app, files.clone());
                 }
-
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.set_focus();
-                    if let Err(error) =
-                        app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
-                    {
-                        log::warn!("Failed to emit single-instance payload: {error}");
-                    }
-                } else {
-                    log::warn!("Single-instance callback fired before main window was ready");
-                    let app_handle = app.clone();
-                    let deferred_files = if !files.is_empty() {
-                        Some(files.clone())
-                    } else {
-                        None
-                    };
-                    app.once("window-ready", move |_| {
-                        if let Some(files) = deferred_files {
-                            set_window_open_with_files(&app_handle, files);
-                        }
-                        if let Some(window) = app_handle.get_webview_window("main") {
-                            let _ = window.set_focus();
-                        }
-                        if let Err(error) = app_handle
-                            .emit("single-instance", SingleInstancePayload { args: argv, cwd })
-                        {
-                            log::warn!("Failed to emit deferred single-instance payload: {error}");
-                        }
-                    });
-                }
+                app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
+                    .unwrap();
             })
             .dbus_id("com.bilingify.readest".to_owned())
             .build(),
@@ -344,16 +362,16 @@ pub fn run() {
             let is_appimage = false;
 
             #[cfg(desktop)]
-            let updater_disabled = std::env::var("HERMES_DISABLE_UPDATER").is_ok();
+            let updater_disabled = std::env::var("READEST_DISABLE_UPDATER").is_ok();
             #[cfg(not(desktop))]
             let updater_disabled = false;
 
             let init_script = format!(
                 r#"
-                    if ({is_eink}) window.__HERMES_IS_EINK = true;
-                    if ({cli_access}) window.__HERMES_CLI_ACCESS = true;
-                    if ({is_appimage}) window.__HERMES_IS_APPIMAGE = true;
-                    if ({updater_disabled}) window.__HERMES_UPDATER_DISABLED = true;
+                    if ({is_eink}) window.__READEST_IS_EINK = true;
+                    if ({cli_access}) window.__READEST_CLI_ACCESS = true;
+                    if ({is_appimage}) window.__READEST_IS_APPIMAGE = true;
+                    if ({updater_disabled}) window.__READEST_UPDATER_DISABLED = true;
                     window.addEventListener('DOMContentLoaded', function() {{
                         document.documentElement.classList.add('edge-to-edge');
                         const isTauriLocal = window.location.protocol === 'tauri:' ||
@@ -415,7 +433,9 @@ pub fn run() {
                     true
                 });
 
-            #[cfg(desktop)]
+            #[cfg(target_os = "macos")]
+            let win_builder = win_builder.inner_size(1280.0, 800.0).resizable(true);
+            #[cfg(all(not(target_os = "macos"), desktop))]
             let win_builder = win_builder.inner_size(800.0, 600.0).resizable(true);
 
             #[cfg(target_os = "macos")]
@@ -430,11 +450,13 @@ pub fn run() {
                     .decorations(false)
                     .visible(false)
                     .shadow(true)
-                    .title("Hermes");
+                    .title("Readest");
 
                 #[cfg(target_os = "windows")]
                 {
-                    builder = builder.transparent(false);
+                    builder = builder
+                        .transparent(false)
+                        .scroll_bar_style(ScrollBarStyle::FluentOverlay);
                 }
                 #[cfg(target_os = "linux")]
                 {
@@ -446,9 +468,28 @@ pub fn run() {
                 builder
             };
 
-            win_builder.build().unwrap();
+            #[cfg(not(target_os = "macos"))]
+            {
+                win_builder.build().unwrap();
+            }
             // let win = win_builder.build().unwrap();
             // win.open_devtools();
+
+            #[cfg(target_os = "macos")]
+            {
+                let window = win_builder.build().unwrap();
+                // On macOS, closing a window (via Cmd+W or the red traffic light) should
+                // not quit the app — only Cmd+Q should. Hide the window instead so the
+                // app keeps running in the dock, and restore it when the user reopens
+                // the app from the dock.
+                let window_for_close = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window_for_close.hide();
+                    }
+                });
+            }
 
             #[cfg(target_os = "macos")]
             macos::menu::setup_macos_menu(app.handle())?;
@@ -463,18 +504,34 @@ pub fn run() {
             #[allow(unused_variables)]
             |app_handle, event| {
                 #[cfg(target_os = "macos")]
-                if let tauri::RunEvent::Opened { urls } = event {
-                    let files = urls
-                        .into_iter()
-                        .filter_map(|url| url.to_file_path().ok())
-                        .collect::<Vec<_>>();
+                match event {
+                    tauri::RunEvent::Opened { urls } => {
+                        let files = urls
+                            .into_iter()
+                            .filter_map(|url| url.to_file_path().ok())
+                            .collect::<Vec<_>>();
 
-                    let app_handler_clone = app_handle.clone();
-                    allow_file_in_scopes(app_handle, files.clone());
-                    app_handle.listen("window-ready", move |_| {
-                        println!("Window is ready, proceeding to handle files.");
-                        set_window_open_with_files(&app_handler_clone, files.clone());
-                    });
+                        let app_handler_clone = app_handle.clone();
+                        allow_file_in_scopes(app_handle, files.clone());
+                        app_handle.listen("window-ready", move |_| {
+                            println!("Window is ready, proceeding to handle files.");
+                            set_window_open_with_files(&app_handler_clone, files.clone());
+                        });
+                    }
+                    // When the user reopens the app from the dock after closing all
+                    // windows, re-show the main window instead of leaving the dock
+                    // icon inert.
+                    tauri::RunEvent::Reopen {
+                        has_visible_windows: false,
+                        ..
+                    } => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = window.unminimize();
+                        }
+                    }
+                    _ => {}
                 }
             },
         );

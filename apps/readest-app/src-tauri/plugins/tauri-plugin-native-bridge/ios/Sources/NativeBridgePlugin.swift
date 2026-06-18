@@ -43,6 +43,8 @@ class SetSystemUIVisibilityRequestArgs: Decodable {
 class InterceptKeysRequestArgs: Decodable {
   let backKey: Bool?
   let volumeKeys: Bool?
+  let pageTurnerKeys: Bool?
+  let learnMode: Bool?
 }
 
 class LockScreenOrientationRequestArgs: Decodable {
@@ -188,6 +190,44 @@ class VolumeKeyHandler: NSObject {
       }
       self.previousVolume = currentVolume
       self.setSessionVolume(self.referenceVolume)
+    }
+  }
+}
+
+class MediaKeyHandler {
+  private weak var webView: WKWebView?
+  private var registered = false
+  private let commandCenter = MPRemoteCommandCenter.shared()
+
+  func start(webView: WKWebView) {
+    self.webView = webView
+    if registered { return }
+    registered = true
+    commandCenter.nextTrackCommand.isEnabled = true
+    commandCenter.previousTrackCommand.isEnabled = true
+    commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+      self?.forward("MediaNext")
+      return .success
+    }
+    commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+      self?.forward("MediaPrevious")
+      return .success
+    }
+    logger.log("MediaKeyHandler: started")
+  }
+
+  func stop() {
+    if !registered { return }
+    registered = false
+    commandCenter.nextTrackCommand.removeTarget(nil)
+    commandCenter.previousTrackCommand.removeTarget(nil)
+    logger.log("MediaKeyHandler: stopped")
+  }
+
+  private func forward(_ name: String) {
+    DispatchQueue.main.async { [weak self] in
+      self?.webView?.evaluateJavaScript(
+        "try { window.onNativeKeyDown('\(name)', 0); } catch (_) {}", completionHandler: nil)
     }
   }
 }
@@ -423,14 +463,27 @@ class NativeBridgePlugin: Plugin {
   private var currentOrientationMask: UIInterfaceOrientationMask = .all
   private var originalDelegate: UIApplicationDelegate?
   private var webViewLifecycleManager: WebViewLifecycleManager?
+  private var traitChangeRegistered = false
 
   @objc public override func load(webview: WKWebView) {
     self.webView = webview
     logger.log("NativeBridgePlugin loaded")
 
+    // Suppress the iOS system text-selection edit menu so it never
+    // covers Readest's annotation toolbar. See ContextMenuSuppressor.
+    ContextMenuSuppressor.installIfNeeded()
+
     webViewLifecycleManager = WebViewLifecycleManager()
     webViewLifecycleManager?.startMonitoring(webView: webview)
     logger.log("NativeBridgePlugin: WebView lifecycle monitoring activated")
+
+    // The WKWebView never fires the `prefers-color-scheme` media query
+    // `change` event while the app stays foregrounded, so observe the
+    // native appearance and push changes to JS instead. Registration is
+    // deferred because the window scene may not be connected yet.
+    DispatchQueue.main.async { [weak self] in
+      self?.registerTraitChangeObserverIfNeeded()
+    }
 
     NotificationCenter.default.addObserver(
       self,
@@ -470,6 +523,48 @@ class NativeBridgePlugin: Plugin {
     if volumeKeyHandler != nil {
       activateVolumeKeyInterception()
     }
+    registerTraitChangeObserverIfNeeded()
+    // Fallback for iOS < 17 (no `registerForTraitChanges`): re-check the
+    // appearance whenever the app becomes active, e.g. after toggling
+    // dark mode from Control Center.
+    notifyColorSchemeChange()
+  }
+
+  // Resolves the foreground window scene. Its trait collection reflects
+  // the real system appearance and is unaffected by the per-window
+  // `overrideUserInterfaceStyle` that `set_system_ui_visibility` applies.
+  private func foregroundWindowScene() -> UIWindowScene? {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    return scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+  }
+
+  private func systemColorScheme() -> String {
+    let userInterfaceStyle =
+      foregroundWindowScene()?.traitCollection.userInterfaceStyle
+      ?? UITraitCollection.current.userInterfaceStyle
+    return (userInterfaceStyle == .dark) ? "dark" : "light"
+  }
+
+  private func registerTraitChangeObserverIfNeeded() {
+    guard !traitChangeRegistered, #available(iOS 17.0, *) else { return }
+    guard let windowScene = foregroundWindowScene() else { return }
+    traitChangeRegistered = true
+    MainActor.assumeIsolated {
+      windowScene.registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
+        [weak self] (_: UIWindowScene, _: UITraitCollection) in
+        self?.notifyColorSchemeChange()
+      }
+    }
+  }
+
+  private func notifyColorSchemeChange() {
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self, let webView = self.webView else { return }
+      let colorScheme = self.systemColorScheme()
+      webView.evaluateJavaScript(
+        "try { window.onNativeColorSchemeChange && window.onNativeColorSchemeChange('\(colorScheme)'); } catch (_) {}",
+        completionHandler: nil)
+    }
   }
 
   @objc func appDidEnterBackground() {
@@ -503,6 +598,8 @@ class NativeBridgePlugin: Plugin {
   private struct AssociatedKeys {
     static var volumeKeyHandler = "volumeKeyHandler"
     static var interceptingVolumeKeys = "interceptingVolumeKeys"
+    static var mediaKeyHandler = "mediaKeyHandler"
+    static var mediaKeyState = "mediaKeyState"
   }
 
   private var volumeKeyHandler: VolumeKeyHandler? {
@@ -523,6 +620,44 @@ class NativeBridgePlugin: Plugin {
     set {
       objc_setAssociatedObject(
         self, &AssociatedKeys.interceptingVolumeKeys, newValue, .OBJC_ASSOCIATION_RETAIN)
+    }
+  }
+
+  private var mediaKeyHandler: MediaKeyHandler? {
+    get {
+      return objc_getAssociatedObject(self, &AssociatedKeys.mediaKeyHandler) as? MediaKeyHandler
+    }
+    set {
+      objc_setAssociatedObject(
+        self, &AssociatedKeys.mediaKeyHandler, newValue, .OBJC_ASSOCIATION_RETAIN)
+    }
+  }
+
+  // Bit 0 = pageTurnerKeys interception, bit 1 = learn mode.
+  private var mediaKeyState: Int {
+    get {
+      return objc_getAssociatedObject(self, &AssociatedKeys.mediaKeyState) as? Int ?? 0
+    }
+    set {
+      objc_setAssociatedObject(
+        self, &AssociatedKeys.mediaKeyState, newValue, .OBJC_ASSOCIATION_RETAIN)
+    }
+  }
+
+  private func updateMediaKeyHandler() {
+    let shouldRun = mediaKeyState != 0
+    if shouldRun {
+      if mediaKeyHandler == nil {
+        mediaKeyHandler = MediaKeyHandler()
+      }
+      if let webView = self.webView {
+        mediaKeyHandler?.start(webView: webView)
+      } else {
+        logger.warning("Cannot start media key handler: webView is nil")
+      }
+    } else {
+      mediaKeyHandler?.stop()
+      mediaKeyHandler = nil
     }
   }
 
@@ -550,10 +685,8 @@ class NativeBridgePlugin: Plugin {
     let args = try invoke.parseArgs(SafariAuthRequestArgs.self)
     let authUrl = URL(string: args.authUrl)!
 
-    authSession = ASWebAuthenticationSession(
-      url: authUrl,
-      callbackURLScheme: "hermes",
-    ) { [weak self] callbackURL, error in
+    authSession = ASWebAuthenticationSession(url: authUrl, callbackURLScheme: "readest") {
+      [weak self] callbackURL, error in
       guard let strongSelf = self else { return }
 
       if let error = error {
@@ -635,6 +768,19 @@ class NativeBridgePlugin: Plugin {
           }
         }
       }
+
+      if let pageTurnerKeys = args.pageTurnerKeys {
+        mediaKeyState = pageTurnerKeys ? (mediaKeyState | 1) : (mediaKeyState & ~1)
+      }
+      if let learnMode = args.learnMode {
+        mediaKeyState = learnMode ? (mediaKeyState | 2) : (mediaKeyState & ~2)
+      }
+      if args.pageTurnerKeys != nil || args.learnMode != nil {
+        DispatchQueue.main.async { [weak self] in
+          self?.updateMediaKeyHandler()
+        }
+      }
+
       invoke.resolve()
     } catch {
       invoke.reject(error.localizedDescription)
@@ -796,9 +942,9 @@ class NativeBridgePlugin: Plugin {
   }
 
   @objc public func get_system_color_scheme(_ invoke: Invoke) {
-    let userInterfaceStyle = UITraitCollection.current.userInterfaceStyle
-    let colorScheme = (userInterfaceStyle == .dark) ? "dark" : "light"
-    invoke.resolve(["colorScheme": colorScheme])
+    DispatchQueue.main.async { [weak self] in
+      invoke.resolve(["colorScheme": self?.systemColorScheme() ?? "light"])
+    }
   }
 
   @objc public func get_screen_brightness(_ invoke: Invoke) {
@@ -923,6 +1069,235 @@ class NativeBridgePlugin: Plugin {
       }
     }
   }
+
+  // ── Sync passphrase keychain ──────────────────────────────────────────
+  // Backed by the iOS Security framework Keychain. The TS-side
+  // CryptoSession reads/writes via these commands so the user's sync
+  // passphrase persists across app launches.
+
+  private static let syncKeychainService = "com.bilingify.readest.sync-passphrase"
+  private static let syncKeychainAccount = "default"
+
+  private func syncKeychainBaseQuery() -> [String: Any] {
+    return [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: NativeBridgePlugin.syncKeychainService,
+      kSecAttrAccount as String: NativeBridgePlugin.syncKeychainAccount
+    ]
+  }
+
+  @objc public func set_sync_passphrase(_ invoke: Invoke) {
+    do {
+      let args = try invoke.parseArgs(SyncPassphraseSetArgs.self)
+      guard let data = args.passphrase.data(using: .utf8) else {
+        invoke.resolve(["success": false, "error": "encoding"])
+        return
+      }
+      var query = syncKeychainBaseQuery()
+      query[kSecValueData as String] = data
+      // Replace any existing entry. Delete-then-add keeps the
+      // accessibility class consistent across SDK versions.
+      SecItemDelete(query as CFDictionary)
+      let status = SecItemAdd(query as CFDictionary, nil)
+      if status == errSecSuccess {
+        invoke.resolve(["success": true])
+      } else {
+        invoke.resolve(["success": false, "error": "OSStatus \(status)"])
+      }
+    } catch {
+      invoke.resolve(["success": false, "error": "\(error)"])
+    }
+  }
+
+  @objc public func get_sync_passphrase(_ invoke: Invoke) {
+    var query = syncKeychainBaseQuery()
+    query[kSecReturnData as String] = true
+    query[kSecMatchLimit as String] = kSecMatchLimitOne
+    var item: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &item)
+    if status == errSecSuccess, let data = item as? Data, let s = String(data: data, encoding: .utf8) {
+      invoke.resolve(["passphrase": s])
+    } else if status == errSecItemNotFound {
+      // No entry: empty response. The TS layer treats this as "prompt".
+      invoke.resolve([:])
+    } else {
+      invoke.resolve(["error": "OSStatus \(status)"])
+    }
+  }
+
+  @objc public func clear_sync_passphrase(_ invoke: Invoke) {
+    let status = SecItemDelete(syncKeychainBaseQuery() as CFDictionary)
+    if status == errSecSuccess || status == errSecItemNotFound {
+      invoke.resolve(["success": true])
+    } else {
+      invoke.resolve(["success": false, "error": "OSStatus \(status)"])
+    }
+  }
+
+  @objc public func is_sync_keychain_available(_ invoke: Invoke) {
+    // The Keychain is always available on iOS; report true and let the
+    // TS layer trust it. We probe SecItemCopyMatching anyway so a
+    // future sandbox restriction surfaces an explicit error.
+    var query = syncKeychainBaseQuery()
+    query[kSecMatchLimit as String] = kSecMatchLimitOne
+    let status = SecItemCopyMatching(query as CFDictionary, nil)
+    if status == errSecSuccess || status == errSecItemNotFound {
+      invoke.resolve(["available": true])
+    } else {
+      invoke.resolve(["available": false, "error": "OSStatus \(status)"])
+    }
+  }
+
+  @objc public func show_lookup_popover(_ invoke: Invoke) {
+    // Bridge for the system-dictionary "Look Up" surface on iOS.
+    // We use `UIReferenceLibraryViewController`, which is the same
+    // view UIKit presents for the Look Up callout in editable text
+    // views. Two notes:
+    //
+    //   * The controller refuses to render and `dictionaryHasDefinitionForTerm`
+    //     returns false for empty strings, so guard for that explicitly
+    //     to keep the rejection path consistent with the Rust models.
+    //   * Presentation must happen on the main thread, against a
+    //     view controller that's actually in the active window
+    //     hierarchy. We reach the foreground scene (matching how
+    //     other commands here pick a `keyWindow`) and walk down to
+    //     the topmost presented controller so the lookup view sits
+    //     above any modal sheet (settings, notebook, etc.) the user
+    //     might have open when they tap "dictionary".
+    guard let args = try? invoke.parseArgs(ShowLookupPopoverArgs.self) else {
+      return invoke.reject("Failed to parse arguments")
+    }
+    let trimmed = args.word.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty {
+      return invoke.reject("empty word")
+    }
+
+    DispatchQueue.main.async {
+      let windows = UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .flatMap { $0.windows }
+      let keyWindow = windows.first(where: { $0.isKeyWindow }) ?? windows.first
+      guard let rootVC = keyWindow?.rootViewController else {
+        invoke.reject("no root view controller")
+        return
+      }
+      // Drill past any modally-presented stack so the dictionary
+      // view appears on top of (not behind) settings dialogs etc.
+      var presenter: UIViewController = rootVC
+      while let next = presenter.presentedViewController {
+        presenter = next
+      }
+
+      // `UIReferenceLibraryViewController` itself doesn't expose
+      // dictionary availability, but the static
+      // `dictionaryHasDefinitionForTerm:` does. We don't surface
+      // "no definition" as an error — Apple's view shows its own
+      // "No definition found" / download UI in that case, which is
+      // the expected UX. Logging it is enough for diagnostics.
+      let hasDefinition = UIReferenceLibraryViewController.dictionaryHasDefinition(forTerm: trimmed)
+      if !hasDefinition {
+        logger.log("[show_lookup_popover] no built-in dictionary entry for '\(trimmed, privacy: .private)'")
+      }
+
+      let dictVC = UIReferenceLibraryViewController(term: trimmed)
+      // Constrain the lookup to the lower half of the screen so the
+      // book content the user just selected from stays visible above
+      // it — the full-screen default feels heavyweight for a quick
+      // dictionary glance. On iOS 15+ we use a half-detent sheet
+      // presentation: medium height by default, but the user can
+      // drag-to-expand to full if they want more room. iPad keeps
+      // the form sheet (a native floating panel) since half-screen
+      // sheets look out of place on tablet-class screens.
+      if UIDevice.current.userInterfaceIdiom == .pad {
+        dictVC.modalPresentationStyle = .formSheet
+      } else if #available(iOS 15.0, *) {
+        dictVC.modalPresentationStyle = .pageSheet
+        if let sheet = dictVC.sheetPresentationController {
+          sheet.detents = [.medium(), .large()]
+          // Default to medium (lower half). The system handles drag
+          // to expand to large; we don't need to track changes.
+          sheet.selectedDetentIdentifier = .medium
+          // Keep the grabber visible so users discover they can
+          // expand or drag down to dismiss.
+          sheet.prefersGrabberVisible = true
+          // Round only the top corners (the standard iOS sheet look).
+          sheet.preferredCornerRadius = 16
+        }
+      } else {
+        // iOS 14 and earlier — sheets/detents API doesn't exist; fall
+        // back to a centered form sheet so it at least doesn't take
+        // the full screen.
+        dictVC.modalPresentationStyle = .formSheet
+      }
+      presenter.present(dictVC, animated: true) {
+        invoke.resolve(["success": true])
+      }
+    }
+  }
+
+  /// Open a hidden-but-visible WKWebView at `url`, capture
+  /// `document.documentElement.outerHTML` after the page settles, and
+  /// resolve with `{ html }`. Implements the mobile half of the
+  /// `clip_url` command — see `clip_url.rs` for the desktop half and
+  /// `ClipUrlController.swift` for the actual lifecycle.
+  @objc public func clip_url(_ invoke: Invoke) {
+    let args: ClipUrlArgs
+    do {
+      args = try invoke.parseArgs(ClipUrlArgs.self)
+    } catch {
+      invoke.reject(error.localizedDescription)
+      return
+    }
+    DispatchQueue.main.async {
+      // Find the topmost view controller to present from. The Tauri
+      // root WKWebView lives in the app's key window — present over
+      // whatever's currently on top of it (e.g., the library page,
+      // a settings sheet) so the user keeps their place after the
+      // controller dismisses.
+      guard let presenter = topmostViewController() else {
+        invoke.reject("Could not find a view controller to present from")
+        return
+      }
+
+      let controller = ClipUrlController(args: args) { result in
+        switch result {
+        case .success(let html):
+          invoke.resolve(["html": html])
+        case .failure(let err):
+          invoke.reject(err.message)
+        }
+      }
+      presenter.present(controller, animated: true)
+    }
+  }
+}
+
+/// Find the visible top-of-stack `UIViewController` so the clip flow
+/// can present over whatever the user is looking at. Walks
+/// presentedViewController chains and unwraps standard container
+/// types (UINavigationController, UITabBarController).
+private func topmostViewController() -> UIViewController? {
+  let scene =
+    UIApplication.shared.connectedScenes
+    .compactMap { $0 as? UIWindowScene }
+    .first { $0.activationState == .foregroundActive }
+    ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+  let window = scene?.windows.first(where: \.isKeyWindow) ?? scene?.windows.first
+  var top = window?.rootViewController
+  while let presented = top?.presentedViewController {
+    top = presented
+  }
+  if let nav = top as? UINavigationController { top = nav.visibleViewController ?? nav }
+  if let tab = top as? UITabBarController { top = tab.selectedViewController ?? tab }
+  return top
+}
+
+class SyncPassphraseSetArgs: Decodable {
+  let passphrase: String
+}
+
+class ShowLookupPopoverArgs: Decodable {
+  let word: String
 }
 
 @_cdecl("init_plugin_native_bridge")
