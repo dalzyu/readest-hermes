@@ -42,8 +42,9 @@ export function Navigation({
   const viewSettings = settings.globalViewSettings;
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const { isTrafficLightVisible } = useTrafficLight();
+  const { isTrafficLightVisible } = useTrafficLight(headerRef);
 
   useEffect(() => {
     setSearchQuery(searchTerm || '');
@@ -77,6 +78,7 @@ export function Navigation({
 
   return (
     <header
+      ref={headerRef}
       className={clsx(
         'navbar min-h-0 px-2',
         'flex h-[48px] w-full items-center',
