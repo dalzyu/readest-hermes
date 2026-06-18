@@ -169,13 +169,24 @@ export const useCustomOPDSStore = create<OPDSStoreState>((set, get) => ({
     set((state) => {
       const idx = state.catalogs.findIndex((c) => c.contentId === catalog.contentId);
       if (idx >= 0) {
-        // Preserve local-only fields (username/password — not yet in the
-        // synced field set) when overlaying a remote update.
+        // Preserve local credentials when remote arrives without them
+        // (publishing device hadn't unlocked the CryptoSession, or the
+        // local session couldn't decrypt). When remote DOES include
+        // decrypted creds, accept them — that's the cross-device sync
+        // path enabled by replicaCryptoMiddleware.decryptRowFields.
+        // `??` is nullish so an explicit "" from remote (user cleared
+        // the password) still overwrites.
         const old = state.catalogs[idx]!;
         const merged: OPDSCatalog = {
           ...catalog,
-          username: old.username,
-          password: old.password,
+          username: catalog.username ?? old.username,
+          password: catalog.password ?? old.password,
+          // Preserve the previously-applied cipher fingerprint when
+          // the orchestrator didn't attach a fresh one (e.g., row
+          // carried no cipher fields, or every decrypt failed).
+          // Without this fallback the next pull would treat the row
+          // as "never decrypted" and prompt again unnecessarily.
+          lastSeenCipher: catalog.lastSeenCipher ?? old.lastSeenCipher,
           deletedAt: undefined,
         };
         return { catalogs: state.catalogs.map((c, i) => (i === idx ? merged : c)) };
