@@ -75,3 +75,9 @@ apps/readest-app/src-tauri/audio_sync_helper/build/
 apps/readest-app/src-tauri/audio_sync_helper/dist/
 apps/readest-app/src-tauri/audio_sync_helper/*.spec
 .cache/
+
+# Plans and review artifacts
+plans/
+artifacts/
+code_review_report.md
+*.diff
