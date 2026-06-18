@@ -6,25 +6,36 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useReaderStore } from '@/store/readerStore';
 import { BookNote, BooknoteGroup, NoteExportConfig } from '@/types/book';
 import { DEFAULT_NOTE_EXPORT_CONFIG } from '@/services/constants';
-import { DEFAULT_NOTE_EXPORT_TEMPLATE, NOTE_EXPORT_PRESETS } from '@/utils/noteExportTemplates';
 import { saveViewSettings } from '@/helpers/settings';
 import { renderNoteTemplate, formatBlockQuote } from '@/utils/note';
+import {
+  AnnotationLinkType,
+  buildAnnotationAppUrl,
+  buildAnnotationUrl,
+  buildAnnotationWebUrl,
+} from '@/utils/deeplink';
 import Dialog from '@/components/Dialog';
 
 interface ExportMarkdownDialogProps {
   bookKey: string;
   isOpen: boolean;
+  bookHash: string;
   bookTitle: string;
   bookAuthor: string;
   booknotes: BookNote[];
   booknoteGroups: { [href: string]: BooknoteGroup };
   onCancel: () => void;
-  onExport: (markdown: string) => void;
+  onExport: (
+    markdown: string,
+    isPlainText: boolean,
+    sharePosition?: { x: number; y: number; preferredEdge?: 'top' | 'bottom' | 'left' | 'right' },
+  ) => void;
 }
 
 const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
   bookKey,
   isOpen,
+  bookHash,
   bookTitle,
   bookAuthor,
   booknotes,
@@ -36,36 +47,51 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
   const { envConfig } = useEnv();
   const { getViewSettings } = useReaderStore();
   const viewSettings = getViewSettings(bookKey);
-  const defaultTemplate = DEFAULT_NOTE_EXPORT_TEMPLATE;
+
+  const defaultTemplate = `## {{ title }}
+**${_('Author')}**: {{ author }}
+
+**${_('Exported from Readest')}**: {{ exportDate | date('%Y-%m-%d') }}
+
+---
+
+### ${_('Highlights & Annotations')}
+
+{% for chapter in chapters %}
+#### {{ chapter.title }}
+{% for annotation in chapter.annotations %}
+{% if annotation.color == 'yellow' %}
+- {{ annotation.text }}
+{% elif annotation.color == 'red' %}
+- ❗ {{ annotation.text }}
+{% elif annotation.color == 'green' %}
+- ✅ {{ annotation.text }}
+{% elif annotation.color == 'blue' %}
+- 💡 {{ annotation.text }}
+{% elif annotation.color == 'violet' %}
+- ✨ {{ annotation.text }}
+{% else %}
+- {{ annotation.text }}
+{% endif %}
+{% if annotation.note %}
+**${_('Note:')}** {{ annotation.note }}
+{% endif %}
+*{% if annotation.link %}[${_('Page:')} {{ annotation.page }}]({{ annotation.link }}){% else %}${_('Page:')} {{ annotation.page }}{% endif %} · ${_('Time:')} {{ annotation.timestamp | date('%Y-%m-%d %H:%M') }}*
+{% endfor %}
+
+---
+{% endfor %}`;
 
   const [exportConfig, setExportConfig] = useState<NoteExportConfig>(() => {
     const noteExportConfig = viewSettings?.noteExportConfig || DEFAULT_NOTE_EXPORT_CONFIG;
-    if (!noteExportConfig.customTemplate) {
-      return {
-        ...noteExportConfig,
-        customTemplate: defaultTemplate,
-      };
-    }
-    return noteExportConfig;
+    return {
+      ...noteExportConfig,
+      // Configs persisted before link types existed fall back to the
+      // platform-aware default (app in the native app, web on the web).
+      linkType: noteExportConfig.linkType ?? DEFAULT_NOTE_EXPORT_CONFIG.linkType,
+      customTemplate: noteExportConfig.customTemplate || defaultTemplate,
+    };
   });
-
-  const selectedPresetId = useMemo(() => {
-    const preset = NOTE_EXPORT_PRESETS.find(
-      (item) => item.template === exportConfig.customTemplate,
-    );
-    return preset?.id ?? '';
-  }, [exportConfig.customTemplate]);
-
-  const handlePresetChange = (presetId: string) => {
-    const preset = NOTE_EXPORT_PRESETS.find((item) => item.id === presetId);
-    if (!preset) return;
-
-    setExportConfig({
-      ...exportConfig,
-      useCustomTemplate: true,
-      customTemplate: preset.template,
-    });
-  };
 
   const [showSource, setShowSource] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -109,6 +135,15 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
           title: group.label || _('Untitled'),
           annotations: group.booknotes.map((note) => ({
             ...note,
+            id: note.id,
+            cfi: note.cfi,
+            bookHash,
+            link: buildAnnotationUrl(
+              { bookHash, noteId: note.id, cfi: note.cfi },
+              exportConfig.linkType,
+            ),
+            webLink: buildAnnotationWebUrl({ bookHash, noteId: note.id, cfi: note.cfi }),
+            appLink: buildAnnotationAppUrl({ bookHash, noteId: note.id, cfi: note.cfi }),
             text: note.text || '',
             note: note.note || '',
             style: note.style,
@@ -139,7 +174,7 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
 
       // Add export date
       if (exportConfig.includeDate) {
-        lines.push(`**${_('Exported from Hermes')}**: ${new Date().toISOString().slice(0, 10)}`);
+        lines.push(`**${_('Exported from Readest')}**: ${new Date().toISOString().slice(0, 10)}`);
         lines.push('');
       }
 
@@ -172,17 +207,26 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
 
           let pageStr = '';
           if (exportConfig.includePageNumber && note.page) {
-            pageStr = `${_('Page: {{number}}', { number: note.page })}`;
+            const pageText = _('Page: {{number}}', { number: note.page });
+            if (bookHash && note.id) {
+              const url = buildAnnotationUrl(
+                { bookHash, noteId: note.id, cfi: note.cfi },
+                exportConfig.linkType,
+              );
+              pageStr = `[${pageText}](${url})`;
+            } else {
+              pageStr = pageText;
+            }
           }
           let timestampStr = '';
           if (exportConfig.includeTimestamp && note.updatedAt) {
             const timestamp = new Date(note.updatedAt).toLocaleString();
             timestampStr = `${_('Time:')} ${timestamp}`;
           }
-          if (pageStr || timestampStr) {
+          const infoParts = [pageStr, timestampStr].filter(Boolean);
+          if (infoParts.length > 0) {
             lines.push('');
-            const infoStr = pageStr ? `${pageStr} · ${timestampStr}`.trim() : timestampStr;
-            lines.push(`*${infoStr}*`);
+            lines.push(`*${infoParts.join(' · ')}*`);
           }
 
           lines.push(exportConfig.noteSeparator);
@@ -203,12 +247,13 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
     }
 
     return output;
-  }, [exportConfig, booknoteGroups, bookTitle, bookAuthor, _]);
+  }, [exportConfig, booknoteGroups, bookTitle, bookAuthor, bookHash, _]);
 
   // Convert markdown to HTML for preview
   const htmlPreview = useMemo(() => {
     if (!markdownPreview) return '';
-    return marked.parse(markdownPreview);
+    const html = marked.parse(markdownPreview) as string;
+    return html.replace(/<a href=/g, '<a target="_blank" rel="noopener noreferrer" href=');
   }, [markdownPreview]);
 
   const handleToggle = (field: keyof NoteExportConfig) => {
@@ -218,8 +263,19 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
     }));
   };
 
-  const handleExport = () => {
-    onExport(markdownPreview);
+  const handleExport = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Anchor the macOS / iPad share sheet to the Export button rect so
+    // NSSharingServicePicker doesn't fall back to the WebView's top-left.
+    // `preferredEdge: 'bottom'` maps to NSMinYEdge — in the flipped WKWebView
+    // coord space that's the rect's top edge, so the popover appears above
+    // the button regardless of whether there is room below it.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const sharePosition = {
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+      preferredEdge: 'bottom' as const,
+    };
+    onExport(markdownPreview, !!exportConfig.exportAsPlainText, sharePosition);
   };
 
   return (
@@ -340,6 +396,23 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
               <span className='text-sm'>{_('Note Date')}</span>
             </label>
           </div>
+
+          <div className='flex items-center justify-between gap-3'>
+            <span className='text-sm'>{_('Annotation Link')}</span>
+            <select
+              value={exportConfig.linkType}
+              onChange={(e) =>
+                setExportConfig((prev) => ({
+                  ...prev,
+                  linkType: e.target.value as AnnotationLinkType,
+                }))
+              }
+              className='select select-bordered select-sm eink-bordered'
+            >
+              <option value='app'>{_('App Link')}</option>
+              <option value='web'>{_('Web Link')}</option>
+            </select>
+          </div>
         </div>
 
         {/* Advanced Options */}
@@ -369,32 +442,12 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
               {exportConfig.useCustomTemplate && (
                 <>
                   <div className='space-y-2'>
-                    <div className='space-y-2'>
-                      <label className='text-sm font-medium'>{_('Template Preset')}</label>
-                      <select
-                        className='select select-bordered select-sm w-full'
-                        value={selectedPresetId}
-                        onChange={(e) => handlePresetChange(e.target.value)}
-                      >
-                        <option value=''>{_('Custom')}</option>
-                        <option value='obsidian'>{_('Obsidian Markdown')}</option>
-                        <option value='notion'>{_('Notion Markdown')}</option>
-                        <option value='study-notes'>{_('Study Notes')}</option>
-                      </select>
-                    </div>
-
                     <div className='flex items-center justify-between'>
                       <label className='text-sm font-medium'>{_('Export Template')}</label>
                       <button
-                        onClick={() => {
-                          const activePreset = NOTE_EXPORT_PRESETS.find(
-                            (p) => p.id === selectedPresetId,
-                          );
-                          setExportConfig({
-                            ...exportConfig,
-                            customTemplate: activePreset?.template ?? defaultTemplate,
-                          });
-                        }}
+                        onClick={() =>
+                          setExportConfig({ ...exportConfig, customTemplate: defaultTemplate })
+                        }
                         className='text-sm text-blue-500 hover:underline'
                       >
                         {_('Reset Template')}
@@ -495,6 +548,18 @@ const ExportMarkdownDialog: React.FC<ExportMarkdownDialogProps> = ({
                         <li className='ml-8'>
                           <code className='bg-base-300 rounded px-1'>annotation.timestamp</code> -{' '}
                           {_('Annotation time')}
+                        </li>
+                        <li className='ml-8'>
+                          <code className='bg-base-300 rounded px-1'>annotation.link</code> -{' '}
+                          {_('Annotation link (follows the selected Link Type)')}
+                        </li>
+                        <li className='ml-8'>
+                          <code className='bg-base-300 rounded px-1'>annotation.appLink</code> -{' '}
+                          {_('App deeplink (readest://)')}
+                        </li>
+                        <li className='ml-8'>
+                          <code className='bg-base-300 rounded px-1'>annotation.webLink</code> -{' '}
+                          {_('Universal web link (https://)')}
                         </li>
                       </ul>
                     </div>
