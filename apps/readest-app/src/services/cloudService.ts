@@ -9,30 +9,59 @@ import {
 import {
   downloadFile,
   uploadFile,
+  uploadReplicaFile,
   deleteFile as deleteCloudFile,
   createProgressHandler,
   batchGetDownloadUrls,
 } from '@/libs/storage';
 import { ClosableFile } from '@/utils/file';
 import { ProgressHandler } from '@/utils/transfer';
-import { CLOUD_BOOKS_SUBDIR } from './constants';
+import { CLOUD_BOOKS_SUBDIR, CLOUD_REPLICAS_SUBDIR } from './constants';
+import { isBookFileContentSource, resolveBookContentSource } from './bookContent';
 
 export async function deleteBook(
   fs: FileSystem,
   book: Book,
   deleteAction: DeleteAction,
 ): Promise<void> {
-  if (deleteAction === 'local' || deleteAction === 'both') {
-    const localDeleteFps =
-      deleteAction === 'local'
-        ? [getLocalBookFilename(book)]
-        : [getLocalBookFilename(book), getCoverFilename(book)];
-    for (const fp of localDeleteFps) {
-      if (await fs.exists(fp, 'Books')) {
-        await fs.removeFile(fp, 'Books');
+  if (deleteAction === 'local' || deleteAction === 'both' || deleteAction === 'purge') {
+    const source = await resolveBookContentSource(fs, book);
+    if (source.kind === 'external') {
+      try {
+        if (await fs.exists(source.path, source.base)) {
+          await fs.removeFile(source.path, source.base);
+        }
+      } catch (error) {
+        // Best effort: a missing/permission-denied source shouldn't block
+        // the metadata-side bookkeeping that follows.
+        console.log('Failed to remove in-place source file:', error);
+      }
+    } else if (source.kind === 'managed' && deleteAction !== 'purge') {
+      // Purge wipes the whole directory below, so skip the per-file removal.
+      if (await fs.exists(source.path, source.base)) {
+        await fs.removeFile(source.path, source.base);
       }
     }
-    if (deleteAction === 'local') {
+
+    // Purge erases the entire app-generated Books/<hash>/ directory — the
+    // managed book file, cover.png, and (the reason for issue #4615)
+    // config.json (reading progress, notes, bookmarks) + nav.json that the
+    // other delete actions leave behind. For in-place books the external
+    // source file was already removed above; this clears the sidecar dir.
+    if (deleteAction === 'purge') {
+      const dir = getDir(book);
+      if (await fs.exists(dir, 'Books')) {
+        await fs.removeDir(dir, 'Books', true);
+      }
+    }
+
+    if (deleteAction === 'both' && (await fs.exists(getCoverFilename(book), 'Books'))) {
+      await fs.removeFile(getCoverFilename(book), 'Books');
+    }
+    if (deleteAction === 'local' || deleteAction === 'purge') {
+      // Mirror 'local': mark not-downloaded but leave the tombstone (deletedAt)
+      // to the caller. The page's handleBookDelete sets deletedAt and queues the
+      // cloud deletion for purge, exactly as it does for the 'both' action.
       book.downloadedAt = null;
     } else {
       book.deletedAt = Date.now();
@@ -75,56 +104,122 @@ export async function uploadFileToCloud(
   return downloadUrl;
 }
 
+// Upload a single replica binary to the cloud under
+// CLOUD_REPLICAS_SUBDIR/<kind>/<replicaId>/<filename>. Filename is the
+// caller-supplied logical name (server-validated; see replicaSchemas.ts).
+export async function uploadReplicaFileToCloud(
+  fs: FileSystem,
+  resolveFilePath: (path: string, base: BaseDir) => Promise<string>,
+  opts: {
+    kind: string;
+    replicaId: string;
+    filename: string;
+    lfp: string;
+    base: BaseDir;
+    onProgress: ProgressHandler;
+  },
+): Promise<void> {
+  const cfp = `${CLOUD_REPLICAS_SUBDIR}/${opts.kind}/${opts.replicaId}/${opts.filename}`;
+  console.log('Uploading replica file:', opts.lfp, 'to', cfp);
+  const file = await fs.openFile(opts.lfp, opts.base, opts.filename);
+  const localFullpath = await resolveFilePath(opts.lfp, opts.base);
+  await uploadReplicaFile(file, localFullpath, cfp, opts.kind, opts.replicaId, opts.onProgress);
+  const f = file as ClosableFile;
+  if (f && f.close) {
+    await f.close();
+  }
+}
+
+// Cloud key for a replica binary. Centralized so adapters and the
+// download path share the same path-construction rule.
+export const replicaCloudKey = (kind: string, replicaId: string, filename: string): string =>
+  `${CLOUD_REPLICAS_SUBDIR}/${kind}/${replicaId}/${filename}`;
+
+export async function downloadReplicaFileFromCloud(
+  appService: AppService,
+  opts: {
+    kind: string;
+    replicaId: string;
+    filename: string;
+    dst: string;
+    onProgress?: ProgressHandler;
+  },
+): Promise<void> {
+  const cfp = replicaCloudKey(opts.kind, opts.replicaId, opts.filename);
+  await downloadFile({
+    appService,
+    cfp,
+    dst: opts.dst,
+    onProgress: opts.onProgress,
+  });
+}
+
+export async function deleteReplicaBundleFromCloud(
+  kind: string,
+  replicaId: string,
+  filenames: string[],
+): Promise<void> {
+  for (const filename of filenames) {
+    const cfp = replicaCloudKey(kind, replicaId, filename);
+    try {
+      await deleteCloudFile(cfp);
+    } catch (error) {
+      console.log(`Failed to delete replica file ${cfp}:`, error);
+    }
+  }
+}
+
 export async function uploadBook(
   fs: FileSystem,
   resolveFilePath: (path: string, base: BaseDir) => Promise<string>,
   book: Book,
   onProgress?: ProgressHandler,
 ): Promise<void> {
-  let uploaded = false;
   const completedFiles = { count: 0 };
-  let toUploadFpCount = 0;
   const coverExist = await fs.exists(getCoverFilename(book), 'Books');
-  let bookFileExist = await fs.exists(getLocalBookFilename(book), 'Books');
-  if (coverExist) {
-    toUploadFpCount++;
-  }
-  if (bookFileExist) {
-    toUploadFpCount++;
-  }
-  if (!bookFileExist && book.url) {
-    const fileobj = await fs.openFile(book.url, 'None');
+
+  let bookSource = await resolveBookContentSource(fs, book);
+  if (bookSource.kind === 'url') {
+    const fileobj = await fs.openFile(bookSource.path, bookSource.base);
     await fs.writeFile(getLocalBookFilename(book), 'Books', await fileobj.arrayBuffer());
-    bookFileExist = true;
+    const f = fileobj as ClosableFile;
+    if (f && f.close) {
+      await f.close();
+    }
+    bookSource = { kind: 'managed', path: getLocalBookFilename(book), base: 'Books' };
   }
 
+  if (!isBookFileContentSource(bookSource)) {
+    throw new Error('Book file not uploaded');
+  }
+
+  const toUploadFpCount = coverExist ? 2 : 1;
   const handleProgress = createProgressHandler(toUploadFpCount, completedFiles, onProgress);
 
   if (coverExist) {
     const lfp = getCoverFilename(book);
     const cfp = `${CLOUD_BOOKS_SUBDIR}/${getCoverFilename(book)}`;
     await uploadFileToCloud(fs, resolveFilePath, lfp, cfp, 'Books', handleProgress, book.hash);
-    uploaded = true;
     completedFiles.count++;
   }
 
-  if (bookFileExist) {
-    const lfp = getLocalBookFilename(book);
-    const cfp = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
-    await uploadFileToCloud(fs, resolveFilePath, lfp, cfp, 'Books', handleProgress, book.hash);
-    uploaded = true;
-    completedFiles.count++;
-  }
+  const cfp = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
+  await uploadFileToCloud(
+    fs,
+    resolveFilePath,
+    bookSource.path,
+    cfp,
+    bookSource.base,
+    handleProgress,
+    book.hash,
+  );
+  completedFiles.count++;
 
-  if (uploaded) {
-    book.deletedAt = null;
-    book.updatedAt = Date.now();
-    book.uploadedAt = Date.now();
-    book.downloadedAt = Date.now();
-    book.coverDownloadedAt = Date.now();
-  } else {
-    throw new Error('Book file not uploaded');
-  }
+  book.deletedAt = null;
+  book.updatedAt = Date.now();
+  book.uploadedAt = Date.now();
+  book.downloadedAt = Date.now();
+  book.coverDownloadedAt = Date.now();
 }
 
 export async function downloadCloudFile(
