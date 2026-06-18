@@ -13,6 +13,7 @@ import { getPopupPosition, getPosition, Position } from '@/utils/sel';
 import { FootnoteHandler } from 'foliate-js/footnotes.js';
 import { mountAdditionalFonts, mountCustomFont } from '@/styles/fonts';
 import { eventDispatcher } from '@/utils/event';
+import { shouldCheckAsFootnote } from '../utils/footnoteHeuristics';
 import { FoliateView } from '@/types/view';
 import { isCJKLang } from '@/utils/lang';
 import { Overlay } from '@/components/Overlay';
@@ -136,6 +137,7 @@ const FootnotePopup: React.FC<FootnotePopupProps> = ({ bookKey, bookDoc }) => {
       const backButtonMargin = canGoBackRef.current ? 32 : 0;
       renderer.setAttribute('flow', 'scrolled');
       renderer.setAttribute('no-preload', '');
+      renderer.setAttribute('no-background', '');
       renderer.setAttribute('margin-top', `${viewSettings.vertical ? 0 : backButtonMargin}px`);
       renderer.setAttribute('margin-right', `${viewSettings.vertical ? backButtonMargin : 0}px`);
       renderer.setAttribute('margin-bottom', '0px');
@@ -244,6 +246,9 @@ const FootnotePopup: React.FC<FootnotePopupProps> = ({ bookKey, bookDoc }) => {
     const footnoteClasses = ['duokan-footnote', 'footnote-link', 'footnote'];
     if (footnoteClasses.some((cls) => anchor.classList.contains(cls))) {
       detail['follow'] = true;
+    }
+    if (shouldCheckAsFootnote(anchor)) {
+      detail['check'] = true;
     }
     historyRef.current = { items: [detail], index: 0 };
     setCanGoBack(false);
