@@ -4,35 +4,60 @@ import {
   Book,
   BookConfig,
   BookContent,
-  LoadBookContentOptions,
   BookFormat,
+  BookLookupIndex,
   BookNote,
   FIXED_LAYOUT_FORMATS,
+  ImportBookOptions,
 } from '@/types/book';
 import {
   getDir,
   getLocalBookFilename,
   getCoverFilename,
   getConfigFilename,
+  getBookNavFilename,
   INIT_BOOK_CONFIG,
   formatTitle,
   formatAuthors,
   getPrimaryLanguage,
   getMetadataHash,
 } from '@/utils/book';
+import type { BookNav } from '@/services/nav';
 import { partialMD5, md5 } from '@/utils/md5';
 import { getBaseFilename, getFilename } from '@/utils/path';
-import { BookDoc, DocumentLoader, EXTS } from '@/libs/document';
+import { BookDoc, DocumentLoader } from '@/libs/document';
+import { tryNativeParseEpub } from '@/utils/tauriEpubBridge';
+import { tryNativeParseMobi } from '@/utils/tauriMobiBridge';
+import { isPseStreamFileName, openPseStreamBook, parsePseStreamFileName } from './opds/pseStream';
 import { DEFAULT_BOOK_SEARCH_CONFIG, DEFAULT_FIXED_LAYOUT_VIEW_SETTINGS } from './constants';
 import { isContentURI, isValidURL, makeSafeFilename } from '@/utils/misc';
-import { deserializeConfig, serializeConfig } from '@/utils/serializer';
+import { deserializeConfig, serializeConfig, serializeRawConfig } from '@/utils/serializer';
 import { ClosableFile } from '@/utils/file';
 import { TxtToEpubConverter } from '@/utils/txt';
 import { svg2png } from '@/utils/svg';
 import { normalizeMetadataIsbn } from '@/utils/isbn';
-import { loadAudioSyncGeneratedPackage } from '@/services/audioSync/storage';
 import { BookFileNotFoundError } from './errors';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import {
+  isBookFileContentSource,
+  resolveBookContentSource,
+  type BookFileContentSource,
+} from './bookContent';
+
+export function buildBookLookupIndex(books: Book[]): BookLookupIndex {
+  const byHash = new Map<string, Book>();
+  const byMetaKey = new Map<string, Book[]>();
+  for (const book of books) {
+    byHash.set(book.hash, book);
+    if (book.metaHash && !book.deletedAt) {
+      const key = `${book.metaHash}:${book.format}`;
+      const list = byMetaKey.get(key);
+      if (list) list.push(book);
+      else byMetaKey.set(key, [book]);
+    }
+  }
+  return { byHash, byMetaKey };
+}
 
 export interface CoverContext {
   fs: FileSystem;
@@ -128,12 +153,17 @@ export async function mergeBooks(
   fs: FileSystem,
   books: Book[],
   book: Book,
+  lookupIndex?: BookLookupIndex,
 ): Promise<string | undefined> {
   if (!book.metaHash) return undefined;
 
-  const duplicates = books.filter(
-    (b) => b.metaHash === book.metaHash && b.format === book.format && !b.deletedAt && b !== book,
-  );
+  const metaKey = `${book.metaHash}:${book.format}`;
+  const duplicates = lookupIndex
+    ? (lookupIndex.byMetaKey.get(metaKey) ?? []).filter((b) => !b.deletedAt && b !== book)
+    : books.filter(
+        (b) =>
+          b.metaHash === book.metaHash && b.format === book.format && !b.deletedAt && b !== book,
+      );
   if (duplicates.length === 0) return undefined;
 
   const allCandidates = [book, ...duplicates];
@@ -169,7 +199,7 @@ export async function mergeBooks(
     }
     base.booknotes = [...noteMap.values()];
 
-    mergedConfigData = JSON.stringify(base);
+    mergedConfigData = serializeRawConfig(base);
   }
 
   for (const dup of duplicates) {
@@ -185,6 +215,16 @@ export async function mergeBooks(
 
 // --- Book Import ---
 
+/**
+ * Options consumed by bookService.importBook. Extends the user-facing
+ * ImportBookOptions with the required AppService callbacks that are bound by
+ * the AppService wrapper.
+ */
+export interface ImportBookInternalOptions extends ImportBookOptions {
+  saveBookConfig: (book: Book, config: BookConfig) => Promise<void>;
+  generateCoverImageUrl: (book: Book) => Promise<string>;
+}
+
 export async function importBook(
   fs: FileSystem,
   // file might be:
@@ -195,39 +235,95 @@ export async function importBook(
   // 4. File object from browsers
   file: string | File,
   books: Book[],
-  saveBook: boolean,
-  saveCover: boolean,
-  overwrite: boolean,
-  transient: boolean,
-  saveBookConfigFn: (book: Book, config: BookConfig) => Promise<void>,
-  generateCoverImageUrlFn: (book: Book) => Promise<string>,
+  options: ImportBookInternalOptions,
 ): Promise<Book | null> {
+  const {
+    saveBookConfig: saveBookConfigFn,
+    generateCoverImageUrl: generateCoverImageUrlFn,
+    saveBook = true,
+    saveCover = true,
+    overwrite = false,
+    transient = false,
+    inPlace = false,
+    lookupIndex,
+  } = options;
+  const isPseStream = typeof file === 'string' && isPseStreamFileName(file);
   try {
     let loadedBook: BookDoc;
     let format: BookFormat;
     let filename: string;
-    let fileobj: File;
+    let fileobj: File | undefined;
+    // When the Rust EPUB parser succeeds it gives us the partialMD5 for free,
+    // so we can short-circuit the JS hashing pass below.
+    let nativeHash: string | undefined;
+    let usedNativeParser = false;
 
     if (transient && typeof file !== 'string') {
       throw new Error('Transient import is only supported for file paths');
     }
 
     try {
-      if (typeof file === 'string') {
-        fileobj = await fs.openFile(file, 'None');
-        filename = fileobj.name || getFilename(file);
+      if (isPseStream) {
+        const data = parsePseStreamFileName(file as string);
+        ({ book: loadedBook, format } = await openPseStreamBook(data));
+        filename = file as string;
       } else {
-        fileobj = file;
-        filename = file.name;
+        if (typeof file === 'string') {
+          fileobj = await fs.openFile(file, 'None');
+          filename = fileobj.name || getFilename(file);
+        } else {
+          fileobj = file;
+          filename = file.name;
+        }
+        if (/\.txt$/i.test(filename)) {
+          const txt2epub = new TxtToEpubConverter();
+          ({ file: fileobj } = await txt2epub.convert({ file: fileobj }));
+        }
+        if (!fileobj || fileobj.size === 0) {
+          throw new Error('Invalid or empty book file');
+        }
+        // Q1 fast path: when running under Tauri with a real file
+        // path, let Rust contribute the mechanical parts of the
+        // import work — partialMD5 over the file, the downscaled
+        // cover, and (for EPUB) the raw OPF bytes. Metadata
+        // extraction itself runs through foliate-js so the import
+        // path produces the same `Book.metadata` shape the reader
+        // path does (`refines` chains / ONIX5 / language maps / EPUB
+        // `belongs-to-collection` for EPUB; PalmDB UID identifier
+        // for MOBI), without any `DocumentLoader.open()` overhead —
+        // the importer never reads sections / toc / fixed-layout
+        // detection, so spending CPU on a zip central-directory
+        // scan, nav/ncx inflate, or PDB record-table walk would be
+        // pure waste here.
+        //
+        // Both bridges are no-ops on web / non-eligible paths, so
+        // the cost when neither matches is just two cheap regex
+        // tests.
+        let nativeBookDoc: BookDoc | undefined;
+        let nativeFormat: BookFormat | undefined;
+        if (typeof file === 'string' && !/\.txt$/i.test(filename)) {
+          const nativeEpub = await tryNativeParseEpub(file);
+          if (nativeEpub) {
+            nativeBookDoc = nativeEpub.bookDoc;
+            nativeFormat = 'EPUB' as BookFormat;
+            nativeHash = nativeEpub.partialMd5;
+          } else {
+            const nativeMobi = await tryNativeParseMobi(file, fileobj);
+            if (nativeMobi) {
+              nativeBookDoc = nativeMobi.bookDoc;
+              nativeFormat = nativeMobi.format;
+              nativeHash = nativeMobi.partialMd5;
+            }
+          }
+        }
+        if (nativeBookDoc && nativeFormat) {
+          loadedBook = nativeBookDoc;
+          format = nativeFormat;
+          usedNativeParser = true;
+        } else {
+          ({ book: loadedBook, format } = await new DocumentLoader(fileobj).open());
+        }
       }
-      if (/\.txt$/i.test(filename)) {
-        const txt2epub = new TxtToEpubConverter();
-        ({ file: fileobj } = await txt2epub.convert({ file: fileobj }));
-      }
-      if (!fileobj || fileobj.size === 0) {
-        throw new Error('Invalid or empty book file');
-      }
-      ({ book: loadedBook, format } = await new DocumentLoader(fileobj).open());
       if (!loadedBook) {
         throw new Error('Unsupported or corrupted book file');
       }
@@ -240,9 +336,16 @@ export async function importBook(
       throw new Error(`Failed to open the book file: ${(error as Error).message || error}`);
     }
 
-    const hash = await partialMD5(fileobj);
+    const hash = isPseStream
+      ? md5(file as string)
+      : usedNativeParser
+        ? nativeHash!
+        : await partialMD5(fileobj!);
+
     const metaHash = getMetadataHash(loadedBook.metadata);
-    let existingBook = books.filter((b) => b.hash === hash)[0];
+    let existingBook = lookupIndex
+      ? lookupIndex.byHash.get(hash)
+      : books.find((b) => b.hash === hash);
     let metaHashMatch = false;
     let oldBookDir: string | undefined;
     if (existingBook) {
@@ -257,9 +360,10 @@ export async function importBook(
     let bestConfigData: string | undefined;
     if (!transient && metaHash) {
       if (!existingBook) {
-        const firstMatch = books.find(
-          (b) => b.metaHash === metaHash && b.format === format && !b.deletedAt,
-        );
+        const metaKey = `${metaHash}:${format}`;
+        const firstMatch = lookupIndex
+          ? (lookupIndex.byMetaKey.get(metaKey) ?? []).find((b) => !b.deletedAt)
+          : books.find((b) => b.metaHash === metaHash && b.format === format && !b.deletedAt);
         if (firstMatch) {
           oldBookDir = getDir(firstMatch);
           existingBook = firstMatch;
@@ -269,7 +373,7 @@ export async function importBook(
         }
       }
       if (existingBook) {
-        bestConfigData = await mergeBooks(fs, books, existingBook);
+        bestConfigData = await mergeBooks(fs, books, existingBook, lookupIndex);
       }
     }
 
@@ -296,6 +400,7 @@ export async function importBook(
       if (series) {
         book.metadata.series = formatTitle(series.name);
         book.metadata.seriesIndex = parseFloat(series.position || '0');
+        if (series.total) book.metadata.seriesTotal = parseInt(series.total, 10);
       }
     }
     // update book metadata when reimporting the same book
@@ -327,17 +432,23 @@ export async function importBook(
       await fs.createDir(getDir(book), 'Books');
     }
     const bookFilename = getLocalBookFilename(book);
-    if (saveBook && !transient && (!(await fs.exists(bookFilename, 'Books')) || overwrite)) {
+    const willWriteBookFile =
+      saveBook &&
+      !transient &&
+      !inPlace &&
+      !!fileobj &&
+      (!(await fs.exists(bookFilename, 'Books')) || overwrite);
+    if (willWriteBookFile && fileobj) {
       if (/\.txt$/i.test(filename)) {
         await fs.writeFile(bookFilename, 'Books', fileobj);
       } else if (typeof file === 'string' && isContentURI(file)) {
-        await fs.copyFile(file, bookFilename, 'Books');
+        await fs.copyFile(file, 'None', bookFilename, 'Books');
       } else if (typeof file === 'string' && !isValidURL(file)) {
         try {
           // try to copy the file directly first in case of large files to avoid memory issues
           // on desktop when reading recursively from selected directory the direct copy will fail
           // due to permission issues, then fallback to read and write files
-          await fs.copyFile(file, bookFilename, 'Books');
+          await fs.copyFile(file, 'None', bookFilename, 'Books');
         } catch {
           await fs.writeFile(bookFilename, 'Books', await fileobj.arrayBuffer());
         }
@@ -354,13 +465,23 @@ export async function importBook(
         } catch {}
       }
       if (cover) {
-        await fs.writeFile(getCoverFilename(book), 'Books', await cover.arrayBuffer());
+        const coverBytes = await cover.arrayBuffer();
+        await fs.writeFile(getCoverFilename(book), 'Books', coverBytes);
       }
     }
     // Never overwrite the config file only when it's not existed
     if (!existingBook) {
       await saveBookConfigFn(book, INIT_BOOK_CONFIG);
-      books.splice(0, 0, book);
+      books.push(book);
+      if (lookupIndex) {
+        lookupIndex.byHash.set(book.hash, book);
+        if (book.metaHash) {
+          const key = `${book.metaHash}:${book.format}`;
+          const list = lookupIndex.byMetaKey.get(key);
+          if (list) list.push(book);
+          else lookupIndex.byMetaKey.set(key, [book]);
+        }
+      }
     } else if (metaHashMatch && oldBookDir && oldBookDir !== getDir(book)) {
       // Migrate config from old directory to new directory, updating bookHash and metaHash
       // Use aggregated best config when available from deduplication
@@ -368,7 +489,7 @@ export async function importBook(
         const config: Partial<BookConfig> = JSON.parse(bestConfigData);
         config.bookHash = hash;
         config.metaHash = metaHash;
-        await fs.writeFile(getConfigFilename(book), 'Books', JSON.stringify(config));
+        await fs.writeFile(getConfigFilename(book), 'Books', serializeRawConfig(config));
       } else {
         const oldConfigPath = `${oldBookDir}/config.json`;
         if (await fs.exists(oldConfigPath, 'Books')) {
@@ -376,7 +497,7 @@ export async function importBook(
           const config: Partial<BookConfig> = JSON.parse(configData);
           config.bookHash = hash;
           config.metaHash = metaHash;
-          await fs.writeFile(getConfigFilename(book), 'Books', JSON.stringify(config));
+          await fs.writeFile(getConfigFilename(book), 'Books', serializeRawConfig(config));
         } else {
           await saveBookConfigFn(book, INIT_BOOK_CONFIG);
         }
@@ -390,16 +511,21 @@ export async function importBook(
       const config: Partial<BookConfig> = JSON.parse(bestConfigData);
       config.bookHash = hash;
       config.metaHash = metaHash;
-      await fs.writeFile(getConfigFilename(book), 'Books', JSON.stringify(config));
+      await fs.writeFile(getConfigFilename(book), 'Books', serializeRawConfig(config));
     }
 
     // update file links with url or path or content uri
-    if (typeof file === 'string') {
+    if (isPseStream) {
+      book.url = file as string;
+      if (existingBook) existingBook.url = file as string;
+    } else if (typeof file === 'string') {
       if (isValidURL(file)) {
         book.url = file;
         if (existingBook) existingBook.url = file;
-      }
-      if (transient) {
+      } else if (transient || inPlace) {
+        // transient: source file is loaded directly, never persisted in Books/.
+        // inPlace: source file is inside the user's library root and we read it
+        // there directly instead of duplicating it under Books/<hash>/.
         book.filePath = file;
         if (existingBook) existingBook.filePath = file;
       }
@@ -420,72 +546,64 @@ export async function importBook(
 // --- Book Content & Config ---
 
 export async function isBookAvailable(fs: FileSystem, book: Book): Promise<boolean> {
-  const fp = getLocalBookFilename(book);
-  if (await fs.exists(fp, 'Books')) {
-    return true;
-  }
-  if (book.filePath) {
-    return await fs.exists(book.filePath, 'None');
-  }
-  if (book.url) {
-    return isValidURL(book.url);
-  }
-  return false;
+  return (await resolveBookContentSource(fs, book)).kind !== 'missing';
 }
 
 export async function getBookFileSize(fs: FileSystem, book: Book): Promise<number | null> {
-  const fp = getLocalBookFilename(book);
-  if (await fs.exists(fp, 'Books')) {
-    const file = await fs.openFile(fp, 'Books');
-    const size = file.size;
-    const f = file as ClosableFile;
-    if (f && f.close) {
-      await f.close();
-    }
-    return size;
+  const source = await resolveBookContentSource(fs, book);
+  if (source.kind !== 'managed' && source.kind !== 'external') {
+    return null;
   }
-  return null;
+  const file = await fs.openFile(source.path, source.base);
+  const size = file.size;
+  const f = file as ClosableFile;
+  if (f && f.close) {
+    await f.close();
+  }
+  return size;
 }
 
-export async function loadBookContent(
+async function openBookFileContent(
   fs: FileSystem,
   book: Book,
-  options: LoadBookContentOptions = {},
-): Promise<BookContent> {
-  let file: File;
-  if (options.preferGeneratedPackage !== false && book.format === 'EPUB') {
-    const generatedPackage = await loadAudioSyncGeneratedPackage(fs, book);
-    if (
-      generatedPackage?.validation.valid &&
-      (await fs.exists(generatedPackage.packagePath, 'Books'))
-    ) {
-      file = await fs.openFile(generatedPackage.packagePath, 'Books');
-      return { book, file };
-    }
+): Promise<{
+  source: BookFileContentSource;
+  file: File;
+}> {
+  const source = await resolveBookContentSource(fs, book);
+  if (!isBookFileContentSource(source)) {
+    throw new BookFileNotFoundError();
   }
-  const fp = getLocalBookFilename(book);
-  if (await fs.exists(fp, 'Books')) {
-    file = await fs.openFile(fp, 'Books');
-  } else if (book.filePath) {
-    file = await fs.openFile(book.filePath, 'None');
-  } else if (book.url) {
-    file = await fs.openFile(book.url, 'None');
-  } else {
-    // 0.9.64 has a bug that book.title might be modified but the filename is not updated
-    const bookDir = getDir(book);
-    const files = await fs.readDir(getDir(book), 'Books');
-    if (files.length > 0) {
-      const bookFile = files.find((f) => f.path.endsWith(`.${EXTS[book.format]}`));
-      if (bookFile) {
-        file = await fs.openFile(`${bookDir}/${bookFile.path}`, 'Books');
-      } else {
-        throw new BookFileNotFoundError();
-      }
-    } else {
-      throw new BookFileNotFoundError();
-    }
-  }
+  return { source, file: await fs.openFile(source.path, source.base) };
+}
+
+export async function loadBookContent(fs: FileSystem, book: Book): Promise<BookContent> {
+  const { file } = await openBookFileContent(fs, book);
   return { book, file };
+}
+
+/**
+ * Best-effort resolution of an absolute, on-disk filesystem path for a book.
+ *
+ * Returns null when the book is not stored on disk (e.g. in-memory blob,
+ * remote URL) or the path cannot be resolved. The returned path is
+ * suitable for handing to native (Rust) commands that read the file
+ * directly via std::fs.
+ */
+export async function resolveNativeBookFilePath(
+  fs: FileSystem,
+  resolveFilePath: (path: string, base: BaseDir) => Promise<string>,
+  book: Book,
+): Promise<string | null> {
+  try {
+    const source = await resolveBookContentSource(fs, book);
+    if (source.kind !== 'managed' && source.kind !== 'external') return null;
+    const fp = await resolveFilePath(source.path, source.base);
+    if (!fp) return null;
+    return fp.startsWith('file://') ? decodeURI(fp.slice('file://'.length)) : fp;
+  } catch {
+    return null;
+  }
 }
 
 export async function loadBookConfig(
@@ -522,9 +640,26 @@ export async function saveBookConfig(
     };
     serializedConfig = serializeConfig(config, globalViewSettings, DEFAULT_BOOK_SEARCH_CONFIG);
   } else {
-    serializedConfig = JSON.stringify(config);
+    serializedConfig = serializeRawConfig(config);
   }
   await fs.writeFile(getConfigFilename(book), 'Books', serializedConfig);
+}
+
+export async function loadBookNav(fs: FileSystem, book: Book): Promise<BookNav | null> {
+  try {
+    const path = getBookNavFilename(book);
+    if (!(await fs.exists(path, 'Books'))) return null;
+    const str = (await fs.readFile(path, 'Books', 'text')) as string;
+    const parsed = JSON.parse(str) as BookNav;
+    if (!parsed || typeof parsed.version !== 'number') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveBookNav(fs: FileSystem, book: Book, nav: BookNav): Promise<void> {
+  await fs.writeFile(getBookNavFilename(book), 'Books', JSON.stringify(nav));
 }
 
 export async function fetchBookDetails(
@@ -570,6 +705,7 @@ export async function refreshBookMetadata(fs: FileSystem, book: Book): Promise<b
     if (series) {
       book.metadata.series = formatTitle(series.name);
       book.metadata.seriesIndex = parseFloat(series.position || '0');
+      if (series.total) book.metadata.seriesTotal = parseInt(series.total, 10);
     }
   }
 
@@ -580,20 +716,23 @@ export async function exportBook(
   fs: FileSystem,
   book: Book,
   resolveFilePath: (path: string, base: BaseDir) => Promise<string>,
-  copyFile: (srcPath: string, dstPath: string, base: BaseDir) => Promise<void>,
+  copyFile: (srcPath: string, srcBase: BaseDir, dstPath: string, dstBase: BaseDir) => Promise<void>,
   saveFile: (
     filename: string,
     content: ArrayBuffer,
     options?: { filePath?: string; mimeType?: string },
   ) => Promise<boolean>,
 ): Promise<boolean> {
-  const { file } = await loadBookContent(fs, book);
+  const { source, file } = await openBookFileContent(fs, book);
   const content = await file.arrayBuffer();
   const filename = `${makeSafeFilename(book.title)}.${book.format.toLowerCase()}`;
-  let filePath = await resolveFilePath(getLocalBookFilename(book), 'Books');
   const mimeType = file.type || 'application/octet-stream';
+  if (source.kind === 'url') {
+    return await saveFile(filename, content, { mimeType });
+  }
+  let filePath = await resolveFilePath(source.path, source.base);
   if (getFilename(filePath) !== filename) {
-    await copyFile(filePath, filename, 'Temp');
+    await copyFile(source.path, source.base, filename, 'Temp');
     filePath = await resolveFilePath(filename, 'Temp');
   }
   return await saveFile(filename, content, { filePath, mimeType });

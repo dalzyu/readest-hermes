@@ -13,7 +13,12 @@ import { Insets } from '@/types/misc';
 import { EnvConfigType } from '@/services/environment';
 import { FoliateView } from '@/types/view';
 import { DocumentLoader, TOCItem } from '@/libs/document';
-import { updateToc } from '@/utils/toc';
+import {
+  isPseStreamFileName,
+  openPseStreamBook,
+  parsePseStreamFileName,
+} from '@/services/opds/pseStream';
+import { BOOK_NAV_VERSION, computeBookNav, hydrateBookNav, updateToc } from '@/services/nav';
 import { formatTitle, getMetadataHash, getPrimaryLanguage } from '@/utils/book';
 import { getBaseFilename } from '@/utils/path';
 import { SUPPORTED_LANGNAMES } from '@/services/constants';
@@ -21,12 +26,10 @@ import { useSettingsStore } from './settingsStore';
 import { BookData, useBookDataStore } from './bookDataStore';
 import { useLibraryStore } from './libraryStore';
 import { uniqueId } from '@/utils/misc';
-import { readingStatsService } from '@/services/readingStats/readingStatsService';
 
 interface ViewState {
   /* Unique key for each book view */
   key: string;
-  bookHash: string;
   view: FoliateView | null;
   viewerKey: string;
   isPrimary: boolean;
@@ -38,23 +41,17 @@ interface ViewState {
   ttsEnabled: boolean;
   syncing: boolean;
   gridInsets: Insets | null;
-  /* View settings for the view: 
+  /* True while the reader is showing a position requested by an external
+     deep link (e.g. ?cfi=...) that the user hasn't yet confirmed by reading.
+     Progress writers (auto-save, cloud sync, kosync) skip while this is true
+     so the user's actual last-read position isn't overwritten by a preview.
+     Cleared on the first user-initiated relocate (page turn / scroll). */
+  previewMode: boolean;
+  /* View settings for the view:
     generally view settings have a hierarchy of global settings < book settings < view settings
     view settings for primary view are saved to book config which is persisted to config file
     omitting settings that are not changed from global settings */
   viewSettings: ViewSettings | null;
-  /* Session tracking for reading stats */
-  sessionStartedAt: number | null;
-  sessionStartPage: number | null;
-}
-
-export type ReaderIndexPhase = 'pending' | 'chunking' | 'embedding' | 'finalizing' | 'complete';
-
-export interface ReaderIndexProgress {
-  runId: string;
-  current: number;
-  total: number;
-  phase: ReaderIndexPhase;
 }
 
 interface ReaderStore {
@@ -96,27 +93,8 @@ interface ReaderStore {
   getGridInsets: (key: string) => Insets | null;
   setGridInsets: (key: string, insets: Insets | null) => void;
   setViewInited: (key: string, inited: boolean) => void;
+  setPreviewMode: (key: string, previewMode: boolean) => void;
   recreateViewer: (envConfig: EnvConfigType, key: string) => void;
-  recordSession: (key: string) => boolean;
-  indexingProgress: Record<string, ReaderIndexProgress>;
-  startIndexing: (key: string, runId: string) => void;
-  updateIndexingProgress: (
-    key: string,
-    runId: string,
-    progress: Omit<ReaderIndexProgress, 'runId'>,
-  ) => void;
-  finishIndexing: (key: string, runId: string) => void;
-  cancelIndexing: (key: string, runId?: string) => void;
-}
-
-const INDEXING_COMPLETE_HOLD_MS = 1200;
-const indexingClearTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-function clearIndexingTimer(key: string): void {
-  const timer = indexingClearTimers.get(key);
-  if (!timer) return;
-  clearTimeout(timer);
-  indexingClearTimers.delete(key);
 }
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
@@ -124,85 +102,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   bookKeys: [],
   hoveredBookKey: null,
   setBookKeys: (keys: string[]) => set({ bookKeys: keys }),
-  indexingProgress: {},
-  startIndexing: (key: string, runId: string) => {
-    clearIndexingTimer(key);
-    set((state) => ({
-      indexingProgress: {
-        ...state.indexingProgress,
-        [key]: { runId, current: 0, total: 1, phase: 'pending' },
-      },
-    }));
-  },
-  updateIndexingProgress: (
-    key: string,
-    runId: string,
-    progress: Omit<ReaderIndexProgress, 'runId'>,
-  ) =>
-    set((state) => {
-      const currentProgress = state.indexingProgress[key];
-      if (!currentProgress || currentProgress.runId !== runId) {
-        return state;
-      }
-      return {
-        indexingProgress: {
-          ...state.indexingProgress,
-          [key]: { runId, current: progress.current, total: progress.total, phase: progress.phase },
-        },
-      };
-    }),
-  finishIndexing: (key: string, runId: string) => {
-    clearIndexingTimer(key);
-    set((state) => {
-      const currentProgress = state.indexingProgress[key];
-      if (!currentProgress || currentProgress.runId !== runId) {
-        return state;
-      }
-      return {
-        indexingProgress: {
-          ...state.indexingProgress,
-          [key]: {
-            ...currentProgress,
-            current: currentProgress.total,
-            phase: 'complete',
-          },
-        },
-      };
-    });
-
-    const timer = setTimeout(() => {
-      set((state) => {
-        const currentProgress = state.indexingProgress[key];
-        if (
-          !currentProgress ||
-          currentProgress.runId !== runId ||
-          currentProgress.phase !== 'complete'
-        ) {
-          return state;
-        }
-        const indexingProgress = { ...state.indexingProgress };
-        delete indexingProgress[key];
-        return { indexingProgress };
-      });
-      indexingClearTimers.delete(key);
-    }, INDEXING_COMPLETE_HOLD_MS);
-    indexingClearTimers.set(key, timer);
-  },
-  cancelIndexing: (key: string, runId?: string) => {
-    clearIndexingTimer(key);
-    set((state) => {
-      const currentProgress = state.indexingProgress[key];
-      if (!currentProgress) {
-        return state;
-      }
-      if (runId && currentProgress.runId !== runId) {
-        return state;
-      }
-      const indexingProgress = { ...state.indexingProgress };
-      delete indexingProgress[key];
-      return { indexingProgress };
-    });
-  },
   setHoveredBookKey: (key: string | null) => set({ hoveredBookKey: key }),
   getView: (key: string | null) => (key && get().viewStates[key]?.view) || null,
   setView: (key: string, view) =>
@@ -242,7 +141,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         ...state.viewStates,
         [key]: {
           key: '',
-          bookHash: id,
           view: null,
           viewerKey: '',
           isPrimary: false,
@@ -254,28 +152,46 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           ttsEnabled: false,
           syncing: false,
           gridInsets: null,
+          previewMode: false,
           viewSettings: null,
-          sessionStartedAt: null,
-          sessionStartPage: null,
         },
       },
     }));
     try {
       const appService = await envConfig.getAppService();
       const { settings } = useSettingsStore.getState();
-      const { library } = useLibraryStore.getState();
-      const book = library.find((b) => b.hash === id);
+      const { getBookByHash, library } = useLibraryStore.getState();
+      const book = getBookByHash(id);
       if (!book) {
+        console.error(
+          `Book ${id} not found in library (size=${library.length}); likely the in-memory entry was dropped by a library reload.`,
+        );
         throw new Error('Book not found');
       }
+      const isPseStream = !!book.url && isPseStreamFileName(book.url);
       let bookDoc = bookData?.bookDoc;
-      let file = bookData?.file;
-      if (!bookDoc || !file || reload) {
-        const content = (await appService.loadBookContent(book)) as BookContent;
-        file = content.file;
+      let file: File | null = bookData?.file ?? null;
+      if (!bookDoc || (!isPseStream && !file) || reload) {
         console.log('Loading book', key);
-        const doc = await new DocumentLoader(file).open();
-        bookDoc = doc.book;
+        if (isPseStream) {
+          const data = parsePseStreamFileName(book.url!);
+          const doc = await openPseStreamBook(data);
+          bookDoc = doc.book;
+          file = null;
+        } else {
+          const content = (await appService.loadBookContent(book)) as BookContent;
+          file = content.file;
+          let nativeFilePath: string | null = null;
+          try {
+            nativeFilePath = await appService.resolveNativeBookFilePath(book);
+          } catch (err) {
+            console.warn('resolveNativeBookFilePath failed', err);
+          }
+          const doc = await new DocumentLoader(file, {
+            nativeFilePath: nativeFilePath ?? undefined,
+          }).open();
+          bookDoc = doc.book;
+        }
       }
       const config = await appService.loadBookConfig(book, settings);
       // Import annotations from third-party readers on first open
@@ -297,12 +213,27 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       }
       // Filter out invalid booknotes
       config.booknotes = config.booknotes?.filter((booknote) => booknote.cfi) ?? [];
+      // Load cached book navigation (TOC + section fragments) or compute and persist.
+      if (book.format === 'EPUB' && bookDoc.rendition?.layout !== 'pre-paginated') {
+        const cachedNav = await appService.loadBookNav(book);
+        if (cachedNav?.version === BOOK_NAV_VERSION && process.env.NODE_ENV === 'production') {
+          hydrateBookNav(bookDoc, cachedNav);
+        } else {
+          const freshNav = await computeBookNav(bookDoc);
+          hydrateBookNav(bookDoc, freshNav);
+          try {
+            await appService.saveBookNav(book, freshNav);
+          } catch (e) {
+            console.warn('Failed to persist book nav cache:', e);
+          }
+        }
+      }
       await updateToc(
         bookDoc,
         config.viewSettings?.sortedTOC ?? false,
         config.viewSettings?.convertChineseVariant ?? 'none',
       );
-      if (!bookDoc.metadata.title) {
+      if (!bookDoc.metadata.title && file) {
         bookDoc.metadata.title = getBaseFilename(file.name);
       }
       book.sourceTitle = formatTitle(bookDoc.metadata.title);
@@ -325,8 +256,12 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           book.metadata.series = book.metadata.series ?? formatTitle(series.name);
           book.metadata.seriesIndex =
             book.metadata.seriesIndex ?? parseFloat(series.position || '0');
+          book.metadata.seriesTotal =
+            book.metadata.seriesTotal ?? (series.total ? parseInt(series.total, 10) : undefined);
         }
       }
+      // TODO: uncomment this when we can ensure metaHash is correctly generated for all books
+      // book.metaHash = book.metaHash ?? getMetadataHash(bookDoc.metadata);
       book.metaHash = getMetadataHash(bookDoc.metadata);
 
       const isFixedLayout =
@@ -346,7 +281,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           [key]: {
             ...state.viewStates[key],
             key,
-            bookHash: id,
             view: null,
             viewerKey: `${key}-${uniqueId()}`,
             isPrimary,
@@ -358,9 +292,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             ttsEnabled: false,
             syncing: false,
             gridInsets: null,
+            previewMode: false,
             viewSettings: { ...globalViewSettings, ...configViewSettings },
-            sessionStartedAt: null,
-            sessionStartPage: null,
           },
         },
       }));
@@ -372,7 +305,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           [key]: {
             ...state.viewStates[key],
             key: '',
-            bookHash: id,
             view: null,
             viewerKey: '',
             isPrimary: false,
@@ -384,9 +316,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             ttsEnabled: false,
             syncing: false,
             gridInsets: null,
+            previewMode: false,
             viewSettings: null,
-            sessionStartedAt: null,
-            sessionStartPage: null,
           },
         },
       }));
@@ -443,37 +374,20 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
 
       const pageInfo = bookData.isFixedLayout ? section : pageinfo;
       const progress: [number, number] = [pageInfo.current + 1, pageInfo.total];
-
-      // calculate progress percentage
       const progressPercentage = Math.round((progress[0] / progress[1]) * 100);
 
-      // update library book progress
-      const { library, setLibrary } = useLibraryStore.getState();
-      const bookIndex = library.findIndex((b) => b.hash === id);
-      if (bookIndex !== -1) {
-        const updatedLibrary = [...library];
-        const existingBook = updatedLibrary[bookIndex]!;
-
-        // determine new reading status
+      // Lightweight library update — O(1) lookup, no array copy, no refreshGroups
+      const { getBookByHash, updateBookProgress } = useLibraryStore.getState();
+      const existingBook = getBookByHash(id);
+      if (existingBook) {
         let newReadingStatus = existingBook.readingStatus;
-
-        // auto-clear 'unread' status when user starts reading (progress changes)
         if (existingBook.readingStatus === 'unread') {
           newReadingStatus = undefined;
         }
-
-        // auto mark as 'finished' when progress reaches 100%
         if (progressPercentage >= 100 && existingBook.readingStatus !== 'finished') {
           newReadingStatus = 'finished';
         }
-
-        updatedLibrary[bookIndex] = {
-          ...existingBook,
-          progress,
-          readingStatus: newReadingStatus,
-          updatedAt: Date.now(),
-        };
-        setLibrary(updatedLibrary);
+        updateBookProgress(id, progress, newReadingStatus);
       }
 
       const oldConfig = bookData.config;
@@ -508,7 +422,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
               timeinfo,
               index: section.current,
               range,
-              page: pageInfo.current + 1, // 1-based page number
+              page: pageInfo.current + 1,
             } as BookProgress,
           },
         },
@@ -572,25 +486,26 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     })),
 
   setViewInited: (key: string, inited: boolean) =>
-    set((state) => {
-      const viewState = state.viewStates[key];
-      if (!viewState) return state;
-
-      const nextSessionStartedAt = inited ? Date.now() : null;
-      const nextSessionStartPage = inited ? (viewState.progress?.pageinfo?.current ?? 0) : null;
-
-      return {
-        viewStates: {
-          ...state.viewStates,
-          [key]: {
-            ...viewState,
-            inited,
-            sessionStartedAt: nextSessionStartedAt,
-            sessionStartPage: nextSessionStartPage,
-          },
+    set((state) => ({
+      viewStates: {
+        ...state.viewStates,
+        [key]: {
+          ...state.viewStates[key]!,
+          inited,
         },
-      };
-    }),
+      },
+    })),
+
+  setPreviewMode: (key: string, previewMode: boolean) =>
+    set((state) => ({
+      viewStates: {
+        ...state.viewStates,
+        [key]: {
+          ...state.viewStates[key]!,
+          previewMode,
+        },
+      },
+    })),
 
   recreateViewer: (envConfig: EnvConfigType, key: string) => {
     const id = key.split('-')[0]!;
@@ -608,86 +523,4 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         }));
       });
   },
-
-  recordSession: (key: string) => {
-    const viewState = get().viewStates[key];
-    if (!viewState?.inited || !viewState.sessionStartedAt) return false;
-
-    const progress = viewState.progress?.pageinfo;
-    const currentPage = progress?.current ?? viewState.sessionStartPage ?? 0;
-    const sessionStartPage = viewState.sessionStartPage ?? currentPage;
-    const endedAt = Date.now();
-    const startedAt = viewState.sessionStartedAt;
-    const secondsRead = Math.floor((endedAt - startedAt) / 1000);
-    const pageDelta = Math.max(0, currentPage - sessionStartPage);
-    const bookHash = viewState.bookHash;
-
-    const recorded = readingStatsService.recordSession({
-      bookHash,
-      startedAt,
-      endedAt,
-      secondsRead,
-      pageDelta,
-    });
-
-    if (recorded) {
-      set((state) => ({
-        viewStates: {
-          ...state.viewStates,
-          [key]: {
-            ...state.viewStates[key]!,
-            sessionStartedAt: null,
-            sessionStartPage: null,
-          },
-        },
-      }));
-    }
-
-    return recorded;
-  },
 }));
-
-function flushActiveReadingSessions(): void {
-  const { viewStates, recordSession } = useReaderStore.getState();
-  Object.entries(viewStates).forEach(([key, viewState]) => {
-    const recorded = recordSession(key);
-    if (recorded || !viewState.sessionStartedAt) return;
-
-    useReaderStore.setState((state) => ({
-      viewStates: {
-        ...state.viewStates,
-        [key]: {
-          ...state.viewStates[key]!,
-          sessionStartedAt: null,
-          sessionStartPage: null,
-        },
-      },
-    }));
-  });
-}
-
-function resumeActiveReadingSessions(): void {
-  const { viewStates, setViewInited } = useReaderStore.getState();
-  Object.entries(viewStates).forEach(([key, viewState]) => {
-    if (viewState.view && viewState.inited && !viewState.sessionStartedAt) {
-      setViewInited(key, true);
-    }
-  });
-}
-
-if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-  const handleVisibilityChange = () => {
-    if (document.visibilityState === 'hidden') {
-      flushActiveReadingSessions();
-      return;
-    }
-
-    if (document.visibilityState === 'visible') {
-      resumeActiveReadingSessions();
-    }
-  };
-
-  window.addEventListener('beforeunload', flushActiveReadingSessions);
-  window.addEventListener('pagehide', flushActiveReadingSessions);
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-}
