@@ -29,6 +29,13 @@ const QuizPanel: React.FC<QuizPanelProps> = ({ bookHash, initialMode = 'vocabula
     };
     void load();
   }, [bookHash, mode]);
+  const handleReviewed = async (grade: 'good' | 'again') => {
+    const current = entries[0];
+    if (!current) return;
+    await markVocabularyEntryReviewed(current, grade);
+    setEntries((prev) => prev.slice(1));
+    setAnswerVisible(false);
+  };
 
   const current = entries[0];
   return (
@@ -74,15 +81,11 @@ const QuizPanel: React.FC<QuizPanelProps> = ({ bookHash, initialMode = 'vocabula
             <button
               type='button'
               className='btn btn-sm btn-primary'
-              onClick={() => void markVocabularyEntryReviewed(current, 'good')}
+              onClick={() => handleReviewed('good')}
             >
               Good
             </button>
-            <button
-              type='button'
-              className='btn btn-sm'
-              onClick={() => void markVocabularyEntryReviewed(current, 'again')}
-            >
+            <button type='button' className='btn btn-sm' onClick={() => handleReviewed('again')}>
               Again
             </button>
           </div>

@@ -323,7 +323,6 @@ export async function parseDictionary(
   buffer: Uint8Array,
 ): Promise<{ entries: DictionaryEntry[]; name: string }> {
   const format = detectFormat(filename, buffer);
-  const content = new TextDecoder('utf-8').decode(buffer);
 
   switch (format) {
     case 'stardict': {
@@ -356,35 +355,45 @@ export async function parseDictionary(
       return { entries, name };
     }
 
-    case 'csv':
+    case 'csv': {
+      const content = new TextDecoder('utf-8').decode(buffer);
       return {
         entries: parseTabularDictionary(content, filename, ','),
         name: inferDictionaryName(filename),
       };
+    }
 
-    case 'tsv':
+    case 'tsv': {
+      const content = new TextDecoder('utf-8').decode(buffer);
       return {
         entries: parseTabularDictionary(content, filename, '\t'),
         name: inferDictionaryName(filename),
       };
+    }
 
-    case 'txt':
+    case 'txt': {
+      const content = new TextDecoder('utf-8').decode(buffer);
       return {
         entries: parsePlainTextDictionary(content, filename),
         name: inferDictionaryName(filename),
       };
+    }
 
-    case 'json':
+    case 'json': {
+      const content = new TextDecoder('utf-8').decode(buffer);
       return {
         entries: parseJsonDictionary(content, filename),
         name: inferDictionaryName(filename),
       };
+    }
 
-    case 'jsonl':
+    case 'jsonl': {
+      const content = new TextDecoder('utf-8').decode(buffer);
       return {
         entries: parseJsonLinesDictionary(content, filename),
         name: inferDictionaryName(filename),
       };
+    }
 
     default:
       throw new Error(

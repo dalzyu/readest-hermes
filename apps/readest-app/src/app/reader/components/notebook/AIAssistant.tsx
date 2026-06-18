@@ -14,6 +14,7 @@ import { streamChat } from '@/services/ai/adapters/ChatStreamAdapter';
 import type { AIMessage } from '@/services/ai/types';
 import { useAIChatStore } from '@/store/aiChatStore';
 import { useBookDataStore } from '@/store/bookDataStore';
+import { useReaderStore } from '@/store/readerStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { eventDispatcher } from '@/utils/event';
 
@@ -33,7 +34,10 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
     setActiveConversation,
     createConversation,
     addMessage,
+    pendingSeedMessage,
+    clearPendingSeedMessage,
   } = useAIChatStore();
+  const { getProgress } = useReaderStore();
   const bookData = getBookData(bookKey);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +53,8 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
   const bookHash = bookKey.split('-')[0] || '';
   const bookTitle = bookData?.book?.title || 'Unknown';
   const aiSettings = settings?.aiSettings;
+  const authorName = bookData?.book?.author || '';
+  const currentPage = getProgress(bookKey)?.page ?? 0;
 
   useEffect(() => {
     if (!bookHash) {
@@ -136,15 +142,25 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
         createdAt: Date.now(),
       };
       setStreamingMessage(draft);
-      const final = await streamChat(
-        { messages: baseMessages, bookHash, bookTitle, aiSettings },
-        (token) =>
-          setStreamingMessage((current) =>
-            current ? { ...current, content: current.content + token } : current,
-          ),
-      );
-      await addMessage({ conversationId, role: 'assistant', content: final.content });
-      setStreamingMessage(null);
+      try {
+        const final = await streamChat(
+          { messages: baseMessages, bookHash, bookTitle, authorName, currentPage, aiSettings },
+          (token) =>
+            setStreamingMessage((current) =>
+              current ? { ...current, content: current.content + token } : current,
+            ),
+        );
+        await addMessage({ conversationId, role: 'assistant', content: final.content });
+      } catch (error) {
+        aiLogger.chat.error(`Chat failed: ${(error as Error).message}`);
+        await addMessage({
+          conversationId,
+          role: 'assistant',
+          content: `*Error:* ${(error as Error).message}`,
+        });
+      } finally {
+        setStreamingMessage(null);
+      }
     },
     [
       activeConversationId,
@@ -152,11 +168,33 @@ const AIAssistant = ({ bookKey }: AIAssistantProps) => {
       aiSettings,
       bookHash,
       bookTitle,
+      authorName,
+      currentPage,
       createConversation,
       messages,
       setActiveConversation,
     ],
   );
+
+  useEffect(() => {
+    if (pendingSeedMessage) {
+      const content = pendingSeedMessage.content;
+      if (pendingSeedMessage.conversationId !== activeConversationId) {
+        setActiveConversation(pendingSeedMessage.conversationId).then(() => {
+          handleSend(content);
+        });
+      } else {
+        handleSend(content);
+      }
+      clearPendingSeedMessage(pendingSeedMessage.conversationId);
+    }
+  }, [
+    pendingSeedMessage,
+    activeConversationId,
+    setActiveConversation,
+    handleSend,
+    clearPendingSeedMessage,
+  ]);
 
   if (!aiSettings?.enabled) {
     return (

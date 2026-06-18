@@ -60,19 +60,14 @@ function resolveTranslationSources(
       : configuredTranslation;
 
   const contextualMeaningSource =
-    (configuredSources.contextualMeaning ??
-      (configuredTranslation === 'dictionary' ? 'dictionary' : 'ai')) === 'ai'
+    configuredSources.contextualMeaning === 'ai'
       ? availability.chat
         ? 'ai'
         : 'dictionary'
       : 'dictionary';
 
   const examplesSource =
-    (configuredSources.examples ?? 'ai') === 'ai'
-      ? availability.chat
-        ? 'ai'
-        : 'corpus'
-      : 'corpus';
+    configuredSources.examples === 'ai' ? (availability.chat ? 'ai' : 'corpus') : 'corpus';
 
   const fieldSources: FieldSourceMap = {
     translation: translationSource,
@@ -80,7 +75,7 @@ function resolveTranslationSources(
     examples: examplesSource,
   };
 
-  if ((configuredSources.grammarHint ?? 'ai') === 'ai' && availability.chat) {
+  if (configuredSources.grammarHint === 'ai' && availability.chat) {
     fieldSources['grammarHint'] = 'ai';
   }
 

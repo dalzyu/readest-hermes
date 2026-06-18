@@ -3,7 +3,12 @@ import { RiRobot2Line, RiVolumeUpLine } from 'react-icons/ri';
 import Popup from '@/components/Popup';
 import { useLearningLookup } from '@/hooks/useLearningLookup';
 import type { LookupMode } from '@/services/learning/types';
+import type { LookupSettings } from '@/services/learning/settings';
 import type { Position } from '@/utils/sel';
+import { useOpenAIInNotebook } from '../../hooks/useOpenAIInNotebook';
+import { buildAskAboutThisMessage } from './LookupPopupUtils';
+import { useBookDataStore } from '@/store/bookDataStore';
+import { useSettingsStore } from '@/store/settingsStore';
 
 interface LearningLookupPopupProps {
   bookKey: string;
@@ -17,10 +22,12 @@ interface LearningLookupPopupProps {
   onDismiss: () => void;
 }
 
-const speak = (text: string) => {
+const speak = (text: string, lang?: string) => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  const utterance = new SpeechSynthesisUtterance(text);
+  if (lang) utterance.lang = lang;
+  window.speechSynthesis.speak(utterance);
 };
 
 const LearningLookupPopup: React.FC<LearningLookupPopupProps> = ({
@@ -40,7 +47,14 @@ const LearningLookupPopup: React.FC<LearningLookupPopupProps> = ({
     selectedText,
     mode,
   });
+  const lookupSettings = useSettingsStore(
+    (state: { settings: { globalReadSettings?: { lookup?: LookupSettings } } }) =>
+      state.settings.globalReadSettings?.lookup,
+  );
   const [saved, setSaved] = React.useState(false);
+  const { openAIInNotebook } = useOpenAIInNotebook();
+  const { getBookData } = useBookDataStore();
+  const bookLanguage = getBookData(bookKey)?.book?.primaryLanguage;
 
   const dictionaryFirst = mode === 'dictionary';
   const dictionary = result?.dictionaryEntries ?? [];
@@ -87,19 +101,16 @@ const LearningLookupPopup: React.FC<LearningLookupPopupProps> = ({
           <button
             type='button'
             className='btn btn-ghost btn-sm'
-            onClick={() => speak(selectedText)}
+            onClick={() => speak(selectedText, bookLanguage)}
           >
             <RiVolumeUpLine />
           </button>
         </header>
-
         {loading ? <p className='text-base-content/60 text-sm'>Looking up…</p> : null}
         {error ? (
           <div className='bg-error/10 text-error rounded-md p-2 text-sm'>
             {error}
-            <button type='button' className='ml-2 underline' onClick={retry}>
-              Retry
-            </button>
+            <button type='button' className='ml-2 underline' onClick={retry}></button>
           </div>
         ) : null}
 
@@ -109,13 +120,13 @@ const LearningLookupPopup: React.FC<LearningLookupPopupProps> = ({
         {result?.phonetic ? (
           <p className='text-base-content/70 text-sm'>{result.phonetic}</p>
         ) : null}
-        {result?.grammarHint ? (
+        {lookupSettings?.showGrammarHints !== false && result?.grammarHint ? (
           <p className='text-base-content/70 text-sm'>{result.grammarHint}</p>
         ) : null}
-        {result?.frequencyBadge ? (
+        {lookupSettings?.showFrequencyBadges !== false && result?.frequencyBadge ? (
           <div className='badge badge-outline'>{result.frequencyBadge.level}</div>
         ) : null}
-        {result?.examples.length ? (
+        {lookupSettings?.showExamples !== false && result?.examples.length ? (
           <section>
             <h3 className='text-base-content/60 text-xs font-semibold uppercase'>Examples</h3>
             <ul className='list-disc space-y-1 pl-4 text-sm'>
@@ -140,13 +151,30 @@ const LearningLookupPopup: React.FC<LearningLookupPopupProps> = ({
             className='btn btn-primary btn-sm'
             disabled={!result || saved}
             onClick={async () => {
-              await saveToVocabulary();
-              setSaved(true);
+              try {
+                await saveToVocabulary();
+                setSaved(true);
+              } catch (error) {
+                // Ignore or toast
+              }
             }}
           >
             {saved ? 'Saved' : 'Save to vocabulary'}
           </button>
-          <button type='button' className='btn btn-ghost btn-sm' disabled={!result}>
+          <button
+            type='button'
+            className='btn btn-ghost btn-sm'
+            disabled={!result}
+            onClick={() => {
+              const prompt = buildAskAboutThisMessage(selectedText, result as never, {} as never);
+              void openAIInNotebook({
+                bookHash,
+                newConversationTitle: `About "${selectedText}"`,
+                firstMessageContent: prompt,
+              });
+              onDismiss();
+            }}
+          >
             <RiRobot2Line /> Ask AI
           </button>
         </footer>

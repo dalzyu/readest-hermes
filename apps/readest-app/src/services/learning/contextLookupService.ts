@@ -297,10 +297,6 @@ export async function runContextLookup(
     attempt.fields,
     request.selectedText,
   );
-  const targetAnnotations = plugins.target.enrichTargetAnnotations?.(
-    attempt.fields,
-    request.selectedText,
-  );
   const sourceExampleAnnotations = plugins.source.enrichExampleAnnotations?.(
     parsedExamples,
     'source',
@@ -317,13 +313,11 @@ export async function runContextLookup(
             examples: sourceExampleAnnotations ?? sourceAnnotations?.examples,
           }
         : undefined,
-    target:
-      targetAnnotations || targetExampleAnnotations
-        ? {
-            ...targetAnnotations,
-            examples: targetExampleAnnotations ?? targetAnnotations?.examples,
-          }
-        : undefined,
+    target: targetExampleAnnotations
+      ? {
+          examples: targetExampleAnnotations,
+        }
+      : undefined,
   };
 
   return {

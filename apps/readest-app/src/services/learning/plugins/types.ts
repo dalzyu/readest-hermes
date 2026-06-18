@@ -8,11 +8,6 @@ export interface LookupPlugin {
     fields: Record<string, string>,
     selectedText: string,
   ) => LookupAnnotations | undefined;
-  /** Enriches the result with target-language annotations */
-  enrichTargetAnnotations?: (
-    fields: Record<string, string>,
-    selectedText: string,
-  ) => LookupAnnotations | undefined;
   enrichExampleAnnotations?: (
     examples: LookupExample[],
     slot: 'source' | 'target',

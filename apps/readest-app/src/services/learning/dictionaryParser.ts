@@ -182,7 +182,12 @@ export async function extractFromZip(
       const ifo = ifoBuffer;
       const idx = idxBuffer;
 
-      dictBufferPromise.then((dictBuffer) => resolve({ ifo, idx, dict: dictBuffer }), reject);
+      dictBufferPromise
+        .catch((error) => {
+          if (plainDictBuffer) return plainDictBuffer;
+          throw error;
+        })
+        .then((dictBuffer) => resolve({ ifo, idx, dict: dictBuffer }), reject);
     });
   });
 }

@@ -12,6 +12,8 @@ export interface ChatStreamInput {
   messages: AIMessage[];
   bookHash: string;
   bookTitle: string;
+  authorName?: string;
+  currentPage?: number;
   aiSettings: AISettings;
   signal?: AbortSignal;
 }
@@ -87,7 +89,12 @@ export async function streamChat(
     }
   }
 
-  const systemPrompt = buildSystemPrompt(input.bookTitle, '', chunks, 0);
+  const systemPrompt = buildSystemPrompt(
+    input.bookTitle,
+    input.authorName ?? '',
+    chunks,
+    input.currentPage ?? 0,
+  );
   const messages = input.messages.map((message) => ({
     role: message.role,
     content: message.content,

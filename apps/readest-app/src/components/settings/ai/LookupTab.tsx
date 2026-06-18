@@ -1,10 +1,17 @@
 import React from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { normalizeLookupSettings } from '@/services/learning/settings';
 
 const LookupTab: React.FC = () => {
+  const _ = useTranslation();
   const { settings, setSettings } = useSettingsStore();
   const lookup = normalizeLookupSettings(settings.globalReadSettings?.lookup);
+  const LABELS: Record<string, string> = {
+    showExamples: _('Show examples'),
+    showGrammarHints: _('Show grammar hints'),
+    showFrequencyBadges: _('Show frequency badges'),
+  };
   const update = (patch: Partial<typeof lookup>) => {
     setSettings({
       ...settings,
@@ -34,17 +41,9 @@ const LookupTab: React.FC = () => {
           onChange={(event) => update({ targetLanguage: event.target.value })}
         />
       </label>
-      {(
-        [
-          'aiPreferred',
-          'showExamples',
-          'showGrammarHints',
-          'showFrequencyBadges',
-          'autoExpandSelection',
-        ] as const
-      ).map((key) => (
+      {(['showExamples', 'showGrammarHints', 'showFrequencyBadges'] as const).map((key) => (
         <label key={key} className='flex items-center justify-between gap-3'>
-          <span>{key}</span>
+          <span>{LABELS[key as keyof typeof LABELS]}</span>
           <input
             type='checkbox'
             className='toggle'

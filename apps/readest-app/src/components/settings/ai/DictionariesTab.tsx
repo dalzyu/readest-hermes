@@ -1,5 +1,4 @@
 import React from 'react';
-import { SUPPORTED_DICTIONARY_IMPORT_FORMATS } from '@/services/learning/dictionaryService';
 import { normalizeDictionarySettings } from '@/services/learning/settings';
 import { useSettingsStore } from '@/store/settingsStore';
 
@@ -15,9 +14,6 @@ const DictionariesTab: React.FC = () => {
   return (
     <section className='space-y-3'>
       <h3 className='font-semibold'>Dictionaries</h3>
-      <p className='text-base-content/60 text-sm'>
-        Supported formats: {SUPPORTED_DICTIONARY_IMPORT_FORMATS}
-      </p>
       <label className='flex items-center justify-between gap-3'>
         <span>Enable dictionaries</span>
         <input

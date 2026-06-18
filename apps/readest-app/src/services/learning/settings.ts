@@ -1,16 +1,14 @@
 import type { UserDictionary } from '@/services/learning/types';
-
-export type TranslatorName = 'deepl' | 'azure' | 'google' | 'yandex';
+import type { TranslatorName } from './translator/providers/index';
+export type { TranslatorName };
 
 export interface LookupSettings {
   enabled: boolean;
   targetLanguage: string;
   translatorProvider: TranslatorName;
-  aiPreferred: boolean;
   showExamples: boolean;
   showGrammarHints: boolean;
   showFrequencyBadges: boolean;
-  autoExpandSelection: boolean;
 }
 
 export interface DictionarySettings {
@@ -23,11 +21,9 @@ export const DEFAULT_LOOKUP_SETTINGS: LookupSettings = {
   enabled: false,
   targetLanguage: 'en',
   translatorProvider: 'deepl',
-  aiPreferred: true,
   showExamples: true,
   showGrammarHints: true,
   showFrequencyBadges: true,
-  autoExpandSelection: true,
 };
 
 export const DEFAULT_DICTIONARY_SETTINGS: DictionarySettings = {

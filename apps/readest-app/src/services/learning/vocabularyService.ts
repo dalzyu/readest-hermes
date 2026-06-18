@@ -34,14 +34,17 @@ export async function saveVocabularyEntry(input: NewEntry): Promise<VocabularyEn
  * SM-2 spaced repetition update. Grade 0-2 = fail, 3-5 = pass.
  * Returns updated entry with new scheduling fields; does NOT persist.
  */
-export function sm2Update(entry: VocabularyEntry, grade: 0 | 1 | 2 | 3 | 4 | 5): VocabularyEntry {
+export function sm2Update(
+  entry: VocabularyEntry,
+  grade: 0 | 1 | 2 | 3 | 4 | 5,
+  now = Date.now(),
+): VocabularyEntry {
   const EF_MIN = 1.3;
   const ef = Math.max(
     EF_MIN,
     (entry.easeFactor ?? 2.5) + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02)),
   );
   const repetition = entry.repetition ?? 0;
-  const now = Date.now();
 
   if (grade >= 3) {
     // Correct response
@@ -87,8 +90,7 @@ export async function markVocabularyEntryReviewed(
   if (!entry) throw new Error('Vocabulary entry not found');
   const grade =
     typeof quality === 'number' ? quality : quality === 'again' ? 1 : quality === 'easy' ? 5 : 3;
-  const updated = sm2Update(entry, grade);
-  updated.lastReviewedAt = now;
+  const updated = sm2Update(entry, grade, now);
   return saveVocabularyEntry(updated);
 }
 

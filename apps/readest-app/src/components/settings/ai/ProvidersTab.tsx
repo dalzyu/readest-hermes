@@ -6,7 +6,7 @@ const ProvidersTab: React.FC = () => {
   return (
     <section className='space-y-3'>
       <h3 className='font-semibold'>Providers</h3>
-      <p className='text-base-content/60 text-sm'>Configure model providers and task routing.</p>
+      <p className='text-base-content/60 text-sm'>View configured model providers.</p>
       <div className='space-y-2'>
         {(aiSettings?.providers ?? []).map((provider) => (
           <div key={provider.id} className='border-base-300 rounded-md border p-3'>
