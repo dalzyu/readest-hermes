@@ -10,6 +10,7 @@ import { NativeTouchEventType } from '@/types/system';
 import { getLocale, getOSPlatform, makeSafeFilename, uniqueId } from '@/utils/misc';
 import { useThemeStore } from '@/store/themeStore';
 import { useBookDataStore } from '@/store/bookDataStore';
+import { getBookProgress, useBookProgress } from '@/store/readerProgressStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useNotebookStore } from '@/store/notebookStore';
@@ -45,7 +46,7 @@ import {
 import { Insets } from '@/types/misc';
 import { runSimpleCC } from '@/utils/simplecc';
 import { getWordCount } from '@/utils/word';
-import { getIndexFromCfi, isCfiInLocation } from '@/utils/cfi';
+import { getIndexFromCfi } from '@/utils/cfi';
 import { writeTextToClipboard } from '@/utils/clipboard';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
@@ -54,6 +55,7 @@ import {
   getHighlightColorHex,
   removeBookNoteOverlays,
 } from '../../utils/annotatorUtil';
+import { buildAnnotationIndex, selectLocationAnnotations } from '../../utils/annotationIndex';
 import {
   expandAllRenderedSections,
   expandGlobalAnnotation,
@@ -91,8 +93,15 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
   const { settings, setSettingsDialogBookKey, setSettingsDialogOpen, setActiveSettingsItemId } =
     useSettingsStore();
   const { isDarkMode } = useThemeStore();
-  const { getConfig, saveConfig, getBookData, updateBooknotes } = useBookDataStore();
-  const { getProgress, getView, getViewsById, getViewSettings } = useReaderStore();
+  // Per-field selectors — see store/readerProgressStore.ts header for the
+  // "destructure-subscribes-the-whole-store" rationale.
+  const getConfig = useBookDataStore((s) => s.getConfig);
+  const saveConfig = useBookDataStore((s) => s.saveConfig);
+  const getBookData = useBookDataStore((s) => s.getBookData);
+  const updateBooknotes = useBookDataStore((s) => s.updateBooknotes);
+  const getView = useReaderStore((s) => s.getView);
+  const getViewsById = useReaderStore((s) => s.getViewsById);
+  const getViewSettings = useReaderStore((s) => s.getViewSettings);
   const { setNotebookVisible, setNotebookNewAnnotation } = useNotebookStore();
   const { clearBooknotesNav } = useSidebarStore();
   const { listenToNativeTouchEvents } = useDeviceControlStore();
@@ -112,7 +121,11 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
 
   const osPlatform = getOSPlatform();
   const config = getConfig(bookKey)!;
-  const progress = getProgress(bookKey)!;
+  // Reactive: subscribe to THIS book's progress via the dedicated
+  // progress store. This is the only piece of data we need to react to
+  // per page turn — the `useEffect(..., [progress])` below uses it to
+  // re-apply local-page annotations after each relocate.
+  const progress = useBookProgress(bookKey)!;
   const bookData = getBookData(bookKey)!;
   const view = getView(bookKey);
   const viewSettings = getViewSettings(bookKey)!;
@@ -793,25 +806,33 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection, bookKey]);
 
+  // Index live annotations by the CFI spine prefix (the chapter id) so
+  // each page turn only scans the bucket for the current chapter rather
+  // than the whole booknotes array. With heavy users (>1k highlights) a
+  // naive `booknotes.filter(...)` per page turn was the dominant
+  // contributor to `c` (epubcfi parse) in the Bottom-Up profile —
+  // ~1.4 s self time over a 28 s session. The bucketed read replaces
+  // O(N) walks with O(K) where K is the number of annotations in the
+  // currently-visible chapter (typically a handful).
+  //
+  // `globals` (book-wide highlights) are split into their own pre-filtered
+  // array so we don't re-walk N items each turn just to find the same few
+  // global ones. The index is recomputed only when `booknotes` itself
+  // changes (add/remove/edit) — not on every page turn.
+  const annotationIndex = useMemo(
+    () => buildAnnotationIndex(config.booknotes ?? []),
+    [config.booknotes],
+  );
+
   useEffect(() => {
     if (!progress) return;
     const { location } = progress;
-    const { booknotes = [] } = config;
-    const annotations = booknotes.filter(
-      (item) =>
-        !item.deletedAt &&
-        item.type === 'annotation' &&
-        item.style &&
-        isCfiInLocation(item.cfi, location),
-    );
-    const notes = booknotes.filter(
-      (item) =>
-        !item.deletedAt &&
-        item.type === 'annotation' &&
-        item.note &&
-        item.note.trim().length > 0 &&
-        isCfiInLocation(item.cfi, location),
-    );
+    // Single pass over the *current chapter's* candidates: classify each
+    // one into the in-page annotations / notes lists. Using the bucket
+    // keeps this fast even when the user has thousands of highlights
+    // elsewhere in the book.
+    const { annotations, notes } = selectLocationAnnotations(annotationIndex, location);
+
     try {
       Promise.all(annotations.map((annotation) => view?.addAnnotation(annotation)));
       Promise.all(
@@ -821,18 +842,16 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
       // book-wide, so we don't filter by `location` here: every note
       // with `global=true` gets expanded across every section that
       // happens to be rendered right now. Sections rendered later are
-      // covered by `onCreateOverlay`.
-      const globalAnnotations = booknotes.filter(
-        (item) => !item.deletedAt && item.type === 'annotation' && item.style && item.global,
-      );
-      for (const annotation of globalAnnotations) {
+      // covered by `onCreateOverlay`. Using the pre-built `globals`
+      // array avoids re-walking booknotes per page turn.
+      for (const annotation of annotationIndex.globals) {
         if (view) expandAllRenderedSections(view, annotation);
       }
     } catch (e) {
       console.warn(e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progress]);
+  }, [progress, annotationIndex]);
 
   useEffect(() => {
     if (!config.booknotes || !selection?.cfi || !showAnnotationNotes) return;
@@ -979,7 +998,7 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
     const style = settings.globalReadSettings.highlightStyle;
     const color = settings.globalReadSettings.highlightStyles[style];
     const { booknotes: annotations = [] } = getConfig(bookKey)!;
-    const page = getProgress(bookKey)?.page;
+    const page = getBookProgress(bookKey)?.page;
     const annotation = buildTTSSentenceHighlight(
       annotations,
       { cfi: detail.cfi, text: detail.text, style, color, page },
