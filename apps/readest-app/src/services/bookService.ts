@@ -25,7 +25,7 @@ import { getBaseFilename, getFilename } from '@/utils/path';
 import { BookDoc, DocumentLoader, EXTS } from '@/libs/document';
 import { DEFAULT_BOOK_SEARCH_CONFIG, DEFAULT_FIXED_LAYOUT_VIEW_SETTINGS } from './constants';
 import { isContentURI, isValidURL, makeSafeFilename } from '@/utils/misc';
-import { deserializeConfig, serializeConfig } from '@/utils/serializer';
+import { deserializeConfig, serializeConfig, serializeRawConfig } from '@/utils/serializer';
 import { ClosableFile } from '@/utils/file';
 import { TxtToEpubConverter } from '@/utils/txt';
 import { svg2png } from '@/utils/svg';
@@ -169,7 +169,7 @@ export async function mergeBooks(
     }
     base.booknotes = [...noteMap.values()];
 
-    mergedConfigData = JSON.stringify(base);
+    mergedConfigData = serializeRawConfig(base);
   }
 
   for (const dup of duplicates) {
@@ -368,7 +368,7 @@ export async function importBook(
         const config: Partial<BookConfig> = JSON.parse(bestConfigData);
         config.bookHash = hash;
         config.metaHash = metaHash;
-        await fs.writeFile(getConfigFilename(book), 'Books', JSON.stringify(config));
+        await fs.writeFile(getConfigFilename(book), 'Books', serializeRawConfig(config));
       } else {
         const oldConfigPath = `${oldBookDir}/config.json`;
         if (await fs.exists(oldConfigPath, 'Books')) {
@@ -376,7 +376,7 @@ export async function importBook(
           const config: Partial<BookConfig> = JSON.parse(configData);
           config.bookHash = hash;
           config.metaHash = metaHash;
-          await fs.writeFile(getConfigFilename(book), 'Books', JSON.stringify(config));
+          await fs.writeFile(getConfigFilename(book), 'Books', serializeRawConfig(config));
         } else {
           await saveBookConfigFn(book, INIT_BOOK_CONFIG);
         }
@@ -390,7 +390,7 @@ export async function importBook(
       const config: Partial<BookConfig> = JSON.parse(bestConfigData);
       config.bookHash = hash;
       config.metaHash = metaHash;
-      await fs.writeFile(getConfigFilename(book), 'Books', JSON.stringify(config));
+      await fs.writeFile(getConfigFilename(book), 'Books', serializeRawConfig(config));
     }
 
     // update file links with url or path or content uri
@@ -522,7 +522,7 @@ export async function saveBookConfig(
     };
     serializedConfig = serializeConfig(config, globalViewSettings, DEFAULT_BOOK_SEARCH_CONFIG);
   } else {
-    serializedConfig = JSON.stringify(config);
+    serializedConfig = serializeRawConfig(config);
   }
   await fs.writeFile(getConfigFilename(book), 'Books', serializedConfig);
 }
