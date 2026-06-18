@@ -24,7 +24,6 @@ import HintInfo from './HintInfo';
 import ReadingRuler from './ReadingRuler';
 import DoubleBorder from './DoubleBorder';
 
-import IndexingProgressBar from './IndexingProgressBar';
 interface BooksGridProps {
   bookKeys: string[];
   onCloseBook: (bookKey: string) => void;
@@ -35,7 +34,7 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
   const _ = useTranslation();
   const { appService } = useEnv();
   const { getConfig, getBookData } = useBookDataStore();
-  const { getProgress, getViewState, getViewSettings, indexingProgress } = useReaderStore();
+  const { getProgress, getViewState, getViewSettings } = useReaderStore();
   const { setGridInsets, hoveredBookKey } = useReaderStore();
   const { sideBarBookKey } = useSidebarStore();
   const [dropdownOpenBook, setDropdownOpenBook] = useState<string>('');
@@ -107,11 +106,8 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
         };
         const scrolled = viewSettings.scrolled;
         const showBarsOnScroll = viewSettings.showBarsOnScroll;
-        const chromeVisible = !viewSettings.focusMode;
-        const showHeader =
-          chromeVisible && viewSettings.showHeader && (scrolled ? showBarsOnScroll : true);
-        const showFooter =
-          chromeVisible && viewSettings.showFooter && (scrolled ? showBarsOnScroll : true);
+        const showHeader = viewSettings.showHeader && (scrolled ? showBarsOnScroll : true);
+        const showFooter = viewSettings.showFooter && (scrolled ? showBarsOnScroll : true);
 
         return (
           <div
@@ -122,28 +118,18 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
               appService?.hasRoundedWindow && 'rounded-window',
             )}
           >
-            {chromeVisible && isBookmarked && !hoveredBookKey && (
-              <Ribbon width={`${horizontalGapPercent}%`} />
-            )}
-            {chromeVisible && (
-              <>
-                <HeaderBar
-                  bookKey={bookKey}
-                  gridInsets={gridInsets}
-                  screenInsets={screenInsets}
-                  bookTitle={book.title}
-                  isTopLeft={index === 0}
-                  isHoveredAnim={bookKeys.length > 2}
-                  onCloseBook={onCloseBook}
-                  onGoToLibrary={onGoToLibrary}
-                  onDropdownOpenChange={(isOpen) => setDropdownOpenBook(isOpen ? bookKey : '')}
-                />
-                <PageNavigationButtons
-                  bookKey={bookKey}
-                  isDropdownOpen={dropdownOpenBook === bookKey}
-                />
-              </>
-            )}
+            {isBookmarked && !hoveredBookKey && <Ribbon width={`${horizontalGapPercent}%`} />}
+            <HeaderBar
+              bookKey={bookKey}
+              gridInsets={gridInsets}
+              screenInsets={screenInsets}
+              bookTitle={book.title}
+              isTopLeft={index === 0}
+              isHoveredAnim={bookKeys.length > 2}
+              onCloseBook={onCloseBook}
+              onGoToLibrary={onGoToLibrary}
+              onDropdownOpenChange={(isOpen) => setDropdownOpenBook(isOpen ? bookKey : '')}
+            />
             <FoliateViewer
               key={viewerKey}
               bookKey={bookKey}
@@ -152,7 +138,7 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
               gridInsets={gridInsets}
               contentInsets={contentInsets}
             />
-            {chromeVisible && viewSettings.vertical && viewSettings.scrolled && (
+            {viewSettings.vertical && viewSettings.scrolled && (
               <>
                 {(showFooter || viewSettings.doubleBorder) && (
                   <div
@@ -174,7 +160,7 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
                 )}
               </>
             )}
-            {chromeVisible && viewSettings.vertical && viewSettings.doubleBorder && (
+            {viewSettings.vertical && viewSettings.doubleBorder && (
               <DoubleBorder
                 showHeader={showHeader}
                 showFooter={showFooter}
@@ -196,19 +182,17 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
                 gridInsets={gridInsets}
               />
             )}
-            {chromeVisible && (
-              <HintInfo
-                bookKey={bookKey}
-                showDoubleBorder={viewSettings.vertical && viewSettings.doubleBorder}
-                isScrolled={viewSettings.scrolled}
-                isVertical={viewSettings.vertical}
-                isEink={viewSettings.isEink}
-                horizontalGap={horizontalGapPercent}
-                contentInsets={contentInsets}
-                gridInsets={gridInsets}
-              />
-            )}
-            {chromeVisible && viewSettings.readingRulerEnabled && viewState?.inited && (
+            <HintInfo
+              bookKey={bookKey}
+              showDoubleBorder={viewSettings.vertical && viewSettings.doubleBorder}
+              isScrolled={viewSettings.scrolled}
+              isVertical={viewSettings.vertical}
+              isEink={viewSettings.isEink}
+              horizontalGap={horizontalGapPercent}
+              contentInsets={contentInsets}
+              gridInsets={gridInsets}
+            />
+            {viewSettings.readingRulerEnabled && viewState?.inited && (
               <ReadingRuler
                 bookKey={bookKey}
                 isVertical={viewSettings.vertical}
@@ -230,29 +214,22 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
                 gridInsets={gridInsets}
               />
             )}
-            {chromeVisible && <Annotator bookKey={bookKey} />}
-            {chromeVisible && <SearchResultsNav bookKey={bookKey} gridInsets={gridInsets} />}
-            {chromeVisible && (
-              <BooknotesNav bookKey={bookKey} gridInsets={gridInsets} toc={bookDoc.toc || []} />
-            )}
-            {chromeVisible && <FootnotePopup bookKey={bookKey} bookDoc={bookDoc} />}
-            {chromeVisible && (
-              <FooterBar
-                bookKey={bookKey}
-                bookFormat={book.format}
-                section={section}
-                pageinfo={pageinfo}
-                isHoveredAnim={false}
-                gridInsets={gridInsets}
-              />
-            )}
-            {chromeVisible && indexingProgress[bookKey] && (
-              <IndexingProgressBar
-                current={indexingProgress[bookKey]!.current}
-                total={indexingProgress[bookKey]!.total}
-                phase={indexingProgress[bookKey]!.phase}
-              />
-            )}
+            <PageNavigationButtons
+              bookKey={bookKey}
+              isDropdownOpen={dropdownOpenBook === bookKey}
+            />
+            <Annotator bookKey={bookKey} />
+            <SearchResultsNav bookKey={bookKey} gridInsets={gridInsets} />
+            <BooknotesNav bookKey={bookKey} gridInsets={gridInsets} toc={bookDoc.toc || []} />
+            <FootnotePopup bookKey={bookKey} bookDoc={bookDoc} />
+            <FooterBar
+              bookKey={bookKey}
+              bookFormat={book.format}
+              section={section}
+              pageinfo={pageinfo}
+              isHoveredAnim={false}
+              gridInsets={gridInsets}
+            />
           </div>
         );
       })}
