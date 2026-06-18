@@ -4,17 +4,11 @@ import { CustomTexture } from '@/styles/textures';
 import { HighlightColor, HighlightStyle, UserHighlightColor, ViewSettings } from './book';
 import { OPDSCatalog } from './opds';
 import type { AISettings } from '@/services/ai/types';
-import type { DictionarySettings, LookupSettings } from '@/services/learning/settings';
-import type {
-  ContextDictionarySettings,
-  ContextTranslationSettings,
-  UserDictionary,
-} from '@/services/learning/types';
 import type { NotebookTab } from '@/store/notebookStore';
+import type { DictionarySettings, ImportedDictionary } from '@/services/dictionaries/types';
 
 export type ThemeType = 'light' | 'dark' | 'auto';
 export type LibraryViewModeType = 'grid' | 'list';
-export type LibrarySurfaceModeType = 'books' | 'series';
 export const LibrarySortByType = {
   Title: 'title',
   Author: 'author',
@@ -59,13 +53,6 @@ export interface ReadSettings {
   defaultHighlightLabels: Partial<Record<HighlightColor, string>>;
   customTtsHighlightColors: string[];
   customThemes: CustomTheme[];
-
-  lookup?: LookupSettings;
-  dictionary?: DictionarySettings;
-  /** Legacy settings kept readable until lookup UI migration is complete. */
-  contextTranslation?: ContextTranslationSettings;
-  contextDictionary?: ContextDictionarySettings;
-  autoIndexOnOpen?: boolean;
 }
 
 export interface KOSyncSettings {
@@ -85,6 +72,27 @@ export interface ReadwiseSettings {
   accessToken: string;
   lastSyncedAt: number;
 }
+
+export interface HardcoverSettings {
+  enabled: boolean;
+  accessToken: string;
+  lastSyncedAt: number;
+}
+
+/**
+ * User-facing sync categories. 'progress' gates the existing book-config
+ * (reading progress) sync, 'note' gates annotations, 'book' gates book
+ * binaries + metadata, 'dictionary' gates the imported-dictionary replica
+ * sync. Adding a new replica kind extends this union.
+ */
+export type SyncCategory = 'book' | 'progress' | 'note' | 'dictionary';
+
+export const SYNC_CATEGORIES: readonly SyncCategory[] = [
+  'book',
+  'progress',
+  'note',
+  'dictionary',
+] as const;
 
 export interface SystemSettings {
   version: number;
@@ -117,7 +125,8 @@ export interface SystemSettings {
   libraryColumns: number;
   customFonts: CustomFont[];
   customTextures: CustomTexture[];
-  userDictionaryMeta: UserDictionary[];
+  customDictionaries: ImportedDictionary[];
+  dictionarySettings: DictionarySettings;
   opdsCatalogs: OPDSCatalog[];
   metadataSeriesCollapsed: boolean;
   metadataOthersCollapsed: boolean;
@@ -125,14 +134,30 @@ export interface SystemSettings {
 
   kosync: KOSyncSettings;
   readwise: ReadwiseSettings;
+  hardcover: HardcoverSettings;
 
   lastSyncedAtBooks: number;
   lastSyncedAtConfigs: number;
   lastSyncedAtNotes: number;
+  /**
+   * Per-kind cursor for replica sync. Stores the HLC string of the last
+   * pulled row per kind. Absent kinds pull from the beginning.
+   */
+  lastSyncedAtReplicas?: Record<string, string>;
+  /**
+   * Per-category sync toggles. Missing keys default to ON. The
+   * 'progress' category gates the existing book-config (reading
+   * progress) sync; 'note' gates annotation sync; 'book' gates book
+   * binary + metadata sync; 'dictionary' gates the imported-dictionary
+   * replica sync. Future replica kinds add new SyncCategory members.
+   */
+  syncCategories?: Partial<Record<SyncCategory, boolean>>;
 
   migrationVersion: number;
 
   aiSettings: AISettings;
+  // Global read settings that apply to the reader page
   globalReadSettings: ReadSettings;
+  // Global view settings that apply to all books, and can be overridden by book-specific view settings
   globalViewSettings: ViewSettings;
 }
