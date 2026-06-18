@@ -19,7 +19,7 @@ jobs:
         with:
           submodules: 'true'
       - name: setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install minimal stable with clippy and rustfmt
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -40,19 +40,17 @@ jobs:
         run: cargo fmt --check
       - name: Clippy Check
         working-directory: apps/readest-app/src-tauri
-        run: cargo clippy -p Hermes --no-deps -- -D warnings
+        run: cargo clippy -p Readest --no-deps -- -D warnings
 
   build_web_app:
     runs-on: ubuntu-latest
-    env:
-      NODE_OPTIONS: '--max-old-space-size=8192'
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: 'true'
 
       - name: setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
 
       - name: setup node
         uses: actions/setup-node@v6
@@ -74,17 +72,12 @@ jobs:
         run: |
           pnpm install && pnpm setup-vendors
 
+      - name: install LuaJIT (for koplugin lint)
+        run: sudo apt-get update && sudo apt-get install -y luajit
+
       - name: run format check
         run: |
           pnpm format:check || (pnpm format && git diff && exit 1)
-
-      - name: install playwright browsers
-        working-directory: apps/readest-app
-        run: npx playwright install --with-deps chromium
-
-      - name: run web tests
-        working-directory: apps/readest-app
-        run: pnpm test:pr:web
 
       - name: run lint
         working-directory: apps/readest-app
@@ -95,6 +88,78 @@ jobs:
         working-directory: apps/readest-app
         run: |
           pnpm build-web && pnpm check:all
+
+      - name: install playwright browsers
+        working-directory: apps/readest-app
+        run: npx playwright install --with-deps chromium
+
+      - name: run web e2e tests
+        id: web_e2e
+        working-directory: apps/readest-app
+        run: pnpm test:e2e:web
+
+      - name: upload e2e report
+        if: ${{ failure() && steps.web_e2e.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/readest-app/playwright-report/
+          retention-days: 7
+
+  test_web_app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: 'true'
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: cache Next.js build
+        uses: actions/cache@v5
+        with:
+          path: apps/readest-app/.next/cache
+          key: nextjs-test-${{ github.sha }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            nextjs-test-${{ github.sha }}-
+            nextjs-test-
+
+      - name: install Dependencies
+        working-directory: apps/readest-app
+        run: |
+          pnpm install && pnpm setup-vendors
+
+      - name: install LuaJIT + busted (for koplugin tests)
+        run: |
+          sudo apt-get update
+          # luajit  — pnpm test:lua
+          # luarocks/libsqlite3-dev — required to build lsqlite3complete
+          sudo apt-get install -y luajit luarocks libsqlite3-dev
+          # Install busted + the SQLite binding the LibraryStore specs use,
+          # both pinned to Lua 5.1 (LuaJIT-compatible). System-wide install
+          # so `luarocks --lua-version=5.1 path` (sourced by
+          # scripts/test-koplugin.mjs) picks them up.
+          sudo luarocks --lua-version=5.1 install busted
+          sudo luarocks --lua-version=5.1 install lsqlite3complete
+
+      - name: install playwright browsers
+        working-directory: apps/readest-app
+        run: npx playwright install --with-deps chromium
+
+      - name: run web tests
+        working-directory: apps/readest-app
+        run: pnpm test:pr:web
+
+      - name: run koplugin tests
+        working-directory: apps/readest-app
+        run: pnpm test:lua
 
   build_tauri_app:
     runs-on: ubuntu-latest
@@ -107,7 +172,7 @@ jobs:
           submodules: 'true'
 
       - name: setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
 
       - name: setup node
         uses: actions/setup-node@v6
@@ -130,7 +195,7 @@ jobs:
           pnpm install && pnpm setup-vendors
 
       - name: setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -151,14 +216,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libfontconfig-dev libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libsoup-3.0-dev xvfb
-
-      - name: run format check
-        working-directory: apps/readest-app
-        run: pnpm format:check
-
-      - name: run lint
-        working-directory: apps/readest-app
-        run: pnpm lint
 
       - name: run tauri tests
         working-directory: apps/readest-app

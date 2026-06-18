@@ -67,6 +67,13 @@ src-tauri/gen
 
 /dist/
 
+.context/
 .claude/settings.local.json
 .claude/skills
+
+# Playwright web e2e
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 
