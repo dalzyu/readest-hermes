@@ -14,7 +14,9 @@ import {
   generateLightPalette,
   generateDarkPalette,
 } from '@/styles/themes';
+import { createFontCSS, CustomFont } from '@/styles/fonts';
 import { getOSPlatform } from './misc';
+import { SCROLL_WRAPPER_CLASS, SCROLL_WRAPPER_FIT_CLASS } from './scrollable';
 
 /**
  * Build the resolved CSS font-family lists (serif / sans-serif / monospace)
@@ -146,6 +148,54 @@ const getFontStyles = (
   return fontStyles;
 };
 
+/** True for #fff, #f5f5f5, rgb(255,…), etc. Used when rewriting EPUB CSS in dark mode. */
+const isLightCssColor = (value: string): boolean => {
+  const v = value.trim().toLowerCase();
+  if (v === 'white') return true;
+  const hex = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    const h = hex[1]!;
+    const expand =
+      h.length === 3
+        ? h
+            .split('')
+            .map((c) => c + c)
+            .join('')
+        : h;
+    const r = parseInt(expand.slice(0, 2), 16);
+    const g = parseInt(expand.slice(2, 4), 16);
+    const b = parseInt(expand.slice(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.85;
+  }
+  const rgb = v.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
+  if (rgb?.[1] != null && rgb[2] != null && rgb[3] != null) {
+    const r = parseInt(rgb[1], 10);
+    const g = parseInt(rgb[2], 10);
+    const b = parseInt(rgb[3], 10);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.85;
+  }
+  return false;
+};
+
+const getDarkModeLightBackgroundOverrides = (bg: string) => `
+    /* Callout boxes often use inline white/light backgrounds while html/body set dark fg. */
+    *[style*="background-color: #fff"], *[style*="background-color:#fff"],
+    *[style*="background-color: #ffffff"], *[style*="background-color:#ffffff"],
+    *[style*="background-color: white"], *[style*="background-color:white"],
+    *[style*="background: #fff"], *[style*="background:#fff"],
+    *[style*="background: #ffffff"], *[style*="background:#ffffff"],
+    *[style*="background: white"], *[style*="background:white"],
+    *[style*="background-color: rgb(255"], *[style*="background-color:rgb(255"],
+    *[style*="background: rgb(255"], *[style*="background:rgb(255"] {
+      background-color: ${bg} !important;
+    }
+    body.theme-dark {
+      background-color: ${bg} !important;
+    }
+`;
+
 const getEinkSelectionStyles = () => {
   return `
     ::selection {
@@ -221,6 +271,9 @@ const getColorStyles = (
     hr.background-img {
       mix-blend-mode: multiply;
     }
+    p[width][height] > img:only-child {
+      mix-blend-mode: multiply;
+    }
     /* inline images */
     *:has(> img.has-text-siblings):not(body) {
       ${overrideColor ? `background-color: ${bg};` : ''}
@@ -228,12 +281,12 @@ const getColorStyles = (
     p img.has-text-siblings, span img.has-text-siblings, sup img.has-text-siblings {
       mix-blend-mode: ${isDarkMode ? 'screen' : 'multiply'};
     }
-    table {
-      overflow: auto;
-      display: table !important;
-    }
     table:has(> colgroup) {
       table-layout: fixed;
+    }
+    td, th {
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
     /* code */
     body.theme-dark code {
@@ -264,6 +317,7 @@ const getColorStyles = (
     *[style*="color:#000"], *[style*="color:#000000"], *[style*="color:black"] {
       color: ${fg} !important;
     }
+    ${isDarkMode && !overrideColor ? getDarkModeLightBackgroundOverrides(bg) : ''}
     /* for the Gutenberg eBooks */
     #pg-header * {
       color: inherit !important;
@@ -284,46 +338,23 @@ const getColorStyles = (
   return colorStyles;
 };
 
-const getLayoutStyles = (
-  overrideLayout: boolean,
+const getPageLayoutStyles = (
   marginTop: number,
   marginRight: number,
   marginBottom: number,
   marginLeft: number,
-  paragraphMargin: number,
-  lineSpacing: number,
-  wordSpacing: number,
-  letterSpacing: number,
-  textIndent: number,
-  justify: boolean,
-  hyphenate: boolean,
   zoomLevel: number,
   writingMode: string,
   vertical: boolean,
-) => {
-  const layoutStyle = `
-  @namespace epub "http://www.idpf.org/2007/ops";
+) => `
   html {
-    --default-text-align: ${justify ? 'justify' : 'start'};
     --margin-top: ${marginTop}px;
     --margin-right: ${marginRight}px;
     --margin-bottom: ${marginBottom}px;
     --margin-left: ${marginLeft}px;
-    hanging-punctuation: allow-end last;
-    orphans: 2;
-    widows: 2;
-  }
-  [align="left"] { text-align: left; }
-  [align="right"] { text-align: right; }
-  [align="center"] { text-align: center; }
-  [align="justify"] { text-align: justify; }
-  :is(hgroup, header) p {
-      text-align: unset;
-      hyphens: unset;
   }
   html, body {
     ${writingMode === 'auto' ? '' : `writing-mode: ${writingMode} !important;`}
-    text-align: var(--default-text-align);
     max-height: unset;
     -webkit-touch-callout: none;
     -webkit-user-select: text;
@@ -351,6 +382,157 @@ const getLayoutStyles = (
     content: '';
     position: absolute;
     inset: -10px;
+  }
+
+  .${SCROLL_WRAPPER_CLASS} {
+    display: block;
+    overflow: auto;
+    max-width: 100%;
+    touch-action: pan-x pan-y;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .${SCROLL_WRAPPER_FIT_CLASS} {
+    overflow: visible;
+  }
+  .${SCROLL_WRAPPER_CLASS} > table {
+    display: table !important;
+    max-width: 100%;
+  }
+  pre, code, math {
+    white-space: pre-wrap !important;
+    scrollbar-width: none;
+  }
+  math {
+    overflow: auto;
+  }
+  table, math {
+    max-width: calc(var(--available-width) * 1px);
+    max-height: calc(var(--available-height) * 1px);
+  }
+
+  .epubtype-footnote,
+  aside[epub|type~="endnote"],
+  aside[epub|type~="footnote"],
+  aside[epub|type~="note"],
+  aside[epub|type~="rearnote"] {
+    display: none;
+  }
+
+  /* Now begins really dirty hacks to fix some badly designed epubs */
+  body {
+    line-height: unset;
+  }
+
+  .duokan-footnote-content,
+  .duokan-footnote-item {
+    display: none;
+  }
+
+  .duokan-image-gallery-cell {
+    height: calc(var(--available-height) * 1px);
+  }
+
+  .duokan-image-gallery-cell img {
+    height: 90%;
+  }
+
+  div:has(> img, > svg) {
+    max-width: 100% !important;
+  }
+
+  body.paginated-mode td:has(img), body.paginated-mode td :has(img) {
+    max-height: calc(var(--available-height) * 0.8 * 1px);
+  }
+
+  figure.code {
+    overflow: unset !important;
+  }
+
+  /* some epubs set insane inline-block for p */
+  p {
+    display: block;
+  }
+
+  /* inline images without dimension */
+  .ie6 img {
+    width: unset;
+    height: unset;
+  }
+  sup img {
+    height: 1em;
+  }
+  img.has-text-siblings {
+    ${vertical ? 'width: 1em;' : 'height: 1em;'}
+    vertical-align: baseline;
+  }
+  :is(div) > img.has-text-siblings[style*="object-fit"] {
+    display: block;
+    height: auto;
+    vertical-align: unset;
+  }
+  .duokan-footnote img:not([class]) {
+    width: 0.8em;
+    height: 0.8em;
+  }
+  div:has(img.singlepage) {
+    position: relative;
+    width: auto;
+    height: auto;
+  }
+  /* some mobi */
+  p[width][height] > img:only-child { 
+    width: unset !important;
+    height: unset !important;
+  }
+
+  /* page break */
+  body.paginated-mode div[style*="page-break-after: always"],
+  body.paginated-mode div[style*="page-break-after:always"],
+  body.paginated-mode p[style*="page-break-after: always"],
+  body.paginated-mode p[style*="page-break-after:always"] {
+    margin-bottom: calc(var(--available-height) * 1px);
+  }
+
+  .br {
+    display: flow-root;
+  }
+
+  .h5_mainbody {
+    overflow: unset !important;
+  }
+`;
+
+// Paragraph-scoped CSS controlled by the Paragraph section of the Layout
+// panel. Gated by BookStyle.useBookLayout: when true, this chunk is skipped
+// and the book's own paragraph formatting takes over.
+const getParagraphLayoutStyles = (
+  overrideLayout: boolean,
+  paragraphMargin: number,
+  lineSpacing: number,
+  wordSpacing: number,
+  letterSpacing: number,
+  textIndent: number,
+  justify: boolean,
+  hyphenate: boolean,
+  vertical: boolean,
+) => `
+  html {
+    --default-text-align: ${justify ? 'justify' : 'start'};
+    hanging-punctuation: allow-end last;
+    orphans: 2;
+    widows: 2;
+  }
+  html, body {
+    text-align: var(--default-text-align);
+  }
+  [align="left"] { text-align: left; }
+  [align="right"] { text-align: right; }
+  [align="center"] { text-align: center; }
+  [align="justify"] { text-align: justify; }
+  :is(hgroup, header) p {
+      text-align: unset;
+      hyphens: unset;
   }
   p, blockquote, dd, div:not(:has(*:not(b, a, em, i, strong, u, span))) {
     line-height: ${lineSpacing} ${overrideLayout ? '!important' : ''};
@@ -414,28 +596,20 @@ const getLayoutStyles = (
     ${!vertical && overrideLayout ? `margin-top: ${paragraphMargin}em !important;` : ''}
     ${!vertical && overrideLayout ? `margin-bottom: ${paragraphMargin}em !important;` : ''}
   }
+  p > font:only-child { 
+    display: flow-root; 
+  }
 
   :lang(zh), :lang(ja), :lang(ko) {
     widows: 1;
     orphans: 1;
   }
 
-  pre {
-    white-space: pre-wrap !important;
-  }
-
-  .epubtype-footnote,
-  aside[epub|type~="endnote"],
-  aside[epub|type~="footnote"],
-  aside[epub|type~="note"],
-  aside[epub|type~="rearnote"] {
-    display: none;
-  }
-
-  /* Now begins really dirty hacks to fix some badly designed epubs */
-  body {
-    line-height: unset;
-  }
+  /* workaround for some badly designed epubs */
+  div.left *, p.left * { text-align: left; }
+  div.right *, p.right * { text-align: right; }
+  div.center *, p.center * { text-align: center; }
+  div.justify *, p.justify * { text-align: justify; }
 
   img.pi {
     ${vertical ? 'transform: rotate(90deg);' : ''}
@@ -445,79 +619,10 @@ const getLayoutStyles = (
     ${vertical ? `vertical-align: unset;` : ''}
   }
 
-  .duokan-footnote-content,
-  .duokan-footnote-item {
-    display: none;
-  }
-
-  div:has(> img, > svg) {
-    max-width: 100% !important;
-  }
-
-  body.paginated-mode td:has(img), body.paginated-mode td :has(img) {
-    max-height: calc(var(--available-height) * 0.8 * 1px);
-  }
-
-  /* some epubs set insane inline-block for p */
-  p {
-    display: block;
-  }
-
-  /* inline images without dimension */
-  .ie6 img {
-    width: unset;
-    height: unset;
-  }
-  sup img {
-    height: 1em;
-  }
-  img.has-text-siblings {
-    ${vertical ? 'width: 1em;' : 'height: 1em;'}
-    vertical-align: baseline;
-  }
-  :is(div) > img.has-text-siblings[style*="object-fit"] {
-    display: block;
-    height: auto;
-    vertical-align: unset;
-  }
-  .duokan-footnote img:not([class]) {
-    width: 0.8em;
-    height: 0.8em;
-  }
-  div:has(img.singlepage) {
-    position: relative;
-    width: auto;
-    height: auto;
-  }
-
-  /* page break */
-  body.paginated-mode div[style*="page-break-after: always"],
-  body.paginated-mode div[style*="page-break-after:always"],
-  body.paginated-mode p[style*="page-break-after: always"],
-  body.paginated-mode p[style*="page-break-after:always"] {
-    margin-bottom: calc(var(--available-height) * 1px);
-  }
-
-  /* workaround for some badly designed epubs */
-  div.left *, p.left * { text-align: left; }
-  div.right *, p.right * { text-align: right; }
-  div.center *, p.center * { text-align: center; }
-  div.justify *, p.justify * { text-align: justify; }
-
-  .br {
-    display: flow-root;
-  }
-
-  .h5_mainbody {
-    overflow: unset !important;
-  }
-
   .nonindent, .noindent {
     text-indent: unset !important;
   }
 `;
-  return layoutStyle;
-};
 
 export const getFootnoteStyles = () => `
   .duokan-footnote-content,
@@ -565,6 +670,35 @@ export const getFootnoteStyles = () => `
   }
 `;
 
+/**
+ * Baseline stylesheet injected into every dictionary card's shadow root
+ * (alongside any loose `.css` files imported with the bundle and any
+ * `<link rel="stylesheet">` references resolved from the MDD).
+ *
+ * The seam exists so app-wide rules can be added in one place without
+ * touching the provider code. Currently it ships:
+ */
+export const getDictStyles = (bg: string, fg: string, isDarkMode: boolean) => {
+  void fg;
+  return `
+    a:empty {
+      background-color: transparent;
+      mix-blend-mode: multiply;
+    }
+    a img {
+      mix-blend-mode: multiply;
+    }
+    div[data-dict-kind="mdict"] .entry_name {
+      font-size: 1.2em;
+      margin-block-start: 0.5em;
+      margin-block-end: 0.5em;
+    }
+    div[data-dict-kind="mdict"] .juan_drop {
+      ${isDarkMode ? `background-color: color-mix(in srgb, ${bg} 80%, #000);` : ''}
+    }
+  `;
+};
+
 const getTranslationStyles = (showSource: boolean) => `
   .translation-source {
   }
@@ -581,6 +715,44 @@ const getTranslationStyles = (showSource: boolean) => `
     display: block !important;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+`;
+
+const getWarichuStyles = () => `
+  /* Warichu (割注/夹注) — double-line inline annotation */
+  .warichu-pending {
+    display: inline;
+    font-size: 0.5em;
+    line-height: 1.1;
+  }
+  .warichu-chunk {
+    display: inline-block;
+    line-height: 1.1;
+    font-size: 0.5em;
+    text-indent: 0;
+    vertical-align: middle !important;
+    width: 1lh !important;
+    text-align: center !important;
+  }
+  .warichu-chunk .warichu-line {
+    display: inline;
+  }
+  .warichu-open,
+  .warichu-close {
+    display: inline;
+    font-size: 0.5em;
+    vertical-align: middle;
+    line-height: 1.1;
+  }
+`;
+
+const getRubyStyles = () => `
+  rt {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  rp {
+    display: none !important;
   }
 `;
 
@@ -629,27 +801,36 @@ export const getThemeCode = () => {
   } as ThemeCode;
 };
 
-export const getStyles = (viewSettings: ViewSettings, themeCode?: ThemeCode) => {
+export const getStyles = (
+  viewSettings: ViewSettings,
+  themeCode?: ThemeCode,
+  customFonts: CustomFont[] = [],
+) => {
   if (!themeCode) {
     themeCode = getThemeCode();
   }
-  const layoutStyles = getLayoutStyles(
-    viewSettings.overrideLayout!,
+  const pageLayoutStyles = getPageLayoutStyles(
     viewSettings.marginTopPx,
     viewSettings.marginRightPx,
     viewSettings.marginBottomPx,
     viewSettings.marginLeftPx,
-    viewSettings.paragraphMargin!,
-    viewSettings.lineHeight!,
-    viewSettings.wordSpacing!,
-    viewSettings.letterSpacing!,
-    viewSettings.textIndent!,
-    viewSettings.fullJustification!,
-    viewSettings.hyphenation!,
     1.0,
     viewSettings.writingMode!,
     viewSettings.vertical!,
   );
+  const paragraphLayoutStyles = viewSettings.useBookLayout
+    ? ''
+    : getParagraphLayoutStyles(
+        viewSettings.overrideLayout!,
+        viewSettings.paragraphMargin!,
+        viewSettings.lineHeight!,
+        viewSettings.wordSpacing!,
+        viewSettings.letterSpacing!,
+        viewSettings.textIndent!,
+        viewSettings.fullJustification!,
+        viewSettings.hyphenation!,
+        viewSettings.vertical!,
+      );
   // scale the font size on-the-fly so that we can sync the same font size on different devices
   const isMobile = ['ios', 'android'].includes(getOSPlatform());
   const fontScale = isMobile ? 1.25 : 1;
@@ -666,6 +847,14 @@ export const getStyles = (viewSettings: ViewSettings, themeCode?: ThemeCode) => 
     viewSettings.fontWeight!,
     viewSettings.overrideFont!,
   );
+  // Inline `@font-face` rules for the caller-supplied custom fonts so
+  // they ship to the iframe synchronously with the rest of the
+  // stylesheet. Paginator injects this CSS into the iframe `<style>`
+  // before the 'load' event fires, so the first paint already resolves
+  // the configured font instead of falling back to serif/sans-serif and
+  // visibly swapping a moment later. Blob URLs are already in memory, so
+  // no network round-trip happens here.
+  const customFontFaces = getCustomFontFaces(customFonts);
   const colorStyles = getColorStyles(
     viewSettings.overrideColor!,
     viewSettings.invertImgColorInDark!,
@@ -674,9 +863,35 @@ export const getStyles = (viewSettings: ViewSettings, themeCode?: ThemeCode) => 
     viewSettings.isEink,
   );
   const translationStyles = getTranslationStyles(viewSettings.showTranslateSource!);
+  const warichuStyles = getWarichuStyles();
+  const rubyStyles = getRubyStyles();
   const userStylesheet = viewSettings.userStylesheet!;
-  return `${layoutStyles}\n${fontStyles}\n${colorStyles}\n${translationStyles}\n${userStylesheet}`;
+  // The `@namespace` declaration must lead the stylesheet: a `@namespace` rule
+  // placed after any style or `@font-face` rule is invalid and silently ignored,
+  // which drops the namespaced `aside[epub|type~="footnote"]` selector and lets
+  // the footnote aside's border show as a stray horizontal line (#4438). Keep it
+  // ahead of the inlined custom `@font-face` rules.
+  const epubNamespace = `@namespace epub "http://www.idpf.org/2007/ops";`;
+  return `${epubNamespace}\n${customFontFaces}\n${pageLayoutStyles}\n${paragraphLayoutStyles}\n${fontStyles}\n${colorStyles}\n${translationStyles}\n${warichuStyles}\n${rubyStyles}\n${userStylesheet}`;
 };
+
+// Build a CSS chunk of `@font-face` rules for the given user custom
+// fonts. The caller (a reader component) owns the font store and passes
+// in the loaded fonts, keeping this util free of store dependencies.
+// Fonts without a blob URL are skipped; createFontCSS throws when the
+// blob URL is unset, so the inner try/catch keeps a single bad font from
+// breaking the whole stylesheet.
+const getCustomFontFaces = (fonts: CustomFont[]): string =>
+  fonts
+    .filter((font) => !!font.blobUrl)
+    .map((font) => {
+      try {
+        return createFontCSS(font);
+      } catch {
+        return '';
+      }
+    })
+    .join('\n');
 
 export const applyTranslationStyle = (viewSettings: ViewSettings) => {
   const styleId = 'translation-style';
@@ -771,24 +986,16 @@ export const transformStylesheet = (css: string, vw: number, vh: number, vertica
       if (!/display\s*:/.test(block)) {
         block = block.replace(/}$/, ' display: flow-root !important; }');
       }
-      if (!/width\s*:/.test(block) && directions.includes('left') && directions.includes('right')) {
+      if (directions.includes('left') && directions.includes('right')) {
         block = block
-          .replace(
-            /}$/,
-            ' width: calc(var(--_max-width) + var(--page-margin-left) + var(--page-margin-right)) !important; }',
-          )
+          .replace(/}$/, ' width: calc(var(--full-width) * 1px) !important; }')
+          .replace(/}$/, ' min-width: calc(var(--full-width) * 1px) !important; }')
           .replace(/}$/, ' max-width: calc(var(--full-width) * 1px) !important; }');
       }
-      if (
-        !/height\s*:/.test(block) &&
-        directions.includes('top') &&
-        directions.includes('bottom')
-      ) {
+      if (directions.includes('top') && directions.includes('bottom')) {
         block = block
-          .replace(
-            /}$/,
-            ' height: calc(100% + var(--page-margin-top) + var(--page-margin-bottom)) !important; }',
-          )
+          .replace(/}$/, ' height: calc(var(--full-height) * 1px) !important; }')
+          .replace(/}$/, ' min-height: calc(var(--full-height) * 1px) !important; }')
           .replace(/}$/, ' max-height: calc(var(--full-height) * 1px) !important; }');
       }
     }
@@ -817,7 +1024,7 @@ export const transformStylesheet = (css: string, vw: number, vh: number, vertica
     if (pxWidth > vw && !/max-width\s*:/.test(block)) {
       block = block.replace(
         /}$/,
-        ' max-width: calc(var(--available-width) * 1px); box-sizing: border-box; }',
+        ' width: 100%; max-width: calc(var(--available-width) * 1px); box-sizing: border-box; }',
       );
       return selector + block;
     }
@@ -847,6 +1054,8 @@ export const transformStylesheet = (css: string, vw: number, vh: number, vertica
     .replace(/font-size\s*:\s*(\d*\.?\d+)(px|rem|em|%)?/gi, (_, size, unit = 'px') => {
       return `font-size: max(${size}${unit}, var(--min-font-size, 8px))`;
     })
+    // remove no-op backdrop-filter: brightness(100%); see #3895
+    .replace(/backdrop-filter\s*:\s*brightness\(100%\)\s*[;]?/gi, '')
     .replace(/(\d*\.?\d+)vw/gi, (_, d) => (parseFloat(d) * vw) / 100 + 'px')
     .replace(/(\d*\.?\d+)vh/gi, (_, d) => (parseFloat(d) * vh) / 100 + 'px')
     .replace(/([\s;])-webkit-user-select\s*:\s*none/gi, '$1-webkit-user-select: unset')
@@ -863,6 +1072,22 @@ export const transformStylesheet = (css: string, vw: number, vh: number, vertica
     .replace(/([\s;])color\s*:\s*#000000/gi, '$1color: var(--theme-fg-color)')
     .replace(/([\s;])color\s*:\s*#000/gi, '$1color: var(--theme-fg-color)')
     .replace(/([\s;])color\s*:\s*rgb\(0,\s*0,\s*0\)/gi, '$1color: var(--theme-fg-color)');
+
+  const { isDarkMode, bg } = getThemeCode();
+  if (isDarkMode) {
+    css = css.replace(ruleRegex, (match, selector, block) => {
+      const rewritten = block.replace(
+        /background(-color)?\s*:\s*([^;!}]+)(\s*!important)?(?=\s*[;!}])/gi,
+        (decl: string, _prop: string, value: string, important?: string) => {
+          const raw = value.trim().split(/\s+/)[0] ?? '';
+          if (!isLightCssColor(raw)) return decl;
+          return `background-color: ${bg}${important ?? ''}`;
+        },
+      );
+      return rewritten === block ? match : selector + rewritten;
+    });
+  }
+
   return css;
 };
 
@@ -933,56 +1158,6 @@ export const applyImageStyle = (document: Document) => {
     const computedStyle = window.getComputedStyle(hr);
     if (computedStyle.backgroundImage && computedStyle.backgroundImage !== 'none') {
       hr.classList.add('background-img');
-    }
-  });
-};
-
-export const applyTableStyle = (document: Document) => {
-  document.querySelectorAll('table').forEach((table) => {
-    const parent = table.parentNode;
-    if (!parent || parent.nodeType !== Node.ELEMENT_NODE) return;
-
-    // Calculate total width from td elements with width attribute or inline style
-    let totalTableWidth = 0;
-    const rows = table.querySelectorAll('tr');
-
-    // Check all rows and use the widest one
-    for (const row of rows) {
-      const cells = row.querySelectorAll('td, th');
-      let rowWidth = 0;
-
-      cells.forEach((cell) => {
-        const cellElement = cell as HTMLElement;
-
-        const widthAttr = cellElement.getAttribute('width');
-        const styleWidth = cellElement.style.width;
-        const widthStr = widthAttr || styleWidth;
-
-        if (widthStr) {
-          const widthValue = parseFloat(widthStr);
-          const widthUnit = widthStr.replace(widthValue.toString(), '').trim();
-
-          if (widthUnit === 'px' || !widthUnit) {
-            rowWidth += widthValue;
-          }
-        }
-      });
-
-      if (rowWidth > totalTableWidth) {
-        totalTableWidth = rowWidth;
-      }
-    }
-
-    const parentWidth = window.getComputedStyle(parent as Element).width;
-    const parentContainerWidth = parseFloat(parentWidth) || 0;
-    if (totalTableWidth > 0) {
-      const scale = `calc(min(1, var(--available-width) / ${totalTableWidth}))`;
-      table.style.transformOrigin = 'left top';
-      table.style.transform = `scale(${scale})`;
-    } else if (parentContainerWidth > 0) {
-      const scale = `calc(min(1, var(--available-width) / ${parentContainerWidth}))`;
-      table.style.transformOrigin = 'center top';
-      table.style.transform = `scale(${scale})`;
     }
   });
 };

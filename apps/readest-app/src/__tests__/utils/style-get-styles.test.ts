@@ -9,6 +9,7 @@ vi.mock('@/utils/misc', async (importOriginal) => {
 });
 
 import { getStyles, ThemeCode } from '@/utils/style';
+import { CustomFont } from '@/styles/fonts';
 import { ViewSettings } from '@/types/book';
 import {
   DEFAULT_BOOK_FONT,
@@ -368,6 +369,58 @@ describe('getLayoutStyles branches (via getStyles)', () => {
     // getStyles passes 1.0 as zoomLevel to getLayoutStyles
     expect(css).toContain('zoom: 1');
   });
+
+  it('omits only paragraph-related layout rules when useBookLayout is true', () => {
+    const vs = makeViewSettings({
+      useBookLayout: true,
+      lineHeight: 1.7,
+      wordSpacing: 3,
+      letterSpacing: 2,
+      textIndent: 2,
+      paragraphMargin: 1.25,
+      fullJustification: true,
+      hyphenation: true,
+      marginTopPx: 50,
+    });
+    const css = getStyles(vs, theme);
+    // paragraph-specific tokens driven by the Paragraph section must be absent
+    expect(css).not.toContain('--default-text-align:');
+    expect(css).not.toContain('line-height: 1.7');
+    expect(css).not.toContain('word-spacing: 3px');
+    expect(css).not.toContain('letter-spacing: 2px');
+    expect(css).not.toContain('text-indent: 2em');
+    expect(css).not.toContain('hyphens: auto');
+    expect(css).not.toContain('-webkit-hyphens: auto');
+    // non-paragraph layout rules must still be emitted
+    expect(css).toContain('@namespace epub');
+    expect(css).toContain('--margin-top: 50px');
+    expect(css).toContain('--margin-right:');
+    expect(css).toContain('--margin-bottom:');
+    expect(css).toContain('--margin-left:');
+    // font/color/translation sections must still be present
+    expect(css).toContain('--serif:');
+    expect(css).toContain('--theme-bg-color');
+    expect(css).toContain('.translation-source');
+  });
+
+  it('includes paragraph layout rules when useBookLayout is false', () => {
+    const vs = makeViewSettings({
+      useBookLayout: false,
+      lineHeight: 1.7,
+      wordSpacing: 3,
+      letterSpacing: 2,
+      textIndent: 2,
+      fullJustification: true,
+      hyphenation: true,
+    });
+    const css = getStyles(vs, theme);
+    expect(css).toContain('--default-text-align: justify');
+    expect(css).toContain('line-height: 1.7');
+    expect(css).toContain('word-spacing: 3px');
+    expect(css).toContain('letter-spacing: 2px');
+    expect(css).toContain('text-indent: 2em');
+    expect(css).toContain('hyphens: auto');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -516,6 +569,22 @@ describe('getColorStyles branches (via getStyles)', () => {
     const css = getStyles(vs, theme);
     // body.pbg block should be empty or absent
     expect(css).not.toMatch(/body\.pbg\s*\{[^}]*background-color:[^}]*!important/);
+  });
+
+  it('overrides inline white backgrounds in dark mode when overrideColor is false', () => {
+    const vs = makeViewSettings({ overrideColor: false });
+    const theme = makeThemeCode({ isDarkMode: true, bg: '#1a1a1a', fg: '#e0e0e0' });
+    const css = getStyles(vs, theme);
+    expect(css).toContain('background-color: #1a1a1a !important');
+    expect(css).toContain('background-color: #fff"]');
+    expect(css).toContain('body.theme-dark');
+  });
+
+  it('does not add inline white background overrides in light mode', () => {
+    const vs = makeViewSettings({ overrideColor: false });
+    const theme = makeThemeCode({ isDarkMode: false });
+    const css = getStyles(vs, theme);
+    expect(css).not.toContain('background-color: #fff"]');
   });
 
   it('applies dark mode link color lightblue when overrideColor is false', () => {
@@ -692,5 +761,78 @@ describe('getStyles integration', () => {
     const css = getStyles(vs);
     expect(css).toBeTruthy();
     expect(css).toContain('--theme-bg-color');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// custom @font-face inlining
+// ---------------------------------------------------------------------------
+
+/** Build a loaded CustomFont (blob URL in memory) for testing. */
+function makeCustomFont(overrides: Partial<CustomFont> = {}): CustomFont {
+  return {
+    id: 'my-test-font',
+    name: 'My Test Font',
+    path: '/fonts/my-test-font.ttf',
+    blobUrl: 'blob:http://localhost/my-test-font',
+    ...overrides,
+  };
+}
+
+describe('custom @font-face inlining (via getStyles)', () => {
+  const theme = makeThemeCode();
+
+  it('inlines an @font-face rule for each loaded custom font', () => {
+    const vs = makeViewSettings();
+    const css = getStyles(vs, theme, [makeCustomFont()]);
+    expect(css).toContain('@font-face');
+    expect(css).toContain('font-family: "My Test Font"');
+    expect(css).toContain('blob:http://localhost/my-test-font');
+  });
+
+  it('keeps @namespace epub ahead of every @font-face rule (#4438)', () => {
+    const vs = makeViewSettings();
+    const css = getStyles(vs, theme, [makeCustomFont()]);
+    // A `@namespace` rule is only honored when it precedes all style and
+    // `@font-face` rules; a misplaced one is silently ignored, which drops
+    // the namespaced `aside[epub|type~="footnote"]` selector and reveals the
+    // footnote aside's border as a stray horizontal line (#4438). The custom
+    // `@font-face` rules must therefore come after the namespace declaration.
+    expect(css).toContain('@namespace epub');
+    expect(css).toContain('@font-face');
+    expect(css.indexOf('@namespace epub')).toBeLessThan(css.indexOf('@font-face'));
+  });
+
+  it('still inlines custom @font-face ahead of the font-family declarations', () => {
+    const vs = makeViewSettings();
+    const css = getStyles(vs, theme, [makeCustomFont()]);
+    // Paginator writes this CSS into the iframe before its first paint, so the
+    // custom `@font-face` rules should still precede the `--serif`/`--sans-serif`
+    // font lists that reference them.
+    expect(css.indexOf('@font-face')).toBeLessThan(css.indexOf('--serif:'));
+  });
+
+  it('emits one @font-face per loaded font', () => {
+    const vs = makeViewSettings();
+    const fonts = [
+      makeCustomFont({ id: 'font-a', name: 'Font A', blobUrl: 'blob:http://localhost/a' }),
+      makeCustomFont({ id: 'font-b', name: 'Font B', blobUrl: 'blob:http://localhost/b' }),
+    ];
+    const css = getStyles(vs, theme, fonts);
+    expect(css.split('@font-face').length - 1).toBe(2);
+    expect(css).toContain('font-family: "Font A"');
+    expect(css).toContain('font-family: "Font B"');
+  });
+
+  it('skips fonts that have no blob URL', () => {
+    const vs = makeViewSettings();
+    const css = getStyles(vs, theme, [makeCustomFont({ blobUrl: undefined })]);
+    expect(css).not.toContain('font-family: "My Test Font"');
+  });
+
+  it('emits no custom @font-face when no fonts are passed', () => {
+    const vs = makeViewSettings();
+    const css = getStyles(vs, theme);
+    expect(css).not.toContain('font-family: "My Test Font"');
   });
 });
