@@ -13,36 +13,20 @@ import {
 } from '@/types/system';
 import { DatabaseOpts, DatabaseService } from '@/types/database';
 import { SchemaType } from '@/services/database/migrate';
-import { Book, BookConfig, BookContent, LoadBookContentOptions, ViewSettings } from '@/types/book';
-import { getAudioSourceFilename, getLibraryFilename, getLibraryBackupFilename } from '@/utils/book';
+import { Book, BookConfig, BookContent, ImportBookOptions, ViewSettings } from '@/types/book';
+import type { BookNav } from '@/services/nav';
+import { getLibraryFilename, getLibraryBackupFilename } from '@/utils/book';
 
-import { getOSPlatform, uniqueId } from '@/utils/misc';
-import { partialMD5 } from '@/utils/md5';
-import { getFilename } from '@/utils/path';
+import { getOSPlatform } from '@/utils/misc';
 import { ProgressHandler } from '@/utils/transfer';
 import { CustomTextureInfo } from '@/styles/textures';
 import { CustomFont, CustomFontInfo } from '@/styles/fonts';
-import {
-  AudioAssetFormat,
-  AudioSyncJobStatus,
-  AudioSyncStartRequest,
-  AudioSyncStatus,
-  BookAudioAsset,
-} from '@/services/audioSync/types';
-import { SUPPORTED_AUDIOBOOK_EXTS } from '@/services/audioSync/constants';
-import {
-  clearBookAudioSidecars,
-  hasLegacyAudioSyncMap,
-  loadAudioAlignmentReport,
-  loadAudioSyncGeneratedPackage,
-  loadAudioSyncMap,
-  loadBookAudioAsset,
-  saveBookAudioAsset,
-} from '@/services/audioSync/storage';
-import { buildAudioSyncStatus } from '@/services/audioSync/status';
+import type { ImportedDictionary } from './dictionaries/types';
+import type { SelectedFile } from '@/hooks/useFileSelector';
 
 import * as BookSvc from './bookService';
 import * as CloudSvc from './cloudService';
+import * as DictSvc from './dictionaries/dictionaryService';
 import * as FontSvc from './fontService';
 import * as ImageSvc from './imageService';
 import * as LibrarySvc from './libraryService';
@@ -76,6 +60,7 @@ export abstract class BaseAppService implements AppService {
   hasIAP = false;
   canCustomizeRootDir = false;
   canReadExternalDir = false;
+  supportsCanvasContext2DFilter = true;
   distChannel = 'readest' as DistChannel;
   storefrontRegionCode: string | null = null;
   isOnlineCatalogsAccessible = true;
@@ -220,80 +205,6 @@ export abstract class BaseAppService implements AppService {
   async updateCoverImage(book: Book, imageUrl?: string, imageFile?: string): Promise<void> {
     return BookSvc.updateCoverImage(this.coverCtx, book, imageUrl, imageFile);
   }
-  async attachBookAudio(book: Book, file: string | File): Promise<BookAudioAsset> {
-    const sourceFile = typeof file === 'string' ? await this.fs.openFile(file, 'None') : file;
-    const originalFilename = typeof file === 'string' ? getFilename(file) : file.name;
-    const format = originalFilename.split('.').pop()?.toLowerCase() as AudioAssetFormat | undefined;
-    if (!format || !SUPPORTED_AUDIOBOOK_EXTS.includes(format)) {
-      throw new Error(`Unsupported audiobook format: ${originalFilename || 'unknown file'}`);
-    }
-
-    await clearBookAudioSidecars(this.fs, book);
-
-    const originalPath = getAudioSourceFilename(book, format);
-    if (typeof file === 'string') {
-      await this.fs.copyFile(file, originalPath, 'Books');
-    } else {
-      await this.fs.writeFile(originalPath, 'Books', file);
-    }
-
-    const now = Date.now();
-    const asset: BookAudioAsset = {
-      id: uniqueId(),
-      bookHash: book.hash,
-      audioHash: await partialMD5(sourceFile),
-      originalPath,
-      originalFilename,
-      format,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await saveBookAudioAsset(this.fs, book, asset);
-    return asset;
-  }
-
-  async getBookAudioAsset(book: Book): Promise<BookAudioAsset | null> {
-    return loadBookAudioAsset(this.fs, book);
-  }
-
-  async removeBookAudio(book: Book): Promise<void> {
-    await clearBookAudioSidecars(this.fs, book);
-  }
-
-  async generateCorrectedAudioSyncPackage(_book: Book): Promise<void> {
-    throw new Error(
-      'Corrected EPUB3 package generation is only available on desktop Hermes builds',
-    );
-  }
-
-  async startAudioSync(_book: Book, _request?: AudioSyncStartRequest): Promise<AudioSyncJobStatus> {
-    throw new Error('Audio sync is only available on desktop Hermes builds');
-  }
-
-  async getAudioSyncStatus(book: Book, _runId?: string): Promise<AudioSyncStatus> {
-    const [asset, map, report, generatedPackage, legacyMapDetected] = await Promise.all([
-      loadBookAudioAsset(this.fs, book),
-      loadAudioSyncMap(this.fs, book),
-      loadAudioAlignmentReport(this.fs, book),
-      loadAudioSyncGeneratedPackage(this.fs, book),
-      hasLegacyAudioSyncMap(this.fs, book),
-    ]);
-    return buildAudioSyncStatus(
-      {
-        asset,
-        map,
-        job: null,
-        report,
-        package: generatedPackage,
-      },
-      { legacyMapDetected: !map && legacyMapDetected },
-    );
-  }
-
-  async cancelAudioSync(_book: Book, _runId: string): Promise<void> {
-    throw new Error('Audio sync is only available on desktop Hermes builds');
-  }
 
   async importFont(file?: string | File): Promise<CustomFontInfo | null> {
     return FontSvc.importFont(this.fs, file);
@@ -311,25 +222,24 @@ export abstract class BaseAppService implements AppService {
     return ImageSvc.deleteImage(this.fs, texture);
   }
 
+  async importDictionaries(files: SelectedFile[]): Promise<DictSvc.ImportDictionariesResult> {
+    return DictSvc.importDictionaries(this.fs, files);
+  }
+
+  async deleteDictionary(dict: ImportedDictionary): Promise<void> {
+    return DictSvc.deleteDictionary(this.fs, dict);
+  }
+
   async importBook(
     file: string | File,
     books: Book[],
-    saveBook: boolean = true,
-    saveCover: boolean = true,
-    overwrite: boolean = false,
-    transient: boolean = false,
+    options: ImportBookOptions = {},
   ): Promise<Book | null> {
-    return BookSvc.importBook(
-      this.fs,
-      file,
-      books,
-      saveBook,
-      saveCover,
-      overwrite,
-      transient,
-      this.saveBookConfig.bind(this),
-      this.generateCoverImageUrl.bind(this),
-    );
+    return BookSvc.importBook(this.fs, file, books, {
+      saveBookConfig: this.saveBookConfig.bind(this),
+      generateCoverImageUrl: this.generateCoverImageUrl.bind(this),
+      ...options,
+    });
   }
 
   async deleteBook(book: Book, deleteAction: DeleteAction): Promise<void> {
@@ -407,8 +317,8 @@ export abstract class BaseAppService implements AppService {
     return BookSvc.getBookFileSize(this.fs, book);
   }
 
-  async loadBookContent(book: Book, options?: LoadBookContentOptions): Promise<BookContent> {
-    return BookSvc.loadBookContent(this.fs, book, options);
+  async loadBookContent(book: Book): Promise<BookContent> {
+    return BookSvc.loadBookContent(this.fs, book);
   }
 
   async loadBookConfig(book: Book, settings: SystemSettings): Promise<BookConfig> {
@@ -421,6 +331,14 @@ export abstract class BaseAppService implements AppService {
 
   async saveBookConfig(book: Book, config: BookConfig, settings?: SystemSettings) {
     return BookSvc.saveBookConfig(this.fs, book, config, settings);
+  }
+
+  async loadBookNav(book: Book) {
+    return BookSvc.loadBookNav(this.fs, book);
+  }
+
+  async saveBookNav(book: Book, nav: BookNav) {
+    return BookSvc.saveBookNav(this.fs, book, nav);
   }
 
   async loadLibraryBooks(): Promise<Book[]> {

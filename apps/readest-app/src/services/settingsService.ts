@@ -21,6 +21,7 @@ import {
   DEFAULT_MOBILE_SYSTEM_SETTINGS,
   DEFAULT_ANNOTATOR_CONFIG,
   DEFAULT_EINK_VIEW_SETTINGS,
+  DEFAULT_VIEW_SETTINGS_CONFIG,
 } from './constants';
 import { DEFAULT_AI_SETTINGS, DEFAULT_AI_PROFILE } from './ai/constants';
 import type { AISettings, AITaskType, ModelEntry, ProviderConfig } from './ai/types';
@@ -41,13 +42,14 @@ export function getDefaultViewSettings(ctx: Context): ViewSettings {
     ...DEFAULT_BOOK_STYLE,
     ...DEFAULT_BOOK_FONT,
     ...DEFAULT_BOOK_LANGUAGE,
-    ...(ctx.isMobile ? DEFAULT_MOBILE_VIEW_SETTINGS : {}),
-    ...(ctx.isEink ? DEFAULT_EINK_VIEW_SETTINGS : {}),
-    ...(isCJKEnv() ? DEFAULT_CJK_VIEW_SETTINGS : {}),
     ...DEFAULT_VIEW_CONFIG,
     ...DEFAULT_TTS_CONFIG,
     ...DEFAULT_SCREEN_CONFIG,
     ...DEFAULT_ANNOTATOR_CONFIG,
+    ...DEFAULT_VIEW_SETTINGS_CONFIG,
+    ...(ctx.isMobile ? DEFAULT_MOBILE_VIEW_SETTINGS : {}),
+    ...(ctx.isEink ? DEFAULT_EINK_VIEW_SETTINGS : {}),
+    ...(isCJKEnv() ? DEFAULT_CJK_VIEW_SETTINGS : {}),
     ...{ ...DEFAULT_TRANSLATOR_CONFIG, translateTargetLang: getTargetLang() },
   };
 }
@@ -253,6 +255,14 @@ export async function loadSettings(ctx: Context): Promise<SystemSettings> {
   });
 
   settings.localBooksDir = await ctx.fs.getPrefix('Books');
+
+  // Coerce stale `'wikipedia'` quick-action to `'dictionary'`. The Wikipedia
+  // annotation tool was removed; Wikipedia is now reachable as a tab inside
+  // the unified dictionary popup. Without this guard, users who had set the
+  // quick action to wikipedia would get a no-op.
+  if ((settings.globalViewSettings.annotationQuickAction as string) === 'wikipedia') {
+    settings.globalViewSettings.annotationQuickAction = 'dictionary';
+  }
 
   if (!settings.kosync.deviceId) {
     settings.kosync.deviceId = uuidv4();

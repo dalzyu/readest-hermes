@@ -1,25 +1,24 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Hermes",
-  "mainBinaryName": "hermes",
-  "identifier": "com.hermes.readest",
-
+  "productName": "Readest",
+  "mainBinaryName": "readest",
+  "identifier": "com.bilingify.readest",
   "version": "../package.json",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "corepack pnpm dev",
-    "beforeBuildCommand": "corepack pnpm build"
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
   },
   "app": {
     "windows": [],
     "security": {
       "csp": {
         "default-src": "'self' 'unsafe-inline' blob: data: customprotocol: asset: http://asset.localhost ipc: http://ipc.localhost",
-        "connect-src": "'self' blob: data: asset: http://asset.localhost ipc: http://ipc.localhost http://*:* https://*:* https://*.sentry.io https://*.posthog.com https://*.deepl.com https://*.wikipedia.org https://*.wiktionary.org https://*.supabase.co wss://speech.platform.bing.com https://*.cloudflarestorage.com https://translate.googleapis.com https://translate.toil.cc https://*.microsofttranslator.com https://edge.microsoft.com https://*.googleusercontent.com",
+        "connect-src": "'self' blob: data: asset: http://asset.localhost ipc: http://ipc.localhost http://*:* https://*:* https://*.sentry.io https://*.posthog.com https://*.deepl.com https://*.wikipedia.org https://*.wiktionary.org https://*.supabase.co https://*.readest.com wss://speech.platform.bing.com https://*.cloudflarestorage.com https://translate.googleapis.com https://translate.toil.cc https://*.microsofttranslator.com https://edge.microsoft.com https://*.googleusercontent.com",
         "img-src": "'self' blob: data: asset: http://asset.localhost https://* https://*:* http://* http://*:*",
-        "style-src": "'self' 'unsafe-inline' blob: asset: http://asset.localhost https://cdn.jsdelivr.net https://fonts.googleapis.com https://cdnjs.cloudflare.com",
-        "font-src": "'self' blob: data: asset: http://asset.localhost tauri: https://db.onlinewebfonts.com https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com",
+        "style-src": "'self' 'unsafe-inline' blob: asset: http://asset.localhost https://cdn.jsdelivr.net https://fonts.googleapis.com https://cdnjs.cloudflare.com https://storage.readest.com",
+        "font-src": "'self' blob: data: asset: http://asset.localhost tauri: https://db.onlinewebfonts.com https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com  https://storage.readest.com",
         "frame-src": "'self' blob: asset: http://asset.localhost https://*.stripe.com",
         "script-src": "'self' 'unsafe-inline' 'unsafe-eval' data: blob: asset: http://asset.localhost https://*.sentry.io https://*.posthog.com  https://*.stripe.com"
       },
@@ -31,7 +30,6 @@
             "$APPDATA/**/*",
             "$APPCACHE/**/*",
             "$TEMP/**/*",
-            "**/Hermes/**/*",
             "**/Readest/**/*",
             "/private/var/mobile/Containers/Data/Application/**/*"
           ],
@@ -135,7 +133,7 @@
       "requireLiteralLeadingDot": false
     },
     "cli": {
-      "description": "Hermes CLI",
+      "description": "Readest CLI",
       "args": [
         {
           "name": "file1",
@@ -160,14 +158,20 @@
       ]
     },
     "deep-link": {
-      "mobile": [{ "host": "auth-callback", "scheme": ["hermes"] }],
+      "mobile": [
+        { "scheme": ["https"], "host": "web.readest.com", "appLink": true },
+        { "scheme": ["readest"], "appLink": false }
+      ],
       "desktop": {
-        "schemes": ["hermes"]
+        "schemes": ["readest"]
       }
     },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJFMEQ1QjE2OEU1NEIzNTEKUldSUnMxU09GbHNOdmpEaWFMT1crRFpEV2VORzQ2MklxaFc0M1R0ci9xY2c1bENXS0xhM1R1L2sK",
-      "endpoints": ["https://github.com/dalzyu/readest-hermes/releases/latest/download/latest.json"]
+      "endpoints": [
+        "https://download.readest.com/releases/latest.json",
+        "https://github.com/readest/readest/releases/latest/download/latest.json"
+      ]
     }
   }
 }

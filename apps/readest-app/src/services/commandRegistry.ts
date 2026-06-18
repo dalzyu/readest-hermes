@@ -237,6 +237,12 @@ const layoutPanelItems = [
     section: 'Layout',
   },
   {
+    id: 'settings.layout.useBookLayout',
+    labelKey: _('Use Book Layout'),
+    keywords: ['paragraph', 'book', 'layout', 'default', 'original', 'preserve'],
+    section: 'Paragraph',
+  },
+  {
     id: 'settings.layout.paragraphMargin',
     labelKey: _('Paragraph Margin'),
     keywords: ['paragraph', 'margin', 'spacing', 'gap'],
@@ -476,6 +482,12 @@ const controlPanelItems = [
     id: 'settings.control.colorEinkMode',
     labelKey: _('Color E-Ink Mode'),
     keywords: ['color', 'eink', 'e-ink', 'kaleido'],
+    section: 'Device',
+  },
+  {
+    id: 'settings.control.screenWakeLock',
+    labelKey: _('Keep Screen Awake'),
+    keywords: ['screen', 'wake', 'lock', 'awake', 'sleep', 'display'],
     section: 'Device',
   },
   {

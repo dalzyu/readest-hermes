@@ -13,29 +13,37 @@ import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useNotebookStore } from '@/store/notebookStore';
+import { useCustomDictionaryStore } from '@/store/customDictionaryStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { useDeviceControlStore } from '@/store/deviceStore';
 import { useFoliateEvents } from '../../hooks/useFoliateEvents';
 import { useNotesSync } from '../../hooks/useNotesSync';
 import { useReadwiseSync } from '../../hooks/useReadwiseSync';
+import { useHardcoverSync } from '../../hooks/useHardcoverSync';
 import { useTextSelector } from '../../hooks/useTextSelector';
 import { Point, Position, TextSelection } from '@/utils/sel';
 import { getPopupPosition, getPosition, getTextFromRange } from '@/utils/sel';
 import { eventDispatcher } from '@/utils/event';
-import { findTocItemBS } from '@/utils/toc';
+import { findTocItemBS } from '@/services/nav';
 import { throttle } from '@/utils/throttle';
+import {
+  cancelDeferredAction,
+  createDeferredActionState,
+  flushDeferredAction,
+  runOrDeferAction,
+} from '../../utils/deferredAction';
 import { runSimpleCC } from '@/utils/simplecc';
 import { getWordCount } from '@/utils/word';
 import { getIndexFromCfi, isCfiInLocation } from '@/utils/cfi';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
-import { startPrefetch } from '@/services/learning/prefetchService';
 import { getHighlightColorHex } from '../../utils/annotatorUtil';
 import { annotationToolButtons } from './AnnotationTools';
 import AnnotationRangeEditor from './AnnotationRangeEditor';
 import AnnotationPopup from './AnnotationPopup';
-import LearningLookupPopup from './LearningLookupPopup';
+import DictionaryPopup from './DictionaryPopup';
+import TranslatorPopup from './TranslatorPopup';
 import useShortcuts from '@/hooks/useShortcuts';
 import ProofreadPopup from './ProofreadPopup';
 import ExportMarkdownDialog from './ExportMarkdownDialog';
@@ -43,15 +51,25 @@ import ExportMarkdownDialog from './ExportMarkdownDialog';
 const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const _ = useTranslation();
   const { envConfig, appService } = useEnv();
-  const { settings } = useSettingsStore();
+  const { settings, setSettingsDialogBookKey, setSettingsDialogOpen, setActiveSettingsItemId } =
+    useSettingsStore();
   const { isDarkMode } = useThemeStore();
   const { getConfig, saveConfig, getBookData, updateBooknotes } = useBookDataStore();
   const { getProgress, getView, getViewsById, getViewSettings } = useReaderStore();
   const { setNotebookVisible, setNotebookNewAnnotation } = useNotebookStore();
   const { listenToNativeTouchEvents } = useDeviceControlStore();
+  const { loadCustomDictionaries } = useCustomDictionaryStore();
 
   useNotesSync(bookKey);
   useReadwiseSync(bookKey);
+  useHardcoverSync(bookKey);
+
+  useEffect(() => {
+    void loadCustomDictionaries(envConfig).catch((error) => {
+      console.warn('Failed to load custom dictionaries:', error);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const osPlatform = getOSPlatform();
   const config = getConfig(bookKey)!;
@@ -65,16 +83,14 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   const [selection, setSelection] = useState<TextSelection | null>(null);
   const [showAnnotPopup, setShowAnnotPopup] = useState(false);
+  const [showDictionaryPopup, setShowDictionaryPopup] = useState(false);
+  const [showDeepLPopup, setShowDeepLPopup] = useState(false);
   const [showProofreadPopup, setShowProofreadPopup] = useState(false);
-  const [showContextTranslationPopup, setShowContextTranslationPopup] = useState(false);
-  const [showContextDictionaryPopup, setShowContextDictionaryPopup] = useState(false);
   const [trianglePosition, setTrianglePosition] = useState<Position>();
   const [annotPopupPosition, setAnnotPopupPosition] = useState<Position>();
-  const [, setDictPopupPosition] = useState<Position>();
+  const [dictPopupPosition, setDictPopupPosition] = useState<Position>();
+  const [translatorPopupPosition, setTranslatorPopupPosition] = useState<Position>();
   const [proofreadPopupPosition, setProofreadPopupPosition] = useState<Position>();
-  const [contextTranslationPopupPosition, setContextTranslationPopupPosition] =
-    useState<Position>();
-  const [contextDictionaryPopupPosition, setContextDictionaryPopupPosition] = useState<Position>();
   const [highlightOptionsVisible, setHighlightOptionsVisible] = useState(false);
   const [showAnnotationNotes, setShowAnnotationNotes] = useState(false);
   const [annotationNotes, setAnnotationNotes] = useState<BookNote[]>([]);
@@ -93,12 +109,13 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     settings.globalReadSettings.highlightStyles[selectedStyle],
   );
   const androidTouchEndRef = useRef(false);
+  // Holds a quick action that fired while the user is still touching the screen
+  // (Android long-press selects text via selectionchange before touchend). The
+  // pending action runs on touchend so popups don't open under an active touch.
+  const deferredQuickActionRef = useRef(createDeferredActionState());
 
   const showingPopup =
-    showAnnotPopup ||
-    showProofreadPopup ||
-    showContextTranslationPopup ||
-    showContextDictionaryPopup;
+    showAnnotPopup || showDictionaryPopup || showDeepLPopup || showProofreadPopup;
 
   const popupPadding = useResponsiveSize(10);
   const trianglePadding = popupPadding * 2 + 6;
@@ -106,13 +123,11 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const maxHeight = window.innerHeight - 2 * popupPadding;
   const dictPopupWidth = Math.min(480, maxWidth);
   const dictPopupHeight = Math.min(300, maxHeight);
+  const transPopupWidth = Math.min(480, maxWidth);
+  const transPopupHeight = Math.min(265, maxHeight);
   const proofreadPopupWidth = Math.min(440, maxWidth);
   const proofreadPopupHeight = Math.min(200, maxHeight);
-  const ctxTransPopupWidth = Math.min(600, maxWidth);
-  const ctxTransPopupHeight = Math.min(200, maxHeight);
-  const ctxDictPopupWidth = Math.min(480, maxWidth);
-  const ctxDictPopupHeight = Math.min(200, maxHeight);
-  const annotPopupWidth = Math.min(480, maxWidth);
+  const annotPopupWidth = Math.min(useResponsiveSize(300), maxWidth);
   const annotPopupHeight = useResponsiveSize(44);
   const androidSelectionHandlerHeight = 0;
 
@@ -141,6 +156,13 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       dictPopupHeight,
       popupPadding,
     );
+    const transPopupPos = getPopupPosition(
+      triangPos,
+      rect,
+      transPopupWidth,
+      transPopupHeight,
+      popupPadding,
+    );
     const proofreadPopupPos = getPopupPosition(
       triangPos,
       rect,
@@ -148,26 +170,11 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       proofreadPopupHeight,
       popupPadding,
     );
-    const ctxTransPopupPos = getPopupPosition(
-      triangPos,
-      rect,
-      ctxTransPopupWidth,
-      ctxTransPopupHeight,
-      popupPadding,
-    );
-    const ctxDictPopupPos = getPopupPosition(
-      triangPos,
-      rect,
-      ctxDictPopupWidth,
-      ctxDictPopupHeight,
-      popupPadding,
-    );
     if (triangPos.point.x == 0 || triangPos.point.y == 0) return;
     setAnnotPopupPosition(annotPopupPos);
     setDictPopupPosition(dictPopupPos);
+    setTranslatorPopupPosition(transPopupPos);
     setProofreadPopupPosition(proofreadPopupPos);
-    setContextTranslationPopupPosition(ctxTransPopupPos);
-    setContextDictionaryPopupPosition(ctxDictPopupPos);
     setTrianglePosition(triangPos);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection, bookKey, viewSettings.vertical]);
@@ -201,21 +208,17 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     [primaryLang, transformCtx],
   );
 
-  const handleDismissPopup = useMemo(
-    () =>
-      throttle(() => {
-        const dismissingLookupPopup = showContextTranslationPopup || showContextDictionaryPopup;
-        if (dismissingLookupPopup) {
-          eventDispatcher.dispatch('tts-stop', { bookKey });
-        }
-        setSelection(null);
-        setShowAnnotPopup(false);
-        setShowProofreadPopup(false);
-        setShowContextTranslationPopup(false);
-        setShowContextDictionaryPopup(false);
-        setEditingAnnotation(null);
-      }, 500),
-    [bookKey, showContextTranslationPopup, showContextDictionaryPopup],
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleDismissPopup = useCallback(
+    throttle(() => {
+      setSelection(null);
+      setShowAnnotPopup(false);
+      setShowDictionaryPopup(false);
+      setShowDeepLPopup(false);
+      setShowProofreadPopup(false);
+      setEditingAnnotation(null);
+    }, 500),
+    [],
   );
 
   const {
@@ -266,11 +269,13 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       const ev = event.detail as NativeTouchEventType;
       if (ev.type === 'touchstart') {
         androidTouchEndRef.current = false;
+        cancelDeferredAction(deferredQuickActionRef.current);
         handleTouchStart();
       } else if (ev.type === 'touchend') {
         androidTouchEndRef.current = true;
         handleTouchEnd();
         handlePointerUp(doc, index);
+        flushDeferredAction(deferredQuickActionRef.current);
       }
     };
 
@@ -313,9 +318,10 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
                 cfi: view?.getCFI(index, range),
                 page: index + 1,
               });
-              // Show unified context translation popup for PDF right-click
+              // Show translation popup preferentially for PDF right-click
               setShowAnnotPopup(false);
-              setShowContextTranslationPopup(true);
+              setShowDeepLPopup(true);
+              setShowDictionaryPopup(false);
             }
           }
         } catch (err) {
@@ -497,38 +503,38 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   const handleQuickAction = () => {
     const action = viewSettings.annotationQuickAction;
-    if (appService?.isAndroidApp && !androidTouchEndRef.current) return;
-    switch (action) {
-      case 'copy':
-        handleCopy(false);
-        handleDismissPopupAndSelection();
-        break;
-      case 'highlight':
-        // highlight is already applied in instant annotating
-        handleDismissPopupAndSelection();
-        break;
-      case 'search':
-        handleSearch();
-        break;
-      case 'dictionary':
-        handleDictionary();
-        break;
-      case 'wikipedia':
-        handleWikipedia();
-        break;
-      case 'translate':
-        handleTranslation();
-        break;
-      case 'ctx-translate':
-        handleContextTranslation();
-        break;
-      case 'ctx-dictionary':
-        handleDictionaryLookup();
-        break;
-      case 'tts':
-        handleSpeakText(true);
-        break;
-    }
+    const runAction = () => {
+      switch (action) {
+        case 'copy':
+          handleCopy(false);
+          handleDismissPopupAndSelection();
+          break;
+        case 'highlight':
+          // highlight is already applied in instant annotating
+          handleDismissPopupAndSelection();
+          break;
+        case 'search':
+          handleSearch();
+          break;
+        case 'dictionary':
+          handleDictionary();
+          break;
+        case 'translate':
+          handleTranslation();
+          break;
+        case 'tts':
+          handleSpeakText(true);
+          break;
+      }
+    };
+    // On Android, a long-press fires selectionchange (and this handler) while
+    // the finger is still down. Defer until touchend so popups aren't dismissed
+    // by the in-progress touch (closes #3935).
+    runOrDeferAction(
+      deferredQuickActionRef.current,
+      !!appService?.isAndroidApp && !androidTouchEndRef.current,
+      runAction,
+    );
   };
 
   useEffect(() => {
@@ -556,6 +562,13 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         dictPopupHeight,
         popupPadding,
       );
+      const transPopupPos = getPopupPosition(
+        triangPos,
+        rect,
+        transPopupWidth,
+        transPopupHeight,
+        popupPadding,
+      );
       const proofreadPopupPos = getPopupPosition(
         triangPos,
         rect,
@@ -563,26 +576,11 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         proofreadPopupHeight,
         popupPadding,
       );
-      const ctxTransPopupPos = getPopupPosition(
-        triangPos,
-        rect,
-        ctxTransPopupWidth,
-        ctxTransPopupHeight,
-        popupPadding,
-      );
-      const ctxDictPopupPos = getPopupPosition(
-        triangPos,
-        rect,
-        ctxDictPopupWidth,
-        ctxDictPopupHeight,
-        popupPadding,
-      );
       if (triangPos.point.x == 0 || triangPos.point.y == 0) return;
       setAnnotPopupPosition(annotPopupPos);
       setDictPopupPosition(dictPopupPos);
+      setTranslatorPopupPosition(transPopupPos);
       setProofreadPopupPosition(proofreadPopupPos);
-      setContextTranslationPopupPosition(ctxTransPopupPos);
-      setContextDictionaryPopupPosition(ctxDictPopupPos);
       setTrianglePosition(triangPos);
 
       const { enableAnnotationQuickActions, annotationQuickAction } = viewSettings;
@@ -590,29 +588,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         handleQuickAction();
       } else {
         handleShowAnnotPopup();
-      }
-
-      // Prefetch RAG context while the annotation toolbar is visible, so that
-      // if the user taps "Context Translate" or "Dictionary", data is warm.
-      const lookupSettings = settings.globalReadSettings.lookup;
-      if (lookupSettings?.enabled && settings.globalReadSettings.contextTranslation) {
-        startPrefetch({
-          bookKey,
-          bookHash: bookData.book?.hash ?? '',
-          currentPage: progress.page,
-          selectedText: selection.text,
-          settings: settings.globalReadSettings.contextTranslation,
-          aiSettings: settings.aiSettings ?? {
-            enabled: false,
-            providers: [],
-            profiles: [],
-            activeProfileId: '',
-            developerMode: false,
-            spoilerProtection: true,
-            maxContextChunks: 10,
-            indexingMode: 'on-demand',
-          },
-        });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -663,6 +638,8 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       containerRef.current?.focus();
     }
     setShowAnnotPopup(true);
+    setShowDeepLPopup(false);
+    setShowDictionaryPopup(false);
   };
 
   const handleCopy = (dismissPopup = true) => {
@@ -791,27 +768,15 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   };
 
   const handleDictionary = () => {
-    handleDictionaryLookup();
-  };
-
-  const handleWikipedia = () => {
-    handleContextTranslation();
+    if (!selection || !selection.text) return;
+    setShowAnnotPopup(false);
+    setShowDictionaryPopup(true);
   };
 
   const handleTranslation = () => {
-    handleContextTranslation();
-  };
-
-  const handleContextTranslation = () => {
     if (!selection || !selection.text) return;
     setShowAnnotPopup(false);
-    setShowContextTranslationPopup(true);
-  };
-
-  const handleDictionaryLookup = () => {
-    if (!selection || !selection.text) return;
-    setShowAnnotPopup(false);
-    setShowContextDictionaryPopup(true);
+    setShowDeepLPopup(true);
   };
 
   const handleSpeakText = async (oneTime = false) => {
@@ -868,9 +833,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       },
       onDictionarySelection: () => {
         handleDictionary();
-      },
-      onWikipediaSelection: () => {
-        handleWikipedia();
       },
       onReadAloudSelection: () => {
         handleSpeakText();
@@ -977,11 +939,9 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           onClick: handleSearch,
         };
       case 'dictionary':
-        return { tooltipText: _('AI Dictionary'), Icon, onClick: handleDictionary };
-      case 'wikipedia':
-        return { tooltipText: _('AI Translate'), Icon, onClick: handleWikipedia };
+        return { tooltipText: _(label), Icon, onClick: handleDictionary };
       case 'translate':
-        return { tooltipText: _('AI Translate'), Icon, onClick: handleTranslation };
+        return { tooltipText: _(label), Icon, onClick: handleTranslation };
       case 'tts':
         return {
           tooltipText: _(label),
@@ -995,20 +955,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           onClick: handleProofread,
           disabled: bookData.book?.format !== 'EPUB',
         };
-      case 'ctx-translate':
-        return {
-          tooltipText: _(label),
-          Icon,
-          onClick: handleContextTranslation,
-          disabled: !settings.globalReadSettings.lookup?.enabled,
-        };
-      case 'ctx-dictionary':
-        return {
-          tooltipText: _(label),
-          Icon,
-          onClick: handleDictionaryLookup,
-          disabled: !settings.globalReadSettings.dictionary?.enabled,
-        };
       default:
         return { tooltipText: '', Icon, onClick: () => {} };
     }
@@ -1016,6 +962,36 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   return (
     <div ref={containerRef} role='toolbar' tabIndex={-1}>
+      {showDictionaryPopup && trianglePosition && dictPopupPosition && (
+        <DictionaryPopup
+          word={selection?.text as string}
+          lang={bookData.bookDoc?.metadata.language as string}
+          position={dictPopupPosition}
+          trianglePosition={trianglePosition}
+          popupWidth={dictPopupWidth}
+          popupHeight={dictPopupHeight}
+          onDismiss={handleDismissPopupAndSelection}
+          onManage={() => {
+            // Dismiss the popup so the user returns to the reader cleanly
+            // when they close settings; the dictionaries sub-page in the
+            // SettingsDialog is enough surface for managing providers.
+            handleDismissPopupAndSelection();
+            setSettingsDialogBookKey(bookKey);
+            setActiveSettingsItemId('settings.language.dictionaries.manage');
+            setSettingsDialogOpen(true);
+          }}
+        />
+      )}
+      {showDeepLPopup && trianglePosition && translatorPopupPosition && (
+        <TranslatorPopup
+          text={selection?.text as string}
+          position={translatorPopupPosition}
+          trianglePosition={trianglePosition}
+          popupWidth={transPopupWidth}
+          popupHeight={transPopupHeight}
+          onDismiss={handleDismissPopupAndSelection}
+        />
+      )}
       {showAnnotPopup && trianglePosition && annotPopupPosition && (
         <AnnotationPopup
           bookKey={bookKey}
@@ -1045,42 +1021,6 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           onDismiss={handleDismissPopupAndSelection}
         />
       )}
-      {showContextTranslationPopup &&
-        trianglePosition &&
-        contextTranslationPopupPosition &&
-        selection &&
-        settings.globalReadSettings.lookup?.enabled && (
-          <LearningLookupPopup
-            key={selection.cfi || `${selection.index}-${selection.page}-${selection.text}`}
-            bookKey={bookKey}
-            bookHash={bookData.book?.hash ?? ''}
-            selectedText={selection.text}
-            mode='translation'
-            position={contextTranslationPopupPosition}
-            trianglePosition={trianglePosition}
-            popupWidth={ctxTransPopupWidth}
-            popupHeight={ctxTransPopupHeight}
-            onDismiss={handleDismissPopupAndSelection}
-          />
-        )}
-      {showContextDictionaryPopup &&
-        trianglePosition &&
-        contextDictionaryPopupPosition &&
-        selection &&
-        settings.globalReadSettings.dictionary?.enabled && (
-          <LearningLookupPopup
-            key={`dict-${selection.cfi || `${selection.index}-${selection.page}-${selection.text}`}`}
-            bookKey={bookKey}
-            bookHash={bookData.book?.hash ?? ''}
-            selectedText={selection.text}
-            mode='dictionary'
-            position={contextDictionaryPopupPosition}
-            trianglePosition={trianglePosition}
-            popupWidth={ctxDictPopupWidth}
-            popupHeight={ctxDictPopupHeight}
-            onDismiss={handleDismissPopupAndSelection}
-          />
-        )}
       {editingAnnotation && editingAnnotation.color && selection && (
         <AnnotationRangeEditor
           bookKey={bookKey}
@@ -1098,6 +1038,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         <ExportMarkdownDialog
           bookKey={bookKey}
           isOpen={showExportDialog}
+          bookHash={bookData.book.hash}
           bookTitle={bookData.book.title}
           bookAuthor={bookData.book.author || ''}
           booknotes={exportData.booknotes}

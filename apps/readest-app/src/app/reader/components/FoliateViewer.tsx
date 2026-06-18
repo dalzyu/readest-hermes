@@ -1,8 +1,9 @@
 import clsx from 'clsx';
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { convertBlobUrlToDataUrl, BookDoc, getDirection } from '@/libs/document';
+import { BOOK_IDS_SEPARATOR } from '@/services/constants';
 import { BookConfig, PageInfo } from '@/types/book';
-import type { BookNote } from '@/types/book';
 import { FoliateView, wrappedFoliateView } from '@/types/view';
 import { Insets } from '@/types/misc';
 import { useEnv } from '@/context/EnvContext';
@@ -12,9 +13,8 @@ import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useCustomFontStore } from '@/store/customFontStore';
 import { useParallelViewStore } from '@/store/parallelViewStore';
-import { useAudioSyncStore } from '@/store/audioSyncStore';
 import { useMouseEvent, useTouchEvent, useLongPressEvent } from '../hooks/useIframeEvents';
-import { usePagination } from '../hooks/usePagination';
+import { usePagination, viewPagination } from '../hooks/usePagination';
 import { useFoliateEvents } from '../hooks/useFoliateEvents';
 import { useProgressSync } from '../hooks/useProgressSync';
 import { useProgressAutoSave } from '../hooks/useProgressAutoSave';
@@ -37,6 +37,7 @@ import {
   transformStylesheet,
 } from '@/utils/style';
 import { mountAdditionalFonts, mountCustomFont } from '@/styles/fonts';
+import { layoutWarichu, relayoutWarichu } from '@/utils/warichu';
 import { getBookDirFromLanguage, getBookDirFromWritingMode } from '@/utils/book';
 import { getIndexFromCfi } from '@/utils/cfi';
 import { useUICSS } from '@/hooks/useUICSS';
@@ -57,11 +58,6 @@ import { getDirFromUILanguage } from '@/utils/rtl';
 import { isTauriAppPlatform } from '@/services/environment';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
-import type { AudioSyncWord } from '@/services/audioSync/types';
-import {
-  createAudioSyncWordHighlightNote,
-  findAudioSyncWord,
-} from '@/services/audioSync/highlight';
 import { lockScreenOrientation } from '@/utils/bridge';
 import { useTextTranslation } from '../hooks/useTextTranslation';
 import { useBookCoverAutoSave } from '../hooks/useAutoSaveBookCover';
@@ -92,11 +88,13 @@ const FoliateViewer: React.FC<{
   contentInsets: Insets;
 }> = ({ bookKey, bookDoc, config, gridInsets, contentInsets: insets }) => {
   const _ = useTranslation();
+  const searchParams = useSearchParams();
   const { appService, envConfig } = useEnv();
   const { themeCode, isDarkMode } = useThemeStore();
   const { settings } = useSettingsStore();
   const { loadFont, loadCustomFonts, getLoadedFonts, getAvailableFonts } = useCustomFontStore();
   const { getView, setView: setFoliateView, setViewInited, setProgress } = useReaderStore();
+  const setPreviewMode = useReaderStore((s) => s.setPreviewMode);
   const { getViewState, getProgress, getViewSettings, setViewSettings } = useReaderStore();
   const { getParallels } = useParallelViewStore();
   const { getBookData } = useBookDataStore();
@@ -105,27 +103,14 @@ const FoliateViewer: React.FC<{
   const bookData = getBookData(bookKey);
   const viewState = getViewState(bookKey);
   const viewSettings = getViewSettings(bookKey);
-  const bookHash = bookData?.book?.hash;
-  const activeAudioSyncWordId = useAudioSyncStore((state) =>
-    bookHash ? (state.sessionStates[bookHash]?.activeWordId ?? null) : null,
-  );
-  const audioSyncMap = useAudioSyncStore((state) =>
-    bookHash ? (state.statuses[bookHash]?.map ?? null) : null,
-  );
-  const activeAudioSyncWord = useMemo(
-    () => findAudioSyncWord(audioSyncMap, activeAudioSyncWordId),
-    [audioSyncMap, activeAudioSyncWordId],
-  );
 
   const viewRef = useRef<FoliateView | null>(null);
-  const audioSyncWordHighlightRef = useRef<BookNote | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isViewCreated = useRef(false);
   const doubleClickDisabled = useRef(!!viewSettings?.disableDoubleClick);
   const [toastMessage, setToastMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [scrollMargins, setScrollMargins] = useState({ top: 0, bottom: 0 });
-  const [docLoadVersion, setDocLoadVersion] = useState(0);
   const docLoaded = useRef(false);
 
   useAutoFocus<HTMLDivElement>({ ref: containerRef });
@@ -147,99 +132,6 @@ const FoliateViewer: React.FC<{
   useBookCoverAutoSave(bookKey);
   const { syncState, conflictDetails, resolveWithLocal, resolveWithRemote } = useKOSync(bookKey);
   useTextTranslation(bookKey, viewRef.current);
-
-  const resolveAudioSyncWordCfi = useCallback((word: AudioSyncWord): string | null => {
-    const view = viewRef.current;
-    if (!view) {
-      return null;
-    }
-
-    try {
-      const start = view.resolveCFI(word.cfiStart);
-      const end = view.resolveCFI(word.cfiEnd);
-      if (start.index !== end.index) {
-        return null;
-      }
-
-      const contents = view.renderer.getContents();
-      const content = contents.find((item) => item.index === start.index);
-      const doc = content?.doc;
-      if (!doc) {
-        return null;
-      }
-
-      const startRange = start.anchor(doc);
-      const endRange = end.anchor(doc);
-      const range = doc.createRange();
-      range.setStart(startRange.startContainer, startRange.startOffset);
-      range.setEnd(endRange.endContainer, endRange.endOffset);
-
-      return view.getCFI(start.index, range);
-    } catch (error) {
-      console.warn('Failed to resolve audio sync word highlight', { word, error });
-      return null;
-    }
-  }, []);
-
-  const removeAudioSyncWordHighlight = useCallback(() => {
-    const highlight = audioSyncWordHighlightRef.current;
-    const view = viewRef.current;
-    if (highlight && view) {
-      try {
-        view.addAnnotation(highlight, true);
-      } catch {
-        // Ignore stale annotations when the backing section has been unloaded.
-      }
-    }
-    audioSyncWordHighlightRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    if (!activeAudioSyncWord) {
-      removeAudioSyncWordHighlight();
-      return;
-    }
-
-    const view = viewRef.current;
-    if (!view) {
-      return;
-    }
-
-    const cfi = resolveAudioSyncWordCfi(activeAudioSyncWord);
-    if (!cfi) {
-      removeAudioSyncWordHighlight();
-      return;
-    }
-
-    const currentHighlight = audioSyncWordHighlightRef.current;
-    const nextHighlight = createAudioSyncWordHighlightNote(
-      activeAudioSyncWord,
-      cfi,
-      themeCode.primary,
-    );
-    if (currentHighlight?.id === nextHighlight.id && currentHighlight.cfi === nextHighlight.cfi) {
-      return;
-    }
-
-    removeAudioSyncWordHighlight();
-    audioSyncWordHighlightRef.current = nextHighlight;
-    try {
-      view.addAnnotation(nextHighlight);
-    } catch (error) {
-      audioSyncWordHighlightRef.current = null;
-      console.warn('Failed to add audio sync word highlight', { highlight: nextHighlight, error });
-    }
-  }, [
-    activeAudioSyncWord,
-    docLoadVersion,
-    removeAudioSyncWordHighlight,
-    resolveAudioSyncWordCfi,
-    themeCode.primary,
-  ]);
-
-  useEffect(() => {
-    return () => removeAudioSyncWordHighlight();
-  }, [removeAudioSyncWordHighlight]);
 
   const progressRelocateHandler = (event: Event) => {
     const detail = (event as CustomEvent).detail;
@@ -288,6 +180,7 @@ const FoliateViewer: React.FC<{
                 'sanitizer',
                 'simplecc',
                 'proofread',
+                'warichu',
               ],
             };
             return Promise.resolve(transformContent(ctx));
@@ -309,6 +202,12 @@ const FoliateViewer: React.FC<{
     }
   }, [getView, getProgress, bookKey]);
 
+  const skipToNextSection = useCallback(() => {
+    const view = getView(bookKey);
+    const viewSettings = getViewSettings(bookKey);
+    viewPagination(view, viewSettings, 'down', 'section');
+  }, [bookKey]);
+
   const docLoadHandler = (event: Event) => {
     docLoaded.current = true;
     if (bookDoc.rendition?.layout === 'pre-paginated') {
@@ -317,7 +216,6 @@ const FoliateViewer: React.FC<{
     const detail = (event as CustomEvent).detail;
     console.log('doc index loaded:', detail.index);
     if (detail.doc) {
-      setDocLoadVersion((version) => version + 1);
       const renderer = viewRef.current?.renderer;
       const writingDir = renderer?.setStyles && getDirection(detail.doc);
       const viewSettings = getViewSettings(bookKey)!;
@@ -363,9 +261,11 @@ const FoliateViewer: React.FC<{
       applyScrollModeClass(detail.doc, viewSettings.scrolled || false);
       applyScrollbarStyle(document, viewSettings.hideScrollbar || false);
       keepTextAlignment(detail.doc);
-      handleA11yNavigation(viewRef.current, detail.doc, detail.index, {
+      handleA11yNavigation(viewRef.current, detail.doc, {
         skipToLastPosCallback: skipToReadingPosition,
         skipToLastPosLabel: _('Skip to last reading position'),
+        skipToNextSectionCallback: skipToNextSection,
+        skipToNextSectionLabel: _('End of this section. Continue to the next.'),
       });
 
       // Inline scripts in tauri platforms are not executed by default
@@ -408,7 +308,9 @@ const FoliateViewer: React.FC<{
         detail.doc.addEventListener('mousedown', handleMousedown.bind(null, bookKey));
         detail.doc.addEventListener('mouseup', handleMouseup.bind(null, bookKey));
         detail.doc.addEventListener('click', handleClick.bind(null, bookKey, doubleClickDisabled));
-        detail.doc.addEventListener('wheel', handleWheel.bind(null, bookKey));
+        // passive: false so handleWheel can preventDefault for mouse-wheel
+        // events and replace the native jerky scroll with a smooth animation.
+        detail.doc.addEventListener('wheel', handleWheel.bind(null, bookKey), { passive: false });
         detail.doc.addEventListener('touchstart', handleTouchStart.bind(null, bookKey));
         detail.doc.addEventListener('touchmove', handleTouchMove.bind(null, bookKey));
         detail.doc.addEventListener('touchend', handleTouchEnd.bind(null, bookKey));
@@ -435,11 +337,29 @@ const FoliateViewer: React.FC<{
 
   const stabilizedHandler = useCallback(() => {
     setLoading(false);
+    // Layout/relayout warichu after paginator has set column-width via columnize()
+    const contents = viewRef.current?.renderer?.getContents?.() || [];
+    for (const { doc } of contents) {
+      if (doc) {
+        const hasPending = doc.querySelectorAll('.warichu-pending').length > 0;
+        const hasExisting = doc.querySelectorAll('.warichu-head').length > 0;
+        if (hasPending) {
+          layoutWarichu(doc);
+        } else if (hasExisting) {
+          relayoutWarichu(doc);
+        }
+      }
+    }
   }, []);
 
   const docRelocateHandler = (event: Event) => {
     const detail = (event as CustomEvent).detail;
     if (detail.reason !== 'scroll' && detail.reason !== 'page') return;
+
+    // First user-initiated navigation after a deep-link landing — promote
+    // the preview into the real reading position. Subsequent progress writes
+    // can flow normally.
+    setPreviewMode(bookKey, false);
 
     const parallelViews = getParallels(bookKey);
     if (parallelViews && parallelViews.size > 0) {
@@ -670,13 +590,33 @@ const FoliateViewer: React.FC<{
       }
       applyMarginAndGap();
 
-      const lastLocation = config.location;
+      // If the URL carries ?cfi=... (e.g. opened from a deep link / annotation
+      // export link), use it as the initial location instead of the saved one.
+      // Only applies to the primary book — first id in the route's `ids` —
+      // so parallel views don't all jump to the same CFI.
+      const cfiParam = searchParams?.get('cfi');
+      const idsParam =
+        searchParams?.get('ids') ?? window.location.pathname.split('/reader/')[1] ?? '';
+      const primaryId = idsParam.split(BOOK_IDS_SEPARATOR).filter(Boolean)[0];
+      const thisId = bookKey.split('-')[0];
+      const overrideLocation = cfiParam && primaryId === thisId ? cfiParam : null;
+
+      const lastLocation = overrideLocation ?? config.location;
       if (lastLocation) {
         await view.init({ lastLocation });
       } else {
         await view.goToFraction(0);
       }
       setViewInited(bookKey, true);
+
+      // The reader is showing a deep-link target, not the user's actual reading
+      // position. Mark the view as a preview so progress writers (auto-save,
+      // cloud sync, kosync) skip until the user takes a reading action. The
+      // flag clears on the first user-initiated relocate (page / scroll) in
+      // docRelocateHandler below.
+      if (overrideLocation) {
+        setPreviewMode(bookKey, true);
+      }
     };
 
     openBook();
@@ -857,7 +797,7 @@ const FoliateViewer: React.FC<{
       />
       <ParagraphControl bookKey={bookKey} viewRef={viewRef} gridInsets={gridInsets} />
       {((!docLoaded.current && loading) || viewState?.loading) && (
-        <div className='bg-base-100/85 absolute left-0 top-0 z-10 flex h-full w-full items-center justify-center'>
+        <div className='absolute left-0 top-0 z-10 flex h-full w-full items-center justify-center'>
           <Spinner loading={true} />
         </div>
       )}

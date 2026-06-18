@@ -1,17 +1,17 @@
 [package]
-name = "Hermes"
-version = "0.3.0"
-description = "Hermes, the offline-first fork of Readest"
+name = "Readest"
+version = "0.2.2"
+description = "Your online library"
 authors = ["Bilingify LLC"]
 license = ""
-repository = "https://github.com/dalzyu/readest-hermes"
+repository = ""
 edition = "2021"
 rust-version = "1.77.2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "hermeslib"
+name = "readestlib"
 crate-type = ["staticlib", "cdylib", "lib"]
 
 [features]
@@ -19,6 +19,7 @@ crate-type = ["staticlib", "cdylib", "lib"]
 cargo-clippy = []
 # Enable WebDriver plugin for E2E testing (use with `tauri build --debug --features webdriver`)
 webdriver = ["tauri-plugin-webdriver"]
+devtools = ["tauri/devtools"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -38,7 +39,6 @@ reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "stream",
 ] }
-mp4ameta = "0.13.0"
 tauri = { version = "2", features = [ "protocol-asset" ] }
 tauri-build = "2"
 tauri-plugin-log = "2"
@@ -58,15 +58,9 @@ tauri-plugin-native-bridge = { path = "./plugins/tauri-plugin-native-bridge" }
 tauri-plugin-native-tts = { path = "./plugins/tauri-plugin-native-tts" }
 tauri-plugin-websocket = "2"
 tauri-plugin-sharekit = "0.3"
-lofty = "0.22"
-sha2 = "0.10"
-hex = "0.4"
-minisign-verify = "0.2"
-tauri-plugin-webdriver = { version = "0.2", optional = true }
-
-[target.'cfg(not(all(target_os = "windows", target_arch = "x86")))'.dependencies]
 tauri-plugin-device-info = "1.0.1"
-
+tauri-plugin-turso = { path = "./plugins/tauri-plugin-turso" }
+tauri-plugin-webdriver = { version = "0.2", optional = true }
 
 [target."cfg(target_os = \"macos\")".dependencies]
 rand = "0.8"
@@ -80,16 +74,11 @@ objc2-authentication-services = "0.3"
 objc2-foundation = { version = "0.3", features = ["NSError", "NSArray"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
-tauri-plugin-turso = { path = "./plugins/tauri-plugin-turso" }
 tauri-plugin-cli = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
 discord-rich-presence = "1.0.0"
 
-
-[target.'cfg(unix)'.dependencies]
-nix = { version = "0.30", features = ["signal", "process"] }
-
-[target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
+[target.'cfg(target_os = "android")'.dependencies]
+libc = "0.2"

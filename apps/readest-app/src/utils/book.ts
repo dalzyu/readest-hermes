@@ -1,10 +1,4 @@
 import { BookMetadata, EXTS } from '@/libs/document';
-import {
-  AUDIO_SYNC_EPUB3_DIRNAME,
-  AUDIO_SYNC_EPUB3_FILENAME,
-  AUDIO_SYNC_EPUB3_VERSION,
-  AUDIO_SYNC_PACKAGE_PROVENANCE_FILENAME,
-} from '@/services/audioSync/constants';
 import { Book, BookConfig, BookProgress, WritingMode } from '@/types/book';
 import { SUPPORTED_LANGS } from '@/services/constants';
 import { getLocale, getUserLang, makeSafeFilename } from './misc';
@@ -41,58 +35,9 @@ export const getCoverFilename = (book: Book) => {
 export const getConfigFilename = (book: Book) => {
   return `${book.hash}/config.json`;
 };
-export const getBookAudioDir = (book: Book) => {
-  return `${book.hash}/audio`;
+export const getBookNavFilename = (book: Book) => {
+  return `${book.hash}/nav.json`;
 };
-export const getAudioAssetFilename = (book: Book) => {
-  return `${getBookAudioDir(book)}/asset.json`;
-};
-export const getAudioSourceFilename = (book: Book, format: string) => {
-  return `${getBookAudioDir(book)}/source.${format}`;
-};
-export const getNormalizedAudioFilename = (book: Book, format: string) => {
-  return `${getBookAudioDir(book)}/normalized.${format}`;
-};
-export const getAudioChaptersFilename = (book: Book) => {
-  return `${getBookAudioDir(book)}/chapters.json`;
-};
-export const getAudioAlignmentInputFilename = (book: Book) => {
-  return `${getBookAudioDir(book)}/alignment-input.v3.json`;
-};
-export const getAudioSyncMapFilename = (book: Book) => {
-  return `${getBookAudioDir(book)}/sync-map.v2.json`;
-};
-export const getLegacyAudioSyncMapFilename = (book: Book) => {
-  return `${getBookAudioDir(book)}/sync-map.v1.json`;
-};
-export const getAudioAlignmentReportFilename = (book: Book) => {
-  return `${getBookAudioDir(book)}/alignment-report.json`;
-};
-export const getAudioSyncPackageDir = (book: Book) => {
-  return `${getBookAudioDir(book)}/${AUDIO_SYNC_EPUB3_DIRNAME}`;
-};
-export const getAudioSyncPackageVersionDir = (
-  book: Book,
-  version: number = AUDIO_SYNC_EPUB3_VERSION,
-) => {
-  return `${getAudioSyncPackageDir(book)}/v${version}`;
-};
-export const getAudioSyncPackageFilename = (
-  book: Book,
-  version: number = AUDIO_SYNC_EPUB3_VERSION,
-) => {
-  return `${getAudioSyncPackageVersionDir(book, version)}/${AUDIO_SYNC_EPUB3_FILENAME}`;
-};
-export const getAudioSyncPackageProvenanceFilename = (
-  book: Book,
-  version: number = AUDIO_SYNC_EPUB3_VERSION,
-) => {
-  return `${getAudioSyncPackageVersionDir(book, version)}/${AUDIO_SYNC_PACKAGE_PROVENANCE_FILENAME}`;
-};
-export const getAudioSyncCorrectionFilename = (book: Book) => {
-  return `${getBookAudioDir(book)}/alignment-corrections.json`;
-};
-
 export const isBookFile = (filename: string) => {
   return Object.values(EXTS).includes(filename.split('.').pop()!);
 };
@@ -363,16 +308,29 @@ const getIdentifiersList = (
       : [identifiers.value];
 };
 
-export const getMetadataHash = (metadata: BookMetadata) => {
+export interface MetadataHashInfo {
+  title: string;
+  authors: string[];
+  identifiers: string[];
+  hashSource: string;
+  metaHash: string;
+}
+
+export const getMetadataHashInfo = (metadata: BookMetadata): MetadataHashInfo | undefined => {
+  if (!metadata) return;
   try {
     const title = getTitleForHash(metadata.title);
-    const authors = getAuthorsList(metadata.author).join(',');
-    const identifiers = getIdentifiersList(metadata.altIdentifier || metadata.identifier).join(',');
-    const hashSource = `${title}|${authors}|${identifiers}`;
+    const authors = getAuthorsList(metadata.author);
+    const identifiers = getIdentifiersList(metadata.altIdentifier || metadata.identifier);
+    const hashSource = `${title}|${authors.join(',')}|${identifiers.join(',')}`;
     const metaHash = md5(hashSource.normalize('NFC'));
-    return metaHash;
+    return { title, authors, identifiers, hashSource, metaHash };
   } catch (error) {
     console.error('Error generating metadata hash:', error);
   }
   return;
+};
+
+export const getMetadataHash = (metadata: BookMetadata) => {
+  return getMetadataHashInfo(metadata)?.metaHash;
 };

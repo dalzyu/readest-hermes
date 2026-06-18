@@ -8,7 +8,7 @@ import { MdCloudSync, MdSync, MdSyncProblem } from 'react-icons/md';
 
 import { invoke, PermissionState } from '@tauri-apps/api/core';
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
-import { CLOUD_ENABLED, DOWNLOAD_READEST_URL } from '@/services/constants';
+import { DOWNLOAD_READEST_URL } from '@/services/constants';
 import { setBackupDialogVisible } from '@/app/library/components/BackupWindow';
 import { useAuth } from '@/context/AuthContext';
 import { useEnv } from '@/context/EnvContext';
@@ -27,7 +27,7 @@ import { setMigrateDataDirDialogVisible } from '@/app/library/components/Migrate
 import { requestStoragePermission } from '@/utils/permission';
 import { saveSysSettings } from '@/helpers/settings';
 import { selectDirectory } from '@/utils/bridge';
-import { formatLocaleDateTime } from '@/utils/book';
+import dayjs from 'dayjs';
 import UserAvatar from '@/components/UserAvatar';
 import MenuItem from '@/components/MenuItem';
 import Quota from '@/components/Quota';
@@ -55,7 +55,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
   const [isAutoCheckUpdates, setIsAutoCheckUpdates] = useState(settings.autoCheckUpdates);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(settings.alwaysOnTop);
   const [isAlwaysShowStatusBar, setIsAlwaysShowStatusBar] = useState(settings.alwaysShowStatusBar);
-  const [isScreenWakeLock, setIsScreenWakeLock] = useState(settings.screenWakeLock);
   const [isOpenLastBooks, setIsOpenLastBooks] = useState(settings.openLastBooks);
   const [isAutoImportBooksOnOpen, setIsAutoImportBooksOnOpen] = useState(
     settings.autoImportBooksOnOpen,
@@ -102,11 +101,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
     setThemeMode(nextMode);
   };
 
-  const handleReloadPage = () => {
-    window.location.reload();
-    setIsDropdownOpen?.(false);
-  };
-
   const handleFullScreen = () => {
     tauriHandleToggleFullScreen();
     setIsDropdownOpen?.(false);
@@ -151,12 +145,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
     const newValue = !settings.autoCheckUpdates;
     saveSysSettings(envConfig, 'autoCheckUpdates', newValue);
     setIsAutoCheckUpdates(newValue);
-  };
-
-  const toggleScreenWakeLock = () => {
-    const newValue = !settings.screenWakeLock;
-    saveSysSettings(envConfig, 'screenWakeLock', newValue);
-    setIsScreenWakeLock(newValue);
   };
 
   const toggleOpenLastBooks = () => {
@@ -263,6 +251,11 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
     setAlwaysInForeground(requestAlwaysInForeground);
   };
 
+  const handleSyncLibrary = () => {
+    onPullLibrary(true, true);
+    setIsDropdownOpen?.(false);
+  };
+
   const avatarUrl = user?.user_metadata?.['picture'] || user?.user_metadata?.['avatar_url'];
   const userFullName = user?.user_metadata?.['full_name'];
   const userDisplayName = userFullName ? userFullName.split(' ')[0] : null;
@@ -285,76 +278,73 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
       )}
       onCancel={() => setIsDropdownOpen?.(false)}
     >
-      {CLOUD_ENABLED &&
-        (user ? (
-          <MenuItem
-            label={
-              userDisplayName
-                ? _('Logged in as {{userDisplayName}}', { userDisplayName })
-                : _('Logged in')
-            }
-            labelClass='!max-w-40'
-            aria-label={_('View account details and quota')}
-            Icon={
-              avatarUrl ? (
-                <UserAvatar url={avatarUrl} size={iconSize} DefaultIcon={PiUserCircleCheck} />
-              ) : (
-                PiUserCircleCheck
-              )
-            }
-          >
-            <ul className='ms-0 flex flex-col ps-0 before:hidden'>
-              <MenuItem
-                label={_('Cloud File Transfers')}
-                Icon={MdCloudSync}
-                description={
-                  hasActiveTransfers
-                    ? _('{{activeCount}} active, {{pendingCount}} pending', {
-                        activeCount: stats.active,
-                        pendingCount: stats.pending,
-                      })
-                    : stats.failed > 0
-                      ? _('{{failedCount}} failed', { failedCount: stats.failed })
-                      : ''
-                }
-                onClick={openTransferQueue}
-              />
-              <MenuItem
-                label={
-                  settings.lastSyncedAtBooks
-                    ? _('Synced at {{time}}', {
-                        time: formatLocaleDateTime(settings.lastSyncedAtBooks),
-                      })
-                    : _('Never synced')
-                }
-                Icon={user ? MdSync : MdSyncProblem}
-                labelClass='ps-2 pe-1 !mx-0'
-                iconClassName={user && isSyncing ? 'animate-reverse-spin' : ''}
-                onClick={onPullLibrary.bind(null, true, true)}
-              />
-              <button
-                onClick={handleUserProfile}
-                className='hover:bg-base-300 w-full rounded-md'
-                style={{
-                  paddingInlineStart: `${iconSize}px`,
-                }}
-              >
-                <Quota quotas={quotas} labelClassName='h-10 pl-3 pr-2' />
-              </button>
-              <MenuItem label={_('Account')} onClick={handleUserProfile} />
-            </ul>
-          </MenuItem>
-        ) : (
-          <MenuItem label={_('Sign In')} Icon={PiUserCircle} onClick={handleUserLogin}></MenuItem>
-        ))}
-
-      {CLOUD_ENABLED && (
+      {user ? (
         <MenuItem
-          label={_('Auto Upload Books to Cloud')}
-          toggled={isAutoUpload}
-          onClick={toggleAutoUploadBooks}
-        />
+          label={
+            userDisplayName
+              ? _('Logged in as {{userDisplayName}}', { userDisplayName })
+              : _('Logged in')
+          }
+          labelClass='!max-w-40'
+          aria-label={_('View account details and quota')}
+          Icon={
+            avatarUrl ? (
+              <UserAvatar url={avatarUrl} size={iconSize} DefaultIcon={PiUserCircleCheck} />
+            ) : (
+              PiUserCircleCheck
+            )
+          }
+        >
+          <ul className='ms-0 flex flex-col ps-0 before:hidden'>
+            <MenuItem
+              label={_('Cloud File Transfers')}
+              Icon={MdCloudSync}
+              description={
+                hasActiveTransfers
+                  ? _('{{activeCount}} active, {{pendingCount}} pending', {
+                      activeCount: stats.active,
+                      pendingCount: stats.pending,
+                    })
+                  : stats.failed > 0
+                    ? _('{{failedCount}} failed', { failedCount: stats.failed })
+                    : ''
+              }
+              onClick={openTransferQueue}
+            />
+            <MenuItem
+              label={
+                settings.lastSyncedAtBooks
+                  ? _('Synced {{time}}', {
+                      time: dayjs(settings.lastSyncedAtBooks).fromNow(),
+                    })
+                  : _('Never synced')
+              }
+              Icon={user ? MdSync : MdSyncProblem}
+              labelClass='ps-2 pe-1 !mx-0'
+              iconClassName={user && isSyncing ? 'animate-reverse-spin' : ''}
+              onClick={handleSyncLibrary}
+            />
+            <button
+              onClick={handleUserProfile}
+              className='hover:bg-base-300 w-full rounded-md'
+              style={{
+                paddingInlineStart: `${iconSize}px`,
+              }}
+            >
+              <Quota quotas={quotas} labelClassName='h-10 pl-3 pr-2' />
+            </button>
+            <MenuItem label={_('Account')} onClick={handleUserProfile} />
+          </ul>
+        </MenuItem>
+      ) : (
+        <MenuItem label={_('Sign In')} Icon={PiUserCircle} onClick={handleUserLogin}></MenuItem>
       )}
+
+      <MenuItem
+        label={_('Auto Upload Books to Cloud')}
+        toggled={isAutoUpload}
+        onClick={toggleAutoUploadBooks}
+      />
 
       {isTauriAppPlatform() && !appService?.isMobile && (
         <MenuItem
@@ -396,11 +386,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
           onClick={toggleAlwaysShowStatusBar}
         />
       )}
-      <MenuItem
-        label={_('Keep Screen Awake')}
-        toggled={isScreenWakeLock}
-        onClick={toggleScreenWakeLock}
-      />
       {appService?.isAndroidApp && (
         <MenuItem
           label={_(_('Background Read Aloud'))}
@@ -408,7 +393,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
           onClick={toggleAlwaysInForeground}
         />
       )}
-      <MenuItem label={_('Reload Page')} onClick={handleReloadPage} />
       <MenuItem
         label={themeModeLabel}
         Icon={themeMode === 'dark' ? PiMoon : themeMode === 'light' ? PiSun : TbSunMoon}
@@ -440,15 +424,13 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         </ul>
       </MenuItem>
       <hr aria-hidden='true' className='border-base-200 my-1' />
-      {CLOUD_ENABLED && user && userProfilePlan === 'free' && (
-        <MenuItem label={_('Upgrade to Hermes Premium')} onClick={handleUpgrade} />
+      {user && userProfilePlan === 'free' && (
+        <MenuItem label={_('Upgrade to Readest Premium')} onClick={handleUpgrade} />
       )}
-      {isWebAppPlatform() && (
-        <MenuItem label={_('Download the original project')} onClick={downloadReadest} />
-      )}
-      <MenuItem label={_('About Hermes')} onClick={showAboutReadest} />
+      {isWebAppPlatform() && <MenuItem label={_('Download Readest')} onClick={downloadReadest} />}
+      <MenuItem label={_('About Readest')} onClick={showAboutReadest} />
       <MenuItem
-        label={_('Help improve Hermes')}
+        label={_('Help improve Readest')}
         description={isTelemetryEnabled ? _('Sharing anonymized statistics') : ''}
         toggled={isTelemetryEnabled}
         onClick={toggleTelemetry}

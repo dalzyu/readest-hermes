@@ -10,7 +10,7 @@ import { useDeviceControlStore } from '@/store/deviceStore';
 import { eventDispatcher } from '@/utils/event';
 import { FooterBarProps, NavigationHandlers, FooterBarChildProps } from './types';
 import { debounce } from '@/utils/debounce';
-import { viewPagination } from '../../hooks/usePagination';
+import { RSVPControl } from '../rsvp';
 import MobileFooterBar from './MobileFooterBar';
 import DesktopFooterBar from './DesktopFooterBar';
 import TTSControl from '../tts/TTSControl';
@@ -67,12 +67,12 @@ const FooterBar: React.FC<FooterBarProps> = ({
   );
 
   const handleGoPrevPage = useCallback(() => {
-    viewPagination(view, viewSettings, 'left', 'page');
-  }, [view, viewSettings]);
+    view?.renderer.prev();
+  }, [view]);
 
   const handleGoNextPage = useCallback(() => {
-    viewPagination(view, viewSettings, 'right', 'page');
-  }, [view, viewSettings]);
+    view?.renderer.next();
+  }, [view]);
 
   const handleGoPrevSection = useCallback(() => {
     view?.renderer.prevSection?.();
@@ -219,7 +219,7 @@ const FooterBar: React.FC<FooterBarProps> = ({
   const containerClasses = clsx(
     'footer-bar shadow-xs bottom-0 left-0 z-10 flex w-full flex-col',
     !forceMobileLayout && 'sm:h-[52px] sm:bg-base-100 sm:border-none',
-    'border-base-300/50 border-t',
+    'not-eink:border-base-300/50 eink:border-base-content border-t',
     'transition-[opacity,transform] duration-300',
     forceMobileLayout || window.innerWidth < 640 ? 'fixed' : 'absolute',
     appService?.hasRoundedWindow && 'rounded-window-bottom-right',
@@ -269,6 +269,7 @@ const FooterBar: React.FC<FooterBarProps> = ({
       )}
 
       <TTSControl bookKey={bookKey} gridInsets={gridInsets} />
+      <RSVPControl bookKey={bookKey} gridInsets={gridInsets} />
     </>
   );
 };

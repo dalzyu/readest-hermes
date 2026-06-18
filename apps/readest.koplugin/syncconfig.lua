@@ -4,7 +4,7 @@ local UIManager = require("ui/uimanager")
 local logger = require("logger")
 local util = require("util")
 local sha2 = require("ffi/sha2")
-local _ = require("gettext")
+local _ = require("i18n")
 
 local SyncConfig = {}
 
@@ -22,7 +22,7 @@ local function normalizeAuthor(author)
     return author
 end
 
-function SyncConfig:generateMetadataHash(ui)
+function SyncConfig:getMetadataHashInfo(ui)
     local doc_props = ui.doc_settings:readSetting("doc_props") or {}
     local title = doc_props.title or ''
     if title == '' then
@@ -31,20 +31,21 @@ function SyncConfig:generateMetadataHash(ui)
         title = basename or ''
     end
 
-    local authors = doc_props.authors or ''
-    if authors:find("\n") then
-        authors = util.splitToArray(authors, "\n")
-        for i, author in ipairs(authors) do
-            authors[i] = normalizeAuthor(author)
+    local authors_raw = doc_props.authors or ''
+    local authors_list = {}
+    if authors_raw:find("\n") then
+        local list = util.splitToArray(authors_raw, "\n")
+        for i, author in ipairs(list) do
+            authors_list[i] = normalizeAuthor(author)
         end
-        authors = table.concat(authors, ",")
-    else
-        authors = normalizeAuthor(authors)
+    elseif authors_raw ~= '' then
+        authors_list = { normalizeAuthor(authors_raw) }
     end
 
-    local identifiers = doc_props.identifiers or ''
-    if identifiers:find("\n") then
-        local list = util.splitToArray(identifiers, "\n")
+    local identifiers_raw = doc_props.identifiers or ''
+    local identifiers_list = {}
+    if identifiers_raw:find("\n") then
+        local list = util.splitToArray(identifiers_raw, "\n")
         local normalized = {}
         local priorities = { "uuid", "calibre", "isbn" }
         local preferred = nil
@@ -59,15 +60,26 @@ function SyncConfig:generateMetadataHash(ui)
             end
         end
         if preferred then
-            identifiers = preferred
+            identifiers_list = { preferred }
         else
-            identifiers = table.concat(normalized, ",")
+            identifiers_list = normalized
         end
-    else
-        identifiers = normalizeIdentifier(identifiers)
+    elseif identifiers_raw ~= '' then
+        identifiers_list = { normalizeIdentifier(identifiers_raw) }
     end
-    local doc_meta = title .. "|" .. authors .. "|" .. identifiers
-    return sha2.md5(doc_meta)
+
+    local hash_source = title .. "|" .. table.concat(authors_list, ",") .. "|" .. table.concat(identifiers_list, ",")
+    return {
+        title = title,
+        authors = authors_list,
+        identifiers = identifiers_list,
+        hash_source = hash_source,
+        meta_hash = sha2.md5(hash_source),
+    }
+end
+
+function SyncConfig:generateMetadataHash(ui)
+    return self:getMetadataHashInfo(ui).meta_hash
 end
 
 function SyncConfig:getMetaHash(ui)
@@ -165,7 +177,7 @@ function SyncConfig:push(ui, settings, client, interactive, last_sync_timestamp)
 
     if interactive then
         UIManager:show(InfoMessage:new{
-            text = _("Pushing book config..."),
+            text = _("Pushing reading progress..."),
             timeout = 1,
         })
     end
@@ -182,15 +194,20 @@ function SyncConfig:push(ui, settings, client, interactive, last_sync_timestamp)
             if interactive then
                 if success then
                     UIManager:show(InfoMessage:new{
-                        text = _("Book config pushed successfully"),
+                        text = _("Reading progress pushed successfully"),
                         timeout = 2,
                     })
                 else
                     UIManager:show(InfoMessage:new{
-                        text = _("Failed to push book config"),
+                        text = _("Failed to push reading progress"),
                         timeout = 2,
                     })
                 end
+            end
+            if success and ui.doc_settings then
+                local doc_readest_sync = ui.doc_settings:readSetting("readest_sync") or {}
+                doc_readest_sync.last_synced_at_config = os.time()
+                ui.doc_settings:saveSetting("readest_sync", doc_readest_sync)
             end
         end
     )
@@ -204,7 +221,7 @@ end
 function SyncConfig:pull(ui, settings, client, book_hash, meta_hash, interactive, logout_fn)
     if interactive then
         UIManager:show(InfoMessage:new{
-            text = _("Pulling book config..."),
+            text = _("Pulling reading progress..."),
             timeout = 1,
         })
     end
@@ -216,9 +233,15 @@ function SyncConfig:pull(ui, settings, client, book_hash, meta_hash, interactive
             book = book_hash,
             meta_hash = meta_hash,
         },
-        function(success, response)
+        function(success, response, status)
             if not success then
-                if response and response.error == "Not authenticated" then
+                -- Auth failure: server returns HTTP 403 with body
+                -- {error="Not authenticated"} per apps/readest-app/src/pages/api/sync.ts:31.
+                -- Check the status code primarily so future endpoints with
+                -- different body shapes still trigger relogin (codex finding).
+                local is_auth_fail = status == 401 or status == 403
+                    or (response and response.error == "Not authenticated")
+                if is_auth_fail then
                     if interactive then
                         UIManager:show(InfoMessage:new{
                             text = _("Authentication failed, please login again"),
@@ -230,11 +253,17 @@ function SyncConfig:pull(ui, settings, client, book_hash, meta_hash, interactive
                 end
                 if interactive then
                     UIManager:show(InfoMessage:new{
-                        text = _("Failed to pull book config"),
+                        text = _("Failed to pull reading progress"),
                         timeout = 2,
                     })
                 end
                 return
+            end
+
+            if ui.doc_settings then
+                local doc_readest_sync = ui.doc_settings:readSetting("readest_sync") or {}
+                doc_readest_sync.last_synced_at_config = os.time()
+                ui.doc_settings:saveSetting("readest_sync", doc_readest_sync)
             end
 
             local data = response.configs
@@ -244,7 +273,7 @@ function SyncConfig:pull(ui, settings, client, book_hash, meta_hash, interactive
                     self:applyBookConfig(ui, config)
                     if interactive then
                         UIManager:show(InfoMessage:new{
-                            text = _("Book config synchronized"),
+                            text = _("Reading progress synchronized"),
                             timeout = 2,
                         })
                     end
@@ -254,7 +283,7 @@ function SyncConfig:pull(ui, settings, client, book_hash, meta_hash, interactive
 
             if interactive then
                 UIManager:show(InfoMessage:new{
-                    text = _("No saved config found for this book"),
+                    text = _("No saved reading progress found for this book"),
                     timeout = 2,
                 })
             end
