@@ -52,6 +52,12 @@ import { setProofreadRulesVisibility } from '@/app/reader/components/ProofreadRu
 import ExportMarkdownDialog from './ExportMarkdownDialog';
 import Alert from '@/components/Alert';
 import ModalPortal from '@/components/ModalPortal';
+import { useFileSelector } from '@/hooks/useFileSelector';
+import { parseMrexpt } from '@/utils/mrexpt';
+import {
+  convertMrexptEntriesToBookNotes,
+  mergeImportedBookNotes,
+} from '@/services/annotation/providers/mrexpt';
 
 const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const _ = useTranslation();
@@ -65,6 +71,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const { clearBooknotesNav } = useSidebarStore();
   const { listenToNativeTouchEvents } = useDeviceControlStore();
   const { loadCustomDictionaries } = useCustomDictionaryStore();
+  const { selectFiles } = useFileSelector(appService, _);
 
   useNotesSync(bookKey);
   useReadwiseSync(bookKey);
@@ -484,9 +491,11 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   useEffect(() => {
     eventDispatcher.on('export-annotations', handleExportMarkdown);
     eventDispatcher.on('clear-annotations', handleClearAnnotations);
+    eventDispatcher.on('import-mrexpt', handleImportMrexpt);
     return () => {
       eventDispatcher.off('export-annotations', handleExportMarkdown);
       eventDispatcher.off('clear-annotations', handleClearAnnotations);
+      eventDispatcher.off('import-mrexpt', handleImportMrexpt);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -858,6 +867,126 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     },
     [selection?.text],
   );
+
+  const handleImportMrexpt = async (event: CustomEvent) => {
+    const { bookKey: importBookKey } = event.detail;
+    if (bookKey !== importBookKey) return;
+
+    const { bookDoc } = bookData;
+    if (!bookDoc) {
+      eventDispatcher.dispatch('toast', {
+        type: 'warning',
+        message: _('Book is not ready yet, please try again.'),
+        timeout: 2000,
+      });
+      return;
+    }
+
+    // Pick the .mrexpt file.
+    const result = await selectFiles({
+      type: 'generic',
+      accept: '.mrexpt,text/plain',
+      extensions: ['mrexpt', 'txt'],
+      multiple: false,
+      dialogTitle: _('Select Moon+ Reader Export File'),
+    });
+    if (result.error || result.files.length === 0) return;
+    const selectedFile = result.files[0]!;
+
+    // Read the file content as text on both Web (File) and Tauri (path).
+    let content = '';
+    try {
+      if (selectedFile.file) {
+        content = await selectedFile.file.text();
+      } else if (selectedFile.path) {
+        content = (await appService?.readFile(selectedFile.path, 'None', 'text')) as string;
+      }
+    } catch (e) {
+      console.warn('Failed to read mrexpt file:', e);
+    }
+
+    if (!content) {
+      eventDispatcher.dispatch('toast', {
+        type: 'warning',
+        message: _('Failed to read the selected file.'),
+        timeout: 2000,
+      });
+      return;
+    }
+
+    const entries = parseMrexpt(content);
+    if (entries.length === 0) {
+      eventDispatcher.dispatch('toast', {
+        type: 'info',
+        message: _('No annotations found in the file.'),
+        timeout: 2000,
+      });
+      return;
+    }
+
+    let conversion;
+    try {
+      conversion = await convertMrexptEntriesToBookNotes(entries, bookDoc, {
+        highlightStyle: settings.globalReadSettings.highlightStyle,
+        highlightColor:
+          settings.globalReadSettings.highlightStyles[settings.globalReadSettings.highlightStyle],
+      });
+    } catch (e) {
+      console.warn('Failed to convert mrexpt entries:', e);
+      eventDispatcher.dispatch('toast', {
+        type: 'warning',
+        message: _('Failed to import annotations.'),
+        timeout: 3000,
+      });
+      return;
+    }
+
+    if (conversion.notes.length === 0) {
+      eventDispatcher.dispatch('toast', {
+        type: 'info',
+        message: _('No annotations could be located in this book.'),
+        timeout: 2500,
+      });
+      return;
+    }
+
+    // Merge into the current book config, deduplicating by note id and
+    // preferring the latest updatedAt for any conflicting entries.
+    const config = getConfig(bookKey)!;
+    const { merged, applied, added, updated } = mergeImportedBookNotes(
+      config.booknotes ?? [],
+      conversion.notes,
+    );
+    const updatedConfig = updateBooknotes(bookKey, merged);
+    if (updatedConfig) {
+      saveConfig(envConfig, bookKey, updatedConfig, settings);
+    }
+
+    // Apply imported (or resurrected) annotations to all live views so
+    // they appear immediately. We only re-draw the notes that actually
+    // changed in this round, otherwise duplicate addAnnotation calls
+    // can confuse the overlay layer.
+    const views = getViewsById(bookKey.split('-')[0]!);
+    for (const note of applied) {
+      try {
+        views.forEach((v) => v?.addAnnotation(note));
+      } catch (err) {
+        console.warn('Failed to add imported annotation', { note, err });
+      }
+    }
+
+    // A single result toast: the count if anything changed, otherwise a
+    // plain "nothing new" hint for a repeated import of the same file.
+    const imported = added + updated;
+    eventDispatcher.dispatch('toast', {
+      type: 'info',
+      message:
+        imported > 0
+          ? _('Imported {{count}} annotations', { count: imported })
+          : _('No new annotations to import'),
+      timeout: 2500,
+    });
+  };
 
   const handleExportMarkdown = async (event: CustomEvent) => {
     const { bookKey: exportBookKey } = event.detail;
