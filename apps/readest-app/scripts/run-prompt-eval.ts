@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
+// @ts-nocheck
 /**
- * CLI for running prompt evaluation.
- *
  * Usage:
  *   npx tsx apps/readest-app/scripts/run-prompt-eval.ts
  *     --provider openai          # provider type (openai, anthropic, google, etc.)

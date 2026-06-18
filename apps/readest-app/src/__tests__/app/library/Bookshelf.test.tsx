@@ -240,6 +240,7 @@ const renderBookshelf = (
       handleLibraryNavigation={handleLibraryNavigation}
       handlePushLibrary={handlePushLibrary}
       booksTransferProgress={{}}
+      onScrollerRef={vi.fn()}
     />,
   );
 };

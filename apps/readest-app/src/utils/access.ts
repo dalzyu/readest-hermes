@@ -77,7 +77,7 @@ export const getTranslationQuota = (plan: UserPlan): number => {
 export const getTranslationPlanData = (token: string) => {
   const data = jwtDecode<Token>(token) || {};
   const plan: UserPlan = data['plan'] || 'free';
-  const usage = getDailyUsage() || 0;
+  const usage = getDailyUsage('') || 0;
   const quota = getTranslationQuota(plan);
 
   return {

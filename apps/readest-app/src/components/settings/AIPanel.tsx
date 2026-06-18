@@ -74,12 +74,18 @@ const AIPanel: React.FC = () => {
 
   const aiSettings: AISettings = settings?.aiSettings ?? DEFAULT_AI_SETTINGS;
 
+  const reedyObj =
+    typeof aiSettings.reedy === 'object' && aiSettings.reedy !== null
+      ? aiSettings.reedy
+      : { enabled: !!aiSettings.reedy, runtime: 'mvp' as const };
   const [enabled, setEnabled] = useState(aiSettings.enabled);
-  const [reedyEnabled, setReedyEnabled] = useState(aiSettings.reedy?.enabled ?? false);
+  const [reedyEnabled, setReedyEnabled] = useState(reedyObj.enabled);
   const [reedyAgentRuntime, setReedyAgentRuntime] = useState(
-    (aiSettings.reedy?.runtime ?? 'mvp') === 'agent',
+    (reedyObj.runtime ?? 'mvp') === 'agent',
   );
-  const [provider, setProvider] = useState<AIProviderName>(aiSettings.provider);
+  const [provider, setProvider] = useState<AIProviderName>(
+    (aiSettings.provider ?? 'ollama') as AIProviderName,
+  );
   const [ollamaUrl, setOllamaUrl] = useState(aiSettings.ollamaBaseUrl);
   const [ollamaModel, setOllamaModel] = useState(aiSettings.ollamaModel);
   const [ollamaEmbeddingModel, setOllamaEmbeddingModel] = useState(aiSettings.ollamaEmbeddingModel);
@@ -763,7 +769,7 @@ const AIPanel: React.FC = () => {
             saveAiSetting('reedy', {
               enabled: next,
               runtime: reedyAgentRuntime ? 'agent' : 'mvp',
-            });
+            } as AISettings['reedy']);
           }}
         />
         <SettingsSwitchRow
@@ -776,7 +782,7 @@ const AIPanel: React.FC = () => {
             saveAiSetting('reedy', {
               enabled: reedyEnabled,
               runtime: next ? 'agent' : 'mvp',
-            });
+            } as AISettings['reedy']);
           }}
         />
         <div className='flex min-h-14 items-center justify-between gap-3 pe-4'>
@@ -790,7 +796,7 @@ const AIPanel: React.FC = () => {
               if (!appService) return;
               try {
                 const bundle = await exportReedyMetricsBundle(appService);
-                const blob = new Blob([bundle], { type: 'application/json' });
+                const blob = new Blob([String(bundle)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;

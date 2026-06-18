@@ -44,9 +44,9 @@ function createMemoryFs(): FileSystem {
     getBlobURL: async (p) => p,
     getImageURL: async (p) => p,
     openFile: async () => new File([''], 'f'),
-    copyFile: async (_s, d, b) => {
-      ensureParents(d, b);
-      files.set(normalize(d, b), 'copied');
+    copyFile: async (_srcPath, _srcBase, dstPath, dstBase) => {
+      ensureParents(dstPath, dstBase);
+      files.set(normalize(dstPath, dstBase), 'copied');
     },
     readFile: async (path, base, mode) => {
       const v = files.get(normalize(path, base));

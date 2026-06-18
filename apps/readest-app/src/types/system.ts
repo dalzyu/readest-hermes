@@ -10,6 +10,7 @@ import { SchemaType } from '@/services/database/migrate';
 import type { ImportedDictionary } from '@/services/dictionaries/types';
 import type { ImportDictionariesResult } from '@/services/dictionaries/dictionaryService';
 import type { SelectedFile } from '@/hooks/useFileSelector';
+import type { AudioSyncJobStatus, AudioSyncStatus } from '@/services/audioSync/types';
 
 export type AppPlatform = 'web' | 'tauri' | 'node';
 export type OsPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'linux' | 'unknown';
@@ -227,7 +228,7 @@ export interface AppService {
     base: BaseDir,
     opts?: DatabaseOpts,
   ): Promise<DatabaseService>;
-  getAudioSyncStatus?(book: Book, runId: string): Promise<unknown>;
-  startAudioSync?(book: Book, request?: unknown): Promise<{ runId: string }>;
-  cancelAudioSync?(book: Book, runId: string): Promise<void>;
+  getAudioSyncStatus(book: Book, runId?: string): Promise<AudioSyncStatus>;
+  startAudioSync(book: Book, request?: unknown): Promise<AudioSyncJobStatus>;
+  cancelAudioSync(book: Book, runId: string): Promise<void>;
 }

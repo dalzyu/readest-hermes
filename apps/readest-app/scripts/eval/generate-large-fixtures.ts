@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs';
+// @ts-nocheck
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

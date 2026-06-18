@@ -169,7 +169,7 @@ export async function prepareAudioAlignmentInput(
   book: Book,
   asset: BookAudioAsset,
 ): Promise<string> {
-  const { file } = await appService.loadBookContent(book, { preferGeneratedPackage: false });
+  const { file } = await appService.loadBookContent(book);
   const { book: bookDoc } = await new DocumentLoader(file).open();
   const input = await buildAlignmentInput(bookDoc, asset);
   const target = getAudioAlignmentInputFilename(book);

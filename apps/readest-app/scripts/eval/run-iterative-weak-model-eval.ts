@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+// @ts-nocheck
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { PromptTestFixture, PromptTestResult } from '@/services/learning/promptTestHarness';

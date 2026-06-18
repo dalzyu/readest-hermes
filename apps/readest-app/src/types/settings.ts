@@ -14,6 +14,7 @@ import type {
   LookupSettings,
   DictionarySettings as LearningDictionarySettings,
 } from '@/services/learning/settings';
+import type { UserDictionary } from '@/services/learning/types';
 
 export type ThemeType = 'light' | 'dark' | 'auto';
 export type LibraryViewModeType = 'grid' | 'list';
@@ -367,7 +368,7 @@ export interface SystemSettings {
   webdav: WebDAVSettings;
 
   aiSettings: AISettings;
-  userDictionaryMeta?: Record<string, unknown>;
+  userDictionaryMeta?: UserDictionary[];
   /**
    * Per-device id used as the deviceId portion of every HLC this device
    * mints. Lazy-generated on first sync init via uuidv4 (mirrors

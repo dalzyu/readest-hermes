@@ -128,7 +128,7 @@ export interface AISettings {
   indexingMode: 'on-demand' | 'background';
 
   provider?: string;
-  reedy?: boolean;
+  reedy?: { enabled: boolean; runtime?: 'mvp' | 'agent' } | boolean;
   ollamaBaseUrl?: string;
   ollamaModel?: string;
   ollamaEmbeddingModel?: string;

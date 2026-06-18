@@ -11,7 +11,7 @@ import type { MemoryService } from './MemoryService';
  */
 export interface ConsolidatorMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: number;
 }

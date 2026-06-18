@@ -19,6 +19,7 @@ export interface RetrievedChunk {
   endCfi: string;
   chapterTitle: string | null;
   text: string;
+  sectionIndex?: number;
   positionIndex: number;
   /** Fused RRF score; informational only. */
   score: number;

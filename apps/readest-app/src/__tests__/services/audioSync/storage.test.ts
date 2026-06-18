@@ -72,9 +72,9 @@ function createMemoryFileSystem(): FileSystem {
     getBlobURL: async (path) => path,
     getImageURL: async (path) => path,
     openFile: async () => new File(['audio'], 'audio.mp3'),
-    copyFile: async (_srcPath, dstPath, base) => {
-      ensureParentDirs(dstPath, base);
-      files.set(normalize(dstPath, base), 'copied');
+    copyFile: async (_srcPath, _srcBase, dstPath, dstBase) => {
+      ensureParentDirs(dstPath, dstBase);
+      files.set(normalize(dstPath, dstBase), 'copied');
     },
     readFile: async (path, base, mode) => {
       const value = files.get(normalize(path, base));

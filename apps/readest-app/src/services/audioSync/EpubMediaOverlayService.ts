@@ -973,8 +973,7 @@ export async function createEpubMediaOverlayPackage(input: {
       audioHash: input.asset.audioHash,
       syncMapId: input.map.id,
       syncMapVersion: input.map.version,
-      packagePath:
-        input.packagePath || getAudioSyncPackageFilename(input.book, AUDIO_SYNC_EPUB3_VERSION),
+      packagePath: input.packagePath || getAudioSyncPackageFilename(input.book),
       audioPath: audioPackagePath,
       audioFileName: input.audioFile.name,
       sizeBytes: file.size,
@@ -1002,9 +1001,7 @@ export async function generateEpubMediaOverlayPackage(
   map: AudioSyncMap,
   report?: AudioAlignmentReport | null,
 ): Promise<AudioSyncGeneratedPackage> {
-  const { file: sourceFile } = await appService.loadBookContent(book, {
-    preferGeneratedPackage: false,
-  });
+  const { file: sourceFile } = await appService.loadBookContent(book);
   const audioPath = asset.normalizedPath || asset.originalPath;
   const audioFile = await appService.openFile(audioPath, 'Books');
   const packagePath = getAudioSyncPackageFilename(book);

@@ -1,5 +1,15 @@
 import React from 'react';
+import type { Position } from '@/utils/sel';
 
-const TranslatorPopup: React.FC = () => null;
+export interface TranslatorPopupProps {
+  text?: string;
+  position?: Position;
+  trianglePosition?: Position;
+  popupWidth?: number;
+  popupHeight?: number;
+  onDismiss?: () => void;
+}
+
+const TranslatorPopup: React.FC<TranslatorPopupProps> = () => null;
 
 export default TranslatorPopup;

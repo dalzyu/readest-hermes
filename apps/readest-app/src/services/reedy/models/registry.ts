@@ -17,13 +17,11 @@ export interface ReedyModels {
 
 export function createReedyModels(settings: AISettings): ReedyModels {
   const provider = getAIProvider(settings);
+  const chatId = chatModelIdFor(settings);
+  const embedId = embeddingModelIdFor(settings);
   return {
-    chat: adaptChatModel(provider.getModel(), chatModelIdFor(settings)),
-    embedding: adaptEmbeddingModel(
-      provider.getEmbeddingModel(),
-      embeddingModelIdFor(settings),
-      settings,
-    ),
+    chat: adaptChatModel(provider.getModel(chatId), chatId),
+    embedding: adaptEmbeddingModel(provider.getEmbeddingModel(embedId), embedId, settings),
   };
 }
 
@@ -120,6 +118,8 @@ function chatModelIdFor(settings: AISettings): string {
       );
     case 'openrouter':
       return settings.openrouterModel || 'openai/gpt-4o-mini';
+    default:
+      return 'openai/gpt-4o-mini';
   }
 }
 
@@ -173,5 +173,7 @@ function embeddingModelIdFor(settings: AISettings): string {
       return settings.aiGatewayEmbeddingModel || 'openai/text-embedding-3-small';
     case 'openrouter':
       return settings.openrouterEmbeddingModel || 'openai/text-embedding-3-small';
+    default:
+      return 'openai/text-embedding-3-small';
   }
 }

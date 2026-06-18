@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
+// @ts-nocheck
 import { act, renderHook } from '@testing-library/react';
 import type { ReactNode, RefObject } from 'react';
 

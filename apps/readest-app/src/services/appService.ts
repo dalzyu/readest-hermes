@@ -12,6 +12,7 @@ import {
   SaveLibraryBooksOptions,
   SelectDirectoryMode,
 } from '@/types/system';
+import type { AudioSyncJobStatus, AudioSyncStatus } from '@/services/audioSync/types';
 import { DatabaseOpts, DatabaseService } from '@/types/database';
 import { SchemaType } from '@/services/database/migrate';
 import { Book, BookConfig, BookContent, ImportBookOptions, ViewSettings } from '@/types/book';
@@ -424,5 +425,30 @@ export abstract class BaseAppService implements AppService {
 
   async saveLibraryBooks(books: Book[], options?: SaveLibraryBooksOptions): Promise<void> {
     return LibrarySvc.saveLibraryBooks(this.fs, books, options);
+  }
+  async getAudioSyncStatus(_book: Book, _runId?: string): Promise<AudioSyncStatus> {
+    return {
+      asset: null,
+      map: null,
+      job: null,
+      report: null,
+      playable: false,
+      synced: false,
+      chapterFallback: false,
+      syncStage: 'none',
+    };
+  }
+
+  async startAudioSync(_book: Book, _request?: unknown): Promise<AudioSyncJobStatus> {
+    return {
+      runId: '',
+      phase: 'pending',
+      progress: 0,
+      updatedAt: Date.now(),
+    };
+  }
+
+  async cancelAudioSync(_book: Book, _runId: string): Promise<void> {
+    // no-op stub
   }
 }

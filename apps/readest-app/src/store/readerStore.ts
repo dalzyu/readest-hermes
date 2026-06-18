@@ -100,15 +100,32 @@ interface ReaderStore {
   setPreviewMode: (key: string, previewMode: boolean) => void;
   recreateViewer: (envConfig: EnvConfigType, key: string) => void;
 
-  indexingProgress?: number;
-  startIndexing?: (envConfig: EnvConfigType) => Promise<void>;
-  updateIndexingProgress?: (progress: number) => void;
-  finishIndexing?: () => void;
-  cancelIndexing?: () => void;
+  indexingProgress: Record<string, ReaderIndexProgress>;
+  startIndexing: (bookKey: string, runId: string) => void;
+  updateIndexingProgress: (
+    bookKey: string,
+    runId: string,
+    progress: Omit<ReaderIndexProgress, 'runId'>,
+  ) => void;
+  finishIndexing: (bookKey: string, runId: string) => void;
+  cancelIndexing: (bookKey: string, runId?: string) => void;
   recordSession?: (key: string) => void;
 }
 
-export type ReaderIndexPhase = 'idle' | 'indexing' | 'done' | 'error';
+export type ReaderIndexPhase =
+  | 'idle'
+  | 'pending'
+  | 'chunking'
+  | 'embedding'
+  | 'finalizing'
+  | 'complete'
+  | 'error';
+export interface ReaderIndexProgress {
+  runId: string;
+  current: number;
+  total: number;
+  phase: ReaderIndexPhase;
+}
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
   viewStates: {},
@@ -538,4 +555,47 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         }));
       });
   },
+
+  indexingProgress: {},
+  startIndexing: (bookKey: string, runId: string) =>
+    set((state) => ({
+      indexingProgress: {
+        ...state.indexingProgress,
+        [bookKey]: { runId, current: 0, total: 1, phase: 'pending' },
+      },
+    })),
+  updateIndexingProgress: (
+    bookKey: string,
+    runId: string,
+    progress: Omit<ReaderIndexProgress, 'runId'>,
+  ) =>
+    set((state) => {
+      const current = state.indexingProgress[bookKey];
+      if (!current || current.runId !== runId) return state;
+      return {
+        indexingProgress: {
+          ...state.indexingProgress,
+          [bookKey]: { runId, ...progress },
+        },
+      };
+    }),
+  finishIndexing: (bookKey: string, runId: string) =>
+    set((state) => {
+      const current = state.indexingProgress[bookKey];
+      if (!current || current.runId !== runId) return state;
+      return {
+        indexingProgress: {
+          ...state.indexingProgress,
+          [bookKey]: { ...current, current: current.total, phase: 'complete' },
+        },
+      };
+    }),
+  cancelIndexing: (bookKey: string, runId?: string) =>
+    set((state) => {
+      const current = state.indexingProgress[bookKey];
+      if (!current) return state;
+      if (runId && current.runId !== runId) return state;
+      const { [bookKey]: _, ...rest } = state.indexingProgress;
+      return { indexingProgress: rest };
+    }),
 }));

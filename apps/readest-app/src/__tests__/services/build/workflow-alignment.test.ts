@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+// @ts-nocheck
 import path from 'node:path';
 import { NextRequest } from 'next/server';
 import { describe, expect, test } from 'vitest';

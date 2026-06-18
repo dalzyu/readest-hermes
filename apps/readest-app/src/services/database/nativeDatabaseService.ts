@@ -18,7 +18,7 @@ export class NativeDatabaseService implements DatabaseService {
     // translation when no relevant opts are set so existing callers preserve their
     // plain path-string call shape.
     const loadArg: string | LoadOptions = opts?.experimental?.length
-      ? { path, experimental: opts.experimental as string[] }
+      ? ({ path, experimental: opts.experimental as string[] } as LoadOptions)
       : path;
     const db = await Database.load(loadArg);
     return new NativeDatabaseService(db);

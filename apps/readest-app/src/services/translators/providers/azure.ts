@@ -10,7 +10,7 @@ export class AzureTranslator {
     this.config = config;
   }
 
-  async translate(text: string, from: string, to: string): Promise<string> {
+  async translate(text: string, _from: string, _to: string): Promise<string> {
     return text;
   }
 
