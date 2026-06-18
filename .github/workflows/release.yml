@@ -1,27 +1,16 @@
-name: Release Hermes
-
-# Required secrets for this fork's release workflow:
-# - GITHUB_TOKEN (automatic)
-# - NEXT_PUBLIC_POSTHOG_KEY
-# - NEXT_PUBLIC_POSTHOG_HOST
-# - NEXT_PUBLIC_SUPABASE_URL
-# - NEXT_PUBLIC_SUPABASE_ANON_KEY
-#
-# Secrets used only by upstream (NOT needed for this fork, already gated by if: github.repository == 'readest/readest'):
-# - TAURI_SIGNING_PRIVATE_KEY / PASSWORD
-# - APPLE_CERTIFICATE / PASSWORD / SIGNING_IDENTITY / ID / PASSWORD / TEAM_ID
-# - ANDROID_KEY_ALIAS / PASSWORD / BASE64
-# - RELEASE_R2_ACCOUNT_ID / ACCESS_KEY_ID / SECRET_ACCESS_KEY
+name: Release Readest
 
 on:
   workflow_dispatch:
   release:
     types: [published]
 
+permissions: read-all
+
 jobs:
   get-release:
     permissions:
-      contents: write
+      contents: read
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.get-release.outputs.release_id }}
@@ -30,45 +19,25 @@ jobs:
       release_version: ${{ steps.get-release-notes.outputs.release_version }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
       - name: get version
         run: echo "PACKAGE_VERSION=$(node -p "require('./apps/readest-app/package.json').version")" >> $GITHUB_ENV
       - name: get release
         id: get-release
-        uses: actions/github-script@v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
-            const tag = `v${process.env.PACKAGE_VERSION}`;
-            let data;
-            try {
-              ({ data } = await github.rest.repos.getReleaseByTag({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag,
-              }));
-            } catch (error) {
-              if (error.status !== 404) {
-                throw error;
-              }
-
-              ({ data } = await github.rest.repos.createRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag_name: tag,
-                target_commitish: context.sha,
-                name: `Hermes ${process.env.PACKAGE_VERSION}`,
-                draft: false,
-                prerelease: false,
-                make_latest: 'true',
-              }));
-            }
+            const { data } = await github.rest.repos.getLatestRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })
             core.setOutput('release_id', data.id);
             core.setOutput('release_tag', data.tag_name);
       - name: get release notes
         id: get-release-notes
-        uses: actions/github-script@v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const fs = require('fs');
@@ -90,11 +59,10 @@ jobs:
     steps:
       - name: update release
         id: update-release
-        uses: actions/github-script@v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           release_id: ${{ needs.get-release.outputs.release_id }}
           release_tag: ${{ needs.get-release.outputs.release_tag }}
-          release_version: ${{ needs.get-release.outputs.release_version }}
           release_note: ${{ needs.get-release.outputs.release_note }}
         with:
           script: |
@@ -110,12 +78,45 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: process.env.release_id,
-              name: `Hermes ${process.env.release_version}`,
               body: body,
               draft: false,
-              prerelease: false,
-              make_latest: 'true',
+              prerelease: false
             })
+
+  build-koreader-plugin:
+    needs: get-release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: create KOReader plugin zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=${{ needs.get-release.outputs.release_version }}
+          plugin_zip="Readest-${version}-1.koplugin.zip"
+          meta_file="apps/readest.koplugin/_meta.lua"
+          perl -i -pe "s/^}/    version = \"${version}\",\n}/" "${meta_file}"
+
+          # Exclude dev-only artifacts from the published plugin zip:
+          #   scripts/  — i18n + build helpers
+          #   docs/     — design notes
+          #   spec/     — busted test suite
+          #   .busted   — busted runner config
+          # Mirror these in apps/readest.koplugin/scripts/build-koplugin.mjs
+          # for local builds.
+          cd apps
+          zip -r ../${plugin_zip} readest.koplugin \
+            -x 'readest.koplugin/scripts/*' \
+               'readest.koplugin/docs/*' \
+               'readest.koplugin/spec/*' \
+               'readest.koplugin/.busted'
+          cd ..
+
+          echo "Uploading ${plugin_zip} to GitHub release"
+          gh release upload ${{ needs.get-release.outputs.release_tag }} ${plugin_zip} --clobber
 
   build-tauri:
     needs: get-release
@@ -132,6 +133,10 @@ jobs:
             release: linux
             arch: x86_64
             rust_target: x86_64-unknown-linux-gnu
+          - os: ubuntu-22.04-arm
+            release: linux
+            arch: aarch64
+            rust_target: aarch64-unknown-linux-gnu
           - os: macos-latest
             release: macos
             arch: aarch64
@@ -151,30 +156,30 @@ jobs:
     runs-on: ${{ matrix.config.os }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: initialize git submodules
         run: git submodule update --init --recursive
 
       - name: setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 24
           cache: pnpm
 
       - name: setup Java (for Android build only)
         if: matrix.config.release == 'android'
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:
           distribution: 'zulu'
           java-version: '17'
 
       - name: setup Android SDK (for Android build only)
         if: matrix.config.release == 'android'
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
 
       - name: install NDK (for Android build only)
         if: matrix.config.release == 'android'
@@ -184,15 +189,14 @@ jobs:
         run: pnpm install
 
       - name: copy pdfjs-dist and simplecc-dist to public directory
-        working-directory: apps/readest-app
-        run: pnpm setup-vendors
+        run: pnpm --filter @readest/readest-app setup-vendors
 
       - name: install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           targets: ${{ matrix.config.rust_target }}
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           key: ${{ matrix.config.os }}-${{ matrix.config.release }}-${{ matrix.config.arch }}-cargo
 
@@ -200,7 +204,7 @@ jobs:
         if: contains(matrix.config.os, 'ubuntu') && matrix.config.release != 'android' && matrix.config.arch != 'armhf'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libfontconfig-dev libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
+          sudo apt-get install -y pkg-config libfontconfig-dev libgtk-3-dev libwebkit2gtk-4.1 libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev gir1.2-javascriptcoregtk-4.1 gir1.2-webkit2-4.1 libappindicator3-dev librsvg2-dev patchelf xdg-utils
 
       - name: install dependencies (ubuntu only - armhf specific)
         if: contains(matrix.config.os, 'ubuntu') && matrix.config.arch == 'armhf'
@@ -223,69 +227,8 @@ jobs:
           echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> .env.local
           cp .env.local apps/readest-app/.env.local
 
-      - name: build Android apk (fork only)
-        if: matrix.config.release == 'android' && github.repository != 'readest/readest'
-        env:
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
-        working-directory: apps/readest-app
-        run: |
-          rm -rf src-tauri/gen/android
-          pnpm tauri android init
-          pnpm tauri icon ../../data/icons/readest-book.png
-          python - <<'PY'
-          from pathlib import Path
-
-          build_gradle = Path("src-tauri/gen/android/app/build.gradle.kts")
-          needle = '        versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")\n'
-          patch = needle + '        val storeFlavor = project.findProperty("storeFlavor")?.toString() ?: "foss"\n        missingDimensionStrategy("store", storeFlavor)\n'
-          text = build_gradle.read_text()
-          if 'missingDimensionStrategy("store", storeFlavor)' not in text:
-              if needle not in text:
-                  raise SystemExit(f"Failed to patch {build_gradle}: versionName line not found")
-              text = text.replace(needle, patch, 1)
-              build_gradle.write_text(text)
-          PY
-          ORG_GRADLE_PROJECT_storeFlavor=foss pnpm tauri android build
-
-      - name: upload Android apk artifact (fork only)
-        if: matrix.config.release == 'android' && github.repository != 'readest/readest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-apks
-          path: apps/readest-app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
-
-      - name: upload Android apks to GitHub release (fork only)
-        if: matrix.config.release == 'android' && github.repository != 'readest/readest'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          shopt -s globstar nullglob
-          assets=(apps/readest-app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk)
-          if [ ${#assets[@]} -eq 0 ]; then
-            echo "No Android APKs found to upload"
-            exit 1
-          fi
-          version=${{ needs.get-release.outputs.release_version }}
-          for asset in "${assets[@]}"; do
-            [ -f "$asset" ] || continue
-            relative_path="${asset#*outputs/apk/}"
-            flavor="$(cut -d/ -f1 <<< "$relative_path")"
-            build_type="$(cut -d/ -f2 <<< "$relative_path")"
-            upload_name="Hermes_${version}_${flavor}"
-            if [ -n "$build_type" ] && [ "$build_type" != "$flavor" ]; then
-              upload_name="${upload_name}-${build_type}"
-            fi
-            upload_name="${upload_name}.apk"
-            upload_path="$RUNNER_TEMP/$upload_name"
-            cp "$asset" "$upload_path"
-            echo "Uploading $upload_name to GitHub release"
-            gh release upload ${{ needs.get-release.outputs.release_tag }} "$upload_path" --clobber
-          done
-
       - name: build and upload Android apks
-        if: matrix.config.release == 'android' && github.repository == 'readest/readest'
+        if: matrix.config.release == 'android'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
@@ -296,19 +239,7 @@ jobs:
           rm -rf src-tauri/gen/android
           pnpm tauri android init
           pnpm tauri icon ../../data/icons/readest-book.png
-          python - <<'PY'
-          from pathlib import Path
-
-          build_gradle = Path("src-tauri/gen/android/app/build.gradle.kts")
-          needle = '        versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")\n'
-          patch = needle + '        val storeFlavor = project.findProperty("storeFlavor")?.toString() ?: "foss"\n        missingDimensionStrategy("store", storeFlavor)\n'
-          text = build_gradle.read_text()
-          if 'missingDimensionStrategy("store", storeFlavor)' not in text:
-              if needle not in text:
-                  raise SystemExit(f"Failed to patch {build_gradle}: versionName line not found")
-              text = text.replace(needle, patch, 1)
-              build_gradle.write_text(text)
-          PY
+          git checkout .
 
           pushd src-tauri/gen/android
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
@@ -319,11 +250,11 @@ jobs:
           popd
           version=${{ needs.get-release.outputs.release_version }}
           apk_path=src-tauri/gen/android/app/build/outputs/apk/universal/release
-          universial_apk=Hermes_${version}_universal.apk
-          arm64_apk=Hermes_${version}_arm64.apk
-          ORG_GRADLE_PROJECT_storeFlavor=foss pnpm tauri android build
+          universial_apk=Readest_${version}_universal.apk
+          arm64_apk=Readest_${version}_arm64.apk
+          pnpm tauri android build
           cp ${apk_path}/app-universal-release.apk $universial_apk
-          ORG_GRADLE_PROJECT_storeFlavor=foss pnpm tauri android build -t aarch64
+          pnpm tauri android build -t aarch64
           cp ${apk_path}/app-universal-release.apk $arm64_apk
 
           echo "Uploading $universial_apk to GitHub release"
@@ -337,19 +268,19 @@ jobs:
           gh release upload ${{ needs.get-release.outputs.release_tag }} $arm64_apk.sig --clobber
 
       - name: download and update latest.json for Android release
-        if: matrix.config.release == 'android' && github.repository == 'readest/readest'
+        if: matrix.config.release == 'android'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd apps/readest-app/
-          curl -sL https://github.com/${{ github.repository }}/releases/latest/download/latest.json -o latest.json
+          curl -sL https://github.com/readest/readest/releases/latest/download/latest.json -o latest.json
 
           version=${{ needs.get-release.outputs.release_version }}
-          universial_apk_url="https://github.com/${{ github.repository }}/releases/download/${{ needs.get-release.outputs.release_tag }}/Hermes_${version}_universal.apk"
-          arm64_apk_url="https://github.com/${{ github.repository }}/releases/download/${{ needs.get-release.outputs.release_tag }}/Hermes_${version}_arm64.apk"
+          universial_apk_url="https://github.com/readest/readest/releases/download/${{ needs.get-release.outputs.release_tag }}/Readest_${version}_universal.apk"
+          arm64_apk_url="https://github.com/readest/readest/releases/download/${{ needs.get-release.outputs.release_tag }}/Readest_${version}_arm64.apk"
 
-          universial_sig=$(cat Hermes_${version}_universal.apk.sig)
-          arm64_sig=$(cat Hermes_${version}_arm64.apk.sig)
+          universial_sig=$(cat Readest_${version}_universal.apk.sig)
+          arm64_sig=$(cat Readest_${version}_arm64.apk.sig)
 
           jq --arg url "$universial_apk_url" \
               --arg sig "$universial_sig" \
@@ -366,76 +297,13 @@ jobs:
         if: matrix.config.release == 'linux'
         run: cargo install tauri-cli --git https://github.com/tauri-apps/tauri --branch feat/truly-portable-appimage --force
 
-      - name: build desktop bundles (fork only)
-        if: matrix.config.release != 'android' && github.repository != 'readest/readest'
-        env:
-          NODE_OPTIONS: '--max-old-space-size=8192'
-          TAURI_BUNDLER_NEW_APPIMAGE_FORMAT: 'true'
-        working-directory: apps/readest-app
-        run: pnpm tauri build ${{ matrix.config.args || '' }}
-
-      - name: upload desktop bundle artifact (fork only)
-        if: matrix.config.release != 'android' && github.repository != 'readest/readest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.config.release }}-${{ matrix.config.arch }}
-          path: target/**/release/bundle/**/*
-          if-no-files-found: error
-
-      - name: upload desktop bundles to GitHub release (fork only)
-        if: matrix.config.release != 'android' && github.repository != 'readest/readest'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          assets=()
-          case "${{ matrix.config.release }}" in
-            linux)
-              while IFS= read -r -d '' asset; do
-                assets+=("$asset")
-              done < <(find target -type f \( \
-                -path '*/release/bundle/appimage/*.AppImage' -o \
-                -path '*/release/bundle/deb/*.deb' \
-              \) -print0)
-              ;;
-            macos)
-              while IFS= read -r -d '' asset; do
-                assets+=("$asset")
-              done < <(find target -type f -path '*/release/bundle/dmg/*.dmg' -print0)
-              ;;
-            windows)
-              while IFS= read -r -d '' asset; do
-                assets+=("$asset")
-              done < <(find target -type f \( \
-                -path '*/release/bundle/nsis/*.exe' -o \
-                -path '*/release/bundle/msi/*.msi' \
-              \) -print0)
-              ;;
-            *)
-              echo "Unsupported desktop release target: ${{ matrix.config.release }}"
-              exit 1
-              ;;
-          esac
-          uploaded=0
-          for asset in "${assets[@]}"; do
-            [ -f "$asset" ] || continue
-            echo "Uploading $asset to GitHub release"
-            gh release upload ${{ needs.get-release.outputs.release_tag }} "$asset" --clobber
-            uploaded=1
-          done
-          if [ "$uploaded" -ne 1 ]; then
-            echo "No desktop bundle files found to upload"
-            exit 1
-          fi
-
-      - uses: tauri-apps/tauri-action@v0
-        if: matrix.config.release != 'android' && github.repository == 'readest/readest'
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+        if: matrix.config.release != 'android'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_BUNDLER_NEW_APPIMAGE_FORMAT: 'true'
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -457,11 +325,13 @@ jobs:
           gh release upload ${{ needs.get-release.outputs.release_tag }} apps/readest-app/release-notes.json --clobber
 
       - name: build and upload portable binaries (Windows only)
-        if: matrix.config.os == 'windows-latest' && github.repository == 'readest/readest'
+        if: matrix.config.os == 'windows-latest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         shell: bash
         run: |
           echo "Building Portable Binaries"
@@ -475,15 +345,15 @@ jobs:
           version=${{ needs.get-release.outputs.release_version }}
 
           if [ "$arch" = "x86_64" ]; then
-            bin_file="Hermes_${version}_x64-portable.exe"
+            bin_file="Readest_${version}_x64-portable.exe"
           elif [ "$arch" = "aarch64" ]; then
-            bin_file="Hermes_${version}_arm64-portable.exe"
+            bin_file="Readest_${version}_arm64-portable.exe"
           else
             echo "Unknown architecture: $arch"
             exit 1
           fi
 
-          exe_file="target/${{ matrix.config.rust_target }}/release/hermes.exe"
+          exe_file="target/${{ matrix.config.rust_target }}/release/readest.exe"
           # Browsers on Windows won't download zip files that contain exe files
           # so upload the exe files instead. This is totally stupid.
           # powershell.exe -Command "Compress-Archive -Path $exe_file -DestinationPath $bin_file -Force"
@@ -500,28 +370,28 @@ jobs:
           gh release upload ${{ needs.get-release.outputs.release_tag }} $bin_file.sig --clobber
 
       - name: download and update latest.json for Windows portable release
-        if: matrix.config.os == 'windows-latest' && github.repository == 'readest/readest'
+        if: matrix.config.os == 'windows-latest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          curl -sL https://github.com/${{ github.repository }}/releases/latest/download/latest.json -o latest.json
+          curl -sL https://github.com/readest/readest/releases/latest/download/latest.json -o latest.json
 
           version=${{ needs.get-release.outputs.release_version }}
           arch=${{ matrix.config.arch }}
 
           if [ "$arch" = "x86_64" ]; then
-            bin_file="Hermes_${version}_x64-portable.exe"
+            bin_file="Readest_${version}_x64-portable.exe"
             platform_key="windows-x86_64-portable"
           elif [ "$arch" = "aarch64" ]; then
-            bin_file="Hermes_${version}_arm64-portable.exe"
+            bin_file="Readest_${version}_arm64-portable.exe"
             platform_key="windows-aarch64-portable"
           else
             echo "Unknown architecture: $arch"
             exit 1
           fi
 
-          portable_url="https://github.com/${{ github.repository }}/releases/download/${{ needs.get-release.outputs.release_tag }}/$bin_file"
+          portable_url="https://github.com/readest/readest/releases/download/${{ needs.get-release.outputs.release_tag }}/$bin_file"
           portable_sig=$(cat $bin_file.sig)
 
           jq --arg url "$portable_url" \
@@ -531,3 +401,12 @@ jobs:
 
           echo "Uploading updated latest.json to GitHub release"
           gh release upload ${{ needs.get-release.outputs.release_tag }} latest.json --clobber
+
+  upload-to-r2:
+    needs: [get-release, build-tauri]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/upload-to-r2.yml
+    with:
+      tag: ${{ needs.get-release.outputs.release_tag }}
+    secrets: inherit
