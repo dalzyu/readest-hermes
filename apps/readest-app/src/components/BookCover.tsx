@@ -80,6 +80,8 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
               src={book.metadata?.coverImageUrl || book.coverImageUrl!}
               alt={book.title}
               fill={true}
+              loading='lazy'
+              draggable={false}
               className={clsx('cover-image crop-cover-img object-cover', imageClassName)}
               onLoad={handleImageLoad}
               onError={handleImageError}
@@ -102,6 +104,8 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
                 width={0}
                 height={0}
                 sizes='100vw'
+                loading='lazy'
+                draggable={false}
                 className={clsx(
                   'cover-image fit-cover-img h-auto max-h-full w-auto max-w-full shadow-md',
                   imageClassName,
@@ -142,7 +146,7 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
                 isPreview ? 'text-[0.4em]' : mode === 'grid' ? 'text-base' : 'text-xs',
               )}
             >
-              {formatAuthors(book.author)}
+              {formatAuthors(book.author || book.metadata?.author || '')}
             </span>
           </div>
         </div>

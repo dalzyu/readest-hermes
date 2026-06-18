@@ -10,6 +10,8 @@ import {
   ensureLibraryGroupByType,
   findGroupById,
   getGroupDisplayName,
+  expandBookshelfSelection,
+  buildGroupNameUpdatedAt,
 } from '../../app/library/utils/libraryUtils';
 import { Book, BooksGroup } from '../../types/book';
 import { LibraryGroupByType, LibrarySortByType } from '../../types/settings';
@@ -981,5 +983,134 @@ describe('getGroupDisplayName', () => {
     const items: (Book | BooksGroup)[] = [createMockGroup({ id: 'group-1', name: 'Name' })];
 
     expect(getGroupDisplayName(items, 'non-existent')).toBeUndefined();
+  });
+});
+
+describe('expandBookshelfSelection', () => {
+  const createMockGroup = (overrides: Partial<BooksGroup> = {}): BooksGroup => ({
+    id: 'test-group',
+    name: 'Test Group',
+    displayName: 'Test Display Name',
+    books: [],
+    updatedAt: Date.now(),
+    ...overrides,
+  });
+
+  it('passes through standalone book hashes unchanged', () => {
+    const items: (Book | BooksGroup)[] = [
+      createMockBook({ hash: 'book-1' }),
+      createMockBook({ hash: 'book-2' }),
+    ];
+
+    expect(expandBookshelfSelection(['book-1', 'book-2'], items)).toEqual(['book-1', 'book-2']);
+  });
+
+  it('expands a group id into every book hash in the rendered rollup', () => {
+    // generateBookshelfItems rolls nested-folder books into the top-level
+    // group, so the rendered BooksGroup.books already includes them. The
+    // helper must rely on that rollup so deleting "MyDir" also catches
+    // books whose own groupName is "MyDir/sub".
+    const items: (Book | BooksGroup)[] = [
+      createMockGroup({
+        id: 'group-mydir',
+        name: 'MyDir',
+        books: [
+          createMockBook({ hash: 'direct-book', groupName: 'MyDir', groupId: 'group-mydir' }),
+          createMockBook({ hash: 'nested-book', groupName: 'MyDir/sub', groupId: 'group-sub' }),
+        ],
+      }),
+    ];
+
+    expect(expandBookshelfSelection(['group-mydir'], items).sort()).toEqual([
+      'direct-book',
+      'nested-book',
+    ]);
+  });
+
+  it('deduplicates when a book hash and its parent group are both selected', () => {
+    const items: (Book | BooksGroup)[] = [
+      createMockGroup({
+        id: 'group-1',
+        books: [createMockBook({ hash: 'book-a' }), createMockBook({ hash: 'book-b' })],
+      }),
+    ];
+
+    expect(expandBookshelfSelection(['book-a', 'group-1'], items).sort()).toEqual([
+      'book-a',
+      'book-b',
+    ]);
+  });
+
+  it('skips soft-deleted books inside a group', () => {
+    const items: (Book | BooksGroup)[] = [
+      createMockGroup({
+        id: 'group-1',
+        books: [
+          createMockBook({ hash: 'alive' }),
+          createMockBook({ hash: 'gone', deletedAt: Date.now() }),
+        ],
+      }),
+    ];
+
+    expect(expandBookshelfSelection(['group-1'], items)).toEqual(['alive']);
+  });
+
+  it('returns an empty array when no ids are given', () => {
+    expect(expandBookshelfSelection([], [])).toEqual([]);
+  });
+
+  it('preserves unknown ids so callers can surface stale selections', () => {
+    // Defensive: if the rendered items no longer contain a selected id (e.g.
+    // it was a hash from another view), the helper leaves it alone rather
+    // than silently dropping it.
+    expect(expandBookshelfSelection(['ghost-hash'], [])).toEqual(['ghost-hash']);
+  });
+});
+
+describe('buildGroupNameUpdatedAt', () => {
+  it('takes the max updatedAt across books in each direct group', () => {
+    const books = [
+      createMockBook({ groupName: 'Fiction', updatedAt: 100 }),
+      createMockBook({ groupName: 'Fiction', updatedAt: 300 }),
+      createMockBook({ groupName: 'Fiction', updatedAt: 200 }),
+      createMockBook({ groupName: 'History', updatedAt: 50 }),
+    ];
+    const map = buildGroupNameUpdatedAt(books);
+    expect(map.get('Fiction')).toBe(300);
+    expect(map.get('History')).toBe(50);
+  });
+
+  it('propagates a descendant book up to all ancestor groups', () => {
+    const books = [
+      createMockBook({ groupName: 'Literature/Fiction/Sci-Fi', updatedAt: 500 }),
+      createMockBook({ groupName: 'Literature', updatedAt: 100 }),
+    ];
+    const map = buildGroupNameUpdatedAt(books);
+    expect(map.get('Literature/Fiction/Sci-Fi')).toBe(500);
+    expect(map.get('Literature/Fiction')).toBe(500);
+    expect(map.get('Literature')).toBe(500);
+  });
+
+  it('ignores books without groupName or updatedAt', () => {
+    const books = [
+      createMockBook({ groupName: undefined, updatedAt: 999 }),
+      createMockBook({ groupName: 'A', updatedAt: 0 }),
+      createMockBook({ groupName: 'A', updatedAt: 42 }),
+    ];
+    const map = buildGroupNameUpdatedAt(books);
+    expect(map.get('A')).toBe(42);
+    expect(map.size).toBe(1);
+  });
+
+  it('produces a desc-sort by group freshness when used as the sort key', () => {
+    const books = [
+      createMockBook({ groupName: 'Old', updatedAt: 1 }),
+      createMockBook({ groupName: 'Newer', updatedAt: 10 }),
+      createMockBook({ groupName: 'Newest', updatedAt: 100 }),
+    ];
+    const map = buildGroupNameUpdatedAt(books);
+    const groups = [{ name: 'Old' }, { name: 'Newest' }, { name: 'Newer' }];
+    groups.sort((a, b) => (map.get(b.name) ?? 0) - (map.get(a.name) ?? 0));
+    expect(groups.map((g) => g.name)).toEqual(['Newest', 'Newer', 'Old']);
   });
 });
