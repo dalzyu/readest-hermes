@@ -1,12 +1,13 @@
 import { IconType } from 'react-icons';
 import { FiSearch } from 'react-icons/fi';
 import { FiCopy } from 'react-icons/fi';
+import { FiShare } from 'react-icons/fi';
 import { PiHighlighterFill } from 'react-icons/pi';
 import { BsPencilSquare } from 'react-icons/bs';
-import { TbHexagonLetterA } from 'react-icons/tb';
+import { BsTranslate } from 'react-icons/bs';
+import { TbHexagonLetterD } from 'react-icons/tb';
 import { FaHeadphones } from 'react-icons/fa6';
 import { IoIosBuild } from 'react-icons/io';
-import { RiTranslate2 } from 'react-icons/ri';
 import { AnnotationToolType } from '@/types/annotator';
 import { stubTranslation as _ } from '@/utils/misc';
 
@@ -18,8 +19,30 @@ type AnnotationToolButton = {
   quickAction?: boolean;
 };
 
-export const annotationToolButtons: AnnotationToolButton[] = [
-  { type: 'copy', label: _('Copy'), tooltip: _('Copy text after selection'), Icon: FiCopy },
+function createAnnotationToolButtons<T extends AnnotationToolType>(
+  buttons: AnnotationToolType extends T
+    ? {
+        [K in T]: {
+          type: K;
+          label: string;
+          tooltip: string;
+          Icon: IconType;
+          quickAction?: boolean;
+        };
+      }[T][]
+    : never,
+): AnnotationToolButton[] {
+  return buttons;
+}
+
+export const annotationToolButtons = createAnnotationToolButtons([
+  {
+    type: 'copy',
+    label: _('Copy'),
+    tooltip: _('Copy text after selection'),
+    Icon: FiCopy,
+    quickAction: true,
+  },
   {
     type: 'highlight',
     label: _('Highlight'),
@@ -41,6 +64,20 @@ export const annotationToolButtons: AnnotationToolButton[] = [
     quickAction: true,
   },
   {
+    type: 'dictionary',
+    label: _('Dictionary'),
+    tooltip: _('Look up text in dictionary after selection'),
+    Icon: TbHexagonLetterD,
+    quickAction: true,
+  },
+  {
+    type: 'translate',
+    label: _('Translate'),
+    tooltip: _('Translate text after selection'),
+    Icon: BsTranslate,
+    quickAction: true,
+  },
+  {
     type: 'tts',
     label: _('Speak'),
     tooltip: _('Read text aloud after selection'),
@@ -54,19 +91,13 @@ export const annotationToolButtons: AnnotationToolButton[] = [
     Icon: IoIosBuild,
   },
   {
-    type: 'ctx-translate',
-    label: _('AI Translate'),
-    tooltip: _('Context-aware AI translation after selection'),
-    Icon: RiTranslate2,
+    type: 'share',
+    label: _('Share'),
+    tooltip: _('Share text after selection'),
+    Icon: FiShare,
     quickAction: true,
   },
-  {
-    type: 'ctx-dictionary',
-    label: _('AI Dictionary'),
-    tooltip: _('Context-aware AI dictionary lookup after selection'),
-    Icon: TbHexagonLetterA,
-  },
-];
+]);
 
 export const annotationToolQuickActions = annotationToolButtons.filter(
   (button) => button.quickAction,

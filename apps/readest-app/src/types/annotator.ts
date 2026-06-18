@@ -4,9 +4,7 @@ export type AnnotationToolType =
   | 'annotate'
   | 'search'
   | 'dictionary'
-  | 'wikipedia'
   | 'translate'
   | 'tts'
   | 'proofread'
-  | 'ctx-translate'
-  | 'ctx-dictionary';
+  | 'share';
