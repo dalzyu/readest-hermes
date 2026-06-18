@@ -96,6 +96,7 @@ function seedViewState(
         ttsEnabled: false,
         syncing: false,
         gridInsets: null,
+        previewMode: false,
         viewSettings: null,
         sessionStartedAt: null,
         sessionStartPage: null,
