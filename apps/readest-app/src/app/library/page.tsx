@@ -8,6 +8,7 @@ import { ReadonlyURLSearchParams, useSearchParams } from 'next/navigation';
 
 import { Book } from '@/types/book';
 import { AppService, DeleteAction } from '@/types/system';
+import { buildBookLookupIndex } from '@/services/bookService';
 import { navigateToLibrary, navigateToReader } from '@/utils/nav';
 import { formatAuthors, formatTitle, getPrimaryLanguage, listFormater } from '@/utils/book';
 import { getImportErrorMessage } from '@/services/errors';
@@ -104,7 +105,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     setLibrary,
     getGroupId,
     getGroupName,
-    refreshGroups,
     checkOpenWithBooks,
     checkLastOpenBooks,
     setCheckOpenWithBooks,
@@ -237,27 +237,28 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     }
   }, [appService]);
 
-  const handleRefreshLibrary = useCallback(async () => {
-    const appService = await envConfig.getAppService();
-    const settings = await appService.loadSettings();
-    const library = await appService.loadLibraryBooks();
-    setSettings(settings);
-    setLibrary(library);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [envConfig, appService]);
-
   useEffect(() => {
     if (appService?.hasWindow) {
       const currentWebview = getCurrentWebview();
       const unlisten = currentWebview.listen('close-reader-window', async () => {
-        handleRefreshLibrary();
+        // Reader windows are independent Tauri webviews with their own
+        // libraryStore instance — progress / readingStatus / move-to-front
+        // updates from the reader window do NOT propagate to this main
+        // window's store. Reload from disk so the library reflects the
+        // changes the reader just persisted.
+        const appService = await envConfig.getAppService();
+        const settings = await appService.loadSettings();
+        const library = await appService.loadLibraryBooks();
+        setSettings(settings);
+        setLibrary(library);
       });
       return () => {
         unlisten.then((fn) => fn());
       };
     }
     return;
-  }, [appService, handleRefreshLibrary]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appService, envConfig]);
 
   const handleImportBookFiles = useCallback(async (event: CustomEvent) => {
     const selectedFiles: SelectedFile[] = event.detail.files;
@@ -275,7 +276,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   }, [handleImportBookFiles]);
 
   useEffect(() => {
-    refreshGroups();
     if (!libraryBooks.some((book) => !book.deletedAt)) {
       handleSetSelectMode(false);
     }
@@ -290,7 +290,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         console.log('Open with book:', file);
         try {
           const temp = appService.isMobile ? false : !settings.autoImportBooksOnOpen;
-          const book = await appService.importBook(file, libraryBooks, true, true, false, temp);
+          const book = await appService.importBook(file, libraryBooks, { transient: temp });
           if (book) {
             bookIds.push(book.hash);
           }
@@ -514,6 +514,11 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const importBooks = async (files: SelectedFile[], groupId?: string) => {
     setLoading(true);
     const { library } = useLibraryStore.getState();
+    // Build the lookup index ONCE per import batch so each book lookup is
+    // O(1) instead of O(n) over the existing library. importBook also keeps
+    // the index updated as new books are appended, so subsequent files in
+    // the same batch see the additions.
+    const lookupIndex = buildBookLookupIndex(library);
     const failedImports: Array<{ filename: string; errorMessage: string }> = [];
     const successfulImports: string[] = [];
     const importedBooksForSuggestions: Book[] = [];
@@ -522,7 +527,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       const file = selectedFile.file || selectedFile.path;
       if (!file) return null;
       try {
-        const book = await appService?.importBook(file, library);
+        const book = await appService?.importBook(file, library, { lookupIndex });
         if (!book) return null;
         const { path, basePath } = selectedFile;
         if (groupId) {
@@ -556,7 +561,18 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     for (let i = 0; i < files.length; i += concurrency) {
       const batch = files.slice(i, i + concurrency);
       const importedBooks = (await Promise.all(batch.map(processFile))).filter((book) => !!book);
-      await updateBooks(envConfig, importedBooks);
+      // Update store state per batch (so the UI can render imported books
+      // incrementally) but defer disk persistence until the entire batch is
+      // done — saving library.json once per batch of 4 books was the dominant
+      // cost for large imports.
+      await updateBooks(envConfig, importedBooks, { skipSave: true });
+    }
+
+    // Persist the full library once after every file in the batch is done.
+    if (successfulImports.length > 0) {
+      const finalLibrary = useLibraryStore.getState().library;
+      const finalAppService = await envConfig.getAppService();
+      await finalAppService.saveLibraryBooks(finalLibrary);
     }
 
     pushLibrary();

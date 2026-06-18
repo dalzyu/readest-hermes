@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useReaderStore } from '@/store/readerStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { debounce } from '@/utils/debounce';
@@ -11,7 +11,24 @@ export const useMouseEvent = (
   handlePageFlip: (msg: MessageEvent | React.MouseEvent<HTMLDivElement, MouseEvent>) => void,
 ) => {
   const { hoveredBookKey } = useReaderStore();
-  const debounceFlip = debounce(handlePageFlip, 100);
+  // Keep the latest handlePageFlip in a ref so the debounced wrapper (created
+  // once via useMemo) always invokes the most recent closure. Without this
+  // ref, the empty-deps useMemo would freeze the first-render handler and any
+  // state captured in subsequent re-renders would be invisible to wheel-driven
+  // page flips.
+  const handlePageFlipRef = useRef(handlePageFlip);
+  useEffect(() => {
+    handlePageFlipRef.current = handlePageFlip;
+  }, [handlePageFlip]);
+  const debounceFlip = useMemo(
+    () =>
+      debounce(
+        (msg: MessageEvent | React.MouseEvent<HTMLDivElement, MouseEvent>) =>
+          handlePageFlipRef.current(msg),
+        100,
+      ),
+    [],
+  );
   const handleMouseEvent = (msg: MessageEvent | React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     if (msg instanceof MessageEvent) {
       if (msg.data && msg.data.bookKey === bookKey) {
