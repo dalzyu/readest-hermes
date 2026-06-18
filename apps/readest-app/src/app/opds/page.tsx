@@ -16,6 +16,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useCustomOPDSStore } from '@/store/customOPDSStore';
 import { transferManager } from '@/services/transferManager';
 import { useTransferQueue } from '@/hooks/useTransferQueue';
 import { useTheme } from '@/hooks/useTheme';
@@ -51,6 +52,7 @@ import { Navigation } from './components/Navigation';
 import { normalizeOPDSCustomHeaders } from './utils/customHeaders';
 import { closeOPDSBrowser, stashOPDSReturnTarget } from './utils/opdsClose';
 import { findExistingBookForPublication } from './utils/findExistingBook';
+import Dialog from '@/components/Dialog';
 
 type ViewMode = 'feed' | 'publication' | 'search' | 'loading' | 'error';
 
@@ -73,7 +75,7 @@ interface HistoryEntry {
 export default function BrowserPage() {
   const _ = useTranslation();
   const router = useRouter();
-  const { appService } = useEnv();
+  const { appService, envConfig } = useEnv();
   const { user } = useAuth();
   const { libraryLoaded } = useLibrary();
   // Subscribe to library so the publication detail page can detect copies
@@ -95,6 +97,8 @@ export default function BrowserPage() {
   const [error, setError] = useState<Error | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [showAddCatalog, setShowAddCatalog] = useState(false);
+  const [newCatalogName, setNewCatalogName] = useState('');
 
   const searchParams = useSearchParams();
   const catalogUrl = searchParams?.get('url') || '';
@@ -828,6 +832,48 @@ export default function BrowserPage() {
     };
   }, [appService, catalogSourceId, publication, state.baseURL, library, libraryLoaded]);
 
+  const handleOpenAddCatalog = useCallback(() => {
+    const defaultName =
+      state.feed?.metadata?.title || state.search?.metadata?.title || _('New Catalog');
+    const prefix = catalog?.name ? `${catalog.name} - ` : '';
+    setNewCatalogName(`${prefix}${defaultName}`);
+    setShowAddCatalog(true);
+  }, [state.feed, state.search, catalog, _]);
+
+  const handleConfirmAddCatalog = useCallback(() => {
+    if (!newCatalogName.trim()) return;
+
+    if (useCustomOPDSStore.getState().findByUrl(state.currentURL)) {
+      eventDispatcher.dispatch('toast', {
+        type: 'info',
+        message: _('Catalog already in My Catalogs'),
+        timeout: 2500,
+      });
+      setShowAddCatalog(false);
+      return;
+    }
+
+    useCustomOPDSStore.getState().addCatalog({
+      id: Date.now().toString(),
+      name: newCatalogName.trim(),
+      url: state.currentURL,
+      username: usernameRef.current || undefined,
+      password: passwordRef.current || undefined,
+      customHeaders: customHeadersRef.current,
+      autoDownload: catalog?.autoDownload || false,
+    });
+
+    useCustomOPDSStore.getState().saveCustomOPDSCatalogs(envConfig);
+
+    eventDispatcher.dispatch('toast', {
+      type: 'success',
+      message: _('Catalog added successfully'),
+      timeout: 2500,
+    });
+
+    setShowAddCatalog(false);
+  }, [newCatalogName, state.currentURL, catalog, envConfig, _]);
+
   return (
     <div
       className={clsx(
@@ -850,6 +896,11 @@ export default function BrowserPage() {
           canGoBack={canGoBack}
           canGoForward={canGoForward}
           hasSearch={hasSearch}
+          feed={state.feed}
+          baseURL={state.baseURL}
+          resolveURL={resolveURL}
+          onNavigate={handleNavigate}
+          onAddCatalog={handleOpenAddCatalog}
         />
       </div>
       <main className='flex-1 overflow-auto'>
@@ -885,6 +936,7 @@ export default function BrowserPage() {
             resolveURL={resolveURL}
             onGenerateCachedImageUrl={handleGenerateCachedImageUrl}
             isOPDSCatalog={isOPDSCatalog}
+            onAddCatalog={handleOpenAddCatalog}
           />
         )}
 
@@ -909,6 +961,48 @@ export default function BrowserPage() {
           />
         )}
       </main>
+
+      <Dialog
+        isOpen={showAddCatalog}
+        title={_('Add to My Catalogs')}
+        onClose={() => setShowAddCatalog(false)}
+        boxClassName='sm:max-w-md sm:h-auto'
+        contentClassName='!px-6 !py-4'
+      >
+        <div className='flex flex-col gap-4 pt-2'>
+          <div className='form-control'>
+            <label className='label'>
+              <span className='label-text font-medium text-sm'>{_('Catalog Name')}</span>
+            </label>
+            <input
+              type='text'
+              value={newCatalogName}
+              onChange={(e) => setNewCatalogName(e.target.value)}
+              className='input input-bordered eink-bordered w-full'
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newCatalogName.trim()) {
+                  e.preventDefault();
+                  handleConfirmAddCatalog();
+                }
+              }}
+            />
+          </div>
+          <div className='mt-2 flex justify-end gap-2'>
+            <button className='btn btn-ghost btn-sm' onClick={() => setShowAddCatalog(false)}>
+              {_('Cancel')}
+            </button>
+            <button
+              className='btn btn-primary btn-sm'
+              onClick={handleConfirmAddCatalog}
+              disabled={!newCatalogName.trim()}
+            >
+              {_('Save')}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+
       <Toast />
     </div>
   );
