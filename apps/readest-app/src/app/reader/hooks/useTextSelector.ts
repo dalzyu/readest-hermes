@@ -68,27 +68,6 @@ export const useTextSelector = (
       index,
     });
   };
-  // FIXME: extremely hacky way to dismiss system selection tools on iOS
-  const makeSelectionOnIOS = async (sel: Selection, index: number) => {
-    isTextSelected.current = true;
-    const range = sel.getRangeAt(0);
-    setTimeout(() => {
-      sel.removeAllRanges();
-      setTimeout(async () => {
-        if (!isTextSelected.current) return;
-        sel.addRange(range);
-        const progress = getProgress(bookKey);
-        setSelection({
-          key: bookKey,
-          text: await getAnnotationText(range),
-          cfi: view?.getCFI(index, range),
-          page: bookData?.isFixedLayout ? index + 1 : progress?.page || 0,
-          range,
-          index,
-        });
-      }, 30);
-    }, 30);
-  };
 
   const startInstantAnnotating = (ev: PointerEvent) => {
     isInstantAnnotating.current = true;
@@ -175,11 +154,11 @@ export const useTextSelector = (
     const sel = doc.getSelection() as Selection;
     if (isValidSelection(sel)) {
       const isPointerInside = ev && isPointerInsideSelection(sel, ev);
-      const isIOS = osPlatform === 'ios' || appService?.isIOSApp;
 
-      if (isPointerInside && isIOS) {
-        makeSelectionOnIOS(sel, index);
-      } else if (isPointerInside) {
+      // iOS no longer needs a special path: the native plugin
+      // (ContextMenuSuppressor) suppresses the system selection menu, so
+      // iOS selections go through the same path as desktop.
+      if (isPointerInside) {
         isUpToPopup.current = true;
         makeSelection(sel, index, true);
       } else if (appService?.isAndroidApp) {
@@ -206,15 +185,26 @@ export const useTextSelector = (
     // selectionchange for touch/pen input to pick up native text selections.
     const isAndroid = osPlatform === 'android' && appService?.isAndroidApp;
     const isTouchInput = lastPointerType.current === 'touch' || lastPointerType.current === 'pen';
-    if (!isAndroid && !isTouchInput) return;
 
     const sel = doc.getSelection() as Selection;
     if (isValidSelection(sel)) {
-      if (!selectionPosition.current) {
-        selectionPosition.current = view?.renderer?.start || null;
+      // On desktop with mouse, defer to pointerup for valid selections.
+      if (!isAndroid && !isTouchInput) return;
+      if (selectionPosition.current === null) {
+        // Save the absolute container scroll, not `renderer.start` — the
+        // latter is section-relative, so restoring it as `containerPosition`
+        // snaps multi-section paginated views back to the first rendered
+        // section (#873-related Android regression).
+        selectionPosition.current = view?.renderer?.containerPosition ?? null;
       }
       makeSelection(sel, index, false);
     } else {
+      // Selection cleared (e.g. clicking outside the selection).
+      // Dismiss immediately on all platforms.
+      if (isTextSelected.current) {
+        handleDismissPopup();
+        isTextSelected.current = false;
+      }
       selectionPosition.current = null;
     }
   };
@@ -227,25 +217,18 @@ export const useTextSelector = (
     const viewSettings = getViewSettings(bookKey);
     if (viewSettings?.scrolled) return;
 
-    if (isTextSelected.current && view?.renderer?.containerPosition && selectionPosition.current) {
-      console.warn('Keep container position', selectionPosition.current);
+    if (isTextSelected.current && view?.renderer && selectionPosition.current !== null) {
       view.renderer.containerPosition = selectionPosition.current;
     }
   };
 
   const handleShowPopup = (showPopup: boolean) => {
-    // Set isPopuped immediately so outside-click dismissal works right away
-    isPopuped.current = showPopup;
-    if (showPopup) {
-      // Unconditionally clear the isUpToPopup guard after a short settle
-      // period. On platforms where text selection is a long-hold gesture,
-      // the corresponding iframe-single-click event is suppressed, leaving
-      // isUpToPopup === true. Without this clear the first tap outside the
-      // popup is swallowed instead of dismissing it.
-      setTimeout(() => {
+    setTimeout(() => {
+      if (showPopup && !isPopuped.current) {
         isUpToPopup.current = false;
-      }, 300);
-    }
+      }
+      isPopuped.current = showPopup;
+    }, 500);
   };
 
   const handleUpToPopup = () => {
