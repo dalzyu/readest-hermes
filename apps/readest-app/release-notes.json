@@ -1,96 +1,63 @@
 {
   "releases": {
-    "0.3.0": {
-      "date": "2026-04-20",
+    "0.11.4": {
+      "date": "2026-06-03",
       "notes": [
-        "Context lookup and translation popups were redesigned with cleaner indexing progress, clearer availability messaging, and better source routing between AI, dictionaries, translators, and corpus context",
-        "RAG retrieval was rebuilt around vector similarity plus a literal-term reranker, fully removing the old BM25 hybrid pipeline and hardening popup retrieval caching",
-        "Imported dictionaries were rebuilt around a new storage and lookup path, fixing traditional Chinese locale matching, duplicate imports, stronger exact-match selection, and safer AI prompt injection",
-        "Translation and dictionary flows now degrade cleanly without AI when non-AI sources are available, while live local-model failures in Node and browser-adjacent paths were hardened",
-        "Reasoning presets now include an explicit Off mode, and local-model evaluation plus real-data probes verified the new lookup pipeline against imported dictionaries and book passages"
+        "Library: You can now send a book file directly from the bookshelf selection popup",
+        "Reading: Wide tables now scroll sideways, and oversized images or code blocks scroll in place instead of accidentally turning the page",
+        "Reading: Fixed page backgrounds, textures, and full-page cover images that didn't display correctly in paginated and scrolled modes",
+        "Reading: Fixed bright table and note backgrounds that didn't match the page in dark mode",
+        "Reading: Fixed the reading ruler drifting while scrolling and a stray line at the bottom of the page",
+        "Fonts: Fixed custom fonts disappearing after re-importing, and they now apply correctly inside books",
+        "PDF: Fixed scanned PDFs not displaying in installed app builds",
+        "Annotations: The annotation list now scrolls back to your nearest highlight, and exporting to Readwise works again on desktop",
+        "Android: Fixed a freeze when long-pressing images, plus issues with copying text and opening books directly from other apps",
+        "Fixes: Kept the book menu order stable, synced KOReader book covers, and fixed a Windows launch crash"
       ]
     },
-    "0.2.4": {
-      "date": "2026-04-15",
+    "0.11.2": {
+      "date": "2026-05-31",
       "notes": [
-        "Expanded AI provider advanced inference settings with top K, presence penalty, seed, and stop sequences",
-        "Translation, dictionary lookup, and chat paths now forward the full merged inference settings end to end",
-        "Chat model instantiation now reuses the task-specific inference settings for consistency across reader features"
+        "Send to Readest: Clip web pages and articles into your library via the system share sheet, or by emailing them in",
+        "Dictionary: Look up words with your device's built-in system dictionary on macOS, iOS, and Android, plus faster MDict and StarDict imports",
+        "Library: Import books from a folder with format and size filters, or read them in place from external folders without copying",
+        "Reading: The reading ruler now follows individual lines, you can swipe along the edge to adjust brightness on mobile, and customize hardware-button page turning",
+        "Annotations: Create global highlights that apply to every matching passage in a book",
+        "Text-to-Speech: Added a hotkey to highlight the sentence being read aloud, and made TTS more reliable",
+        "Fonts: Fixed custom fonts disappearing after restarting or reloading the app",
+        "iOS: Fixed the reader not updating when you switch between light and dark mode",
+        "Android: Fixed an issue where highlighting text could trigger unintended page turns",
+        "Fixes: Many improvements across PDFs, EPUBs, Sync, Scrolling, Highlighting"
       ]
     },
-    "0.2.3": {
-      "date": "2026-04-15",
+    "0.11.1": {
+      "date": "2026-05-11",
       "notes": [
-        "Fixed listener leak in Tauri single-instance handler by switching from listen() to once() for window-ready events",
-        "Dictionary initialization now retries after transient failures instead of permanently caching rejected promises",
-        "Embedding API route now enforces an allowlist of permitted models to prevent unauthorized model usage",
-        "Context prompt builder now sanitizes book text to prevent XML pseudo-tag injection from user content",
-        "CJK language disambiguation now correctly uses book language metadata for Japanese/Chinese differentiation",
-        "Removed obsolete disabledBundledDicts filter and added human-readable dictionary display names",
-        "AI provider fixes: Anthropic healthCheck guard order, OpenAI-compatible /v1 dedup, AIGateway auth error logging, Ollama model availability logging",
-        "Series indexing now uses exclusive partial counters and logs catch errors for better diagnostics",
-        "Cleaned up dead PhoneticResult.status field and test hygiene improvements"
+        "Dictionaries: You can now import your own StarDict and MDict dictionaries",
+        "Sync: Your custom dictionaries, custom fonts, background textures and OPDS catalogs now sync across devices",
+        "KOReader Sync: Browse your full Readest Library from inside KOReader, with improved sync diagnostics",
+        "OPDS: Stream books over OPDS-PSE and optionally auto-download new titles from feeds",
+        "Sharing: Create share links for books, jump directly to book via deep links in exported annotations",
+        "Library: Added an optional 4-digit PIN lock at app launch to keep your library private",
+        "Library: You can now drag entire folders to import books",
+        "Reading: Added support for inline CJK ruby annotations (warichu/Gezhu), improved footnote detection",
+        "Speed Reading: Reading position now resumes correctly across devices and inside long sections",
+        "Fixes: Many fixes across PDFs, MOBIs, EPUBs, TTS, scrolling, and accessibility"
       ]
     },
-    "0.2.2": {
-      "date": "2026-04-14",
+    "0.10.6": {
+      "date": "2026-04-13",
       "notes": [
-        "The production context-translation path now uses the hardened repair, rescue, and sanitization harness that was previously only exercised in evaluation",
-        "Translation settings now expose full user-customizable harness controls, including advanced JSON editing for repair and sanitization behavior",
-        "Gemma and Qwen structural reliability improved through stricter finalization, field rescue, and cross-model regression smoke coverage",
-        "PR build scripts were hardened for CI and Windows worktrees, including the sharded Vitest runner and Tauri test launcher"
-      ]
-    },
-    "0.2.1": {
-      "date": "2026-04-12",
-      "notes": [
-        "Context translation prompting now enforces strict XML output templates and non-empty field responses to improve small-model reliability",
-        "Translation runtime now includes automatic repair retries when model output is malformed or missing required fields",
-        "Prompt evaluation harness now performs iterative rescue passes (strict retry + per-field fallback) and reports a usability score per fixture",
-        "Added a large handwritten-style multilingual fixture corpus with 1,500 cases (30 language pairs x 50 examples) for robust weak-model evaluation",
-        "Added automated iterative multi-model evaluation tooling with explicit model unload/load lifecycle handling for constrained hardware setups"
-      ]
-    },
-    "0.2.0": {
-      "date": "2026-04-11",
-      "notes": [
-        "Context popups now include Japanese grammar hints and deterministic conjugation explanations (for example tense and pattern guidance)",
-        "Word frequency indicators now surface CEFR (English), JLPT (Japanese), and HSK (Chinese) levels directly in lookup popups",
-        "Vocabulary review mode now includes multiple-choice, fill-in-the-blank, listening, and reverse recall formats with live streak and timing stats",
-        "A new Comprehension tab can generate spoiler-safe reading questions from your current progress and score your responses",
-        "Translation and dictionary popup speech controls now consistently pass language context for better pronunciation"
-      ]
-    },
-    "0.1.0": {
-      "date": "2026-04-11",
-      "notes": [
-        "Hermes 0.1.0 is the first offline-only release, with cloud account and premium UI gated off for the forked build",
-        "Branding and metadata are aligned across the app, updater feeds, security policy, release packaging, and locale bundles",
-        "Annotation export now ships bundled Obsidian, Notion, and Study Notes markdown presets while keeping custom templates intact",
-        "Reader focus mode now hides sidebar, notebook, header, footer, and page chrome with keyboard shortcuts for distraction-free reading",
-        "Japanese lookup phonetics now use wanakana-backed romaji generation, improving small-tsu and long-vowel handling",
-        "Library home screen shows a compact reading stats card with today's reading time, pages, sessions, and current streak",
-        "Vocabulary panel now supports an in-panel review mode ordered by least-reviewed entries, with answer reveal and persistent review counts",
-        "All successful context lookups are recorded as lookup history and displayed as recent lookups in the vocabulary panel",
-        "AI recap entry point added to the notebook assistant for spoiler-safe book summaries up to the current page",
-        "Reading session tracking records duration and pages for each reading session",
-        "Release and PR workflows now target the supported 0.1.0 platform set and run format plus lint checks in the Tauri job"
-      ]
-    },
-    "0.0.2": {
-      "date": "2026-04-11",
-      "notes": [
-        "Lookup popups now share a reusable shell for more consistent dictionary and translation UI behavior",
-        "Popup interaction tests were tightened to better protect speaking, saving, and notebook handoff flows",
-        "Build and formatting checks were aligned with the new Hermes popup structure"
-      ]
-    },
-    "0.0.1": {
-      "date": "2026-04-10",
-      "notes": [
-        "Hermes now starts its own independent version line at 0.0.1",
-        "Release naming and visible app branding now identify the app as Hermes",
-        "Links to upstream Readest resources are labeled as the original project"
+        "Library: Much faster browsing for large collections",
+        "Reading: Added an option to keep the book's original paragraph layout",
+        "Reading: Fixed page navigation for Arabic books",
+        "PDF: Fixed TTS reading interruptions at line breaks in PDFs",
+        "PDF: You can now apply your chosen theme colors to PDFs",
+        "Sync: Added HTTP Basic auth support for CWA",
+        "Sync: Improved progress sync with Hardcover.app",
+        "OPDS: You can now edit your registered catalogs, with better handling of download filenames",
+        "Speed Reading: Your reading position now syncs across devices",
+        "Platform: Fixed window buttons on macOS, reduced crashes on iOS"
       ]
     },
     "0.10.4": {
