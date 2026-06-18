@@ -449,6 +449,7 @@ export interface BookConfig {
   rsvpPosition?: { cfi: string; wordText: string };
   searchConfig?: Partial<BookSearchConfig>;
   viewSettings?: Partial<ViewSettings>;
+  notebookActiveTab?: 'notes' | 'ai' | 'vocabulary';
 
   lastSyncedAtConfig?: number;
   lastSyncedAtNotes?: number;

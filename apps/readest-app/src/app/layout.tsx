@@ -8,7 +8,7 @@ import Providers from '@/components/Providers';
 import '../styles/globals.css';
 
 const url = 'https://web.readest.com/';
-const title = 'Readest — Where You Read, Digest and Get Insight';
+const title = 'Hermes — Where You Read, Digest and Get Insight';
 const description =
   'Discover Readest, the ultimate online ebook reader for immersive and organized reading. ' +
   'Enjoy seamless access to your digital library, powerful tools for highlighting, bookmarking, ' +
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(url),
   title: {
     default: title,
-    template: '%s | Readest',
+    template: '%s | Hermes',
   },
   description,
   generator: 'Next.js',
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Readest',
+    title: 'Hermes',
     statusBarStyle: 'default',
   },
   openGraph: {
@@ -137,6 +137,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'tauri' ? 'edge-to-edge' : ''}
     >
       <head>
+        <meta name='application-name' content='Hermes' />
         {shouldInjectRuntimeConfig ? (
           <Script src='/runtime-config.js' strategy='beforeInteractive' />
         ) : null}

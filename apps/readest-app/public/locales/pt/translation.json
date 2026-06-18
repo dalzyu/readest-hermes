@@ -1,6 +1,5 @@
 {
   "(detected)": "(detectado)",
-  "About Readest": "Sobre o Readest",
   "Add your notes here...": "Adicione suas notas aqui...",
   "Animation": "Animação",
   "Annotate": "Anotar",
@@ -24,7 +23,6 @@
   "Delete": "Excluir",
   "Delete Highlight": "Excluir Destaque",
   "Dictionary": "Dicionário",
-  "Download Readest": "Baixar Readest",
   "Edit": "Editar",
   "Excerpts": "Trechos",
   "Failed to import book(s): {{filenames}}": "Falha ao importar livro(s): {{filenames}}",
@@ -371,7 +369,6 @@
   "Cloud Sync Storage": "Armazenamento na Nuvem",
   "Disable": "Desativar",
   "Enable": "Ativar",
-  "Upgrade to Readest Premium": "Atualizar para Readest Premium",
   "Show Source Text": "Mostrar Texto Fonte",
   "Cross-Platform Sync": "Sincronização Multiplataforma",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "Sincronize perfeitamente sua biblioteca, progresso, destaques e notas em todos os seus dispositivos—nunca mais perca seu lugar.",

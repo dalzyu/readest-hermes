@@ -1,6 +1,5 @@
 {
   "(detected)": "(terdeteksi)",
-  "About Readest": "Tentang Readest",
   "Add your notes here...": "Tambahkan catatan Anda di sini...",
   "Animation": "Animasi",
   "Annotate": "Anotasi",
@@ -24,7 +23,6 @@
   "Delete": "Hapus",
   "Delete Highlight": "Hapus Sorotan",
   "Dictionary": "Kamus",
-  "Download Readest": "Unduh Readest",
   "Edit": "Edit",
   "Excerpts": "Kutipan",
   "Failed to import book(s): {{filenames}}": "Gagal mengimpor buku: {{filenames}}",
@@ -363,7 +361,6 @@
   "Cloud Sync Storage": "Penyimpanan Sinkronisasi Cloud",
   "Disable": "Nonaktifkan",
   "Enable": "Aktifkan",
-  "Upgrade to Readest Premium": "Tingkatkan ke Readest Premium",
   "Show Source Text": "Perlihatkan Teks Sumber",
   "Cross-Platform Sync": "Sinkronisasi Lintas Platform",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "Sinkronkan pustaka, kemajuan, dan catatan di semua perangkat Anda.",

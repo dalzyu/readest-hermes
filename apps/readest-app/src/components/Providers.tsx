@@ -25,7 +25,7 @@ import {
   setTelemetryDecision,
   TELEMETRY_OPT_OUT_KEY,
 } from '@/utils/telemetry';
-import { SETTINGS_FILENAME } from '@/services/constants';
+import { CLOUD_ENABLED, SETTINGS_FILENAME } from '@/services/constants';
 import type { AppService } from '@/types/system';
 import type { SystemSettings } from '@/types/settings';
 import { DropdownProvider } from '@/context/DropdownContext';
@@ -39,6 +39,10 @@ import { upgradeToKeychainIfAvailable } from '@/libs/crypto/passphrase';
 import { cryptoSession } from '@/libs/crypto/session';
 import { useAppLockStore } from '@/store/appLockStore';
 import { initSettingsSync } from '@/services/sync/replicaSettingsSync';
+
+const NoopProvider = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+const AuthBoundary = CLOUD_ENABLED ? AuthProvider : NoopProvider;
+const SyncBoundary = CLOUD_ENABLED ? SyncProvider : NoopProvider;
 
 // One-time, on first launch after this feature ships, decide how to handle
 // PostHog telemetry for the current install:
@@ -95,7 +99,7 @@ const finalizeTelemetryDecision = ({
     // store isn't seeded yet at this point in boot, so saveSysSettings would
     // write a malformed partial object — write through appService instead.
     settings.telemetryEnabled = false;
-    void appService.saveSettings(settings);
+    void appService.saveSettings?.(settings);
   }
 };
 
@@ -137,7 +141,8 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
     loadDataTheme();
     if (appService) {
       initSystemThemeListener(appService);
-      const hadSettingsFilePromise = appService.exists(SETTINGS_FILENAME, 'Settings');
+      const hadSettingsFilePromise =
+        appService.exists?.(SETTINGS_FILENAME, 'Settings') ?? Promise.resolve(false);
       appService.loadSettings().then(async (settings) => {
         const globalViewSettings = settings.globalViewSettings;
         const hadSettingsFile = await hadSettingsFilePromise.catch(() => false);
@@ -179,7 +184,9 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
         // local defaults to the server with a fresh HLC — overwriting
         // the cross-device authoritative values another device set.
         // Idempotent — safe to call on remount.
-        initSettingsSync(settings);
+        if (CLOUD_ENABLED) {
+          initSettingsSync(settings);
+        }
       });
     }
   }, [
@@ -217,14 +224,14 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   // nothing — without this guard the library would flash on screen
   // for a few hundred ms before `loadSettings` resolved and let the
   // lock store decide whether to lock.
-  const showAppLockScreen = isLockInitialized && !isUnlocked;
-  const appShellHidden = !isLockInitialized || !isUnlocked;
+  const showAppLockScreen = CLOUD_ENABLED && isLockInitialized && !isUnlocked;
+  const appShellHidden = CLOUD_ENABLED && (!isLockInitialized || !isUnlocked);
 
   return (
     <CSPostHogProvider>
-      <AuthProvider>
+      <AuthBoundary>
         <IconContext.Provider value={{ size: `${iconSize}px` }}>
-          <SyncProvider>
+          <SyncBoundary>
             <DropdownProvider>
               <CommandPaletteProvider>
                 <div
@@ -244,9 +251,9 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
                 {showAppLockScreen && <AppLockScreen />}
               </CommandPaletteProvider>
             </DropdownProvider>
-          </SyncProvider>
+          </SyncBoundary>
         </IconContext.Provider>
-      </AuthProvider>
+      </AuthBoundary>
     </CSPostHogProvider>
   );
 };

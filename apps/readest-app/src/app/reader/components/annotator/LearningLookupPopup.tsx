@@ -153,7 +153,7 @@ const LearningLookupPopup: React.FC<LearningLookupPopupProps> = ({
               try {
                 await saveToVocabulary();
                 setSaved(true);
-              } catch (error) {
+              } catch (_error) {
                 // Ignore or toast
               }
             }}

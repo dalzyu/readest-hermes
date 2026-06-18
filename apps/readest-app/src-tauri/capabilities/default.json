@@ -95,10 +95,7 @@
       "identifier": "http:default",
       "allow": [
         {
-          "url": "https://*.readest.com"
-        },
-        {
-          "url": "https://github.com/readest/*"
+          "url": "https://github.com/dalzyu/readest-hermes/*"
         },
         {
           "url": "https://*.deepl.com"
@@ -176,17 +173,17 @@
         {
           "name": "start-readest",
           "cmd": "cmd",
-          "args": ["/C", "start", "", { "validator": "^.*Readest(.*)\\.exe$" }]
+          "args": ["/C", "start", "", { "validator": "^.*Hermes(.*)\\.exe$" }]
         },
         {
           "name": "chmod-appimage",
           "cmd": "chmod",
-          "args": ["+x", { "validator": "^.*Readest(.*)\\.AppImage$" }]
+          "args": ["+x", { "validator": "^.*Hermes(.*)\\.AppImage$" }]
         },
         {
           "name": "launch-appimage",
           "cmd": "setsid",
-          "args": [{ "validator": "^.*Readest(.*)\\.AppImage$" }]
+          "args": [{ "validator": "^.*Hermes(.*)\\.AppImage$" }]
         }
       ]
     },
@@ -199,7 +196,6 @@
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
     "device-info:default",
-    "turso:default",
     "native-tts:default",
     "native-bridge:default"
   ]

@@ -1,6 +1,5 @@
 {
   "(detected)": "(पता लगाया)",
-  "About Readest": "Readest के बारे में",
   "Add your notes here...": "अपनी टिप्पणियां यहां जोड़ें...",
   "Animation": "एनीमेशन",
   "Annotate": "टिप्पणी",
@@ -24,7 +23,6 @@
   "Delete": "हटाएं",
   "Delete Highlight": "हाइलाइट हटाएं",
   "Dictionary": "शब्दकोश",
-  "Download Readest": "Readest डाउनलोड करें",
   "Edit": "संपादित करें",
   "Excerpts": "अंश",
   "Failed to import book(s): {{filenames}}": "पुस्तक(ें) आयात करने में विफल: {{filenames}}",
@@ -367,7 +365,6 @@
   "Cloud Sync Storage": "क्लाउड सिंक स्टोरेज",
   "Disable": "अक्षम करें",
   "Enable": "सक्षम करें",
-  "Upgrade to Readest Premium": "Readest प्रीमियम में अपग्रेड करें",
   "Show Source Text": "मूल पाठ दिखाएं",
   "Cross-Platform Sync": "क्रॉस-प्लेटफ़ॉर्म सिंक",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "सभी डिवाइस पर लाइब्रेरी, प्रगति और नोट सिंक करें।",

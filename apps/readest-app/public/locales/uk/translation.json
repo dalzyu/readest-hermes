@@ -1,6 +1,5 @@
 {
   "(detected)": "(виявлено)",
-  "About Readest": "Про Readest",
   "Add your notes here...": "Додайте свої нотатки сюди...",
   "Animation": "Анімація",
   "Annotate": "Анотація",
@@ -24,7 +23,6 @@
   "Delete": "Видалити",
   "Delete Highlight": "Видалити виділення",
   "Dictionary": "Словник",
-  "Download Readest": "Завантажити Readest",
   "Edit": "Редагувати",
   "Excerpts": "Уривки",
   "Failed to import book(s): {{filenames}}": "Не вдалося імпортувати книгу(и): {{filenames}}",
@@ -375,7 +373,6 @@
   "Cloud Sync Storage": "Хмарне сховище",
   "Disable": "Вимкнути",
   "Enable": "Увімкнути",
-  "Upgrade to Readest Premium": "Оновити до Readest Premium",
   "Show Source Text": "Показати вихідний текст",
   "Cross-Platform Sync": "Міжплатформова синхронізація",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "Безперешкодно синхронізуйте свою бібліотеку, прогрес, виділення та нотатки на всіх своїх пристроях. Більше ніколи не втратите свої книги.",

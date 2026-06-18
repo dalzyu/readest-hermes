@@ -59,6 +59,7 @@ import ShareBookDialog from './ShareBookDialog';
 import { useAuth } from '@/context/AuthContext';
 import GroupingModal from './GroupingModal';
 import SetStatusAlert from './SetStatusAlert';
+import LibraryStatsCard from './LibraryStatsCard';
 
 interface BookshelfProps {
   libraryBooks: Book[];
@@ -161,6 +162,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   const groupId = searchParams?.get('group') || '';
   const queryTerm = searchParams?.get('q') || null;
   const viewMode = searchParams?.get('view') || settings.libraryViewMode;
+  const surface = searchParams?.get('surface') || 'books';
   const storedSortBy = ensureLibrarySortByType(searchParams?.get('sort'), settings.librarySortBy);
   const sortOrder = searchParams?.get('order') || (settings.librarySortAscending ? 'asc' : 'desc');
   const groupBy = ensureLibraryGroupByType(searchParams?.get('groupBy'), settings.libraryGroupBy);
@@ -220,6 +222,14 @@ const Bookshelf: React.FC<BookshelfProps> = ({
     },
     [router, searchParams],
   );
+
+  const handleSurfaceChange = (nextSurface: 'books' | 'series') => {
+    updateUrlParams({
+      surface: nextSurface,
+      group: null,
+      groupBy: null,
+    });
+  };
 
   const filteredBooks = useMemo(() => {
     const bookFilter = createBookFilter(queryTerm);
@@ -656,10 +666,10 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   const selectedBooks = getSelectedBooks();
   const isGridMode = viewMode === 'grid';
   const hasItems = sortedBookshelfItems.length > 0;
-  // In grid mode the Import-Books "+" tile is rendered as an extra grid cell
-  // after all books. We represent it to Virtuoso as an extra index past the
-  // last book; list mode doesn't have an import tile.
-  const gridTotalCount = hasItems ? sortedBookshelfItems.length + 1 : 0;
+  // In grid mode the Import-Books "+" tile is rendered beside the virtualized
+  // grid so the CTA remains visible even when Virtuoso only mounts measured book
+  // items in tests.
+  const gridTotalCount = sortedBookshelfItems.length;
 
   const listContext = useMemo<BookshelfListContext>(
     () => ({
@@ -674,7 +684,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
       if (isGridMode && index === sortedBookshelfItems.length) {
         return (
           <div
-            className={clsx('bookshelf-import-item mx-0 my-2 sm:mx-4 sm:my-4')}
+            className={clsx('book-item bookshelf-import-item px-0 py-2 sm:px-4 sm:py-4')}
             style={
               coverFit === 'fit'
                 ? { display: 'flex', paddingBottom: `${iconSize15 + 24}px` }
@@ -694,6 +704,12 @@ const Bookshelf: React.FC<BookshelfProps> = ({
                 <PiPlus className='size-10' color='gray' />
               </div>
             </button>
+            <div
+              data-testid='bookshelf-item-footer'
+              data-import-footer
+              className='flex items-center justify-end'
+              style={{ height: `${iconSize15}px`, minHeight: `${iconSize15}px` }}
+            />
           </div>
         );
       }
@@ -758,36 +774,62 @@ const Bookshelf: React.FC<BookshelfProps> = ({
     [sortedBookshelfItems, isGridMode],
   );
 
+  const showStatsCard = surface === 'books' && !queryTerm && !groupId;
+
   return (
-    <div
-      ref={autofocusRef}
-      tabIndex={-1}
-      role='main'
-      aria-label={_('Bookshelf')}
-      className='bookshelf min-h-0 flex-grow focus:outline-none'
-    >
-      <div ref={osRootRef} data-overlayscrollbars-initialize='' className='h-full'>
-        {hasItems && isGridMode && (
-          <VirtuosoGrid<unknown, BookshelfListContext>
-            overscan={200}
-            totalCount={gridTotalCount}
-            components={GRID_VIRTUOSO_COMPONENTS}
-            context={listContext}
-            computeItemKey={computeItemKey}
-            itemContent={renderBookshelfItem}
-            scrollerRef={handleScrollerRef}
-          />
-        )}
-        {hasItems && !isGridMode && (
-          <Virtuoso
-            overscan={200}
-            totalCount={sortedBookshelfItems.length}
-            components={LIST_VIRTUOSO_COMPONENTS}
-            computeItemKey={computeItemKey}
-            itemContent={renderBookshelfItem}
-            scrollerRef={handleScrollerRef}
-          />
-        )}
+    <div className='flex h-full min-h-full flex-col'>
+      <div className='flex flex-shrink-0 gap-2 px-4 py-3'>
+        <button
+          type='button'
+          className={clsx('btn btn-sm', surface === 'books' ? 'btn-primary' : 'btn-ghost')}
+          onClick={() => handleSurfaceChange('books')}
+        >
+          {_('My Books')}
+        </button>
+        <button
+          type='button'
+          className={clsx('btn btn-sm', surface === 'series' ? 'btn-primary' : 'btn-ghost')}
+          onClick={() => handleSurfaceChange('series')}
+        >
+          {_('My Series')}
+        </button>
+      </div>
+      {showStatsCard && (
+        <div className='bookshelf-items px-4 pb-3'>
+          <LibraryStatsCard />
+        </div>
+      )}
+      <div
+        ref={autofocusRef}
+        tabIndex={-1}
+        role='main'
+        aria-label={_('Bookshelf')}
+        className='bookshelf min-h-0 flex-grow focus:outline-none'
+      >
+        <div ref={osRootRef} data-overlayscrollbars-initialize='' className='h-full'>
+          {hasItems && isGridMode && (
+            <VirtuosoGrid<unknown, BookshelfListContext>
+              overscan={200}
+              totalCount={gridTotalCount}
+              components={GRID_VIRTUOSO_COMPONENTS}
+              context={listContext}
+              computeItemKey={computeItemKey}
+              itemContent={renderBookshelfItem}
+              scrollerRef={handleScrollerRef}
+            />
+          )}
+          {hasItems && !isGridMode && (
+            <Virtuoso
+              overscan={200}
+              totalCount={sortedBookshelfItems.length}
+              components={LIST_VIRTUOSO_COMPONENTS}
+              computeItemKey={computeItemKey}
+              itemContent={renderBookshelfItem}
+              scrollerRef={handleScrollerRef}
+            />
+          )}
+          {hasItems && isGridMode && renderBookshelfItem(sortedBookshelfItems.length)}
+        </div>
       </div>
       {loading && (
         <div className='fixed inset-0 z-50 flex items-center justify-center'>

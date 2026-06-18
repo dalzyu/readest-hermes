@@ -54,11 +54,22 @@ export const useAppLockStore = create<AppLockState>((set) => ({
   pinHash: null,
   pinSalt: null,
   initialize: ({ enabled, hash, salt }) =>
-    set({
-      isInitialized: true,
-      isUnlocked: !enabled,
-      pinHash: hash ?? null,
-      pinSalt: salt ?? null,
+    set((state) => {
+      const nextState = {
+        isInitialized: true,
+        isUnlocked: !enabled,
+        pinHash: hash ?? null,
+        pinSalt: salt ?? null,
+      };
+      if (
+        state.isInitialized === nextState.isInitialized &&
+        state.isUnlocked === nextState.isUnlocked &&
+        state.pinHash === nextState.pinHash &&
+        state.pinSalt === nextState.pinSalt
+      ) {
+        return state;
+      }
+      return nextState;
     }),
   unlock: () => set({ isUnlocked: true }),
   lock: () => set({ isUnlocked: false }),

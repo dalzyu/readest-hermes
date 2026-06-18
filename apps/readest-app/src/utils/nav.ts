@@ -72,7 +72,7 @@ export const ensureMainLibraryWindow = async (appService: AppService) => {
     height: 600,
     center: true,
     resizable: true,
-    title: appService.isMacOSApp ? '' : 'Readest',
+    title: appService.isMacOSApp ? '' : 'Hermes',
     decorations: !!appService.isMacOSApp,
     transparent: !appService.isMacOSApp,
     shadow: appService.isMacOSApp ? undefined : true,

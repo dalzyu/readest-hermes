@@ -26,6 +26,7 @@ import HintInfo from './HintInfo';
 import ReadingRuler from './ReadingRuler';
 import DoubleBorder from './DoubleBorder';
 import ReadingStatsTracker from './ReadingStatsTracker';
+import IndexingProgressBar from './IndexingProgressBar';
 
 interface BooksGridProps {
   bookKeys: string[];
@@ -110,6 +111,7 @@ const BookCellInner: React.FC<BookCellProps> = ({
   const progress = useBookProgress(bookKey);
   const viewState = useReaderStore((s) => s.viewStates[bookKey]);
   const viewSettings = viewState?.viewSettings ?? null;
+  const indexingProgress = useReaderStore((s) => s.indexingProgress[bookKey]);
 
   // config / bookData are read imperatively: their relevant fields are
   // written alongside progress (setProgress / saveConfig), so the
@@ -154,13 +156,15 @@ const BookCellInner: React.FC<BookCellProps> = ({
   );
 
   if (!book || !config || !bookDoc || !viewSettings || !viewState) return null;
-
   const { section, pageinfo, sectionLabel } = progress || {};
+
+  const focusMode = !!viewSettings.focusMode;
   const isBookmarked = viewState.ribbonVisible;
   const viewerKey = viewState.viewerKey;
   const horizontalGapPercent = viewSettings.gapPercent;
-  const showHeader = viewSettings.showHeader;
-  const showFooter = viewSettings.showFooter;
+  const showHeader = viewSettings.showHeader && !focusMode;
+  const showFooter = viewSettings.showFooter && !focusMode;
+  const showReaderChrome = !focusMode;
 
   return (
     <div
@@ -170,18 +174,22 @@ const BookCellInner: React.FC<BookCellProps> = ({
         appServiceHasRoundedWindow && 'rounded-window',
       )}
     >
-      {isBookmarked && !hoveredBookKey && <Ribbon width={`${horizontalGapPercent}%`} />}
-      <HeaderBar
-        bookKey={bookKey}
-        gridInsets={gridInsets}
-        screenInsets={screenInsets}
-        bookTitle={book.title}
-        isTopLeft={index === 0}
-        isHoveredAnim={isHoveredAnim}
-        onCloseBook={onCloseBook}
-        onGoToLibrary={onGoToLibrary}
-        onDropdownOpenChange={onDropdownOpenChange}
-      />
+      {showReaderChrome && isBookmarked && !hoveredBookKey && (
+        <Ribbon width={`${horizontalGapPercent}%`} />
+      )}
+      {showReaderChrome && (
+        <HeaderBar
+          bookKey={bookKey}
+          gridInsets={gridInsets}
+          screenInsets={screenInsets}
+          bookTitle={book.title}
+          isTopLeft={index === 0}
+          isHoveredAnim={isHoveredAnim}
+          onCloseBook={onCloseBook}
+          onGoToLibrary={onGoToLibrary}
+          onDropdownOpenChange={onDropdownOpenChange}
+        />
+      )}
       <FoliateViewer
         key={viewerKey}
         bookKey={bookKey}
@@ -192,7 +200,7 @@ const BookCellInner: React.FC<BookCellProps> = ({
       />
       {viewSettings.vertical && viewSettings.scrolled && (
         <>
-          {(showFooter || viewSettings.doubleBorder) && (
+          {(showFooter || (showReaderChrome && viewSettings.doubleBorder)) && (
             <div
               className='bg-base-100 absolute left-0 top-0 h-full'
               style={{
@@ -201,7 +209,7 @@ const BookCellInner: React.FC<BookCellProps> = ({
               }}
             />
           )}
-          {(showHeader || viewSettings.doubleBorder) && (
+          {(showHeader || (showReaderChrome && viewSettings.doubleBorder)) && (
             <div
               className='bg-base-100 absolute right-0 top-0 h-full'
               style={{
@@ -212,7 +220,7 @@ const BookCellInner: React.FC<BookCellProps> = ({
           )}
         </>
       )}
-      {viewSettings.vertical && viewSettings.doubleBorder && (
+      {showReaderChrome && viewSettings.vertical && viewSettings.doubleBorder && (
         <DoubleBorder
           showHeader={showHeader}
           showFooter={showFooter}
@@ -234,17 +242,19 @@ const BookCellInner: React.FC<BookCellProps> = ({
           gridInsets={gridInsets}
         />
       )}
-      <HintInfo
-        bookKey={bookKey}
-        showDoubleBorder={viewSettings.vertical && viewSettings.doubleBorder}
-        isScrolled={viewSettings.scrolled}
-        isVertical={viewSettings.vertical}
-        isEink={viewSettings.isEink}
-        horizontalGap={horizontalGapPercent}
-        contentInsets={contentInsets}
-        gridInsets={gridInsets}
-      />
-      {viewSettings.readingRulerEnabled && viewState?.inited && (
+      {showReaderChrome && (
+        <HintInfo
+          bookKey={bookKey}
+          showDoubleBorder={viewSettings.vertical && viewSettings.doubleBorder}
+          isScrolled={viewSettings.scrolled}
+          isVertical={viewSettings.vertical}
+          isEink={viewSettings.isEink}
+          horizontalGap={horizontalGapPercent}
+          contentInsets={contentInsets}
+          gridInsets={gridInsets}
+        />
+      )}
+      {showReaderChrome && viewSettings.readingRulerEnabled && viewState?.inited && (
         <ReadingRuler
           bookKey={bookKey}
           isVertical={viewSettings.vertical}
@@ -259,26 +269,39 @@ const BookCellInner: React.FC<BookCellProps> = ({
         />
       )}
       {showFooter && (
-        <ProgressBar
-          bookKey={bookKey}
-          horizontalGap={horizontalGapPercent}
-          contentInsets={contentInsets}
-          gridInsets={gridInsets}
-        />
+        <>
+          <ProgressBar
+            bookKey={bookKey}
+            horizontalGap={horizontalGapPercent}
+            contentInsets={contentInsets}
+            gridInsets={gridInsets}
+          />
+          {indexingProgress && (
+            <IndexingProgressBar
+              current={indexingProgress.current}
+              total={indexingProgress.total}
+              phase={indexingProgress.phase}
+            />
+          )}
+          <FooterBar
+            bookKey={bookKey}
+            bookFormat={book.format}
+            section={section}
+            pageinfo={pageinfo}
+            isHoveredAnim={false}
+            gridInsets={gridInsets}
+          />
+        </>
       )}
-      <PageNavigationButtons bookKey={bookKey} isDropdownOpen={isDropdownOpen} />
-      <Annotator bookKey={bookKey} contentInsets={contentInsets} />
-      <SearchResultsNav bookKey={bookKey} gridInsets={gridInsets} />
-      <BooknotesNav bookKey={bookKey} gridInsets={gridInsets} toc={bookDoc.toc || []} />
-      <FootnotePopup bookKey={bookKey} bookDoc={bookDoc} />
-      <FooterBar
-        bookKey={bookKey}
-        bookFormat={book.format}
-        section={section}
-        pageinfo={pageinfo}
-        isHoveredAnim={false}
-        gridInsets={gridInsets}
-      />
+      {showReaderChrome && (
+        <>
+          <PageNavigationButtons bookKey={bookKey} isDropdownOpen={isDropdownOpen} />
+          <Annotator bookKey={bookKey} contentInsets={contentInsets} />
+          <SearchResultsNav bookKey={bookKey} gridInsets={gridInsets} />
+          <BooknotesNav bookKey={bookKey} gridInsets={gridInsets} toc={bookDoc.toc || []} />
+          <FootnotePopup bookKey={bookKey} bookDoc={bookDoc} />
+        </>
+      )}
       <ReadingStatsTracker bookKey={bookKey} />
     </div>
   );

@@ -77,16 +77,19 @@ vi.mock('@/store/readerStore', () => {
     setViewSettings: vi.fn(),
     setTTSEnabled: vi.fn(),
   };
-  const useReaderStore = () => store;
+  const useReaderStore = (selector?: (state: typeof store) => unknown) =>
+    selector ? selector(store) : store;
   useReaderStore.getState = () => store;
   return { useReaderStore };
 });
-
-vi.mock('@/store/bookDataStore', () => ({
-  useBookDataStore: () => ({
+vi.mock('@/store/bookDataStore', () => {
+  const store = {
     getBookData: () => mockBookData,
-  }),
-}));
+  };
+  const useBookDataStore = (selector?: (state: typeof store) => unknown) =>
+    selector ? selector(store) : store;
+  return { useBookDataStore };
+});
 
 vi.mock('@/store/proofreadStore', () => ({
   useProofreadStore: () => ({

@@ -531,7 +531,7 @@ pub fn run() {
                     .decorations(false)
                     .visible(false)
                     .shadow(true)
-                    .title("Readest");
+                    .title("Hermes");
 
                 #[cfg(target_os = "windows")]
                 {

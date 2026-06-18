@@ -43,6 +43,7 @@ vi.mock('@/context/EnvContext', () => ({
       getAppService: async () => ({
         loadSettings: async () => ({ lastOpenBooks: [], openLastBooks: false }),
         loadLibraryBooks: async () => libraryState,
+        saveLibraryBooks: vi.fn(),
       }),
     },
     appService: {
@@ -66,8 +67,8 @@ vi.mock('@/store/themeStore', () => ({
   }),
 }));
 
-vi.mock('@/store/settingsStore', () => ({
-  useSettingsStore: () => ({
+vi.mock('@/store/settingsStore', () => {
+  const settingsState = {
     settings: {
       globalViewSettings: {},
       autoUpload: false,
@@ -75,13 +76,17 @@ vi.mock('@/store/settingsStore', () => ({
       autoCheckUpdates: false,
       openLastBooks: false,
       lastOpenBooks: [],
+      localBooksDir: null,
     },
     setSettings: vi.fn(),
     saveSettings: vi.fn(),
     isSettingsDialogOpen: false,
     setSettingsDialogOpen: vi.fn(),
-  }),
-}));
+  };
+  const useSettingsStore = () => settingsState;
+  useSettingsStore.getState = () => settingsState;
+  return { useSettingsStore };
+});
 
 vi.mock('@/store/bookDataStore', () => ({ useBookDataStore: () => ({ clearBookData: vi.fn() }) }));
 vi.mock('@/store/transferStore', () => ({
@@ -129,7 +134,10 @@ vi.mock('@/hooks/useFileSelector', () => ({
 }));
 vi.mock('@/utils/bridge', () => ({ lockScreenOrientation: vi.fn(), selectDirectory: vi.fn() }));
 vi.mock('@/utils/permission', () => ({ requestStoragePermission: vi.fn() }));
-vi.mock('@/services/constants', () => ({ SUPPORTED_BOOK_EXTS: ['epub'] }));
+vi.mock('@/services/constants', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/constants')>()),
+  SUPPORTED_BOOK_EXTS: ['epub'],
+}));
 vi.mock('@/utils/window', () => ({
   tauriHandleClose: vi.fn(),
   tauriHandleSetAlwaysOnTop: vi.fn(),

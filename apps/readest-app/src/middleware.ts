@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const allowedOrigins = [
-  'https://web.readest.com',
   'https://tauri.localhost',
   'http://tauri.localhost',
   'http://localhost:3000',
@@ -20,7 +19,7 @@ export function middleware(request: NextRequest) {
 
   if (isApi) {
     const origin = request.headers.get('origin') ?? '';
-    const isAllowedOrigin = allowedOrigins.includes(origin);
+    const isAllowedOrigin = allowedOrigins.includes(origin) || origin === request.nextUrl.origin;
 
     if (request.method === 'OPTIONS') {
       const preflightHeaders = new Headers({

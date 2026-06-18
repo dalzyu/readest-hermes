@@ -33,7 +33,7 @@ import { stubTranslation as _ } from '@/utils/misc';
 import { DEFAULT_AI_SETTINGS } from './ai/constants';
 import { DEFAULT_ANNOTATION_TOOLBAR_ITEMS } from '@/utils/annotationToolbar';
 
-export const DATA_SUBDIR = 'Readest';
+export const DATA_SUBDIR = 'Hermes';
 export const LOCAL_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
 export const CLOUD_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
 export const CLOUD_REPLICAS_SUBDIR = `${DATA_SUBDIR}/Replicas`;
@@ -817,7 +817,7 @@ export const READEST_UPDATER_PUBKEY =
 
 export const READEST_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';
 
-export const READEST_OPDS_USER_AGENT = 'Readest/1.0 (OPDS Browser)';
+export const READEST_OPDS_USER_AGENT = 'Hermes/1.0 (OPDS Browser)';
 
 export const SYNC_PROGRESS_INTERVAL_SEC = 3;
 export const SYNC_NOTES_INTERVAL_SEC = 5;
@@ -964,6 +964,6 @@ export const SUPPORTED_LANGNAMES: Record<string, string> = Object.fromEntries(
   Object.entries(SUPPORTED_LANGS).map(([code, name]) => [name, code]),
 );
 
-export const CLOUD_ENABLED = true;
-export const HERMES_OPDS_USER_AGENT = 'Readest/1.0 (OPDS Browser)';
+export const CLOUD_ENABLED = process.env['NEXT_PUBLIC_CLOUD_ENABLED'] === 'true';
+export const HERMES_OPDS_USER_AGENT = 'Hermes/1.0 (OPDS Browser)';
 export const HERMES_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { describe, expect, test } from 'vitest';
 
 import { migrateContextTranslationSource } from '@/services/settingsService';
 import { DEFAULT_CONTEXT_TRANSLATION_SETTINGS } from '@/services/learning/defaults';

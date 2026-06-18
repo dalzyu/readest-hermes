@@ -265,6 +265,24 @@ export async function clearBookAudioSidecars(fs: FileSystem, book: Book): Promis
   if (await fs.exists(dir, 'Books')) {
     await fs.removeDir(dir, 'Books', true);
   }
+  for (const filename of [
+    getAudioAssetFilename(book),
+    getAudioSyncMapFilename(book),
+    getLegacyAudioSyncMapFilename(book),
+    getAudioAlignmentReportFilename(book),
+    getAudioSyncPackageFilename(book),
+    getAudioSyncPackageProvenanceFilename(book),
+    getAudioSyncPackageVersionDir(book),
+    getAudioSyncCorrectionFilename(book),
+  ]) {
+    if (await fs.exists(filename, 'Books')) {
+      await fs.removeFile(filename, 'Books');
+    }
+    const backupFilename = `${filename}.bak`;
+    if (await fs.exists(backupFilename, 'Books')) {
+      await fs.removeFile(backupFilename, 'Books');
+    }
+  }
 }
 
 export const AUDIO_SYNC_SIDECAR_FILES = {

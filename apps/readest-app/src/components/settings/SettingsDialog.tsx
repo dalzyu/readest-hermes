@@ -32,6 +32,7 @@ import ControlPanel from './ControlPanel';
 import LangPanel from './LangPanel';
 import MiscPanel from './MiscPanel';
 import AIPanel from './AIPanel';
+import AITranslatePanel from './AITranslatePanel';
 import TTSPanel from './TTSPanel';
 
 export type SettingsPanelType =
@@ -42,6 +43,7 @@ export type SettingsPanelType =
   | 'TTS'
   | 'Language'
   | 'AI'
+  | 'AI Translate'
   | 'Integrations'
   | 'Custom';
 export type SettingsPanelPanelProp = {
@@ -118,6 +120,11 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       disabled: process.env.NODE_ENV === 'production',
     },
     {
+      tab: 'AI Translate',
+      icon: RiTranslate,
+      label: _('AI Translate'),
+    },
+    {
       tab: 'TTS',
       icon: PiSpeakerHigh,
       label: _('TTS'),
@@ -179,6 +186,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     TTS: null,
     Language: null,
     AI: null,
+    'AI Translate': null,
     Integrations: null,
     Custom: null,
   });
@@ -472,6 +480,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           />
         )}
         {activePanel === 'AI' && <AIPanel />}
+        {activePanel === 'AI Translate' && <AITranslatePanel />}
         {activePanel === 'Integrations' && <IntegrationsPanel />}
         {activePanel === 'Custom' && (
           <MiscPanel

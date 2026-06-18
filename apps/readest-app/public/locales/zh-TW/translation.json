@@ -1,6 +1,5 @@
 {
   "(detected)": "(檢測到)",
-  "About Readest": "關於 Readest",
   "Add your notes here...": "在這裡添加您的筆記...",
   "Animation": "動畫",
   "Annotate": "筆記",
@@ -24,7 +23,6 @@
   "Delete": "刪除",
   "Delete Highlight": "刪除劃線",
   "Dictionary": "詞典",
-  "Download Readest": "下載 Readest",
   "Edit": "編輯",
   "Excerpts": "摘錄",
   "Failed to import book(s): {{filenames}}": "導入書籍失敗：{{filenames}}",
@@ -363,7 +361,6 @@
   "Cloud Sync Storage": "雲同步空間",
   "Disable": "禁用",
   "Enable": "啟用",
-  "Upgrade to Readest Premium": "升級到 Readest Premium",
   "Show Source Text": "顯示原文",
   "Cross-Platform Sync": "跨平台同步",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "在所有裝置間無縫同步您的書庫、閱讀進度、標註和筆記——再也不會遺失閱讀位置。",

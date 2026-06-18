@@ -185,6 +185,7 @@ vi.mock('@/utils/window', () => ({
 }));
 
 vi.mock('@/services/environment', () => ({
+  getAPIBaseUrl: () => 'http://localhost',
   isTauriAppPlatform: () => false,
 }));
 vi.mock('@/services/ai/providers', () => ({

@@ -1,6 +1,5 @@
 {
   "(detected)": "(algılandı)",
-  "About Readest": "Readest Hakkında",
   "Add your notes here...": "Notlarınızı buraya ekleyin...",
   "Animation": "Animasyon",
   "Annotate": "Not Ekle",
@@ -24,7 +23,6 @@
   "Delete": "Sil",
   "Delete Highlight": "Vurguyu Sil",
   "Dictionary": "Sözlük",
-  "Download Readest": "Readest'i İndir",
   "Edit": "Düzenle",
   "Excerpts": "Alıntılar",
   "Failed to import book(s): {{filenames}}": "Kitap(lar) içe aktarılamadı: {{filenames}}",
@@ -367,7 +365,6 @@
   "Cloud Sync Storage": "Bulut Senkronizasyon Depolama",
   "Disable": "Devre Dışı Bırak",
   "Enable": "Etkinleştir",
-  "Upgrade to Readest Premium": "Readest Premium’a Yükselt",
   "Show Source Text": "Kaynak Metni Göster",
   "Cross-Platform Sync": "Platformlar Arası Senkronizasyon",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "Kütüphanenizi, ilerlemenizi, vurgularınızı ve notlarınızı tüm cihazlarınızda sorunsuzca senkronize edin—bir daha asla yerinizi kaybetmeyin.",

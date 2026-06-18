@@ -1,6 +1,5 @@
 {
   "(detected)": "(تم التعرف)",
-  "About Readest": "حول ريديست",
   "Add your notes here...": "أضف ملاحظاتك هنا...",
   "Animation": "الرسوم المتحركة",
   "Annotate": "إضافة ملاحظة",
@@ -24,7 +23,6 @@
   "Delete": "حذف",
   "Delete Highlight": "حذف التمييز",
   "Dictionary": "القاموس",
-  "Download Readest": "تحميل ريديست",
   "Edit": "تحرير",
   "Excerpts": "مقتطفات",
   "Failed to import book(s): {{filenames}}": "فشل استيراد الكتاب/الكتب: {{filenames}}",
@@ -383,7 +381,6 @@
   "Parallel Read": "القراءة المتزامنة",
   "Disable": "تعطيل",
   "Enable": "تمكين",
-  "Upgrade to Readest Premium": "ترقية إلى Readest Premium",
   "Show Source Text": "عرض النص المصدر",
   "Cross-Platform Sync": "مزامنة عبر الأجهزة",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "زامن مكتبتك وتقدمك وملاحظاتك عبر جميع أجهزتك بسهولة.",

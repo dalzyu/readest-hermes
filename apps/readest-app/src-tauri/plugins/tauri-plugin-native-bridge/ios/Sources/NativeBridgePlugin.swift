@@ -771,7 +771,7 @@ class NativeBridgePlugin: Plugin {
     let args = try invoke.parseArgs(SafariAuthRequestArgs.self)
     let authUrl = URL(string: args.authUrl)!
 
-    authSession = ASWebAuthenticationSession(url: authUrl, callbackURLScheme: "readest") {
+    authSession = ASWebAuthenticationSession(url: authUrl, callbackURLScheme: "hermes") {
       [weak self] callbackURL, error in
       guard let strongSelf = self else { return }
 

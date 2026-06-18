@@ -11,6 +11,9 @@ import { formatProgress, getReferencePageInfo } from '@/utils/progress';
 import type { FooterBarChildProps } from './types';
 import { getNavigationIcon } from './utils';
 import Button from '@/components/Button';
+import { useAudioSync } from '@/hooks/useAudioSync';
+import { useAudioSyncStore } from '@/store/audioSyncStore';
+import { FaPlay, FaPause } from 'react-icons/fa6';
 
 const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
   bookKey,
@@ -30,6 +33,10 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
   const viewState = getViewState(bookKey);
   const viewSettings = getViewSettings(bookKey);
   const progressStyle = viewSettings?.progressStyle || 'percentage';
+  const bookHash = bookKey.split('-')[0] || '';
+  const { controller: audioController, status: audioStatus } = useAudioSync(bookKey);
+  const { sessionStates } = useAudioSyncStore();
+  const isAudioPlaying = sessionStates[bookHash]?.mode === 'playing';
 
   const [progressValue, setProgressValue] = React.useState(
     progressValid ? progressFraction * 100 : 0,
@@ -144,6 +151,13 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
         onClick={onSpeakText!}
         label={_('Speak')}
       />
+      {audioStatus?.playable && (
+        <Button
+          icon={isAudioPlaying ? <FaPause /> : <FaPlay />}
+          onClick={() => (isAudioPlaying ? audioController?.pause() : audioController?.play())}
+          label={isAudioPlaying ? _('Pause Audiobook') : _('Play Audiobook')}
+        />
+      )}
       {!viewSettings?.showPaginationButtons && (
         <Button
           icon={getNavigationIcon(viewSettings?.rtl, <RiArrowRightSLine />, <RiArrowLeftSLine />)}

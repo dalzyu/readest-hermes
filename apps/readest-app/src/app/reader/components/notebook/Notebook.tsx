@@ -21,7 +21,6 @@ import { eventDispatcher } from '@/utils/event';
 import { getBookDirFromLanguage } from '@/utils/book';
 import { getPanelTopInset } from '@/utils/insets';
 import { Overlay } from '@/components/Overlay';
-import { saveSysSettings } from '@/helpers/settings';
 import { NOTE_PREFIX } from '@/types/view';
 import useShortcuts from '@/hooks/useShortcuts';
 import BooknoteItem from '../sidebar/BooknoteItem';
@@ -38,18 +37,22 @@ const MAX_NOTEBOOK_WIDTH = 0.45;
 const Notebook: React.FC = ({}) => {
   const _ = useTranslation();
   const { envConfig, appService } = useEnv();
-  const { settings } = useSettingsStore();
+  const { settings, setSettings, saveSettings } = useSettingsStore();
   const { updateAppTheme, safeAreaInsets, systemUIVisible, statusBarHeight } = useThemeStore();
   const { sideBarBookKey } = useSidebarStore();
   const { notebookWidth, isNotebookVisible, isNotebookPinned, notebookActiveTab } =
     useNotebookStore();
   const { notebookNewAnnotation, notebookEditAnnotation, setNotebookPin } = useNotebookStore();
-  const { getBookData, getConfig, saveConfig, updateBooknotes } = useBookDataStore();
+  const { getBookData, getConfig, setConfig, saveConfig, updateBooknotes } = useBookDataStore();
   const { getView, getProgress, getViewSettings } = useReaderStore();
   const { getNotebookWidth, setNotebookWidth, setNotebookVisible, toggleNotebookPin } =
     useNotebookStore();
-  const { setNotebookNewAnnotation, setNotebookEditAnnotation, setNotebookActiveTab } =
-    useNotebookStore();
+  const {
+    setNotebookNewAnnotation,
+    setNotebookEditAnnotation,
+    setNotebookBookKey,
+    setNotebookActiveTab,
+  } = useNotebookStore();
   const { activeConversationId } = useAIChatStore();
 
   const [isSearchBarVisible, setIsSearchBarVisible] = useState(false);
@@ -114,6 +117,38 @@ const Notebook: React.FC = ({}) => {
   }, []);
 
   useEffect(() => {
+    if (!sideBarBookKey) {
+      setNotebookBookKey(null);
+      return;
+    }
+
+    const bookData = getBookData(sideBarBookKey);
+    const config = getConfig(sideBarBookKey);
+    if (!bookData?.book || !config) {
+      setNotebookBookKey(null);
+      return;
+    }
+
+    const bookKey = bookData.book.hash;
+    const configuredTab = config.notebookActiveTab ?? settings.globalReadSettings.notebookActiveTab;
+    setNotebookBookKey(bookKey);
+    if (configuredTab) {
+      setNotebookActiveTab(bookKey, configuredTab);
+      if (!config.notebookActiveTab) {
+        setConfig(sideBarBookKey, { notebookActiveTab: configuredTab });
+      }
+    }
+  }, [
+    getBookData,
+    getConfig,
+    setConfig,
+    setNotebookActiveTab,
+    setNotebookBookKey,
+    settings.globalReadSettings.notebookActiveTab,
+    sideBarBookKey,
+  ]);
+
+  useEffect(() => {
     if (!isNotebookVisible || notebookNewAnnotation || notebookEditAnnotation) {
       setIsSearchBarVisible(false);
       setSearchResults(null);
@@ -126,18 +161,25 @@ const Notebook: React.FC = ({}) => {
     settings.globalReadSettings.notebookWidth = newWidth;
   };
 
+  const persistGlobalReadSettings = (globalReadSettings: typeof settings.globalReadSettings) => {
+    const nextSettings = { ...settings, globalReadSettings };
+    setSettings(nextSettings);
+    void saveSettings(envConfig, nextSettings);
+  };
+
   const handleTogglePin = () => {
     toggleNotebookPin();
     const globalReadSettings = settings.globalReadSettings;
-    const newGlobalReadSettings = { ...globalReadSettings, isNotebookPinned: !isNotebookPinned };
-    saveSysSettings(envConfig, 'globalReadSettings', newGlobalReadSettings);
+    persistGlobalReadSettings({ ...globalReadSettings, isNotebookPinned: !isNotebookPinned });
   };
 
   const handleTabChange = (tab: NotebookTab) => {
     setNotebookActiveTab(tab);
+    if (sideBarBookKey) {
+      setConfig(sideBarBookKey, { notebookActiveTab: tab });
+    }
     const globalReadSettings = settings.globalReadSettings;
-    const newGlobalReadSettings = { ...globalReadSettings, notebookActiveTab: tab };
-    saveSysSettings(envConfig, 'globalReadSettings', newGlobalReadSettings);
+    persistGlobalReadSettings({ ...globalReadSettings, notebookActiveTab: tab });
   };
 
   const handleClickOverlay = () => {

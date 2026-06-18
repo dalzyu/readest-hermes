@@ -1,6 +1,5 @@
 {
   "(detected)": "(εντοπίστηκε)",
-  "About Readest": "Σχετικά με το Readest",
   "Add your notes here...": "Προσθέστε τις σημειώσεις σας εδώ...",
   "Animation": "Κινούμενα σχέδια",
   "Annotate": "Σχολιασμός",
@@ -24,7 +23,6 @@
   "Delete": "Διαγραφή",
   "Delete Highlight": "Διαγραφή επισήμανσης",
   "Dictionary": "Λεξικό",
-  "Download Readest": "Λήψη Readest",
   "Edit": "Επεξεργασία",
   "Excerpts": "Αποσπάσματα",
   "Failed to import book(s): {{filenames}}": "Αποτυχία εισαγωγής βιβλίου(ων): {{filenames}}",
@@ -367,7 +365,6 @@
   "Cloud Sync Storage": "Χώρος συγχρονισμού cloud",
   "Disable": "Απενεργοποίηση",
   "Enable": "Ενεργοποίηση",
-  "Upgrade to Readest Premium": "Αναβάθμιση στο Readest Premium",
   "Show Source Text": "Εμφάνιση αρχικού κειμένου",
   "Cross-Platform Sync": "Συγχρονισμός σε όλες τις συσκευές",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "Συγχρονίστε βιβλία, πρόοδο και σημειώσεις σε όλες τις συσκευές.",

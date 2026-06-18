@@ -219,8 +219,8 @@ describe('Providers offline contract', () => {
     expect(screen.getByTestId('token').textContent).toBe('null');
     expect(screen.getByTestId('user').textContent).toBe('null');
 
-    fireEvent.click(screen.getByRole('button', { name: 'trigger-auth' }));
-    fireEvent.click(screen.getByRole('button', { name: 'trigger-sync' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'trigger-auth' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'trigger-sync' }));
 
     await waitFor(() => {
       expect(mocks.syncBooks).not.toHaveBeenCalled();

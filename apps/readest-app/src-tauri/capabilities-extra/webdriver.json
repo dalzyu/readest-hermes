@@ -9,6 +9,7 @@
   "permissions": [
     "core:default",
     "fs:default",
+    "fs:allow-open",
     "fs:read-all",
     "fs:write-all",
     "fs:scope-appconfig-recursive",
@@ -20,6 +21,7 @@
         { "path": "**/.readest-test-sandbox-tauri/**" },
         { "path": "**/__tests__" },
         { "path": "**/__tests__/**" },
+        { "path": "**/src/__tests__/fixtures/data/**/*" },
         { "path": "**/Readest" },
         { "path": "**/Readest/**" }
       ]

@@ -1,7 +1,6 @@
 import { BookDoc, TOCItem, DocumentLoader } from '@/libs/document';
 import { Book } from '@/types/book';
 import { AppService } from '@/types/system';
-import { getAudioAlignmentInputFilename } from '@/utils/book';
 
 import { CanonicalSectionText, extractCanonicalBookText } from './BookCanonicalTextService';
 import { BookAudioAsset } from './types';
@@ -172,7 +171,7 @@ export async function prepareAudioAlignmentInput(
   const { file } = await appService.loadBookContent(book);
   const { book: bookDoc } = await new DocumentLoader(file).open();
   const input = await buildAlignmentInput(bookDoc, asset);
-  const target = getAudioAlignmentInputFilename(book);
+  const target = `${book.hash}/audio/alignment-input.v3.json`;
   await appService.writeFile(target, 'Books', JSON.stringify(input, null, 2));
   return await appService.resolveFilePath(target, 'Books');
 }

@@ -98,6 +98,11 @@ import DropIndicator from '@/components/DropIndicator';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import ModalPortal from '@/components/ModalPortal';
 import TransferQueuePanel from './components/TransferQueuePanel';
+import {
+  buildImportSeriesSuggestions,
+  type ImportSeriesSuggestion,
+} from '@/utils/seriesSuggestions';
+import { addBookToSeries, getAllSeries } from '@/services/learning/seriesService';
 
 /**
  * Key used to persist the last directory the user imported books from.
@@ -191,6 +196,9 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const [isSelectNone, setIsSelectNone] = useState(false);
   const [showDetailsBook, setShowDetailsBook] = useState<Book | null>(null);
   const [failedImportsModal, setFailedImportsModal] = useState<FailedImport[] | null>(null);
+  const [importSeriesSuggestions, setImportSeriesSuggestions] = useState<ImportSeriesSuggestion[]>(
+    [],
+  );
   // "Import from folder" dialog state. Held as a small object rather
   // than a boolean because we need a default starting directory to seed
   // the path field, and we want the dialog to remain mounted long
@@ -691,6 +699,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     const lookupIndex = buildBookLookupIndex(library, appService?.osPlatform);
     const failedImports: Array<{ filename: string; errorMessage: string }> = [];
     const successfulImports: string[] = [];
+    const importedBooksForSeries: Book[] = [];
 
     // Readest's own Books/ prefix is resolved once at app init and persisted
     // in `settings.localBooksDir`. We hand it to `ingestFile` so the in-place
@@ -745,6 +754,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         );
         if (!book) return null;
         successfulImports.push(book.title);
+        importedBooksForSeries.push(book);
         return book;
       } catch (error) {
         const filename = typeof file === 'string' ? file : file.name;
@@ -772,6 +782,14 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       const finalLibrary = useLibraryStore.getState().library;
       const finalAppService = await envConfig.getAppService();
       await finalAppService.saveLibraryBooks(finalLibrary);
+      try {
+        const series = await getAllSeries();
+        setImportSeriesSuggestions(
+          buildImportSeriesSuggestions(importedBooksForSeries, series, finalLibrary),
+        );
+      } catch (error) {
+        console.warn('Failed to build import series suggestions:', error);
+      }
     }
 
     pushLibrary();
@@ -799,6 +817,17 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     }
 
     setLoading(false);
+  };
+
+  const dismissImportSeriesSuggestion = (bookHash: string) => {
+    setImportSeriesSuggestions((suggestions) =>
+      suggestions.filter((suggestion) => suggestion.book.hash !== bookHash),
+    );
+  };
+
+  const confirmImportSeriesSuggestion = async (suggestion: ImportSeriesSuggestion) => {
+    await addBookToSeries(suggestion.series.id, suggestion.book.hash);
+    dismissImportSeriesSuggestion(suggestion.book.hash);
   };
 
   const updateBookTransferProgress = throttle((bookHash: string, progress: ProgressPayload) => {
@@ -1341,6 +1370,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   }
 
   const showBookshelf = libraryLoaded || libraryBooks.length > 0;
+  const importSeriesSuggestion = importSeriesSuggestions[0];
 
   return (
     <div
@@ -1499,6 +1529,42 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           failedImports={failedImportsModal}
           onClose={() => setFailedImportsModal(null)}
         />
+      )}
+      {importSeriesSuggestion && (
+        <ModalPortal>
+          <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4'>
+            <div
+              role='dialog'
+              aria-modal='true'
+              aria-label={_('Add to series?')}
+              className='eink-bordered bg-base-100 text-base-content w-full max-w-sm rounded-2xl p-5 shadow-xl'
+            >
+              <h2 className='mb-2 text-lg font-semibold'>{_('Add to series?')}</h2>
+              <p className='mb-1'>
+                {_('Add "{{title}}" to this series?', {
+                  title: importSeriesSuggestion.book.title,
+                })}
+              </p>
+              <p className='mb-4 font-medium'>{importSeriesSuggestion.series.name}</p>
+              <div className='flex justify-end gap-2'>
+                <button
+                  type='button'
+                  className='btn btn-ghost eink-bordered'
+                  onClick={() => dismissImportSeriesSuggestion(importSeriesSuggestion.book.hash)}
+                >
+                  {_('Skip')}
+                </button>
+                <button
+                  type='button'
+                  className='btn btn-primary'
+                  onClick={() => confirmImportSeriesSuggestion(importSeriesSuggestion)}
+                >
+                  {_('Add')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
       )}
       {importFromFolderState && (
         <ImportFromFolderDialog

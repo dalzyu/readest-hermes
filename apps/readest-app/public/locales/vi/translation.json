@@ -1,6 +1,5 @@
 {
   "(detected)": "(đã phát hiện)",
-  "About Readest": "Về Readest",
   "Add your notes here...": "Thêm ghi chú của bạn vào đây...",
   "Animation": "Hiệu ứng động",
   "Annotate": "Chú thích",
@@ -24,7 +23,6 @@
   "Delete": "Xóa",
   "Delete Highlight": "Xóa văn bản được đánh dấu",
   "Dictionary": "Từ điển",
-  "Download Readest": "Tải Readest",
   "Edit": "Chỉnh sửa",
   "Excerpts": "Trích dẫn",
   "Failed to import book(s): {{filenames}}": "Không thể nhập sách: {{filenames}}",
@@ -363,7 +361,6 @@
   "Cloud Sync Storage": "Lưu trữ đồng bộ đám mây",
   "Disable": "Tắt",
   "Enable": "Bật",
-  "Upgrade to Readest Premium": "Đăng ký Readest Premium",
   "Show Source Text": "Hiển thị văn bản gốc",
   "Cross-Platform Sync": "Đồng Bộ Đa Nền Tảng",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "Đồng bộ liền mạch thư viện, tiến độ, đánh dấu và ghi chú trên tất cả thiết bị—không bao giờ mất vị trí đọc nữa.",

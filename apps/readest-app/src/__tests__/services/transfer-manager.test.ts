@@ -521,7 +521,7 @@ describe('TransferManager', () => {
       expect(useTransferStore.getState().transfers[id1]).toBeUndefined();
       expect(useTransferStore.getState().transfers[id2]).toBeDefined();
 
-      const stored = JSON.parse(localStorage.getItem('readest_transfer_queue')!);
+      const stored = JSON.parse(localStorage.getItem('hermes_transfer_queue')!);
       expect(stored.transfers[id1]).toBeUndefined();
       expect(stored.transfers[id2]).toBeDefined();
     });

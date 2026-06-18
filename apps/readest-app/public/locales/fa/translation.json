@@ -1,6 +1,5 @@
 {
   "(detected)": "(تشخیص‌داده‌شده)",
-  "About Readest": "درباره‌ی Readest",
   "Add your notes here...": "یادداشت‌های خود را اینجا اضافه کنید...",
   "Animation": "انیمیشن",
   "Annotate": "حاشیه‌نویسی",
@@ -24,7 +23,6 @@
   "Delete": "حذف",
   "Delete Highlight": "حذف هایلایت",
   "Dictionary": "فرهنگ لغت",
-  "Download Readest": "دانلود Readest",
   "Edit": "ویرایش",
   "Excerpts": "گزیده‌ها",
   "Failed to import book(s): {{filenames}}": "وارد کردن کتاب(ها) «{{filenames}}» ناموفق بود.",
@@ -367,7 +365,6 @@
   "Parallel Read": "خواندن موازی",
   "Disable": "غیرفعال",
   "Enable": "فعال",
-  "Upgrade to Readest Premium": "ارتقاء به Readest Premium",
   "Show Source Text": "نمایش متن منبع",
   "Cross-Platform Sync": "همگام‌سازی چندپلتفرمی",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "کتابخانه، وضعیت مطالعه، هایلایت‌ها و یادداشت‌های خود را بین همه‌ی دستگاه‌ها به‌صورت یکپارچه همگام‌سازی کنید — دیگر هرگز محل مطالعه‌تان را از دست ندهید.",

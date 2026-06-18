@@ -1,6 +1,5 @@
 {
   "(detected)": "(обнаружено)",
-  "About Readest": "О Readest",
   "Add your notes here...": "Добавьте свои заметки здесь...",
   "Animation": "Анимация",
   "Annotate": "Аннотация",
@@ -24,7 +23,6 @@
   "Delete": "Удалить",
   "Delete Highlight": "Удалить выделение",
   "Dictionary": "Словарь",
-  "Download Readest": "Скачать Readest",
   "Edit": "Редактировать",
   "Excerpts": "Отрывки",
   "Failed to import book(s): {{filenames}}": "Не удалось импортировать книгу(и): {{filenames}}",
@@ -375,7 +373,6 @@
   "Cloud Sync Storage": "Облачное хранилище",
   "Disable": "Отключить",
   "Enable": "Включить",
-  "Upgrade to Readest Premium": "Обновить до Readest Premium",
   "Show Source Text": "Показать исходный текст",
   "Cross-Platform Sync": "Кроссплатформенная Синхронизация",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "Беспрепятственно синхронизируйте свою библиотеку, прогресс, заметки и выделения на всех устройствах—больше никогда не теряйте свое место.",

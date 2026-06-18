@@ -135,7 +135,7 @@ export const UpdaterContent = ({
         const arch = OS_ARCH === 'aarch64' ? 'arm64' : 'universal';
         const downloadUrl = data.platforms[platformKey]?.url as string;
         const apkFilePath = await appService.resolveFilePath(
-          `Readest_${data.version}_${arch}.apk`,
+          `Hermes_${data.version}_${arch}.apk`,
           'Cache',
         );
         setUpdate({
@@ -233,7 +233,7 @@ export const UpdaterContent = ({
         const arch = OS_ARCH === 'x86_64' ? 'x64' : 'arm64';
         const downloadUrl = data.platforms[platformKey]?.url as string;
         const execDir = await invoke<string>('get_executable_dir');
-        const exeFileName = `Readest_${data.version}_${arch}-portable.exe`;
+        const exeFileName = `Hermes_${data.version}_${arch}-portable.exe`;
         const exeFilePath = await join(execDir, exeFileName);
         setUpdate({
           currentVersion,
@@ -268,7 +268,7 @@ export const UpdaterContent = ({
           OS_ARCH === 'x86_64' ? 'linux-x86_64-appimage' : 'linux-aarch64-appimage';
         const arch = OS_ARCH === 'x86_64' ? 'x86_64' : 'aarch64';
         const downloadUrl = data.platforms[platformKey]?.url as string;
-        const appImageFileName = `Readest_${data.version}_${arch}.AppImage`;
+        const appImageFileName = `Hermes_${data.version}_${arch}.AppImage`;
         const appImageFilePath = await join(await desktopDir(), appImageFileName);
         setUpdate({
           currentVersion,
@@ -331,7 +331,7 @@ export const UpdaterContent = ({
           return;
         }
         // Windows-portable / Linux-AppImage / Android: download, verify, install.
-        const fileName = n.url.split('/').pop() || `Readest_${n.version}`;
+        const fileName = n.url.split('/').pop() || `Hermes_${n.version}`;
         let filePath: string;
         if (n.platformKey.includes('portable')) {
           // Windows portable: write into the executable dir so the new exe
@@ -542,10 +542,10 @@ export const UpdaterContent = ({
           {checkUpdate ? (
             <div className='text-base-content flex-grow text-sm'>
               <h2 className='mb-4 text-center font-bold sm:text-start'>
-                {_('A new version of Readest is available!')}
+                {_('A new version of Hermes is available!')}
               </h2>
               <p className='mb-2'>
-                {_('Readest {{newVersion}} is available (installed version {{currentVersion}}).', {
+                {_('Hermes {{newVersion}} is available (installed version {{currentVersion}}).', {
                   newVersion,
                   currentVersion,
                 })}
@@ -712,7 +712,7 @@ export const UpdaterWindow = () => {
     <Dialog
       id='updater_window'
       isOpen={isOpen}
-      title={checkUpdate ? _('Software Update') : _("What's New in Readest")}
+      title={checkUpdate ? _('Software Update') : _("What's New in Hermes")}
       onClose={() => setIsOpen(false)}
       boxClassName='sm:!w-[75%] sm:h-auto sm:!max-h-[85vh] sm:!max-w-2xl'
     >

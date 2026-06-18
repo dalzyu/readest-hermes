@@ -137,8 +137,8 @@ interface KeyDownInterceptor {
 )
 class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
     private val implementation = NativeBridge()
-    private var redirectScheme = "readest"
-    private var redirectHost = "auth-callback"
+    private val redirectScheme = "hermes"
+    private val redirectHost = "auth-callback"
     private val billingManager by lazy {
         BillingManager(activity)
     }
@@ -179,13 +179,16 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
         // OAuth callback uses a custom scheme on intent.data and is handled
         // separately from any user-shared content.
         intent.data?.let { uri ->
-            if (uri.scheme == "readest" && uri.host == "auth-callback") {
-                val result = JSObject().apply {
-                    put("redirectUrl", uri.toString())
+            when {
+                uri.scheme == redirectScheme &&
+                    uri.host == redirectHost -> {
+                    val result = JSObject().apply {
+                        put("redirectUrl", uri.toString())
+                    }
+                    pendingInvoke?.resolve(result)
+                    pendingInvoke = null
+                    return
                 }
-                pendingInvoke?.resolve(result)
-                pendingInvoke = null
-                return
             }
         }
 

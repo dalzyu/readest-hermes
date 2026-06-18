@@ -29,6 +29,7 @@ import { saveSysSettings } from '@/helpers/settings';
 import BookCover from '@/components/BookCover';
 import Dropdown from '../Dropdown';
 import MenuItem from '../MenuItem';
+import BookAudioSection from './BookAudioSection';
 
 interface BookDetailViewProps {
   book: Book;
@@ -62,7 +63,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
   onExport,
 }) => {
   const _ = useTranslation();
-  const { envConfig } = useEnv();
+  const { envConfig, appService } = useEnv();
   const { settings } = useSettingsStore();
 
   // Export and Share both read the book file off disk; `fileSize` is only
@@ -215,6 +216,13 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
           </div>
         </div>
       </div>
+      <BookAudioSection
+        asset={null}
+        status={null}
+        busy={false}
+        isDesktop={!!appService?.isDesktopApp}
+        model=''
+      />
 
       <div className='text-base-content my-4'>
         <div className='metadata-others'>

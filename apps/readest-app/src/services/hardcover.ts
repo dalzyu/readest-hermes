@@ -1,7 +1,10 @@
 import type { HardcoverSettings } from '@/types/settings';
 
 export class HardcoverClient {
-  constructor(_settings: Partial<HardcoverSettings>, _mapStore?: HardcoverSyncMapStore) {}
+  constructor(_settings: Partial<HardcoverSettings>, _mapStore?: HardcoverSyncMapStore) {
+    void _settings;
+    void _mapStore;
+  }
   async isAvailable(): Promise<boolean> {
     return false;
   }
@@ -17,7 +20,9 @@ export class HardcoverClient {
   async pushProgress(_book: unknown, _config: unknown): Promise<void> {}
 }
 export class HardcoverSyncMapStore {
-  constructor(_appService?: unknown) {}
+  constructor(_appService?: unknown) {
+    void _appService;
+  }
   async get(_bookHash: string): Promise<Record<string, unknown>> {
     return {};
   }

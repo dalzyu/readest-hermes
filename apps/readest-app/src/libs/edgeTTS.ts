@@ -470,7 +470,7 @@ export class EdgeSpeechTTS {
     const content = genSendContent(contentHeaders, ssml);
     const config = genSendContent(configHeaders, configContent);
 
-    if (isTauriAppPlatform()) {
+    if (isTauriAppPlatform() && !isCloudflareWorkers()) {
       return new Promise(async (resolve, reject) => {
         try {
           const TauriWebSocket = (await import('@tauri-apps/plugin-websocket')).default;

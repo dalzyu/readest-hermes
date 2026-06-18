@@ -5,11 +5,12 @@ import {
   getAudioSyncPackageFilename,
   getAudioSyncPackageProvenanceFilename,
   getAudioSyncPackageVersionDir,
+  getBookAudioDir,
 } from '@/utils/book';
 import { configureZip } from '@/utils/zip';
 import * as CFI from 'foliate-js/epubcfi.js';
-
 import {
+  AUDIO_SYNC_EPUB3_DIRNAME,
   AUDIO_SYNC_EPUB3_FILENAME,
   AUDIO_SYNC_EPUB3_VERSION,
   AUDIO_SYNC_MAP_VERSION,
@@ -973,7 +974,9 @@ export async function createEpubMediaOverlayPackage(input: {
       audioHash: input.asset.audioHash,
       syncMapId: input.map.id,
       syncMapVersion: input.map.version,
-      packagePath: input.packagePath || getAudioSyncPackageFilename(input.book),
+      packagePath:
+        input.packagePath ||
+        `${getBookAudioDir(input.book)}/${AUDIO_SYNC_EPUB3_DIRNAME}/${AUDIO_SYNC_EPUB3_FILENAME}`,
       audioPath: audioPackagePath,
       audioFileName: input.audioFile.name,
       sizeBytes: file.size,

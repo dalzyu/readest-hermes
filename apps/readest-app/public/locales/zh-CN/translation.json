@@ -1,6 +1,5 @@
 {
   "(detected)": "(检测到)",
-  "About Readest": "关于 Readest",
   "Add your notes here...": "在这里添加您的笔记...",
   "Animation": "动画",
   "Annotate": "笔记",
@@ -24,7 +23,6 @@
   "Delete": "删除",
   "Delete Highlight": "删除划线",
   "Dictionary": "词典",
-  "Download Readest": "下载 Readest",
   "Edit": "编辑",
   "Excerpts": "摘录",
   "Failed to import book(s): {{filenames}}": "导入书籍失败：{{filenames}}",
@@ -364,7 +362,6 @@
   "Cloud Sync Storage": "云同步空间",
   "Disable": "禁用",
   "Enable": "启用",
-  "Upgrade to Readest Premium": "升级到 Readest Premium",
   "Show Source Text": "显示原文",
   "Cross-Platform Sync": "跨平台同步",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "在所有设备间无缝同步您的书库、进度、标注和笔记——再也不会丢失阅读位置。",

@@ -55,6 +55,9 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
   const previousSectionLabelRef = useRef<string | undefined>(undefined);
   const ttsControllerRef = useRef<TTSController | null>(null);
   const isStartingTTSRef = useRef(false);
+  const popupTTSControllerRef = useRef<TTSController | null>(null);
+  const suspendedTTSControllerRef = useRef<TTSController | null>(null);
+  const popupRestoreDoneRef = useRef(true);
   const [ttsController, setTtsController] = useState<TTSController | null>(null);
   const [ttsClientsInited, setTtsClientsInitialized] = useState(false);
 
@@ -139,6 +142,8 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
   useEffect(() => {
     eventDispatcher.on('tts-speak', handleTTSSpeak);
     eventDispatcher.on('tts-stop', handleTTSStop);
+    eventDispatcher.on('tts-popup-speak', handlePopupTTSSpeak);
+    eventDispatcher.on('tts-popup-stop', handlePopupTTSStop);
     eventDispatcher.on('tts-forward', handleTTSForward);
     eventDispatcher.on('tts-backward', handleTTSBackward);
     eventDispatcher.on('tts-toggle-play', handleTTSTogglePlay);
@@ -147,6 +152,8 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     return () => {
       eventDispatcher.off('tts-speak', handleTTSSpeak);
       eventDispatcher.off('tts-stop', handleTTSStop);
+      eventDispatcher.off('tts-popup-speak', handlePopupTTSSpeak);
+      eventDispatcher.off('tts-popup-stop', handlePopupTTSStop);
       eventDispatcher.off('tts-forward', handleTTSForward);
       eventDispatcher.off('tts-backward', handleTTSBackward);
       eventDispatcher.off('tts-toggle-play', handleTTSTogglePlay);
@@ -155,6 +162,10 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       if (ttsControllerRef.current) {
         ttsControllerRef.current.shutdown();
         ttsControllerRef.current = null;
+      }
+      if (popupTTSControllerRef.current) {
+        popupTTSControllerRef.current.shutdown();
+        popupTTSControllerRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -646,6 +657,83 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     } finally {
       isStartingTTSRef.current = false;
     }
+  };
+
+  const restoreSuspendedTTS = async () => {
+    if (popupRestoreDoneRef.current) return;
+    popupRestoreDoneRef.current = true;
+
+    const popupController = popupTTSControllerRef.current;
+    popupTTSControllerRef.current = null;
+    if (popupController) {
+      await popupController.shutdown();
+    }
+
+    const suspendedController = suspendedTTSControllerRef.current;
+    suspendedTTSControllerRef.current = null;
+    if (suspendedController) {
+      await suspendedController.start();
+      setIsPlaying(true);
+      setIsPaused(false);
+      emitPlaybackState('playing');
+    }
+  };
+
+  const handlePopupTTSSpeak = async (event: CustomEvent) => {
+    const {
+      bookKey: ttsBookKey,
+      text,
+      lang = 'en',
+    } = event.detail as {
+      bookKey: string;
+      text?: string;
+      lang?: string;
+    };
+    if (bookKey !== ttsBookKey || !text?.trim()) return;
+
+    const view = getView(bookKey);
+    if (!view) return;
+
+    if (popupTTSControllerRef.current) {
+      await popupTTSControllerRef.current.shutdown();
+      popupTTSControllerRef.current = null;
+    }
+
+    const ambientController = ttsControllerRef.current;
+    if (ambientController) {
+      suspendedTTSControllerRef.current = ambientController;
+      await ambientController.stop();
+      setIsPlaying(false);
+      setIsPaused(true);
+      emitPlaybackState('paused');
+    } else {
+      suspendedTTSControllerRef.current = null;
+    }
+    popupRestoreDoneRef.current = false;
+
+    const popupController = new TTSController(
+      appService,
+      view,
+      !!user?.id,
+      preprocessSSMLForTTS,
+      handleSectionChange,
+    );
+    popupTTSControllerRef.current = popupController;
+    await popupController.init();
+    popupController.setLang(lang);
+    const viewSettings = getViewSettings(bookKey);
+    if (viewSettings) {
+      popupController.setRate(viewSettings.ttsRate);
+    }
+    popupController.speak(genSSMLRaw(text.trim()), true, () => {
+      void restoreSuspendedTTS();
+    });
+  };
+
+  const handlePopupTTSStop = async (event: CustomEvent) => {
+    const { bookKey: ttsBookKey } = event.detail as { bookKey: string };
+    if (bookKey !== ttsBookKey || !popupTTSControllerRef.current) return;
+    await restoreSuspendedTTS();
   };
 
   const handleTTSStop = async (event: CustomEvent) => {

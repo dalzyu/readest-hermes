@@ -30,8 +30,11 @@ function getDicPath(): string {
 export function initJapaneseTokenizer(): Promise<Tokenizer> {
   if (initPromise) return initPromise;
   initPromise = new Promise<Tokenizer>((resolve, reject) => {
-    // Dynamic import avoids pulling kuromoji into SSR bundles
-    import('kuromoji')
+    // Dynamic import avoids pulling kuromoji into SSR bundles.
+    // Variable indirection prevents Vite from resolving at transform time
+    // (kuromoji is an optional runtime dep, not bundled in test/dev).
+    const _pkg = 'kuromoji';
+    import(_pkg)
       .then((kuromoji) => {
         kuromoji.builder({ dicPath: getDicPath() }).build((err: Error | null, tok: Tokenizer) => {
           if (err) {

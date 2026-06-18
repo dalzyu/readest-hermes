@@ -1,6 +1,5 @@
 {
   "(detected)": "(བརྟག་དཔྱད་བྱུང་བ།)",
-  "About Readest": "Readest སྐོར།",
   "Add your notes here...": "འདིར་ཁྱེད་ཀྱི་ཟིན་བྲིས་འདེབས་དང་།...",
   "Animation": "འགུལ་རིས།",
   "Annotate": "ཟིན་བྲིས།",
@@ -24,7 +23,6 @@
   "Delete": "བསུབ་པ།",
   "Delete Highlight": "འོག་ཐིག་བསུབ་པ།",
   "Dictionary": "ཚིག་མཛོད།",
-  "Download Readest": "Readest ཕབ་ལེན།",
   "Edit": "རྩོམ་སྒྲིག",
   "Excerpts": "དྲངས་བཏུས།",
   "Failed to import book(s): {{filenames}}": "དཔེ་དེབ་ནང་འདྲེན་བྱས་མ་ཐུབ། {{filenames}}",
@@ -362,7 +360,6 @@
   "Cloud Sync Storage": "སྤྲི་དོན་སྐད་མཉམ་གྱི་བར་སྟོང་།",
   "Disable": "སྒོ་བརྒྱབ།",
   "Enable": "སྤྱོད་པ།",
-  "Upgrade to Readest Premium": "Readest Premium ལ་རིམ་སྤོར་བྱེད་པ།",
   "Show Source Text": "མགོ་ཡིག་མངོན་པ།",
   "Cross-Platform Sync": "ལས་སྟེགས་བརྒལ་བའི་སྐད་མཉམ།",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "སྒྲིག་ཆས་ཡོད་རྒུའི་བར་དུ་ཁྱེད་ཀྱི་དཔེ་མཛོད། ཡར་འཕེལ། མཚན་སྟོན་དང་ཟིན་བྲིས་བཅས་སྐད་མཉམ་བྱེད་པ།——ཀློག་པའི་གནས་ས་ནམ་ཡང་བོར་མི་སྲིད།",

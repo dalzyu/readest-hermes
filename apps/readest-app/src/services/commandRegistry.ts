@@ -154,6 +154,7 @@ const panelIcons: Record<SettingsPanelType, IconType> = {
   TTS: PiSpeakerHigh,
   Language: RiTranslate,
   AI: PiRobot,
+  'AI Translate': PiRobot,
   Integrations: RiShareLine,
   Custom: IoAccessibilityOutline,
 };
@@ -638,12 +639,12 @@ const actionItems = [
   },
   {
     id: 'action.about',
-    labelKey: _('About Readest'),
+    labelKey: _('About Hermes'),
     keywords: ['about', 'readest', 'version', 'info'],
   },
   {
     id: 'action.telemetry',
-    labelKey: _('Help improve Readest'),
+    labelKey: _('Help improve Hermes'),
     keywords: ['telemetry', 'analytics', 'improve', 'statistics'],
   },
 ];

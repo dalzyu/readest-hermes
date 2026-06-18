@@ -68,10 +68,10 @@ Hermes does not currently maintain separate release channels. Security updates a
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.3.x   | :white_check_mark: |
-| < 0.3   | :x:                |
+| 0.11.x   | :white_check_mark: |
+| < 0.11   | :x:                |
 
-Older 0.1.x releases are unsupported.
+Older 0.10.x releases are unsupported.
 
 ## Reporting a Vulnerability
 

@@ -1,6 +1,5 @@
 {
   "(detected)": "(検出)",
-  "About Readest": "Readestについて",
   "Add your notes here...": "ここにメモを追加...",
   "Animation": "アニメーション",
   "Annotate": "注釈",
@@ -24,7 +23,6 @@
   "Delete": "削除",
   "Delete Highlight": "ハイライトを削除",
   "Dictionary": "辞書",
-  "Download Readest": "Readestをダウンロード",
   "Edit": "編集",
   "Excerpts": "抜粋",
   "Failed to import book(s): {{filenames}}": "書籍のインポートに失敗しました：{{filenames}}",
@@ -363,7 +361,6 @@
   "Cloud Sync Storage": "クラウド同期容量",
   "Disable": "無効にする",
   "Enable": "有効にする",
-  "Upgrade to Readest Premium": "Readest Premiumにアップグレード",
   "Show Source Text": "原文を表示",
   "Cross-Platform Sync": "クロスプラットフォーム同期",
   "Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.": "ライブラリや進捗、メモを全デバイスで同期。",

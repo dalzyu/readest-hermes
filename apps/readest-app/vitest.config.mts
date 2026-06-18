@@ -3,6 +3,10 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
+// jsdom unit tests run as a web environment — override the tauri platform
+// from .env so isTauriAppPlatform() returns false and web code paths
+// (globalThis.fetch, webDownload, IndexedDB fs) are exercised instead of
+// Tauri plugins whose invoke/channel APIs are unavailable in jsdom.
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   resolve: {
@@ -20,7 +24,13 @@ export default defineConfig({
       fflate: path.resolve(__dirname, 'node_modules/fflate'),
     },
   },
+  define: {
+    'process.env.NEXT_PUBLIC_APP_PLATFORM': JSON.stringify('web'),
+  },
   test: {
+    env: {
+      NEXT_PUBLIC_APP_PLATFORM: 'web',
+    },
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     exclude: [

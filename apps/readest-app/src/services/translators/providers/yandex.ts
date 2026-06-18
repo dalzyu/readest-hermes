@@ -1,19 +1,40 @@
-export interface YandexTranslatorConfig {
-  apiKey: string;
-}
+import { normalizeToShortLang } from '@/utils/lang';
 
-export class YandexTranslator {
-  private config: YandexTranslatorConfig;
+export const yandexProvider = {
+  name: 'yandex',
+  label: 'Yandex Translate',
+  authRequired: false,
+  disabled: true,
 
-  constructor(config: YandexTranslatorConfig) {
-    this.config = config;
-  }
+  async translate(texts: string[], sourceLang: string, targetLang: string): Promise<string[]> {
+    if (!texts.length) return [];
 
-  async translate(text: string, _from: string, _to: string): Promise<string> {
-    return text;
-  }
+    const service = 'yandexgpt';
+    const source_lang =
+      sourceLang === 'AUTO' ? 'en' : normalizeToShortLang(sourceLang).toLowerCase();
+    const target_lang = normalizeToShortLang(targetLang).toLowerCase();
+    const lang = `${source_lang}-${target_lang}`;
 
-  isAvailable(): boolean {
-    return !!this.config.apiKey;
-  }
-}
+    const responses = await Promise.all(
+      texts.map(async (text) => {
+        const response = await fetch('https://translate.toil.cc/v2/translate/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lang, service, text }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`${service} failed with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data && Array.isArray(data.translations)) {
+          return data.translations;
+        }
+        return [text];
+      }),
+    );
+
+    return responses.flat();
+  },
+};

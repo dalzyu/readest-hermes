@@ -103,6 +103,18 @@ export function migrateHighlightColorPrefs(read: ReadSettings): void {
   read.userHighlightColors = userColors;
 }
 
+export function migrateContextTranslationSource(settings: SystemSettings): void {
+  const contextTranslation = settings.globalReadSettings?.contextTranslation;
+  const legacySource = contextTranslation?.source;
+  if (!contextTranslation || !legacySource) return;
+
+  contextTranslation.fieldSources = {
+    ...contextTranslation.fieldSources,
+    translation: contextTranslation.fieldSources?.translation ?? legacySource,
+  };
+  delete contextTranslation.source;
+}
+
 export async function loadSettings(ctx: Context): Promise<SystemSettings> {
   const defaultSettings: SystemSettings = {
     ...DEFAULT_SYSTEM_SETTINGS,
@@ -139,6 +151,7 @@ export async function loadSettings(ctx: Context): Promise<SystemSettings> {
     ...settings.globalReadSettings,
   };
   migrateHighlightColorPrefs(settings.globalReadSettings);
+  migrateContextTranslationSource(settings);
   settings.globalViewSettings = {
     ...getDefaultViewSettings(ctx),
     ...settings.globalViewSettings,

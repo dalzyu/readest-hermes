@@ -147,11 +147,22 @@ vi.mock('@/store/settingsStore', () => {
   return { useSettingsStore };
 });
 
-vi.mock('@/store/readerStore', () => ({
-  useReaderStore: () => ({
+vi.mock('@/store/readerStore', () => {
+  const readerStore = {
     bookKeys: state.bookKeys,
+    get viewStates() {
+      return Object.fromEntries(
+        Object.entries(state.viewStateByKey).map(([key, viewState]) => [
+          key,
+          { ...viewState, viewSettings: state.viewSettingsByKey[key] },
+        ]),
+      );
+    },
     getProgress: (key: string) => state.progressByKey[key] ?? null,
-    getViewState: (key: string) => state.viewStateByKey[key] ?? null,
+    getViewState: (key: string) => {
+      const viewState = state.viewStateByKey[key];
+      return viewState ? { ...viewState, viewSettings: state.viewSettingsByKey[key] } : null;
+    },
     getViewSettings: (key: string) => state.viewSettingsByKey[key] ?? null,
     indexingProgress: state.indexingProgress,
     setGridInsets: setGridInsetsMock,
@@ -166,7 +177,16 @@ vi.mock('@/store/readerStore', () => ({
     updateIndexingProgress: vi.fn(),
     finishIndexing: vi.fn(),
     cancelIndexing: vi.fn(),
-  }),
+  };
+  const useReaderStore = <T,>(selector?: (store: typeof readerStore) => T) =>
+    selector ? selector(readerStore) : readerStore;
+  useReaderStore.getState = () => readerStore;
+  return { useReaderStore };
+});
+
+vi.mock('@/store/readerProgressStore', () => ({
+  getBookProgress: (key: string) => state.progressByKey[key] ?? null,
+  useBookProgress: (key: string) => state.progressByKey[key] ?? null,
 }));
 
 vi.mock('@/store/sidebarStore', () => ({
@@ -176,13 +196,17 @@ vi.mock('@/store/sidebarStore', () => ({
   }),
 }));
 
-vi.mock('@/store/bookDataStore', () => ({
-  useBookDataStore: () => ({
+vi.mock('@/store/bookDataStore', () => {
+  const bookDataStore = {
     getConfig: (key: string) => state.configByKey[key] ?? null,
     getBookData: (key: string) => state.bookDataByKey[key] ?? null,
     saveConfig: vi.fn().mockResolvedValue(undefined),
-  }),
-}));
+  };
+  const useBookDataStore = <T,>(selector?: (store: typeof bookDataStore) => T) =>
+    selector ? selector(bookDataStore) : bookDataStore;
+  useBookDataStore.getState = () => bookDataStore;
+  return { useBookDataStore };
+});
 
 vi.mock('@/hooks/useTranslation', () => ({
   useTranslation: () => (value: string) => value,
@@ -199,6 +223,10 @@ vi.mock('@/utils/insets', () => ({
 
 vi.mock('@/app/reader/components/FoliateViewer', () => ({
   default: () => <div data-testid='foliate-viewer' />,
+}));
+
+vi.mock('@/app/reader/components/ReadingStatsTracker', () => ({
+  default: () => null,
 }));
 
 vi.mock('@/app/reader/components/HeaderBar', () => ({
@@ -286,6 +314,7 @@ vi.mock('@/app/reader/hooks/useBooksManager', () => ({
 }));
 
 vi.mock('@/services/environment', () => ({
+  getAPIBaseUrl: () => 'http://localhost',
   isTauriAppPlatform: () => false,
 }));
 

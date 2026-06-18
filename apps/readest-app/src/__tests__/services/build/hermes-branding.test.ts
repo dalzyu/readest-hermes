@@ -6,6 +6,10 @@ const repoRoot = path.resolve(import.meta.dirname, '../../../../../..');
 
 const readRepoFile = (relativePath: string) =>
   fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+const appPackage = JSON.parse(readRepoFile('apps/readest-app/package.json')) as {
+  version: string;
+};
+
 
 describe('Hermes branding copy', () => {
   test('app metadata and user-facing copy use Hermes branding', () => {
@@ -52,7 +56,7 @@ describe('Hermes branding copy', () => {
     const settingsMenu = readRepoFile('apps/readest-app/src/app/library/components/SettingsMenu.tsx');
     const bookMenu = readRepoFile('apps/readest-app/src/app/reader/components/sidebar/BookMenu.tsx');
     const supportLinks = readRepoFile('apps/readest-app/src/components/SupportLinks.tsx');
-    const opdsCatalog = readRepoFile('apps/readest-app/src/app/opds/components/CatelogManager.tsx');
+    const opdsCatalog = readRepoFile('apps/readest-app/src/app/opds/components/CatalogManager.tsx');
     const errorPage = readRepoFile('apps/readest-app/src/app/error.tsx');
     const subscriptionSuccess = readRepoFile('apps/readest-app/src/app/user/subscription/success/page.tsx');
 
@@ -94,7 +98,7 @@ describe('Hermes branding copy', () => {
     expect(security).toContain("outside of Hermes's control");
     expect(security).toContain('Hermes does not currently maintain');
     expect(security).toContain('dalzyu/readest-hermes');
-    expect(security).toContain('0.1.x');
+    expect(security).toContain(`${appPackage.version.split('.').slice(0, 2).join('.')}.x`);
   });
 
   test('no translation file contains stale Readest-branded keys', () => {

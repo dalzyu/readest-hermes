@@ -9,8 +9,24 @@ import { join } from 'path';
 
 describe.concurrent('jieba-wasm', () => {
   beforeAll(async () => {
-    const wasmPath = join(process.cwd(), 'public/vendor/jieba/jieba_rs_wasm_bg.wasm');
-    const wasmBuffer = await readFile(wasmPath);
+    const wasmPaths = [
+      join(process.cwd(), 'public/vendor/jieba/jieba_rs_wasm_bg.wasm'),
+      join(process.cwd(), 'node_modules/jieba-wasm/pkg/web/jieba_rs_wasm_bg.wasm'),
+    ];
+
+    let wasmBuffer: Uint8Array | undefined;
+    for (const wasmPath of wasmPaths) {
+      try {
+        wasmBuffer = await readFile(wasmPath);
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
+
+    if (!wasmBuffer) {
+      throw new Error(`jieba wasm fixture not found in: ${wasmPaths.join(', ')}`);
+    }
     await init({ module_or_path: wasmBuffer });
   });
 
