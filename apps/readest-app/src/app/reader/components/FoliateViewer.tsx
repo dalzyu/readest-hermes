@@ -13,7 +13,7 @@ import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useCustomFontStore } from '@/store/customFontStore';
 import { useParallelViewStore } from '@/store/parallelViewStore';
-import { useMouseEvent, useTouchEvent, useLongPressEvent } from '../hooks/useIframeEvents';
+import { useMouseEvent, useTouchEvent, useOpenMediaEvent } from '../hooks/useIframeEvents';
 import { useBrightnessGesture } from '../hooks/useBrightnessGesture';
 import BrightnessOverlay from './BrightnessOverlay';
 import { usePagination, viewPagination } from '../hooks/usePagination';
@@ -381,7 +381,10 @@ const FoliateViewer: React.FC<{
         detail.doc.addEventListener('keyup', handleKeyup.bind(null, bookKey));
         detail.doc.addEventListener('mousedown', handleMousedown.bind(null, bookKey));
         detail.doc.addEventListener('mouseup', handleMouseup.bind(null, bookKey));
-        detail.doc.addEventListener('click', handleClick.bind(null, bookKey, doubleClickDisabled));
+        detail.doc.addEventListener(
+          'click',
+          handleClick.bind(null, bookKey, doubleClickDisabled, !!bookData?.isFixedLayout),
+        );
         detail.doc.addEventListener('wheel', handleWheel.bind(null, bookKey));
         detail.doc.addEventListener('touchstart', handleTouchStart.bind(null, bookKey));
         detail.doc.addEventListener('touchmove', handleTouchMove.bind(null, bookKey));
@@ -585,7 +588,7 @@ const FoliateViewer: React.FC<{
     setCurrentImageIndex(0);
   }, []);
 
-  useLongPressEvent(bookKey, handleImagePress, handleTablePress);
+  useOpenMediaEvent(bookKey, handleImagePress, handleTablePress);
 
   useFoliateEvents(viewRef.current, {
     onLoad: docLoadHandler,
