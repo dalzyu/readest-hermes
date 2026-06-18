@@ -93,7 +93,7 @@ interface OPDSSubject {
   scheme?: string;
 }
 
-interface OPDSContent {
+export interface OPDSContent {
   value: string;
   type: 'text' | 'html' | 'xhtml';
 }
