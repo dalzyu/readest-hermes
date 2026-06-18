@@ -6,7 +6,14 @@ import { useReaderStore } from '@/store/readerStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { getOSPlatform } from '@/utils/misc';
 import { eventDispatcher } from '@/utils/event';
-import { isPointerInsideSelection, Point, TextSelection } from '@/utils/sel';
+import {
+  isHyphenHandleBugProneRange,
+  isPointerInsideSelection,
+  Point,
+  rangeFromAnchorToPoint,
+  repairJumpedSelectionRange,
+  TextSelection,
+} from '@/utils/sel';
 import { useInstantAnnotation } from './useInstantAnnotation';
 
 const ZERO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -136,6 +143,30 @@ export const useTextSelector = (
   // native touchmove). One of the engagement signals alongside the caret.
   const pointerPos = useRef<{ x: number; y: number } | null>(null);
 
+  // Android hyphen selection-bounds bug (#1553): the selection anchor captured
+  // at the first selectionchange of a touch gesture, plus whether that initial
+  // range is prone to the bug (starts at the first word of a hyphenated
+  // paragraph). Evaluated once per gesture.
+  const gestureInitialRef = useRef<{ node: Node; offset: number; prone: boolean } | null>(null);
+  // While we mutate the DOM selection ourselves (handle suppression, custom
+  // handle drags), selectionchange events are echoes of our own writes —
+  // handleSelectionchange must ignore them. Cleared on a delay because
+  // selectionchange dispatches a task after the mutation.
+  const programmaticSelectionRef = useRef(false);
+  const programmaticClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const guardProgrammaticSelection = () => {
+    if (programmaticClearTimer.current) clearTimeout(programmaticClearTimer.current);
+    programmaticSelectionRef.current = true;
+  };
+
+  const releaseProgrammaticSelection = () => {
+    if (programmaticClearTimer.current) clearTimeout(programmaticClearTimer.current);
+    programmaticClearTimer.current = setTimeout(() => {
+      programmaticSelectionRef.current = false;
+    }, 150);
+  };
+
   const {
     isInstantAnnotationEnabled,
     handleInstantAnnotationPointerDown,
@@ -154,7 +185,12 @@ export const useTextSelector = (
     return sel && sel.toString().trim().length > 0 && sel.rangeCount > 0;
   };
 
-  const makeSelection = async (sel: Selection, index: number, rebuildRange = false) => {
+  const makeSelection = async (
+    sel: Selection,
+    index: number,
+    rebuildRange = false,
+    handlesSuppressed = false,
+  ) => {
     isTextSelected.current = true;
     const range = sel.getRangeAt(0);
     if (rebuildRange) {
@@ -169,6 +205,7 @@ export const useTextSelector = (
       page: bookData?.isFixedLayout ? index + 1 : progress?.page || 0,
       range,
       index,
+      handlesSuppressed,
     });
   };
 
@@ -277,6 +314,87 @@ export const useTextSelector = (
     }
   };
 
+  // Android (#1553): when a touch selection starts on the first word of a
+  // hyphenated paragraph, Blink paints the start handle on the paragraph's
+  // last hyphen and drag gestures re-anchor the selection base there. At
+  // gesture end: restore the intended range if the anchor jumped, then clear
+  // and re-add the selection through the Selection API — a selection that goes
+  // empty for one painted frame loses its touch-handle visibility, so the
+  // broken native handles disappear (the app's own handles take over) while
+  // the highlight stays.
+  const sanitizedGestureRef = useRef(false);
+  const sanitizeAndroidHyphenSelection = async (doc: Document, index: number) => {
+    if (sanitizedGestureRef.current) return;
+    const sel = doc.getSelection();
+    const win = doc.defaultView;
+    if (!sel || !win || !isValidSelection(sel)) return;
+    // Only act when THIS gesture produced a selection — a tap that merely
+    // dismisses an existing selection must not re-assert it here.
+    const initial = gestureInitialRef.current;
+    if (!initial) return;
+    const viewSettings = getViewSettings(bookKey);
+    // The initial range is prone (long-press on the first word), or the
+    // gesture dragged the selection start back onto a hyphenated paragraph
+    // start (upward selection) — either way the painted start bound is bogus.
+    const prone =
+      initial.prone || isHyphenHandleBugProneRange(sel.getRangeAt(0), viewSettings?.vertical);
+    if (!prone) return;
+    sanitizedGestureRef.current = true;
+    let finalRange = sel.getRangeAt(0);
+    if (initial.prone) {
+      // The corrupted drag can leave EITHER selection end at the bogus bound
+      // (base re-anchor or extent overshoot). The trustworthy facts are the
+      // gesture-initial anchor and the finger position (pointerPos, reset at
+      // touchstart and fed by native touchmove): rebuild between those when
+      // the gesture moved; otherwise fall back to the anchor-jump repair.
+      const p = pointerPos.current;
+      const feRect = win.frameElement?.getBoundingClientRect();
+      const clamped = p
+        ? rangeFromAnchorToPoint(
+            doc,
+            initial.node,
+            initial.offset,
+            p.x - (feRect?.left ?? 0),
+            p.y - (feRect?.top ?? 0),
+          )
+        : null;
+      const repaired = clamped ?? repairJumpedSelectionRange(sel, initial.node, initial.offset);
+      if (repaired) finalRange = repaired;
+    }
+    guardProgrammaticSelection();
+    sel.removeAllRanges();
+    await new Promise<void>((resolve) =>
+      win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve())),
+    );
+    // A competing gesture may have touched the selection while we waited —
+    // e.g. a tap collapses the old selection to a caret at the tapped point,
+    // which can also mutate `finalRange` in place. Re-asserting then would
+    // resurrect a stale (or collapsed) selection, so bail out instead.
+    if (sel.rangeCount > 0 || finalRange.collapsed) {
+      releaseProgrammaticSelection();
+      return;
+    }
+    sel.addRange(finalRange);
+    releaseProgrammaticSelection();
+    await makeSelection(sel, index, false, true);
+  };
+
+  // Replace the live DOM selection from the custom selection handles. Guarded
+  // so the resulting selectionchange echoes are ignored; a commit refreshes
+  // the selection state (and thus the popup) once the drag ends.
+  const applyProgrammaticSelection = async (range: Range, index: number, commit: boolean) => {
+    const doc = range.startContainer.ownerDocument;
+    const sel = doc?.getSelection();
+    if (!doc || !sel) return;
+    guardProgrammaticSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    if (commit) {
+      releaseProgrammaticSelection();
+      await makeSelection(sel, index, false, true);
+    }
+  };
+
   const handlePointerUp = async (doc: Document, index: number, ev?: PointerEvent) => {
     if (isInstantAnnotating.current && ev) {
       stopInstantAnnotating(ev);
@@ -316,9 +434,18 @@ export const useTextSelector = (
         isUpToPopup.current = false;
       }
     }
+
+    if (osPlatform === 'android' && appService?.isAndroidApp) {
+      await sanitizeAndroidHyphenSelection(doc, index);
+    }
   };
   const handleTouchStart = () => {
     isTouchStarted.current = true;
+    gestureInitialRef.current = null;
+    sanitizedGestureRef.current = false;
+    // Pointer positions are per-gesture: a stale point from a previous touch
+    // must not steer this gesture's selection repair. Touch moves re-feed it.
+    pointerPos.current = null;
   };
   const handleTouchMove = (ev: TouchEvent) => {
     if (isInstantAnnotating.current) {
@@ -391,6 +518,10 @@ export const useTextSelector = (
   };
 
   const handleSelectionchange = (doc: Document, index: number) => {
+    // Echo of our own programmatic selection writes (handle suppression or a
+    // custom-handle drag) — not user input.
+    if (programmaticSelectionRef.current) return;
+
     // Available on iOS, Android and Desktop, fired when the selection is changed.
     // On Android native app, this is the primary way to detect text selection.
     // On web with touch/pen in scroll mode, pointerup never fires (pointercancel
@@ -400,6 +531,17 @@ export const useTextSelector = (
     const isTouchInput = lastPointerType.current === 'touch' || lastPointerType.current === 'pen';
     const sel = doc.getSelection() as Selection;
     const viewSettings = getViewSettings(bookKey);
+
+    // First selection of an Android touch gesture: remember the anchor and
+    // whether it is prone to the hyphen bounds bug (#1553), before any
+    // drag-extension can corrupt it.
+    if (isAndroid && !gestureInitialRef.current && isValidSelection(sel) && sel.anchorNode) {
+      gestureInitialRef.current = {
+        node: sel.anchorNode,
+        offset: sel.anchorOffset,
+        prone: isHyphenHandleBugProneRange(sel.getRangeAt(0), viewSettings?.vertical),
+      };
+    }
 
     // Auto page-turn (#1354): the selection caret is one of the engagement
     // signals on every platform (and the only one on Android during a native
@@ -520,5 +662,6 @@ export const useTextSelector = (
     handleShowPopup,
     handleUpToPopup,
     handleContextmenu,
+    applyProgrammaticSelection,
   };
 };
