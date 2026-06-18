@@ -8,6 +8,7 @@ export interface TranslateWithUpstreamInput {
   preferred?: TranslatorName;
   token?: string | null;
   useCache?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface TranslateWithUpstreamResult {
@@ -32,7 +33,11 @@ export async function translateWithUpstream({
   preferred,
   token,
   useCache = true,
+  signal,
 }: TranslateWithUpstreamInput): Promise<TranslateWithUpstreamResult> {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
   const input = text.trim();
   if (!input) {
     return { text: '', providerUsed: null };
@@ -54,6 +59,9 @@ export async function translateWithUpstream({
   }
 
   for (const providerName of orderedNames) {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
     const translator = translators.find((entry) => entry.name === providerName);
     if (!translator) continue;
     if (!isTranslatorAvailable(translator, hasToken)) continue;

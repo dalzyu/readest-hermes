@@ -7,11 +7,11 @@ const LookupTab: React.FC = () => {
   const _ = useTranslation();
   const { settings, setSettings } = useSettingsStore();
   const lookup = normalizeLookupSettings(settings.globalReadSettings?.lookup);
-  const LABELS: Record<string, string> = {
+  const LABELS = {
     showExamples: _('Show examples'),
     showGrammarHints: _('Show grammar hints'),
     showFrequencyBadges: _('Show frequency badges'),
-  };
+  } as const;
   const update = (patch: Partial<typeof lookup>) => {
     setSettings({
       ...settings,
@@ -43,7 +43,7 @@ const LookupTab: React.FC = () => {
       </label>
       {(['showExamples', 'showGrammarHints', 'showFrequencyBadges'] as const).map((key) => (
         <label key={key} className='flex items-center justify-between gap-3'>
-          <span>{LABELS[key as keyof typeof LABELS]}</span>
+          <span>{LABELS[key]}</span>
           <input
             type='checkbox'
             className='toggle'

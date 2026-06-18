@@ -29,13 +29,16 @@ const QuizPanel: React.FC<QuizPanelProps> = ({ bookHash, initialMode = 'vocabula
     };
     void load();
   }, [bookHash, mode]);
-  const handleReviewed = async (grade: 'good' | 'again') => {
-    const current = entries[0];
-    if (!current) return;
-    await markVocabularyEntryReviewed(current, grade);
-    setEntries((prev) => prev.slice(1));
-    setAnswerVisible(false);
-  };
+  const handleReviewed = React.useCallback(
+    async (grade: 'good' | 'again') => {
+      const current = entries[0];
+      if (!current) return;
+      await markVocabularyEntryReviewed(current, grade);
+      setEntries((prev) => (prev[0]?.id === current.id ? prev.slice(1) : prev));
+      setAnswerVisible(false);
+    },
+    [entries],
+  );
 
   const current = entries[0];
   return (

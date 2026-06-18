@@ -39,7 +39,7 @@ export async function lookup(request: LookupRequest): Promise<LookupResult> {
     useSettingsStore.getState().settings?.globalReadSettings?.dictionary?.dictionaries ?? [];
   const lookupSettings = useSettingsStore.getState().settings?.globalReadSettings?.lookup;
 
-  if (request.signal?.aborted) throw new Error('Aborted');
+  if (request.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   let translation: string | undefined;
   if (request.mode === 'translation') {
     const { translateWithUpstream } = await import('./translatorService');
@@ -49,8 +49,9 @@ export async function lookup(request: LookupRequest): Promise<LookupResult> {
       preferred: lookupSettings?.translatorProvider,
       targetLang: request.targetLanguage,
       useCache: true,
+      signal: request.signal,
     });
-    if (request.signal?.aborted) throw new Error('Aborted');
+    if (request.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     translation = translated.text || undefined;
     if (translation) provenance.translation = 'translator';
   }
@@ -59,10 +60,12 @@ export async function lookup(request: LookupRequest): Promise<LookupResult> {
     dictionaryEntries = (
       await lookupDefinitions(term, sourceLanguage, request.targetLanguage, installedDictionaries, {
         maxMatchTier: 4,
+        signal: request.signal,
       })
     ).map(normalizeDictionaryEntry);
     if (dictionaryEntries.length > 0) provenance.dictionary = 'dictionary';
-  } catch {
+  } catch (error) {
+    if ((error as { name?: string })?.name === 'AbortError') throw error;
     dictionaryEntries = [];
   }
   if (request.signal?.aborted) throw new Error('Aborted');

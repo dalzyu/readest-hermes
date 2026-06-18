@@ -86,6 +86,7 @@ type MatchResult = {
 
 export type DictionaryLookupOptions = {
   maxMatchTier?: MatchTier;
+  signal?: AbortSignal;
 };
 
 function findMatchesWithTier(entries: DictionaryEntry[], text: string): MatchResult {
@@ -415,7 +416,9 @@ export async function lookupDefinitions(
   options: DictionaryLookupOptions = {},
 ): Promise<DictionaryEntry[]> {
   if (!text) return [];
-
+  if (options.signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
   const searchTerms = await buildDictionarySearchTerms(text, sourceLang);
 
   const MAX_RESULTS = 3;

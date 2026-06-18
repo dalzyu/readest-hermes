@@ -3,7 +3,7 @@ import { RiRobot2Line, RiVolumeUpLine } from 'react-icons/ri';
 import Popup from '@/components/Popup';
 import { useLearningLookup } from '@/hooks/useLearningLookup';
 import type { LookupMode } from '@/services/learning/types';
-import type { LookupSettings } from '@/services/learning/settings';
+import type { PopupContextBundle, TranslationResult } from '@/services/learning/types';
 import type { Position } from '@/utils/sel';
 import { useOpenAIInNotebook } from '../../hooks/useOpenAIInNotebook';
 import { buildAskAboutThisMessage } from './LookupPopupUtils';
@@ -47,10 +47,7 @@ const LearningLookupPopup: React.FC<LearningLookupPopupProps> = ({
     selectedText,
     mode,
   });
-  const lookupSettings = useSettingsStore(
-    (state: { settings: { globalReadSettings?: { lookup?: LookupSettings } } }) =>
-      state.settings.globalReadSettings?.lookup,
-  );
+  const lookupSettings = useSettingsStore((state) => state.settings.globalReadSettings?.lookup);
   const [saved, setSaved] = React.useState(false);
   const { openAIInNotebook } = useOpenAIInNotebook();
   const { getBookData } = useBookDataStore();
@@ -110,7 +107,9 @@ const LearningLookupPopup: React.FC<LearningLookupPopupProps> = ({
         {error ? (
           <div className='bg-error/10 text-error rounded-md p-2 text-sm'>
             {error}
-            <button type='button' className='ml-2 underline' onClick={retry}></button>
+            <button type='button' className='ml-2 underline' onClick={retry}>
+              Retry
+            </button>
           </div>
         ) : null}
 
@@ -166,7 +165,31 @@ const LearningLookupPopup: React.FC<LearningLookupPopupProps> = ({
             className='btn btn-ghost btn-sm'
             disabled={!result}
             onClick={() => {
-              const prompt = buildAskAboutThisMessage(selectedText, result as never, {} as never);
+              if (!result) return;
+              const translationResult: TranslationResult = {
+                translation: result.translation ?? '',
+                grammarHint: result.grammarHint ?? '',
+                phonetic: result.phonetic ?? '',
+              };
+              const popupContext: PopupContextBundle = {
+                localPastContext: '',
+                localFutureBuffer: '',
+                sameBookChunks: [],
+                priorVolumeChunks: [],
+                retrievalStatus: 'idle',
+                retrievalHints: {
+                  currentVolumeIndexed: false,
+                  missingLocalIndex: true,
+                  missingPriorVolumes: [],
+                  missingSeriesAssignment: true,
+                },
+                dictionaryEntries: result.dictionaryEntries.map((entry) => entry.definition),
+              };
+              const prompt = buildAskAboutThisMessage(
+                selectedText,
+                translationResult,
+                popupContext,
+              );
               void openAIInNotebook({
                 bookHash,
                 newConversationTitle: `About "${selectedText}"`,
