@@ -5,7 +5,7 @@ local UIManager = require("ui/uimanager")
 local logger = require("logger")
 local sha2 = require("ffi/sha2")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("i18n")
 
 local SyncAnnotations = {}
 
@@ -179,6 +179,11 @@ function SyncAnnotations:push(ui, settings, client, interactive, full_sync)
             if success then
                 settings.last_notes_sync_at = os.time() * 1000
                 G_reader_settings:saveSetting("readest_sync", settings)
+                if ui.doc_settings then
+                    local doc_readest_sync = ui.doc_settings:readSetting("readest_sync") or {}
+                    doc_readest_sync.last_synced_at_notes = os.time()
+                    ui.doc_settings:saveSetting("readest_sync", doc_readest_sync)
+                end
             end
         end
     )
@@ -209,11 +214,19 @@ function SyncAnnotations:pull(ui, settings, client, book_hash, meta_hash, dialog
             book = book_hash,
             meta_hash = meta_hash,
         },
-        function(success, response)
+        function(success, response, status)
             if not success then
+                -- Treat HTTP 401/403 as auth failure regardless of body shape
+                -- so a future server tweak to the error string doesn't
+                -- silently turn relogin into "Failed to pull annotations"
+                -- noise (codex round 1 finding 15).
+                local is_auth_fail = status == 401 or status == 403
+                    or (response and response.error == "Not authenticated")
                 if interactive then
                     UIManager:show(InfoMessage:new{
-                        text = _("Failed to pull annotations"),
+                        text = is_auth_fail
+                            and _("Authentication failed, please login again")
+                            or _("Failed to pull annotations"),
                         timeout = 2,
                     })
                 end
@@ -287,6 +300,10 @@ function SyncAnnotations:pull(ui, settings, client, book_hash, meta_hash, dialog
 
                 -- Resolve KOReader page number from xpointer
                 local pageno = ui.document:getPageFromXPointer(xp0) or note.page
+                -- Resolve chapter title so downstream tools can group by chapter,
+                -- matching native KOReader highlight creation behavior.
+                local chapter = ui.toc and ui.toc:getTocTitleByPage(xp0) or nil
+                if chapter == "" then chapter = nil end
 
                 if note_type == "bookmark" then
                     if existing_bookmarks[xp0] then goto continue end
@@ -296,6 +313,7 @@ function SyncAnnotations:pull(ui, settings, client, book_hash, meta_hash, dialog
                         page = xp0,
                         text = note.text or "",
                         note = note.note or "",
+                        chapter = chapter,
                         pageno = pageno,
                         datetime = datetime_str,
                         datetime_updated = datetime_updated_str,
@@ -322,6 +340,7 @@ function SyncAnnotations:pull(ui, settings, client, book_hash, meta_hash, dialog
                         note = note.note or "",
                         drawer = drawer,
                         color = READEST_TO_KO_COLOR[note.color] or "yellow",
+                        chapter = chapter,
                         pageno = pageno,
                         datetime = datetime_str,
                         datetime_updated = datetime_updated_str,
@@ -339,6 +358,11 @@ function SyncAnnotations:pull(ui, settings, client, book_hash, meta_hash, dialog
 
             settings.last_notes_sync_at = os.time() * 1000
             G_reader_settings:saveSetting("readest_sync", settings)
+            if ui.doc_settings then
+                local doc_readest_sync = ui.doc_settings:readSetting("readest_sync") or {}
+                doc_readest_sync.last_synced_at_notes = os.time()
+                ui.doc_settings:saveSetting("readest_sync", doc_readest_sync)
+            end
 
             if interactive then
                 UIManager:show(InfoMessage:new{
