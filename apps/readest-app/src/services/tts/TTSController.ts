@@ -194,13 +194,30 @@ export class TTSController extends EventTarget {
       doc,
       textWalker,
       createRejectFilter({
-        tags: ['rt'],
+        tags: ['rt', 'canvas', 'br'],
+        // Footnotes/endnotes are hidden in the rendered page (see the
+        // `.epubtype-footnote`/`aside[epub|type]` rules in getPageLayoutStyles);
+        // skip them in TTS too, including for background sections whose
+        // documents are loaded without those styles.
+        classes: [
+          'annotationLayer',
+          'epubtype-footnote',
+          'duokan-footnote-content',
+          'duokan-footnote-item',
+        ],
+        attributeTokens: [
+          {
+            tag: 'aside',
+            attribute: 'epub:type',
+            tokens: ['footnote', 'endnote', 'note', 'rearnote'],
+          },
+        ],
         contents: [{ tag: 'a', content: /^[\[\(]?[\*\d]+[\)\]]?$/ }],
       }),
       this.#getHighlighter(),
       granularity,
     );
-    console.log(`Initialized TTS for section ${sectionIndex}`);
+    console.log(`[TTS] Initialized TTS for section ${sectionIndex}`);
 
     return true;
   }
@@ -314,7 +331,7 @@ export class TTSController extends EventTarget {
 
     this.#currentSpeakPromise = new Promise(async (resolve, reject) => {
       try {
-        console.log('TTS speak');
+        console.log('[TTS] speak');
         this.state = 'playing';
 
         signal.addEventListener('abort', () => {
@@ -324,18 +341,16 @@ export class TTSController extends EventTarget {
         ssml = await this.#preprocessSSML(await ssml);
         if (!ssml) {
           this.#nossmlCnt++;
-          // Detect end-of-book: if there is no next section, stop cleanly rather
-          // than burning through ten empty cycles.
-          if (this.state === 'playing' && !oneTime) {
+          // FIXME: in case we are at the end of the book, need a better way to handle this
+          if (this.#nossmlCnt < 10 && this.state === 'playing' && !oneTime) {
             resolve();
-            const hasNext = await this.#initTTSForNextSection();
-            if (hasNext) {
+            if (await this.#initTTSForNextSection()) {
               await this.forward();
             } else {
               await this.stop();
             }
           }
-          console.log('no SSML, skipping for', this.#nossmlCnt);
+          console.log('[TTS] no SSML, skipping for', this.#nossmlCnt);
           return;
         } else {
           this.#nossmlCnt = 0;
@@ -408,7 +423,12 @@ export class TTSController extends EventTarget {
 
   async start() {
     await this.initViewTTS();
-    const ssml = this.state.includes('paused') ? this.view.tts?.resume() : this.view.tts?.start();
+    // Always resume from the current list position instead of calling tts.start().
+    // tts.start() resets the TTS list to position 0 (section beginning), which is
+    // wrong when state transiently becomes 'stopped' during forward()/backward()
+    // — a fast play tap in that window would otherwise jump back to section start.
+    // tts.resume() falls back to tts.next() on a fresh TTS, so it's safe at init.
+    const ssml = this.view.tts?.resume();
     if (this.state.includes('paused')) {
       this.resume();
     }
@@ -554,6 +574,16 @@ export class TTSController extends EventTarget {
   }
 
   error(e: unknown) {
+    // AbortError is expected during normal stop/restart cycles (rate change,
+    // forward/backward, voice change) — on iOS especially, the in-flight
+    // audio.play() promise rejects with AbortError after audio.src is reset,
+    // and that rejection can leak through one of the .catch chains. Letting it
+    // flip state to 'stopped' desyncs the state machine: handleSetRate's
+    // `state === 'playing'` check then falls through to a no-op, and #speak's
+    // auto-forward gate skips advancing to the next paragraph.
+    if (e instanceof Error && (e.name === 'AbortError' || e.message === 'Aborted')) {
+      return;
+    }
     console.error(e);
     this.state = 'stopped';
   }
