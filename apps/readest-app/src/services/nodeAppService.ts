@@ -11,6 +11,7 @@ import { BaseAppService } from './appService';
 import {
   DATA_SUBDIR,
   LOCAL_BOOKS_SUBDIR,
+  LOCAL_DICTIONARIES_SUBDIR,
   LOCAL_FONTS_SUBDIR,
   LOCAL_IMAGES_SUBDIR,
 } from './constants';
@@ -99,7 +100,14 @@ const getPathResolver = ({ customRootDir }: { customRootDir?: string } = {}) => 
   const isCustomBaseDir = Boolean(customRootDir);
   const getCustomBasePrefix = isCustomBaseDir
     ? (base: BaseDir) => {
-        const dataDirs: BaseDir[] = ['Settings', 'Data', 'Books', 'Fonts', 'Images'];
+        const dataDirs: BaseDir[] = [
+          'Settings',
+          'Data',
+          'Books',
+          'Fonts',
+          'Images',
+          'Dictionaries',
+        ];
         const leafDir = dataDirs.includes(base) ? '' : base;
         return leafDir ? `${customRootDir}/${leafDir}` : customRootDir!;
       }
@@ -165,6 +173,15 @@ const getPathResolver = ({ customRootDir }: { customRootDir?: string } = {}) => 
             : `${LOCAL_IMAGES_SUBDIR}${fp ? `/${fp}` : ''}`,
           base,
         };
+      case 'Dictionaries':
+        return {
+          baseDir: 0,
+          basePrefix: async () => custom ?? getAppDataDir(),
+          fp: custom
+            ? `${custom}/${LOCAL_DICTIONARIES_SUBDIR}${fp ? `/${fp}` : ''}`
+            : `${LOCAL_DICTIONARIES_SUBDIR}${fp ? `/${fp}` : ''}`,
+          base,
+        };
       case 'None':
         return {
           baseDir: 0,
@@ -187,7 +204,7 @@ const getPathResolver = ({ customRootDir }: { customRootDir?: string } = {}) => 
 // Resolve an fp from resolvePath to an absolute path.
 // When customRootDir is set, fp is already absolute; otherwise join with the base prefix.
 async function toAbsolute(resolved: ResolvedPath): Promise<string> {
-  if (nodePath.isAbsolute(resolved.fp)) return nodePath.normalize(resolved.fp);
+  if (nodePath.isAbsolute(resolved.fp)) return resolved.fp;
   const prefix = (await resolved.basePrefix()).replace(/\/+$/, '');
   return resolved.fp ? nodePath.join(prefix, resolved.fp) : prefix;
 }
@@ -219,10 +236,16 @@ export const nodeFileSystem: FileSystem = {
     return new File([buffer], fileName);
   },
 
-  async copyFile(srcPath: string, dstPath: string, base: BaseDir): Promise<void> {
-    const fullDst = await toAbsolute(this.resolvePath(dstPath, base));
+  async copyFile(
+    srcPath: string,
+    srcBase: BaseDir,
+    dstPath: string,
+    dstBase: BaseDir,
+  ): Promise<void> {
+    const fullSrc = await toAbsolute(this.resolvePath(srcPath, srcBase));
+    const fullDst = await toAbsolute(this.resolvePath(dstPath, dstBase));
     await fsp.mkdir(nodePath.dirname(fullDst), { recursive: true });
-    await fsp.copyFile(srcPath, fullDst);
+    await fsp.copyFile(fullSrc, fullDst);
   },
 
   async readFile(
@@ -344,12 +367,6 @@ export class NodeAppService extends BaseAppService {
     return this.fs.resolvePath(fp, base);
   }
 
-  // Override to ensure native path separators on all platforms (especially Windows).
-  override async resolveFilePath(fp: string, base: BaseDir): Promise<string> {
-    const prefix = await this.fs.getPrefix(base);
-    return fp ? nodePath.join(prefix, fp) : prefix;
-  }
-
   async init(): Promise<void> {
     await this.prepareBooksDir();
   }
@@ -369,15 +386,20 @@ export class NodeAppService extends BaseAppService {
 
   async saveFile(
     _filename: string,
-    content: string | ArrayBuffer,
-    options?: { filePath?: string; mimeType?: string },
+    content: string | ArrayBuffer | null,
+    options?: {
+      filePath?: string;
+      mimeType?: string;
+      share?: boolean;
+      sharePosition?: { x: number; y: number; preferredEdge?: 'top' | 'bottom' | 'left' | 'right' };
+    },
   ): Promise<boolean> {
     try {
       const filepath = options?.filePath ?? '';
       await fsp.mkdir(nodePath.dirname(filepath), { recursive: true });
       if (typeof content === 'string') {
         await fsp.writeFile(filepath, content, 'utf-8');
-      } else {
+      } else if (content) {
         await fsp.writeFile(filepath, Buffer.from(content));
       }
       return true;
