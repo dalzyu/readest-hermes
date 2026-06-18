@@ -36,6 +36,10 @@ export class TTSController extends EventTarget {
 
   #ttsSectionIndex: number = -1;
 
+  // Monotonic counter for the canonical 'tts-position' event so downstream
+  // consumers (paragraph mode, RSVP) can drop out-of-order positions.
+  #positionSequence: number = 0;
+
   // Word-level highlight state for the currently spoken chunk. Armed by a
   // successful dispatchSpeakMark, populated by prepareSpeakWords when a TTS
   // client has word-boundary metadata for the chunk.
@@ -214,13 +218,30 @@ export class TTSController extends EventTarget {
       doc,
       textWalker,
       createRejectFilter({
-        tags: ['rt'],
+        tags: ['rt', 'canvas', 'br'],
+        // Footnotes/endnotes are hidden in the rendered page (see the
+        // `.epubtype-footnote`/`aside[epub|type]` rules in getPageLayoutStyles);
+        // skip them in TTS too, including for background sections whose
+        // documents are loaded without those styles.
+        classes: [
+          'annotationLayer',
+          'epubtype-footnote',
+          'duokan-footnote-content',
+          'duokan-footnote-item',
+        ],
+        attributeTokens: [
+          {
+            tag: 'aside',
+            attribute: 'epub:type',
+            tokens: ['footnote', 'endnote', 'note', 'rearnote'],
+          },
+        ],
         contents: [{ tag: 'a', content: /^[\[\(]?[\*\d]+[\)\]]?$/ }],
       }),
       this.#getHighlighter(),
       granularity,
     );
-    console.log(`Initialized TTS for section ${sectionIndex}`);
+    console.log(`[TTS] Initialized TTS for section ${sectionIndex}`);
 
     return true;
   }
@@ -334,7 +355,7 @@ export class TTSController extends EventTarget {
 
     this.#currentSpeakPromise = new Promise(async (resolve, reject) => {
       try {
-        console.log('TTS speak');
+        console.log('[TTS] speak');
         this.state = 'playing';
 
         signal.addEventListener('abort', () => {
@@ -344,18 +365,16 @@ export class TTSController extends EventTarget {
         ssml = await this.#preprocessSSML(await ssml);
         if (!ssml) {
           this.#nossmlCnt++;
-          // Detect end-of-book: if there is no next section, stop cleanly rather
-          // than burning through ten empty cycles.
-          if (this.state === 'playing' && !oneTime) {
+          // FIXME: in case we are at the end of the book, need a better way to handle this
+          if (this.#nossmlCnt < 10 && this.state === 'playing' && !oneTime) {
             resolve();
-            const hasNext = await this.#initTTSForNextSection();
-            if (hasNext) {
+            if (await this.#initTTSForNextSection()) {
               await this.forward();
             } else {
               await this.stop();
             }
           }
-          console.log('no SSML, skipping for', this.#nossmlCnt);
+          console.log('[TTS] no SSML, skipping for', this.#nossmlCnt);
           return;
         } else {
           this.#nossmlCnt = 0;
@@ -428,7 +447,12 @@ export class TTSController extends EventTarget {
 
   async start() {
     await this.initViewTTS();
-    const ssml = this.state.includes('paused') ? this.view.tts?.resume() : this.view.tts?.start();
+    // Always resume from the current list position instead of calling tts.start().
+    // tts.start() resets the TTS list to position 0 (section beginning), which is
+    // wrong when state transiently becomes 'stopped' during forward()/backward()
+    // — a fast play tap in that window would otherwise jump back to section start.
+    // tts.resume() falls back to tts.next() on a fresh TTS, so it's safe at init.
+    const ssml = this.view.tts?.resume();
     if (this.state.includes('paused')) {
       this.resume();
     }
@@ -562,6 +586,35 @@ export class TTSController extends EventTarget {
     this.ttsTargetLang = lang;
   }
 
+  getSpokenSentence(): { cfi: string; text: string } | null {
+    const range = this.view.tts?.getLastRange();
+    if (!range || this.#ttsSectionIndex < 0) return null;
+    try {
+      const cfi = this.view.getCFI(this.#ttsSectionIndex, range);
+      const text = range.toString().trim();
+      if (!cfi || !text) return null;
+      return { cfi, text };
+    } catch {
+      return null;
+    }
+  }
+
+  // Canonical position signal emitted from the same paths as
+  // tts-highlight-mark / tts-highlight-word. The controller is the source of
+  // truth (it owns the section index and current word/sentence CFI).
+  #dispatchPosition(cfi: string, kind: 'word' | 'sentence') {
+    this.dispatchEvent(
+      new CustomEvent('tts-position', {
+        detail: {
+          cfi,
+          kind,
+          sectionIndex: this.#ttsSectionIndex,
+          sequence: ++this.#positionSequence,
+        },
+      }),
+    );
+  }
+
   dispatchSpeakMark(mark?: TTSMark) {
     this.#resetSpeakWords();
     this.dispatchEvent(new CustomEvent('tts-speak-mark', { detail: mark || { text: '' } }));
@@ -577,6 +630,7 @@ export class TTSController extends EventTarget {
         this.#speakWordsArmed = !!range;
         const cfi = this.view.getCFI(this.#ttsSectionIndex, range);
         this.dispatchEvent(new CustomEvent('tts-highlight-mark', { detail: { cfi } }));
+        this.#dispatchPosition(cfi, 'sentence');
       } catch {
         this.#suppressMarkHighlight = false;
       }
@@ -664,12 +718,23 @@ export class TTSController extends EventTarget {
         const cfi = this.view.getCFI(this.#ttsSectionIndex, range);
         if (cfi) {
           this.dispatchEvent(new CustomEvent('tts-highlight-word', { detail: { cfi } }));
+          this.#dispatchPosition(cfi, 'word');
         }
       } catch {}
     }
   }
 
   error(e: unknown) {
+    // AbortError is expected during normal stop/restart cycles (rate change,
+    // forward/backward, voice change) — on iOS especially, the in-flight
+    // audio.play() promise rejects with AbortError after audio.src is reset,
+    // and that rejection can leak through one of the .catch chains. Letting it
+    // flip state to 'stopped' desyncs the state machine: handleSetRate's
+    // `state === 'playing'` check then falls through to a no-op, and #speak's
+    // auto-forward gate skips advancing to the next paragraph.
+    if (e instanceof Error && (e.name === 'AbortError' || e.message === 'Aborted')) {
+      return;
+    }
     console.error(e);
     this.state = 'stopped';
   }

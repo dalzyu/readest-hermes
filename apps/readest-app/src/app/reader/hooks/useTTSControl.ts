@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useReaderStore } from '@/store/readerStore';
+import { useBookProgress } from '@/store/readerProgressStore';
 import { useProofreadStore } from '@/store/proofreadStore';
 import { TransformContext } from '@/services/transformers/types';
 import { proofreadTransformer } from '@/services/transformers/proofread';
@@ -30,9 +31,12 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
   const { appService } = useEnv();
   const { user } = useAuth();
   const { isDarkMode } = useThemeStore();
-  const { getBookData } = useBookDataStore();
-  const { getView, getProgress, getViewSettings } = useReaderStore();
-  const { setViewSettings, setTTSEnabled } = useReaderStore();
+  const getBookData = useBookDataStore((s) => s.getBookData);
+  const getView = useReaderStore((s) => s.getView);
+  const getProgress = useReaderStore((s) => s.getProgress);
+  const getViewSettings = useReaderStore((s) => s.getViewSettings);
+  const setViewSettings = useReaderStore((s) => s.setViewSettings);
+  const setTTSEnabled = useReaderStore((s) => s.setTTSEnabled);
   const { getMergedRules } = useProofreadStore();
 
   const [ttsLang, setTtsLang] = useState<string>('en');
@@ -50,12 +54,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
   const sectionChangingTimestampRef = useRef(0);
   const previousSectionLabelRef = useRef<string | undefined>(undefined);
   const ttsControllerRef = useRef<TTSController | null>(null);
-  const popupTTSControllerRef = useRef<TTSController | null>(null);
-  const popupTTSActiveSessionRef = useRef<number | null>(null);
-  const popupTTSSessionCounterRef = useRef(0);
-  const popupTTSShouldResumeAmbientRef = useRef(false);
   const isStartingTTSRef = useRef(false);
-  const isStartingPopupTTSRef = useRef(false);
   const [ttsController, setTtsController] = useState<TTSController | null>(null);
   const [ttsClientsInited, setTtsClientsInitialized] = useState(false);
 
@@ -66,6 +65,12 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     initMediaSession,
     deinitMediaSession,
   } = useTTSMediaSession({ bookKey });
+
+  // Broadcast playback transitions on the app-wide bus so consumers that
+  // can't read the hook-local isPlaying flag (RSVP, paragraph mode) can react.
+  const emitPlaybackState = (state: 'playing' | 'paused' | 'stopped') => {
+    eventDispatcher.dispatch('tts-playback-state', { bookKey, state });
+  };
 
   const handleTTSForward = async (event: CustomEvent) => {
     const detail = event.detail as { bookKey: string; byMark?: boolean } | undefined;
@@ -85,6 +90,30 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     }
   };
 
+  const handleTTSHighlightSentence = (event: CustomEvent) => {
+    const detail = event.detail as { bookKey: string } | undefined;
+    if (detail?.bookKey !== bookKey) return;
+    const sentence = ttsControllerRef.current?.getSpokenSentence();
+    if (!sentence) return;
+    eventDispatcher.dispatch('create-tts-highlight', { bookKey, ...sentence });
+  };
+
+  // Set the TTS rate from the app bus. The RSVP overlay is full-screen, so its
+  // rate picker can't reach the TTS panel; it dispatches `tts-set-rate` and we
+  // reuse the same controller rate-change path the panel uses (handleSetRate,
+  // defined below — stop→setRate→start while playing, throttled). Also persists
+  // the value to viewSettings so it survives like a panel change.
+  const handleTTSSetRate = (event: CustomEvent) => {
+    const detail = event.detail as { bookKey: string; rate?: number } | undefined;
+    if (detail?.bookKey !== bookKey || typeof detail.rate !== 'number') return;
+    const viewSettings = getViewSettings(bookKey);
+    if (viewSettings) {
+      viewSettings.ttsRate = detail.rate;
+      setViewSettings(bookKey, viewSettings);
+    }
+    handleSetRate(detail.rate);
+  };
+
   const handleTTSTogglePlay = async (event: CustomEvent) => {
     const detail = event.detail as { bookKey: string } | undefined;
     if (detail?.bookKey !== bookKey) return;
@@ -93,10 +122,12 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     if (ttsController.state === 'playing') {
       setIsPlaying(false);
       setIsPaused(true);
+      emitPlaybackState('paused');
       await ttsController.pause();
     } else {
       setIsPlaying(true);
       setIsPaused(false);
+      emitPlaybackState('playing');
       if (ttsController.state === 'paused') {
         await ttsController.resume();
       } else {
@@ -107,24 +138,20 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
 
   useEffect(() => {
     eventDispatcher.on('tts-speak', handleTTSSpeak);
-    eventDispatcher.on('tts-popup-speak', handlePopupTTSSpeak);
     eventDispatcher.on('tts-stop', handleTTSStop);
-    eventDispatcher.on('tts-popup-stop', handlePopupTTSStop);
     eventDispatcher.on('tts-forward', handleTTSForward);
     eventDispatcher.on('tts-backward', handleTTSBackward);
     eventDispatcher.on('tts-toggle-play', handleTTSTogglePlay);
+    eventDispatcher.on('tts-set-rate', handleTTSSetRate);
+    eventDispatcher.on('tts-highlight-sentence', handleTTSHighlightSentence);
     return () => {
       eventDispatcher.off('tts-speak', handleTTSSpeak);
-      eventDispatcher.off('tts-popup-speak', handlePopupTTSSpeak);
       eventDispatcher.off('tts-stop', handleTTSStop);
-      eventDispatcher.off('tts-popup-stop', handlePopupTTSStop);
       eventDispatcher.off('tts-forward', handleTTSForward);
       eventDispatcher.off('tts-backward', handleTTSBackward);
       eventDispatcher.off('tts-toggle-play', handleTTSTogglePlay);
-      void endPopupSpeech({
-        sessionId: popupTTSActiveSessionRef.current ?? 0,
-        restoreAmbient: false,
-      });
+      eventDispatcher.off('tts-set-rate', handleTTSSetRate);
+      eventDispatcher.off('tts-highlight-sentence', handleTTSHighlightSentence);
       if (ttsControllerRef.current) {
         ttsControllerRef.current.shutdown();
         ttsControllerRef.current = null;
@@ -200,13 +227,6 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       viewSettings.ttsLocation = cfi;
       setViewSettings(bookKey, viewSettings);
 
-      if (!followingTTSLocationRef.current) return;
-
-      const docs = view.renderer.getContents();
-      if (docs.some(({ doc }) => (doc.getSelection()?.toString().length ?? 0) > 0)) {
-        return;
-      }
-
       const hlContents = view.renderer.getContents();
       const hlPrimaryIdx = view.renderer.primaryIndex;
       const { doc, index: viewSectionIndex } = (hlContents.find((x) => x.index === hlPrimaryIdx) ??
@@ -217,6 +237,27 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
 
       const { anchor, index: ttsSectionIndex } = view.resolveCFI(cfi);
       if (viewSectionIndex !== ttsSectionIndex) {
+        // TTS crossed into a new section before the view caught up. The
+        // `await onSectionChange` path in TTSController fires renderer.goTo
+        // via handleSectionChange, but the new paginator's #goTo can resolve
+        // before the visible page actually flips when the target section is
+        // already preloaded as an adjacent view — leaving the user stuck on
+        // the last page of the previous chapter while audio continues. Drive
+        // navigation from the highlight cfi directly, stamping the timestamp
+        // so the "back-to-TTS" button stays suppressed while progress.location
+        // catches up. Skip only when the user is actively selecting text.
+        if (hlContents.some(({ doc }) => (doc.getSelection()?.toString().length ?? 0) > 0)) {
+          return;
+        }
+        sectionChangingTimestampRef.current = Date.now();
+        followingTTSLocationRef.current = true;
+        view.goTo?.(cfi);
+        return;
+      }
+
+      if (!followingTTSLocationRef.current) return;
+
+      if (hlContents.some(({ doc }) => (doc.getSelection()?.toString().length ?? 0) > 0)) {
         return;
       }
 
@@ -231,9 +272,8 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
 
         const showHeader = viewSettings.showHeader;
         const showFooter = viewSettings.showFooter;
-        const showBarsOnScroll = viewSettings.showBarsOnScroll;
-        const headerScrollOverlap = showHeader && showBarsOnScroll ? 44 : 0;
-        const footerScrollOverlap = showFooter && showBarsOnScroll ? 44 : 0;
+        const headerScrollOverlap = showHeader ? viewSettings.marginTopPx : 0;
+        const footerScrollOverlap = showFooter ? viewSettings.marginBottomPx : 0;
         const scrollingOverlap = viewSettings.scrollingOverlap;
         const outOfView =
           rangeBottom > end - footerScrollOverlap - scrollingOverlap ||
@@ -279,21 +319,39 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       }
     };
 
+    // Republish the controller's canonical position signal onto the app-wide
+    // bus so paragraph mode + RSVP can follow TTS without touching the
+    // controller. This MUST be its own listener: handleHighlightMark /
+    // handleHighlightWord early-return on following-suppression and text
+    // selection, which would silently stop the modes from following. The
+    // forward fires on every controller 'tts-position', gated only by the
+    // listener's lifecycle (it exists only while the controller does).
+    const handlePosition = (e: Event) => {
+      eventDispatcher.dispatch('tts-position', {
+        bookKey,
+        ...(e as CustomEvent).detail,
+      });
+    };
+
     ttsController.addEventListener('tts-need-auth', handleNeedAuth);
     ttsController.addEventListener('tts-speak-mark', handleSpeakMark);
     ttsController.addEventListener('tts-highlight-mark', handleHighlightMark);
     ttsController.addEventListener('tts-highlight-word', handleHighlightWord);
+    ttsController.addEventListener('tts-position', handlePosition);
     return () => {
       ttsController.removeEventListener('tts-need-auth', handleNeedAuth);
       ttsController.removeEventListener('tts-speak-mark', handleSpeakMark);
       ttsController.removeEventListener('tts-highlight-mark', handleHighlightMark);
       ttsController.removeEventListener('tts-highlight-word', handleHighlightWord);
+      ttsController.removeEventListener('tts-position', handlePosition);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ttsController, bookKey]);
 
-  // Location tracking — re-highlight when progress changes
-  const progress = getProgress(bookKey);
+  // Location tracking — re-highlight when progress changes.
+  // Reactive subscription via readerProgressStore so the effect below
+  // re-runs on page turns without dragging in the whole readerStore.
+  const progress = useBookProgress(bookKey);
   useEffect(() => {
     const ttsController = ttsControllerRef.current;
     if (!ttsController) return;
@@ -417,7 +475,9 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       if (!sections || sectionIndex < 0 || sectionIndex >= sections.length) return;
       sectionChangingTimestampRef.current = Date.now();
       const resolved = view.resolveNavigation(sectionIndex);
-      view.renderer.goTo?.(resolved);
+      // Await so TTSController's `await onSectionChange` doesn't proceed to
+      // speak the new section before the view has finished navigating to it.
+      await view.renderer.goTo?.(resolved);
     },
     [bookKey, getView],
   );
@@ -445,53 +505,9 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewSettings?.ttsHighlightOptions, viewSettings?.isEink, getTTSHighlightOptions]);
 
-  const endPopupSpeech = useCallback(
-    async ({
-      sessionId,
-      restoreAmbient,
-      clearInterruptedAmbient = true,
-    }: {
-      sessionId: number;
-      restoreAmbient: boolean;
-      clearInterruptedAmbient?: boolean;
-    }) => {
-      if (popupTTSActiveSessionRef.current !== sessionId) return;
-
-      const popupController = popupTTSControllerRef.current;
-      popupTTSControllerRef.current = null;
-      popupTTSActiveSessionRef.current = null;
-      const shouldRestoreAmbient = restoreAmbient && popupTTSShouldResumeAmbientRef.current;
-      if (clearInterruptedAmbient) {
-        popupTTSShouldResumeAmbientRef.current = false;
-      }
-
-      try {
-        if (popupController) {
-          await popupController.shutdown();
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        if (shouldRestoreAmbient && ttsControllerRef.current?.state === 'stopped') {
-          try {
-            await ttsControllerRef.current.start();
-          } catch (error) {
-            console.error(error);
-          }
-        }
-      }
-    },
-    [],
-  );
-
   // handleStop (defined before handleTTSSpeak/handleTTSStop which reference it)
   const handleStop = useCallback(
     async (bookKey: string) => {
-      await endPopupSpeech({
-        sessionId: popupTTSActiveSessionRef.current ?? 0,
-        restoreAmbient: false,
-      });
-
       const ttsController = ttsControllerRef.current;
       if (ttsController) {
         await ttsController.shutdown();
@@ -499,6 +515,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
         setTtsController(null);
         getView(bookKey)?.deselect();
         setIsPlaying(false);
+        emitPlaybackState('stopped');
         onRequestHidePanel?.();
         setShowIndicator(false);
         setShowBackToCurrentTTSLocation(false);
@@ -519,19 +536,8 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
 
   // handleTTSSpeak / handleTTSStop (plain functions, registered once at mount via closure)
   const handleTTSSpeak = async (event: CustomEvent) => {
-    const {
-      bookKey: ttsBookKey,
-      range,
-      index,
-      oneTime = false,
-      text: speakText,
-      lang: overrideLang,
-    } = event.detail;
+    const { bookKey: ttsBookKey, range, index, oneTime = false } = event.detail;
     if (bookKey !== ttsBookKey) return;
-    await endPopupSpeech({
-      sessionId: popupTTSActiveSessionRef.current ?? 0,
-      restoreAmbient: false,
-    });
     // Guard against concurrent starts (e.g. rapid double-clicks on the TTS
     // icon). Without this, both invocations race past the `await`s below and
     // end up creating two TTSController instances that speak simultaneously.
@@ -614,16 +620,13 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
         const ssml =
           oneTime && ttsSpeakRange
             ? genSSMLRaw(ttsSpeakRange.toString().trim())
-            : oneTime && speakText
-              ? genSSMLRaw(typeof speakText === 'string' ? speakText.trim() : '')
-              : ttsFromRange
-                ? view.tts?.from(ttsFromRange)
-                : view.tts?.start();
+            : ttsFromRange
+              ? view.tts?.from(ttsFromRange)
+              : view.tts?.start();
         if (ssml) {
-          // Use explicit language override when provided (e.g. from translation popup
-          // speaking target-language text), otherwise detect from SSML / book metadata.
-          const lang = (overrideLang as string) || parseSSMLLang(ssml, primaryLang) || 'en';
+          const lang = parseSSMLLang(ssml, primaryLang) || 'en';
           setIsPlaying(true);
+          emitPlaybackState('playing');
           setTtsLang(lang);
 
           ttsController.setLang(lang);
@@ -652,87 +655,6 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     }
   };
 
-  const handlePopupTTSSpeak = async (event: CustomEvent) => {
-    const {
-      bookKey: ttsBookKey,
-      text,
-      lang: overrideLang,
-    } = event.detail as {
-      bookKey: string;
-      text?: string;
-      lang?: string;
-    };
-    if (bookKey !== ttsBookKey) return;
-    if (isStartingPopupTTSRef.current) return;
-
-    const view = getView(bookKey);
-    const viewSettings = getViewSettings(bookKey);
-    const bookData = getBookData(bookKey);
-    if (!view || !viewSettings || !bookData?.book) return;
-
-    const speakText = typeof text === 'string' ? text.trim() : '';
-    if (!speakText) return;
-
-    isStartingPopupTTSRef.current = true;
-    let popupSessionId = 0;
-    try {
-      await endPopupSpeech({
-        sessionId: popupTTSActiveSessionRef.current ?? 0,
-        restoreAmbient: false,
-        clearInterruptedAmbient: false,
-      });
-
-      popupSessionId = ++popupTTSSessionCounterRef.current;
-      popupTTSActiveSessionRef.current = popupSessionId;
-
-      // Clone the view so popup speech can own its TTS lifecycle without
-      // clearing the ambient reader controller's `view.tts` reference.
-      const popupView = { ...view, tts: null } as typeof view;
-      const popupController = new TTSController(
-        appService,
-        popupView,
-        !!user?.id,
-        preprocessSSMLForTTS,
-      );
-      popupTTSControllerRef.current = popupController;
-
-      await popupController.init();
-
-      const ambientController = ttsControllerRef.current;
-      if (ambientController?.state === 'playing' && !popupTTSShouldResumeAmbientRef.current) {
-        await ambientController.stop();
-        popupTTSShouldResumeAmbientRef.current = true;
-      }
-
-      const ssml = genSSMLRaw(speakText);
-      const primaryLang = bookData.book.primaryLanguage;
-      const lang = (overrideLang as string) || parseSSMLLang(ssml, primaryLang) || 'en';
-      popupController.setLang(lang);
-      popupController.setRate(viewSettings.ttsRate);
-      popupController.speak(ssml, true, () => {
-        void endPopupSpeech({ sessionId: popupSessionId, restoreAmbient: true });
-      });
-    } catch (error) {
-      await endPopupSpeech({ sessionId: popupSessionId, restoreAmbient: true });
-      eventDispatcher.dispatch('toast', {
-        message: _('TTS not supported for this document'),
-        type: 'error',
-      });
-      console.error(error);
-    } finally {
-      isStartingPopupTTSRef.current = false;
-    }
-  };
-
-  const handlePopupTTSStop = async (event: CustomEvent) => {
-    const { bookKey: ttsBookKey } = event.detail as { bookKey: string };
-    if (bookKey !== ttsBookKey) return;
-    await endPopupSpeech({
-      sessionId: popupTTSActiveSessionRef.current ?? 0,
-      restoreAmbient: true,
-    });
-  };
-
   // Playback callbacks
   const handleTogglePlay = useCallback(async () => {
     const ttsController = ttsControllerRef.current;
@@ -741,10 +663,12 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     if (isPlaying) {
       setIsPlaying(false);
       setIsPaused(true);
+      emitPlaybackState('paused');
       await ttsController.pause();
     } else if (isPaused) {
       setIsPlaying(true);
       setIsPaused(false);
+      emitPlaybackState('playing');
       // start for forward/backward/setvoice-paused
       // set rate don't pause the tts
       if (ttsController.state === 'paused') {
@@ -783,8 +707,10 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     if (ttsController) {
       setIsPlaying(false);
       setIsPaused(true);
+      emitPlaybackState('paused');
       await ttsController.pause();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Rate/voice/timeout/bar controls
