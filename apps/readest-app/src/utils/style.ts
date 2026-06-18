@@ -368,6 +368,9 @@ const getLayoutStyles = (
     ${!vertical && overrideLayout ? `margin-top: ${paragraphMargin}em !important;` : ''}
     ${!vertical && overrideLayout ? `margin-bottom: ${paragraphMargin}em !important;` : ''}
   }
+  p > font:only-child { 
+    display: flow-root; 
+  }
 
   :lang(zh), :lang(ja), :lang(ko) {
     widows: 1;
