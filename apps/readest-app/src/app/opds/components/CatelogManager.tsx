@@ -1,17 +1,30 @@
 'use client';
 
 import clsx from 'clsx';
-import { useState } from 'react';
-import { IoAdd, IoTrash, IoOpenOutline, IoBook, IoEyeOff, IoEye } from 'react-icons/io5';
+import dayjs from 'dayjs';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  IoAdd,
+  IoTrash,
+  IoOpenOutline,
+  IoBook,
+  IoEyeOff,
+  IoEye,
+  IoPencil,
+  IoCloudDownloadOutline,
+} from 'react-icons/io5';
 import { useRouter } from 'next/navigation';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useSettingsStore } from '@/store/settingsStore';
 import { isWebAppPlatform } from '@/services/environment';
-import { saveSysSettings } from '@/helpers/settings';
+import { useCustomOPDSStore } from '@/store/customOPDSStore';
 import { OPDSCatalog } from '@/types/opds';
 import { isLanAddress } from '@/utils/network';
+import { eventDispatcher } from '@/utils/event';
+import { deleteSubscriptionState, loadSubscriptionState } from '@/services/opds';
+import type { OPDSSubscriptionState } from '@/services/opds/types';
 import { validateOPDSURL } from '../utils/opdsUtils';
+import { FailedDownloadsDialog } from './FailedDownloadsDialog';
 import {
   formatOPDSCustomHeadersInput,
   hasOPDSCustomHeaders,
@@ -68,15 +81,24 @@ const EMPTY_NEW_CATALOG = {
   password: '',
   customHeadersInput: '',
   proxyConsent: false,
+  autoDownload: false,
 };
 
 export function CatalogManager() {
   const _ = useTranslation();
   const router = useRouter();
   const { envConfig, appService } = useEnv();
-  const { settings } = useSettingsStore();
-  const [catalogs, setCatalogs] = useState<OPDSCatalog[]>(() => settings.opdsCatalogs || []);
+  // Hydrate the store from settings on mount; all CRUD goes through it
+  // so the replica-sync push fires automatically. The local `catalogs`
+  // mirror tracks the visible (non-deleted) entries; we keep the
+  // setState wrapper so `useEffect` consumers (subscriptions) re-fire
+  // when the list changes.
+  const allCatalogs = useCustomOPDSStore((s) => s.catalogs);
+  const [catalogs, setCatalogs] = useState<OPDSCatalog[]>(() =>
+    useCustomOPDSStore.getState().getAvailableCatalogs(),
+  );
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingCatalogId, setEditingCatalogId] = useState<string | null>(null);
   const [newCatalog, setNewCatalog] = useState(EMPTY_NEW_CATALOG);
   const [showPassword, setShowPassword] = useState(false);
   const [urlError, setUrlError] = useState('');
@@ -84,15 +106,54 @@ export function CatalogManager() {
   const [proxyConsentError, setProxyConsentError] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const popularCatalogs = appService?.isOnlineCatalogsAccessible ? POPULAR_CATALOGS : [];
+  const [subscriptionStates, setSubscriptionStates] = useState<
+    Record<string, OPDSSubscriptionState>
+  >({});
+  const [failedDialogCatalogId, setFailedDialogCatalogId] = useState<string | null>(null);
+
+  const reloadSubscriptionStates = useCallback(async () => {
+    if (!appService) return;
+    const eligible = catalogs.filter((c) => c.autoDownload);
+    const entries = await Promise.all(
+      eligible.map(async (c) => [c.id, await loadSubscriptionState(appService, c.id)] as const),
+    );
+    setSubscriptionStates(Object.fromEntries(entries));
+  }, [appService, catalogs]);
+
+  useEffect(() => {
+    reloadSubscriptionStates();
+  }, [reloadSubscriptionStates]);
+
+  useEffect(() => {
+    const handler = () => {
+      reloadSubscriptionStates();
+    };
+    eventDispatcher.on('opds-sync-complete', handler);
+    return () => eventDispatcher.off('opds-sync-complete', handler);
+  }, [reloadSubscriptionStates]);
   const hasSensitiveWebOPDSInput =
     newCatalog.username.trim().length > 0 ||
     newCatalog.password.trim().length > 0 ||
     newCatalog.customHeadersInput.trim().length > 0;
   const isWebCatalogProxyWarningRequired = isWebAppPlatform() && hasSensitiveWebOPDSInput;
 
-  const saveCatalogs = (updatedCatalogs: OPDSCatalog[]) => {
-    setCatalogs(updatedCatalogs);
-    saveSysSettings(envConfig, 'opdsCatalogs', updatedCatalogs);
+  // Hydrate from settings + persist when the store mutates. Loading
+  // happens once per mount; the store handles backfilling contentId
+  // for legacy entries.
+  useEffect(() => {
+    void useCustomOPDSStore.getState().loadCustomOPDSCatalogs(envConfig);
+  }, [envConfig]);
+
+  // Surface the latest store state into the local mirror used by
+  // subscriptions / dialog rendering. Filters out tombstones.
+  useEffect(() => {
+    setCatalogs(allCatalogs.filter((c) => !c.deletedAt));
+  }, [allCatalogs]);
+
+  // Persist via the store (settings + replica push), then update local
+  // mirror. Replica sync fan-out happens inside the store mutators.
+  const persistMutation = () => {
+    void useCustomOPDSStore.getState().saveCustomOPDSCatalogs(envConfig);
   };
 
   const handleAddCatalog = async () => {
@@ -122,7 +183,7 @@ export function CatalogManager() {
     if (isWebCatalogProxyWarningRequired && !newCatalog.proxyConsent) {
       setProxyConsentError(
         _(
-          'Please confirm that this OPDS connection will be proxied through the original project servers on the web app before continuing.',
+          'Please confirm that this OPDS connection will be proxied through Readest servers on the web app before continuing.',
         ),
       );
       return;
@@ -146,37 +207,87 @@ export function CatalogManager() {
       return;
     }
 
-    const catalog: OPDSCatalog = {
-      id: Date.now().toString(),
-      name: newCatalog.name,
-      url: newCatalog.url,
-      description: newCatalog.description,
-      username: newCatalog.username || undefined,
-      password: newCatalog.password || undefined,
-      customHeaders: hasOPDSCustomHeaders(parsedHeaders.headers)
-        ? parsedHeaders.headers
-        : undefined,
-    };
+    const customHeaders = hasOPDSCustomHeaders(parsedHeaders.headers)
+      ? parsedHeaders.headers
+      : undefined;
 
-    saveCatalogs([catalog, ...catalogs]);
+    if (editingCatalogId) {
+      useCustomOPDSStore.getState().updateCatalog(editingCatalogId, {
+        name: newCatalog.name,
+        url: newCatalog.url,
+        description: newCatalog.description || undefined,
+        username: newCatalog.username || undefined,
+        password: newCatalog.password || undefined,
+        customHeaders,
+        autoDownload: newCatalog.autoDownload || undefined,
+      });
+    } else {
+      useCustomOPDSStore.getState().addCatalog({
+        id: Date.now().toString(),
+        name: newCatalog.name,
+        url: newCatalog.url,
+        description: newCatalog.description || undefined,
+        username: newCatalog.username || undefined,
+        password: newCatalog.password || undefined,
+        customHeaders,
+        autoDownload: newCatalog.autoDownload || undefined,
+      });
+    }
+    persistMutation();
+
     setNewCatalog(EMPTY_NEW_CATALOG);
     setUrlError('');
     setHeaderError('');
     setProxyConsentError('');
     setIsValidating(false);
+    setEditingCatalogId(null);
     setShowAddDialog(false);
+  };
+
+  const handleEditCatalog = (catalog: OPDSCatalog) => {
+    setNewCatalog({
+      name: catalog.name,
+      url: catalog.url,
+      description: catalog.description || '',
+      username: catalog.username || '',
+      password: catalog.password || '',
+      customHeadersInput: formatOPDSCustomHeadersInput(catalog.customHeaders),
+      proxyConsent: false,
+      autoDownload: catalog.autoDownload || false,
+    });
+    setEditingCatalogId(catalog.id);
+    setShowAddDialog(true);
   };
 
   const handleAddPopularCatalog = (popularCatalog: OPDSCatalog) => {
     if (catalogs.some((c) => c.url === popularCatalog.url)) {
       return;
     }
-
-    saveCatalogs([...catalogs, { ...popularCatalog }]);
+    useCustomOPDSStore.getState().addCatalog({ ...popularCatalog });
+    persistMutation();
   };
 
   const handleRemoveCatalog = (id: string) => {
-    saveCatalogs(catalogs.filter((c) => c.id !== id));
+    useCustomOPDSStore.getState().removeCatalog(id);
+    persistMutation();
+    if (appService) {
+      // Don't await — leftover state files are harmless and we don't want to
+      // block UI removal if the filesystem call fails.
+      void deleteSubscriptionState(appService, id);
+    }
+  };
+
+  const handleToggleAutoDownload = (id: string) => {
+    const target = catalogs.find((c) => c.id === id);
+    if (!target) return;
+    const wasEnabled = !!target.autoDownload;
+    useCustomOPDSStore.getState().updateCatalog(id, { autoDownload: !wasEnabled });
+    persistMutation();
+    // When the user just enabled auto-download, sync now instead of waiting
+    // for the next app launch / pull-to-refresh.
+    if (!wasEnabled) {
+      eventDispatcher.dispatch('check-opds-subscriptions');
+    }
   };
 
   const handleOpenCatalog = (catalog: OPDSCatalog) => {
@@ -192,6 +303,7 @@ export function CatalogManager() {
     setHeaderError('');
     setProxyConsentError('');
     setShowPassword(false);
+    setEditingCatalogId(null);
   };
 
   return (
@@ -235,17 +347,26 @@ export function CatalogManager() {
                   <div className='flex items-center justify-between'>
                     <div className='min-w-0 flex-1'>
                       <div className='mb-1 flex items-center justify-between'>
-                        <h3 className='card-title line-clamp-1 text-sm'>
-                          {catalog.icon && <span className=''>{catalog.icon}</span>}
-                          {catalog.name}
+                        <h3 className='card-title text-sm'>
+                          {catalog.icon && <span>{catalog.icon}</span>}
+                          <span className='line-clamp-1'>{catalog.name}</span>
                         </h3>
-                        <button
-                          onClick={() => handleRemoveCatalog(catalog.id)}
-                          className='btn btn-ghost btn-xs btn-square'
-                          title='Remove'
-                        >
-                          <IoTrash className='h-4 w-4' />
-                        </button>
+                        <div className='flex gap-1'>
+                          <button
+                            onClick={() => handleEditCatalog(catalog)}
+                            className='btn btn-ghost btn-xs btn-square'
+                            title={_('Edit')}
+                          >
+                            <IoPencil className='h-4 w-4' />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveCatalog(catalog.id)}
+                            className='btn btn-ghost btn-xs btn-square'
+                            title={_('Remove')}
+                          >
+                            <IoTrash className='h-4 w-4' />
+                          </button>
+                        </div>
                       </div>
                       {catalog.description && (
                         <p className='text-base-content/70 mb-2 line-clamp-1 h-6 text-sm sm:line-clamp-2 sm:h-10'>
@@ -265,6 +386,56 @@ export function CatalogManager() {
                       )}
                     </div>
                   </div>
+                  <div className='mt-2 flex items-center gap-2'>
+                    <label
+                      className={clsx(
+                        'label gap-2 p-0',
+                        catalog.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+                      )}
+                    >
+                      <input
+                        type='checkbox'
+                        className='toggle toggle-sm toggle-primary'
+                        checked={!!catalog.autoDownload}
+                        disabled={!!catalog.disabled}
+                        onChange={() => handleToggleAutoDownload(catalog.id)}
+                      />
+                      <span className='label-text text-xs'>
+                        <IoCloudDownloadOutline className='mr-1 inline h-3.5 w-3.5' />
+                        {_('Auto-download')}
+                      </span>
+                    </label>
+                  </div>
+                  {(() => {
+                    const subState = subscriptionStates[catalog.id];
+                    if (!catalog.autoDownload || !subState) return null;
+                    const lastCheckedAt = subState.lastCheckedAt;
+                    const failedCount = subState.failedEntries.length;
+                    if (lastCheckedAt === 0 && failedCount === 0) return null;
+                    return (
+                      <div className='text-base-content/60 mt-1 flex items-center gap-2 text-xs'>
+                        {lastCheckedAt > 0 && (
+                          <span>
+                            {_('Last synced {{when}}', {
+                              when: dayjs(lastCheckedAt).fromNow(),
+                            })}
+                          </span>
+                        )}
+                        {failedCount > 0 && (
+                          <>
+                            {lastCheckedAt > 0 && <span aria-hidden>·</span>}
+                            <button
+                              type='button'
+                              onClick={() => setFailedDialogCatalogId(catalog.id)}
+                              className='text-error hover:underline'
+                            >
+                              {_('{{count}} failed', { count: failedCount })}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div className='card-actions mt-4 justify-end'>
                     <button
                       onClick={() => handleOpenCatalog(catalog)}
@@ -296,7 +467,7 @@ export function CatalogManager() {
                 >
                   <div className='card-body p-4'>
                     <h3 className='card-title mb-1 text-sm'>
-                      {catalog.icon && <span className=''>{catalog.icon}</span>}
+                      {catalog.icon && <span>{catalog.icon}</span>}
                       {catalog.name}
                     </h3>
                     {catalog.description && (
@@ -329,12 +500,14 @@ export function CatalogManager() {
         </div>
       </section>
 
-      {/* Add Catalog Dialog */}
+      {/* Add/Edit Catalog Dialog */}
       {showAddDialog && (
         <ModalPortal>
           <dialog className='modal modal-open'>
             <div className='modal-box'>
-              <h3 className='mb-4 text-lg font-bold'>{_('Add OPDS Catalog')}</h3>
+              <h3 className='mb-4 text-lg font-bold'>
+                {editingCatalogId ? _('Edit OPDS Catalog') : _('Add OPDS Catalog')}
+              </h3>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -477,7 +650,7 @@ export function CatalogManager() {
                       />
                       <span className='label-text text-sm leading-6'>
                         {_(
-                          'I understand this OPDS connection will be proxied through the original project servers on the web app. If I do not trust the original project with these credentials or headers, I should use the native app instead.',
+                          'I understand this OPDS connection will be proxied through Readest servers on the web app. If I do not trust Readest with these credentials or headers, I should use the native app instead.',
                         )}
                       </span>
                     </label>
@@ -503,6 +676,26 @@ export function CatalogManager() {
                   />
                 </div>
 
+                <div className='form-control'>
+                  <label className='label cursor-pointer justify-start gap-3 p-0'>
+                    <input
+                      type='checkbox'
+                      className='toggle toggle-sm toggle-primary'
+                      checked={newCatalog.autoDownload}
+                      onChange={(e) =>
+                        setNewCatalog({ ...newCatalog, autoDownload: e.target.checked })
+                      }
+                      disabled={isValidating}
+                    />
+                    <div>
+                      <span className='label-text'>{_('Auto-download new items')}</span>
+                      <p className='text-base-content/60 text-xs'>
+                        {_('Automatically download new publications when the app syncs')}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
                 <div className='modal-action'>
                   <button
                     type='button'
@@ -518,6 +711,8 @@ export function CatalogManager() {
                         <span className='loading loading-spinner loading-sm'></span>
                         {_('Validating...')}
                       </>
+                    ) : editingCatalogId ? (
+                      _('Save Changes')
                     ) : (
                       _('Add Catalog')
                     )}
@@ -527,6 +722,19 @@ export function CatalogManager() {
             </div>
           </dialog>
         </ModalPortal>
+      )}
+
+      {failedDialogCatalogId && (
+        <FailedDownloadsDialog
+          catalogId={failedDialogCatalogId}
+          catalogName={catalogs.find((c) => c.id === failedDialogCatalogId)?.name ?? ''}
+          onClose={() => {
+            setFailedDialogCatalogId(null);
+            // The dialog mutates failedEntries / knownEntryIds — refresh the
+            // status row so changes are visible without waiting for a sync.
+            reloadSubscriptionStates();
+          }}
+        />
       )}
     </div>
   );
