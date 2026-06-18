@@ -17,6 +17,7 @@ import {
   ViewSettingsConfig,
 } from '@/types/book';
 import {
+  HardcoverSettings,
   KOSyncSettings,
   LibraryGroupByType,
   LibrarySortByType,
@@ -27,11 +28,9 @@ import {
 import { UserStorageQuota, UserDailyTranslationQuota } from '@/types/quota';
 import { getDefaultMaxBlockSize, getDefaultMaxInlineSize } from '@/utils/config';
 import { stubTranslation as _ } from '@/utils/misc';
-import { getAppVersion } from '@/utils/version';
 import { DEFAULT_AI_SETTINGS } from './ai/constants';
-import { DEFAULT_DICTIONARY_SETTINGS, DEFAULT_LOOKUP_SETTINGS } from './learning/settings';
 
-export const DATA_SUBDIR = 'Hermes';
+export const DATA_SUBDIR = 'Readest';
 export const LOCAL_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
 export const CLOUD_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
 export const LOCAL_FONTS_SUBDIR = `${DATA_SUBDIR}/Fonts`;
@@ -57,8 +56,6 @@ export const BOOK_UNGROUPED_ID = '';
 
 export const SUPPORTED_IMAGE_EXTS = ['png', 'jpg', 'jpeg'];
 export const IMAGE_ACCEPT_FORMATS = SUPPORTED_IMAGE_EXTS.map((ext) => `.${ext}`).join(', ');
-export const SUPPORTED_AUDIO_EXTS = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'm4b'];
-export const AUDIO_ACCEPT_FORMATS = SUPPORTED_AUDIO_EXTS.map((ext) => `.${ext}`).join(', ');
 
 export const DEFAULT_KOSYNC_SETTINGS = {
   serverUrl: 'https://sync.koreader.rocks/', // https://kosync.ak-team.com:3042/
@@ -78,6 +75,12 @@ export const DEFAULT_READWISE_SETTINGS = {
   accessToken: '',
   lastSyncedAt: 0,
 } as ReadwiseSettings;
+
+export const DEFAULT_HARDCOVER_SETTINGS = {
+  enabled: false,
+  accessToken: '',
+  lastSyncedAt: 0,
+} as HardcoverSettings;
 
 export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   keepLogin: false,
@@ -118,6 +121,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
 
   kosync: DEFAULT_KOSYNC_SETTINGS,
   readwise: DEFAULT_READWISE_SETTINGS,
+  hardcover: DEFAULT_HARDCOVER_SETTINGS,
   aiSettings: DEFAULT_AI_SETTINGS,
 
   lastSyncedAtBooks: 0,
@@ -166,9 +170,6 @@ export const DEFAULT_READSETTINGS: ReadSettings = {
   userHighlightColors: [],
   defaultHighlightLabels: {},
   customTtsHighlightColors: [],
-  lookup: DEFAULT_LOOKUP_SETTINGS,
-  dictionary: DEFAULT_DICTIONARY_SETTINGS,
-  autoIndexOnOpen: false,
 };
 
 export const DEFAULT_MOBILE_READSETTINGS: Partial<ReadSettings> = {
@@ -198,12 +199,12 @@ export const DEFAULT_BOOK_LAYOUT: BookLayout = {
   compactMarginRightPx: 16,
   gapPercent: 5,
   scrolled: false,
+  noContinuousScroll: false,
   disableClick: false,
   fullscreenClickArea: false,
   swapClickArea: false,
   disableDoubleClick: false,
   volumeKeysToFlip: false,
-  noContinuousScroll: false,
   maxColumnCount: 2,
   maxInlineSize: getDefaultMaxInlineSize(),
   maxBlockSize: getDefaultMaxBlockSize(),
@@ -229,7 +230,6 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
   textIndent: 0,
   fullJustification: true,
   hyphenation: true,
-  invertImgColorInDark: false,
   theme: 'light',
   backgroundTextureId: 'none',
   backgroundOpacity: 0.6,
@@ -248,6 +248,7 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
   zoomMode: 'fit-page',
   spreadMode: 'auto',
   keepCoverSpread: true,
+  invertImgColorInDark: false,
   applyThemeToPDF: false,
 };
 
@@ -300,7 +301,6 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   showBatteryPercentage: true,
   use24HourClock: false,
   tapToToggleFooter: false,
-  focusMode: false,
   showMarginsOnScroll: false,
   showPaginationButtons: false,
   progressStyle: 'fraction',
@@ -723,23 +723,28 @@ export const CJK_FONTS_PATTENS = new RegExp(
 
 export const BOOK_IDS_SEPARATOR = '+';
 
-export const CLOUD_ENABLED = false;
+export const DOWNLOAD_READEST_URL = 'https://readest.com?utm_source=readest_web';
 
-export const DOWNLOAD_READEST_URL = 'https://github.com/dalzyu/readest-hermes/releases/latest';
+export const READEST_WEB_BASE_URL = 'https://web.readest.com';
+export const READEST_NODE_BASE_URL = 'https://node.readest.com';
 
-export const HERMES_WEB_BASE_URL = '';
-export const HERMES_NODE_BASE_URL = '';
+export const SHARE_BASE_URL = `${READEST_WEB_BASE_URL}/s`;
+export const SHARE_EXPIRATION_DAYS = [1, 3, 7] as const;
+export const SHARE_DEFAULT_EXPIRATION_DAYS = 3;
+export const SHARE_MAX_PER_USER = 50;
+export const SHARE_TOKEN_LENGTH = 22;
+export const SHARE_PRESIGN_TTL_SECONDS = 300;
+export const SHARE_CFI_MAX_LENGTH = 512;
 
-const LATEST_DOWNLOAD_BASE_URL =
-  'https://github.com/dalzyu/readest-hermes/releases/latest/download';
+const LATEST_DOWNLOAD_BASE_URL = 'https://download.readest.com/releases';
 
-export const HERMES_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
+export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 
-export const HERMES_CHANGELOG_FILE = `${LATEST_DOWNLOAD_BASE_URL}/release-notes.json`;
+export const READEST_CHANGELOG_FILE = `${LATEST_DOWNLOAD_BASE_URL}/release-notes.json`;
 
-export const HERMES_PUBLIC_STORAGE_BASE_URL = '';
+export const READEST_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';
 
-export const HERMES_OPDS_USER_AGENT = 'Hermes/' + getAppVersion() + ' (OPDS Browser)';
+export const READEST_OPDS_USER_AGENT = 'Readest/1.0 (OPDS Browser)';
 
 export const SYNC_PROGRESS_INTERVAL_SEC = 3;
 export const SYNC_NOTES_INTERVAL_SEC = 5;
@@ -857,6 +862,8 @@ export const TRANSLATED_LANGS = {
   si: 'සිංහල',
   'zh-CN': '简体中文',
   'zh-TW': '正體中文',
+  ro: 'Română',
+  hu: 'Magyar',
 };
 
 export const TRANSLATOR_LANGS: Record<string, string> = {
@@ -866,7 +873,6 @@ export const TRANSLATOR_LANGS: Record<string, string> = {
   fi: 'Suomi',
   da: 'Dansk',
   cs: 'Čeština',
-  hu: 'Magyar',
   km: 'ខ្មែរ',
   ro: 'Română',
   bg: 'Български',

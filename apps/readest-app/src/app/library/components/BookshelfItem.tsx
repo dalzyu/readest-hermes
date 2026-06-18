@@ -252,10 +252,12 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
         handleBookUpload(book);
       },
     });
-    const manageSeriesMenuItem = await MenuItem.new({
-      text: _('Manage Series'),
+    const shareBookMenuItem = await MenuItem.new({
+      text: _('Share Book'),
       action: async () => {
-        eventDispatcher.dispatch('manage-series', { hash: book.hash, title: book.title });
+        // Bookshelf.tsx hosts the dialog; we dispatch and let it route
+        // unauthenticated users into the login flow first.
+        eventDispatcher.dispatch('show-share-dialog', { book });
       },
     });
     const deleteBookMenuItem = await MenuItem.new({
@@ -267,7 +269,6 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
     const menu = await Menu.new();
     menu.append(selectBookMenuItem);
     menu.append(groupBooksMenuItem);
-    menu.append(manageSeriesMenuItem);
     if (book.readingStatus === 'finished') {
       menu.append(markAsUnreadMenuItem);
     } else {
@@ -284,6 +285,11 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
     }
     if (!book.uploadedAt && book.downloadedAt) {
       menu.append(uploadBookMenuItem);
+    }
+    // Share is offered for any local-or-uploaded book; the dialog will trigger
+    // an upload first if the book hasn't been pushed yet.
+    if (book.downloadedAt || book.uploadedAt) {
+      menu.append(shareBookMenuItem);
     }
     menu.append(deleteBookMenuItem);
     menu.popup();
