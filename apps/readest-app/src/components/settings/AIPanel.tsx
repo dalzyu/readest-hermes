@@ -1,475 +1,65 @@
 import clsx from 'clsx';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  PiCheckCircle,
-  PiWarningCircle,
-  PiArrowsClockwise,
-  PiSpinner,
-  PiTrash,
-  PiPencilSimple,
-  PiPlus,
-} from 'react-icons/pi';
+import { PiCheckCircle, PiWarningCircle, PiArrowsClockwise, PiSpinner } from 'react-icons/pi';
 
-import HelpTip from '@/components/primitives/HelpTip';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEnv } from '@/context/EnvContext';
-import { createProviderFromConfig, getProviderForTask } from '@/services/ai/providers';
-import {
-  AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST,
-  SUPPORTED_PROVIDER_TYPES,
-} from '@/services/ai/capabilities';
-import {
-  DEFAULT_AI_SETTINGS,
-  DEFAULT_AI_PROFILE,
-  providerConfigCanServeEmbeddings,
-  providerTypeSupportsEmbeddings,
-  resolveEmbeddingModelId,
-  resolveChatModelId,
-} from '@/services/ai/constants';
-import type {
-  AISettings,
-  AIProviderType,
-  AIProviderApiStandard,
-  ProviderConfig,
-  AITaskType,
-  ModelEntry,
-  ModelAssignments,
-  TaskModelSelection,
-  InferenceParams,
-} from '@/services/ai/types';
+import { getAIProvider } from '@/services/ai/providers';
+import { DEFAULT_AI_SETTINGS, GATEWAY_MODELS, MODEL_PRICING } from '@/services/ai/constants';
+import type { AISettings, AIProviderName } from '@/services/ai/types';
+import { BoxedList, SettingLabel, SettingsRow, SettingsSwitchRow } from './primitives';
 
 type ConnectionStatus = 'idle' | 'testing' | 'success' | 'error';
+type CustomModelStatus = 'idle' | 'validating' | 'valid' | 'invalid';
 
-const PROVIDER_TYPE_LABELS: Record<AIProviderType, string> = {
-  ollama: 'Ollama',
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  google: 'Google AI',
-  openrouter: 'OpenRouter',
-  deepseek: 'DeepSeek',
-  mistral: 'Mistral',
-  groq: 'Groq',
-  xai: 'xAI (Grok)',
-  cohere: 'Cohere',
-  fireworks: 'Fireworks',
-  togetherai: 'Together AI',
-  'ai-gateway': 'AI Gateway',
-};
+const CUSTOM_MODEL_VALUE = '__custom__';
 
-const REQUIRES_API_KEY: Set<AIProviderType> = new Set([
-  'openai',
-  'anthropic',
-  'google',
-  'openrouter',
-  'deepseek',
-  'mistral',
-  'groq',
-  'xai',
-  'cohere',
-  'fireworks',
-  'togetherai',
-  'ai-gateway',
-]);
-
-const HAS_API_STANDARD: Set<AIProviderType> = new Set(['openai']);
-
-const TASK_LABELS: Record<AITaskType, string> = {
-  translation: 'Translation',
-  dictionary: 'Dictionary',
-  chat: 'Chat',
-  embedding: 'Embedding',
-};
-
-function generateProviderId(): string {
-  return `provider-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+interface ModelOption {
+  id: string;
+  label: string;
+  inputCost: string;
+  outputCost: string;
 }
 
-function generateProfileId(): string {
-  return `profile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function getModelsByKind(config: ProviderConfig, kind: ModelEntry['kind']): ModelEntry[] {
-  return (config.models ?? []).filter((model) => model.kind === kind);
-}
-
-function getPrimaryModel(config: ProviderConfig, kind: ModelEntry['kind']): string {
-  return getModelsByKind(config, kind)[0]?.id ?? '';
-}
-
-function emptyConfig(providerType: AIProviderType): ProviderConfig {
-  const defaults: ModelEntry[] =
-    providerType === 'ollama'
-      ? [
-          { id: 'llama3.2', kind: 'chat' },
-          { id: 'nomic-embed-text', kind: 'embedding' },
-        ]
-      : providerType === 'openai'
-        ? [
-            { id: 'gpt-4o-mini', kind: 'chat' },
-            { id: 'text-embedding-3-small', kind: 'embedding' },
-          ]
-        : providerType === 'google'
-          ? [
-              { id: 'gemini-2.5-flash', kind: 'chat' },
-              { id: 'gemini-embedding-001', kind: 'embedding' },
-            ]
-          : providerType === 'mistral'
-            ? [
-                { id: 'mistral-large-latest', kind: 'chat' },
-                { id: 'mistral-embed', kind: 'embedding' },
-              ]
-            : providerType === 'ai-gateway'
-              ? [
-                  { id: 'google/gemini-2.5-flash-lite', kind: 'chat' },
-                  { id: AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST[0], kind: 'embedding' },
-                ]
-              : [];
-
-  return {
-    id: generateProviderId(),
-    name: '',
-    providerType,
-    baseUrl:
-      providerType === 'ollama'
-        ? 'http://127.0.0.1:11434'
-        : providerType === 'openai'
-          ? 'https://api.openai.com'
-          : '',
-    models: defaults,
-    apiStandard: HAS_API_STANDARD.has(providerType) ? 'chat-completions' : undefined,
-  };
-}
-
-function normalizeProviderConfig(
-  config: ProviderConfig | (ProviderConfig & { [key: string]: unknown }),
-): ProviderConfig {
-  const legacy = config as ProviderConfig & {
-    providerType?: string;
-    model?: string;
-    embeddingModel?: string;
-    apiStyle?: AIProviderApiStandard;
-  };
-  const models = Array.isArray(config.models) ? [...config.models] : [];
-  if (models.length === 0 && typeof legacy.model === 'string' && legacy.model.trim()) {
-    models.push({ id: legacy.model.trim(), kind: 'chat' });
-  }
-  if (
-    typeof legacy.embeddingModel === 'string' &&
-    legacy.embeddingModel.trim() &&
-    !models.some((model) => model.kind === 'embedding')
-  ) {
-    models.push({ id: legacy.embeddingModel.trim(), kind: 'embedding' });
-  }
-  const legacyProviderType = (config as { providerType?: string }).providerType;
-  const normalizedProviderType =
-    legacyProviderType === 'openai-compatible' ? 'openai' : config.providerType;
-  return {
-    id: config.id,
-    name: config.name ?? '',
-    providerType: normalizedProviderType as AIProviderType,
-    baseUrl: config.baseUrl ?? '',
-    apiKey: config.apiKey,
-    models,
-    apiStandard: config.apiStandard ?? legacy.apiStyle,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// ProviderForm — inline add/edit form for one ProviderConfig
-// ---------------------------------------------------------------------------
-
-interface ProviderFormProps {
-  config: ProviderConfig;
-  onChange: (config: ProviderConfig) => void;
-  onSave: () => void;
-  onCancel: () => void;
-  isNew: boolean;
-  _: (key: string) => string;
-}
-
-const ProviderForm: React.FC<ProviderFormProps> = ({
-  config,
-  onChange,
-  onSave,
-  onCancel,
-  isNew,
-  _,
-}) => {
-  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
-  const [fetchingModels, setFetchingModels] = useState(false);
-
-  const update = (patch: Partial<ProviderConfig>) => onChange({ ...config, ...patch });
-
-  const fetchOllamaModels = useCallback(async () => {
-    if (!config.baseUrl) return;
-    setFetchingModels(true);
-    try {
-      const response = await fetch(`${config.baseUrl}/api/tags`);
-      if (!response.ok) throw new Error('Failed');
-      const data = await response.json();
-      setOllamaModels(data.models?.map((m: { name: string }) => m.name) || []);
-    } catch {
-      setOllamaModels([]);
-    } finally {
-      setFetchingModels(false);
-    }
-  }, [config.baseUrl]);
-
-  useEffect(() => {
-    if (config.providerType === 'ollama' && config.baseUrl) {
-      fetchOllamaModels();
-    }
-  }, [config.providerType, config.baseUrl, fetchOllamaModels]);
-
-  const chatModel = getPrimaryModel(config, 'chat');
-
-  const setModelEntry = (index: number, patch: Partial<ModelEntry>) => {
-    const nextModels = [...(config.models ?? [])];
-    const current = nextModels[index];
-    if (!current) return;
-    nextModels[index] = { ...current, ...patch };
-    onChange({ ...config, models: nextModels });
-  };
-
-  const addModelEntry = () => {
-    const nextModels = [...(config.models ?? []), { id: '', kind: 'chat' as const }];
-    onChange({ ...config, models: nextModels });
-  };
-
-  const removeModelEntry = (index: number) => {
-    const nextModels = [...(config.models ?? [])];
-    nextModels.splice(index, 1);
-    onChange({ ...config, models: nextModels });
-  };
-
-  return (
-    <div className='card border-base-200 bg-base-100 border shadow'>
-      <div className='divide-base-200 divide-y'>
-        <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
-          <span>{_('Provider Type')}</span>
-          <select
-            className='select select-bordered select-sm bg-base-100 text-base-content w-full'
-            value={config.providerType}
-            onChange={(e) => {
-              const newType = e.target.value as AIProviderType;
-              const fresh = emptyConfig(newType);
-              onChange({ ...fresh, id: config.id, name: config.name });
-            }}
-          >
-            {SUPPORTED_PROVIDER_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {PROVIDER_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
-          <span>{_('Display Name')}</span>
-          <input
-            type='text'
-            className='input input-bordered input-sm w-full'
-            value={config.name}
-            onChange={(e) => update({ name: e.target.value })}
-            placeholder={PROVIDER_TYPE_LABELS[config.providerType]}
-          />
-        </div>
-
-        <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
-          <div className='flex w-full items-center justify-between'>
-            <span>{_('Base URL')}</span>
-            {config.providerType === 'ollama' && (
-              <button
-                className='btn btn-ghost btn-xs'
-                onClick={fetchOllamaModels}
-                disabled={fetchingModels}
-                title={_('Refresh Models')}
-              >
-                <PiArrowsClockwise className='size-4' />
-              </button>
-            )}
-          </div>
-          <input
-            type='text'
-            className='input input-bordered input-sm w-full'
-            value={config.baseUrl}
-            onChange={(e) => update({ baseUrl: e.target.value })}
-            placeholder={
-              config.providerType === 'ollama'
-                ? 'http://127.0.0.1:11434'
-                : config.providerType === 'openai'
-                  ? 'https://api.openai.com'
-                  : 'https://your-endpoint.example.com'
-            }
-          />
-        </div>
-
-        <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
-          <span>{_('API Key')}</span>
-          <input
-            type='password'
-            className='input input-bordered input-sm w-full'
-            value={config.apiKey ?? ''}
-            onChange={(e) => update({ apiKey: e.target.value })}
-            placeholder={
-              REQUIRES_API_KEY.has(config.providerType)
-                ? 'sk-...'
-                : _('Leave blank if not required')
-            }
-          />
-        </div>
-
-        {HAS_API_STANDARD.has(config.providerType) && (
-          <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
-            <span className='flex items-center gap-1'>
-              {_('API Standard')}
-              <HelpTip
-                tip={_(
-                  'Chat Completions uses /v1/chat/completions. Responses uses the newer /v1/responses endpoint.',
-                )}
-              />
-            </span>
-            <select
-              className='select select-bordered select-sm bg-base-100 text-base-content w-full'
-              value={config.apiStandard || 'chat-completions'}
-              onChange={(e) => update({ apiStandard: e.target.value as AIProviderApiStandard })}
-            >
-              <option value='chat-completions'>{_('Chat Completions')}</option>
-              <option value='responses'>{_('Responses')}</option>
-            </select>
-          </div>
-        )}
-
-        <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
-          <div className='flex w-full items-center justify-between'>
-            <span className='flex items-center gap-1'>
-              {_('Models')}
-              <HelpTip
-                tip={_(
-                  'Add one or more chat models and embedding models for this endpoint. Chat models handle translation/Q&A; embedding models power retrieval indexing.',
-                )}
-              />
-            </span>
-            <button className='btn btn-ghost btn-xs' type='button' onClick={addModelEntry}>
-              <PiPlus className='size-4' />
-              {_('Add model')}
-            </button>
-          </div>
-          <div className='flex w-full flex-col gap-2'>
-            {(config.models ?? []).map((model, index) => {
-              const allowEmbedding = providerTypeSupportsEmbeddings(config.providerType);
-              return (
-                <div
-                  key={`${model.kind}-${index}`}
-                  className='grid w-full gap-2 sm:grid-cols-[1fr,1fr,140px,auto]'
-                >
-                  <input
-                    type='text'
-                    className='input input-bordered input-sm w-full'
-                    value={model.id}
-                    onChange={(e) => setModelEntry(index, { id: e.target.value })}
-                    list={
-                      config.providerType === 'ollama'
-                        ? 'ollama-model-options'
-                        : config.providerType === 'ai-gateway' && model.kind === 'embedding'
-                          ? 'ai-gateway-embedding-model-options'
-                          : undefined
-                    }
-                    placeholder='model-id'
-                  />
-                  <input
-                    type='text'
-                    className='input input-bordered input-sm w-full'
-                    value={model.label ?? ''}
-                    onChange={(e) => setModelEntry(index, { label: e.target.value })}
-                    placeholder={_('Label (optional)')}
-                  />
-                  <div className='flex items-center gap-2'>
-                    <select
-                      className='select select-bordered select-sm bg-base-100 text-base-content w-full'
-                      value={model.kind}
-                      onChange={(e) =>
-                        setModelEntry(index, { kind: e.target.value as ModelEntry['kind'] })
-                      }
-                      disabled={!allowEmbedding}
-                    >
-                      <option value='chat'>{_('Chat')}</option>
-                      <option value='embedding'>{_('Embedding')}</option>
-                    </select>
-                    <HelpTip
-                      tip={_(
-                        'Chat models generate answers. Embedding models build semantic vectors used for retrieval and indexing.',
-                      )}
-                    />
-                  </div>
-                  <button
-                    className='btn btn-ghost btn-sm text-error'
-                    type='button'
-                    onClick={() => removeModelEntry(index)}
-                    aria-label={_('Remove model')}
-                  >
-                    <PiTrash className='size-4' />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          {config.providerType === 'ollama' && ollamaModels.length > 0 && (
-            <datalist id='ollama-model-options'>
-              {ollamaModels.map((model) => (
-                <option key={model} value={model} />
-              ))}
-            </datalist>
-          )}
-          {config.providerType === 'ai-gateway' && (
-            <datalist id='ai-gateway-embedding-model-options'>
-              {AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST.map((model) => (
-                <option key={model} value={model} />
-              ))}
-            </datalist>
-          )}
-        </div>
-
-        {!providerTypeSupportsEmbeddings(config.providerType) && (
-          <div className='config-item'>
-            <span className='text-warning text-xs'>
-              {_(
-                'This provider does not support embeddings. Assign a separate embedding provider for RAG.',
-              )}
-            </span>
-          </div>
-        )}
-
-        {providerTypeSupportsEmbeddings(config.providerType) &&
-          !resolveEmbeddingModelId(config) && (
-            <div className='config-item'>
-              <span className='text-warning text-xs'>
-                {_('Configure an embedding model before using this provider for book indexing.')}
-              </span>
-            </div>
-          )}
-
-        <div className='flex items-center justify-end gap-2 px-4 py-3'>
-          <button className='btn btn-ghost btn-sm' onClick={onCancel}>
-            {_('Cancel')}
-          </button>
-          <button
-            className='btn btn-primary btn-sm'
-            onClick={onSave}
-            disabled={!config.name.trim() || !chatModel.trim()}
-          >
-            {isNew ? _('Add Provider') : _('Save')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// AIPanel — main settings component
-// ---------------------------------------------------------------------------
+const getModelOptions = (): ModelOption[] => [
+  {
+    id: GATEWAY_MODELS.GEMINI_FLASH_LITE,
+    label: 'Gemini 2.5 Flash Lite',
+    inputCost: MODEL_PRICING[GATEWAY_MODELS.GEMINI_FLASH_LITE]?.input ?? '?',
+    outputCost: MODEL_PRICING[GATEWAY_MODELS.GEMINI_FLASH_LITE]?.output ?? '?',
+  },
+  {
+    id: GATEWAY_MODELS.GPT_5_NANO,
+    label: 'GPT-5 Nano',
+    inputCost: MODEL_PRICING[GATEWAY_MODELS.GPT_5_NANO]?.input ?? '?',
+    outputCost: MODEL_PRICING[GATEWAY_MODELS.GPT_5_NANO]?.output ?? '?',
+  },
+  {
+    id: GATEWAY_MODELS.LLAMA_4_SCOUT,
+    label: 'Llama 4 Scout',
+    inputCost: MODEL_PRICING[GATEWAY_MODELS.LLAMA_4_SCOUT]?.input ?? '?',
+    outputCost: MODEL_PRICING[GATEWAY_MODELS.LLAMA_4_SCOUT]?.output ?? '?',
+  },
+  {
+    id: GATEWAY_MODELS.GROK_4_1_FAST,
+    label: 'Grok 4.1 Fast',
+    inputCost: MODEL_PRICING[GATEWAY_MODELS.GROK_4_1_FAST]?.input ?? '?',
+    outputCost: MODEL_PRICING[GATEWAY_MODELS.GROK_4_1_FAST]?.output ?? '?',
+  },
+  {
+    id: GATEWAY_MODELS.DEEPSEEK_V3_2,
+    label: 'DeepSeek V3.2',
+    inputCost: MODEL_PRICING[GATEWAY_MODELS.DEEPSEEK_V3_2]?.input ?? '?',
+    outputCost: MODEL_PRICING[GATEWAY_MODELS.DEEPSEEK_V3_2]?.output ?? '?',
+  },
+  {
+    id: GATEWAY_MODELS.QWEN_3_235B,
+    label: 'Qwen 3 235B',
+    inputCost: MODEL_PRICING[GATEWAY_MODELS.QWEN_3_235B]?.input ?? '?',
+    outputCost: MODEL_PRICING[GATEWAY_MODELS.QWEN_3_235B]?.output ?? '?',
+  },
+];
 
 const AIPanel: React.FC = () => {
   const _ = useTranslation();
@@ -477,648 +67,465 @@ const AIPanel: React.FC = () => {
   const { settings, setSettings, saveSettings } = useSettingsStore();
 
   const aiSettings: AISettings = settings?.aiSettings ?? DEFAULT_AI_SETTINGS;
-  const profiles = aiSettings.profiles ?? [];
-
-  const initialProfiles = profiles.length > 0 ? profiles : [DEFAULT_AI_PROFILE];
-  const initialActiveProfileId = aiSettings.activeProfileId || initialProfiles[0]!.id;
-  const activeProfile =
-    initialProfiles.find((profile) => profile.id === initialActiveProfileId) ?? initialProfiles[0]!;
 
   const [enabled, setEnabled] = useState(aiSettings.enabled);
-  const [providers, setProviders] = useState<ProviderConfig[]>(
-    (aiSettings.providers ?? []).map((provider) =>
-      normalizeProviderConfig(provider as ProviderConfig),
-    ),
+  const [provider, setProvider] = useState<AIProviderName>(aiSettings.provider);
+  const [ollamaUrl, setOllamaUrl] = useState(aiSettings.ollamaBaseUrl);
+  const [ollamaModel, setOllamaModel] = useState(aiSettings.ollamaModel);
+  const [ollamaEmbeddingModel, setOllamaEmbeddingModel] = useState(aiSettings.ollamaEmbeddingModel);
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [gatewayKey, setGatewayKey] = useState(aiSettings.aiGatewayApiKey ?? '');
+
+  const savedCustomModel = aiSettings.aiGatewayCustomModel ?? '';
+  const savedModel = aiSettings.aiGatewayModel ?? DEFAULT_AI_SETTINGS.aiGatewayModel ?? '';
+  const isCustomModelSaved = savedCustomModel.length > 0;
+
+  const [selectedModel, setSelectedModel] = useState(
+    isCustomModelSaved ? CUSTOM_MODEL_VALUE : savedModel,
   );
-  const [profilesState, setProfilesState] = useState(initialProfiles);
-  const [activeProfileId, setActiveProfileId] = useState(initialActiveProfileId);
-  const [activeProviderId, setActiveProviderId] = useState(
-    activeProfile.modelAssignments.chat?.providerId ?? aiSettings.providers[0]?.id ?? '',
+  const [customModelInput, setCustomModelInput] = useState(savedCustomModel);
+  const [customModelStatus, setCustomModelStatus] = useState<CustomModelStatus>(
+    isCustomModelSaved ? 'valid' : 'idle',
   );
-  const [developerMode, setDeveloperMode] = useState(aiSettings.developerMode ?? false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingConfig, setEditingConfig] = useState<ProviderConfig | null>(null);
-  const [addingNew, setAddingNew] = useState(false);
-  const [newConfig, setNewConfig] = useState<ProviderConfig>(emptyConfig('ollama'));
+  const [customModelPricing, setCustomModelPricing] = useState<{
+    input: string;
+    output: string;
+  } | null>(isCustomModelSaved ? { input: '?', output: '?' } : null);
+  const [customModelError, setCustomModelError] = useState('');
+
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const selectedProfile =
-    profilesState.find((profile) => profile.id === activeProfileId) ??
-    profilesState[0] ??
-    DEFAULT_AI_PROFILE;
-  const modelAssignments: ModelAssignments = selectedProfile.modelAssignments ?? {};
-  const inferenceParamsByTask = selectedProfile.inferenceParamsByTask ?? {};
   const isMounted = useRef(false);
-  const settingsRef = useRef(settings);
+  const modelOptions = getModelOptions();
 
+  const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
 
-  const saveFullAiSettings = useCallback(
-    async (patch: Partial<AISettings>) => {
+  const saveAiSetting = useCallback(
+    async (key: keyof AISettings, value: AISettings[keyof AISettings]) => {
       const currentSettings = settingsRef.current;
       if (!currentSettings) return;
-      const current: AISettings = currentSettings.aiSettings ?? DEFAULT_AI_SETTINGS;
-      const updated: AISettings = { ...current, ...patch };
-      const newSettings = { ...currentSettings, aiSettings: updated };
+      const currentAiSettings: AISettings = currentSettings.aiSettings ?? DEFAULT_AI_SETTINGS;
+      const newAiSettings: AISettings = { ...currentAiSettings, [key]: value };
+      const newSettings = { ...currentSettings, aiSettings: newAiSettings };
+
       setSettings(newSettings);
       await saveSettings(envConfig, newSettings);
     },
     [envConfig, setSettings, saveSettings],
   );
 
-  const updateActiveProfile = useCallback(
-    (updater: (profile: typeof selectedProfile) => typeof selectedProfile) => {
-      setProfilesState((currentProfiles) => {
-        const existing =
-          currentProfiles.find((profile) => profile.id === activeProfileId) ?? selectedProfile;
-        const nextProfile = updater(existing);
-        return currentProfiles.map((profile) =>
-          profile.id === nextProfile.id ? nextProfile : profile,
-        );
-      });
-    },
-    [activeProfileId, selectedProfile],
-  );
+  const fetchOllamaModels = useCallback(async () => {
+    if (!ollamaUrl || !enabled) return;
 
-  const updateTaskAssignment = useCallback(
-    (task: AITaskType, selection: TaskModelSelection | undefined) => {
-      updateActiveProfile((profile) => ({
-        ...profile,
-        modelAssignments: { ...profile.modelAssignments, [task]: selection },
-      }));
-    },
-    [updateActiveProfile],
-  );
+    setFetchingModels(true);
+    try {
+      const response = await fetch(`${ollamaUrl}/api/tags`);
+      if (!response.ok) throw new Error('Failed to fetch models');
+      const data = await response.json();
+      const models = data.models?.map((m: { name: string }) => m.name) || [];
 
-  const updateTaskInferenceParams = useCallback(
-    (task: AITaskType, patch: Partial<InferenceParams>) => {
-      updateActiveProfile((profile) => ({
-        ...profile,
-        inferenceParamsByTask: {
-          ...profile.inferenceParamsByTask,
-          [task]: {
-            ...profile.inferenceParamsByTask[task],
-            ...patch,
-          },
-        },
-      }));
-    },
-    [updateActiveProfile],
-  );
+      setOllamaModels(models);
+      if (models.length > 0 && !models.includes(ollamaModel)) {
+        setOllamaModel(models[0]!);
+      }
+    } catch (_err) {
+      setOllamaModels([]);
+    } finally {
+      setFetchingModels(false);
+    }
+  }, [ollamaUrl, ollamaModel, enabled]);
+
+  useEffect(() => {
+    if (provider === 'ollama' && enabled) {
+      fetchOllamaModels();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider, enabled, ollamaUrl]);
 
   useEffect(() => {
     isMounted.current = true;
   }, []);
 
-  // Persist enabled
   useEffect(() => {
     if (!isMounted.current) return;
     if (enabled !== aiSettings.enabled) {
-      saveFullAiSettings({ enabled });
+      saveAiSetting('enabled', enabled);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 
-  // Persist providers/profile routing
   useEffect(() => {
     if (!isMounted.current) return;
-    saveFullAiSettings({
-      providers,
-      developerMode,
-      profiles: profilesState,
-      activeProfileId,
-    });
+    if (provider !== aiSettings.provider) {
+      saveAiSetting('provider', provider);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [providers, profilesState, activeProfileId, developerMode]);
+  }, [provider]);
 
   useEffect(() => {
-    const nextProviderId =
-      selectedProfile.modelAssignments.chat?.providerId ?? providers[0]?.id ?? '';
-    setActiveProviderId(nextProviderId);
-  }, [selectedProfile, providers]);
-
-  const handleAddProvider = () => {
-    const updated = [...providers, newConfig];
-    setProviders(updated);
-    if (updated.length === 1) {
-      setActiveProviderId(newConfig.id);
-      const firstChatModel = getModelsByKind(newConfig, 'chat')[0]?.id;
-      updateTaskAssignment('chat', { providerId: newConfig.id, modelId: firstChatModel });
+    if (!isMounted.current) return;
+    if (ollamaUrl !== aiSettings.ollamaBaseUrl) {
+      saveAiSetting('ollamaBaseUrl', ollamaUrl);
     }
-    setAddingNew(false);
-    setNewConfig(emptyConfig('ollama'));
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ollamaUrl]);
 
-  const handleSaveEdit = () => {
-    if (!editingConfig) return;
-    setProviders(providers.map((p) => (p.id === editingId ? editingConfig : p)));
-    setEditingId(null);
-    setEditingConfig(null);
-  };
-
-  const handleDeleteProvider = (id: string) => {
-    const updated = providers.filter((p) => p.id !== id);
-    setProviders(updated);
-    if (activeProviderId === id) {
-      setActiveProviderId(updated[0]?.id ?? '');
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (ollamaModel !== aiSettings.ollamaModel) {
+      saveAiSetting('ollamaModel', ollamaModel);
     }
-    // Clean up model assignments
-    setProfilesState((currentProfiles) =>
-      currentProfiles.map((profile) => {
-        const cleaned: ModelAssignments = { ...profile.modelAssignments };
-        for (const task of Object.keys(cleaned) as AITaskType[]) {
-          if (cleaned[task]?.providerId === id) delete cleaned[task];
-        }
-        return { ...profile, modelAssignments: cleaned };
-      }),
-    );
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ollamaModel]);
 
-  const handleAddProfile = () => {
-    const nextProfile = {
-      ...selectedProfile,
-      id: generateProfileId(),
-      name: `${selectedProfile.name} Copy`,
-    };
-    setProfilesState([...profilesState, nextProfile]);
-    setActiveProfileId(nextProfile.id);
-  };
-
-  const handleBlankProfile = () => {
-    const defaultAssignments = Object.fromEntries(
-      (['translation', 'dictionary', 'chat', 'embedding'] as AITaskType[]).flatMap((task) => {
-        const kind: ModelEntry['kind'] = task === 'embedding' ? 'embedding' : 'chat';
-        const provider = providers.find((entry) => getModelsByKind(entry, kind).length > 0);
-        const modelId = provider ? getModelsByKind(provider, kind)[0]?.id : undefined;
-        return provider && modelId ? [[task, { providerId: provider.id, modelId }]] : [];
-      }),
-    ) as ModelAssignments;
-
-    const nextProfile = {
-      ...DEFAULT_AI_PROFILE,
-      id: generateProfileId(),
-      name: `Profile ${profilesState.length + 1}`,
-      modelAssignments: defaultAssignments,
-    };
-    setProfilesState([...profilesState, nextProfile]);
-    setActiveProfileId(nextProfile.id);
-  };
-
-  const handleDeleteProfile = () => {
-    if (profilesState.length <= 1) return;
-    const filtered = profilesState.filter((profile) => profile.id !== activeProfileId);
-    setProfilesState(filtered);
-    setActiveProfileId(filtered[0]!.id);
-  };
-  const handleTestConnection = async () => {
-    const config = providers.find((p) => p.id === activeProviderId);
-    if (!config || !enabled) return;
-    setConnectionStatus('testing');
-    setErrorMessage('');
-
-    const runtimeSettings: AISettings = {
-      ...aiSettings,
-      providers,
-      profiles: profilesState,
-      activeProfileId,
-    };
-    let embeddingProviderId = activeProviderId;
-    try {
-      embeddingProviderId = getProviderForTask(runtimeSettings, 'embedding').config.id;
-    } catch {
-      // Keep the active-provider fallback when no embedding route can be resolved.
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (ollamaEmbeddingModel !== aiSettings.ollamaEmbeddingModel) {
+      saveAiSetting('ollamaEmbeddingModel', ollamaEmbeddingModel);
     }
-    const requireEmbedding = embeddingProviderId === config.id;
-    const chatModelId =
-      modelAssignments.chat?.providerId === config.id
-        ? modelAssignments.chat.modelId || resolveChatModelId(config)
-        : resolveChatModelId(config);
-    const embeddingModelId = requireEmbedding
-      ? modelAssignments.embedding?.providerId === config.id
-        ? modelAssignments.embedding.modelId || resolveEmbeddingModelId(config)
-        : resolveEmbeddingModelId(config)
-      : undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ollamaEmbeddingModel]);
 
-    if (requireEmbedding && !providerConfigCanServeEmbeddings(config)) {
-      setConnectionStatus('error');
-      setErrorMessage(
-        providerTypeSupportsEmbeddings(config.providerType)
-          ? _('Configure an embedding model before using this provider for book indexing.')
-          : _(
-              'This provider does not support embeddings. Assign a separate embedding provider for book indexing.',
-            ),
-      );
+  useEffect(() => {
+    if (!isMounted.current) return;
+    if (gatewayKey !== (aiSettings.aiGatewayApiKey ?? '')) {
+      saveAiSetting('aiGatewayApiKey', gatewayKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gatewayKey]);
+
+  // Get the effective model ID to use (either selected or custom)
+  const getEffectiveModelId = useCallback(() => {
+    if (selectedModel === CUSTOM_MODEL_VALUE && customModelStatus === 'valid') {
+      return customModelInput;
+    }
+    return selectedModel;
+  }, [selectedModel, customModelStatus, customModelInput]);
+
+  // Save model selection when it changes
+  useEffect(() => {
+    if (!isMounted.current) return;
+    const effectiveModel = getEffectiveModelId();
+    if (effectiveModel !== aiSettings.aiGatewayModel) {
+      saveAiSetting('aiGatewayModel', effectiveModel);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedModel, customModelStatus, customModelInput]);
+
+  // Save custom model separately
+  useEffect(() => {
+    if (!isMounted.current) return;
+    const customToSave =
+      selectedModel === CUSTOM_MODEL_VALUE && customModelStatus === 'valid' ? customModelInput : '';
+    if (customToSave !== (aiSettings.aiGatewayCustomModel ?? '')) {
+      saveAiSetting('aiGatewayCustomModel', customToSave);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedModel, customModelStatus, customModelInput]);
+
+  const handleModelChange = (value: string) => {
+    setSelectedModel(value);
+    if (value !== CUSTOM_MODEL_VALUE) {
+      setCustomModelStatus('idle');
+      setCustomModelError('');
+      setCustomModelPricing(null);
+    }
+  };
+
+  const validateCustomModel = async () => {
+    if (!customModelInput.trim()) {
+      setCustomModelError(_('Please enter a model ID'));
+      setCustomModelStatus('invalid');
       return;
     }
 
+    setCustomModelStatus('validating');
+    setCustomModelError('');
+
     try {
-      const provider = createProviderFromConfig(config);
-      const ok = await provider.healthCheck({
-        requireEmbedding,
-        modelId: chatModelId,
-        embeddingModelId,
-      });
-      if (ok) {
+      // Simple validation: try to make a minimal request to verify model exists
+      // This uses the AI Gateway to check if the model is available
+      const testSettings: AISettings = {
+        ...aiSettings,
+        provider: 'ai-gateway',
+        aiGatewayApiKey: gatewayKey,
+        aiGatewayModel: customModelInput.trim(),
+      };
+
+      const aiProvider = getAIProvider(testSettings);
+      const isAvailable = await aiProvider.isAvailable();
+
+      if (isAvailable) {
+        setCustomModelStatus('valid');
+        // Set unknown pricing for custom models
+        setCustomModelPricing({ input: '?', output: '?' });
+      } else {
+        setCustomModelStatus('invalid');
+        setCustomModelError(_('Model not available or invalid'));
+      }
+    } catch (_err) {
+      setCustomModelStatus('invalid');
+      setCustomModelError(_('Failed to validate model'));
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!enabled) return;
+    setConnectionStatus('testing');
+    setErrorMessage('');
+
+    try {
+      const effectiveModel = getEffectiveModelId();
+      const testSettings: AISettings = {
+        ...aiSettings,
+        provider,
+        ollamaBaseUrl: ollamaUrl,
+        ollamaModel,
+        ollamaEmbeddingModel,
+        aiGatewayApiKey: gatewayKey,
+        aiGatewayModel: effectiveModel,
+      };
+      const aiProvider = getAIProvider(testSettings);
+      const isHealthy = await aiProvider.healthCheck();
+      if (isHealthy) {
         setConnectionStatus('success');
       } else {
         setConnectionStatus('error');
-        setErrorMessage(_('Connection failed'));
+        setErrorMessage(
+          provider === 'ollama'
+            ? _("Couldn't connect to Ollama. Is it running?")
+            : _('Invalid API key or connection failed'),
+        );
       }
-    } catch (e) {
+    } catch (error) {
       setConnectionStatus('error');
-      setErrorMessage((e as Error).message || _('Connection failed'));
+      setErrorMessage((error as Error).message || _('Connection failed'));
     }
   };
 
   const disabledSection = !enabled ? 'opacity-50 pointer-events-none select-none' : '';
-  const activeConfig = providers.find((p) => p.id === activeProviderId);
 
   return (
     <div className='my-4 w-full space-y-6'>
-      {/* Enable toggle */}
-      <div className='w-full'>
-        <h2 className='mb-2 font-medium'>{_('AI Assistant')}</h2>
-        <div className='card border-base-200 bg-base-100 border shadow'>
-          <div className='divide-base-200 divide-y'>
-            <div className='config-item'>
-              <span>{_('Enable AI Assistant')}</span>
-              <input
-                type='checkbox'
-                className='toggle'
-                checked={enabled}
-                onChange={() => setEnabled(!enabled)}
-              />
-            </div>
-            <div className='config-item'>
-              <span className='flex items-center gap-1'>
-                {_('Developer Mode')}
-                <HelpTip
-                  tip={_(
-                    'Shows a popup debug panel with system prompt, user prompt, raw model output, and parsed result.',
-                  )}
-                />
-              </span>
-              <input
-                type='checkbox'
-                className='toggle'
-                checked={developerMode}
-                onChange={() => setDeveloperMode(!developerMode)}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      <BoxedList title={_('AI Assistant')}>
+        <SettingsSwitchRow
+          label={_('Enable AI Assistant')}
+          checked={enabled}
+          onChange={() => setEnabled(!enabled)}
+        />
+      </BoxedList>
 
-      {/* Provider List */}
-      <div className={clsx('w-full', disabledSection)}>
-        <div className='mb-2 flex items-center justify-between'>
-          <h2 className='font-medium'>{_('Providers')}</h2>
-          {!addingNew && (
-            <button
-              className='btn btn-ghost btn-xs'
-              onClick={() => setAddingNew(true)}
-              disabled={!enabled}
-            >
-              <PiPlus className='size-4' />
-              {_('Add')}
-            </button>
-          )}
-        </div>
+      <BoxedList title={_('Provider')} className={disabledSection}>
+        <SettingsRow label={_('Ollama (Local)')} asLabel>
+          <input
+            type='radio'
+            name='ai-provider'
+            className='radio'
+            checked={provider === 'ollama'}
+            onChange={() => setProvider('ollama')}
+            disabled={!enabled}
+          />
+        </SettingsRow>
+        <SettingsRow label={_('AI Gateway (Cloud)')} asLabel>
+          <input
+            type='radio'
+            name='ai-provider'
+            className='radio'
+            checked={provider === 'ai-gateway'}
+            onChange={() => setProvider('ai-gateway')}
+            disabled={!enabled}
+          />
+        </SettingsRow>
+      </BoxedList>
 
-        {/* Existing providers */}
-        <div className='space-y-2'>
-          {providers.map((p) => {
-            if (editingId === p.id && editingConfig) {
-              return (
-                <ProviderForm
-                  key={p.id}
-                  config={editingConfig}
-                  onChange={setEditingConfig}
-                  onSave={handleSaveEdit}
-                  onCancel={() => {
-                    setEditingId(null);
-                    setEditingConfig(null);
-                  }}
-                  isNew={false}
-                  _={_}
-                />
-              );
-            }
-            return (
-              <div
-                key={p.id}
-                className={clsx(
-                  'card border-base-200 bg-base-100 border shadow',
-                  activeProviderId === p.id && 'ring-primary ring-2',
-                )}
+      {provider === 'ollama' && (
+        <BoxedList title={_('Ollama Configuration')} className={disabledSection}>
+          {/* Stacked-content rows: label-on-top, input below — used when the
+              control is too wide to fit alongside the label (full-width text
+              inputs, long selects). Custom <div> rather than <SettingsRow>
+              since SettingsRow assumes label-left/control-right. */}
+          <div className='flex flex-col gap-2 py-3 pe-4'>
+            <div className='flex w-full items-center justify-between'>
+              <SettingLabel>{_('Server URL')}</SettingLabel>
+              <button
+                className='hover:bg-base-200 inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-150'
+                onClick={fetchOllamaModels}
+                disabled={!enabled || fetchingModels}
+                title={_('Refresh Models')}
+                aria-label={_('Refresh Models')}
               >
-                <div className='config-item'>
-                  <div className='flex items-center gap-2'>
-                    <input
-                      type='radio'
-                      name='active-provider'
-                      className='radio radio-sm'
-                      checked={activeProviderId === p.id}
-                      onChange={() => {
-                        setActiveProviderId(p.id);
-                        const firstChatModel = getModelsByKind(p, 'chat')[0]?.id;
-                        updateTaskAssignment('chat', { providerId: p.id, modelId: firstChatModel });
-                      }}
-                    />
-                    <div>
-                      <div className='text-sm font-medium'>{p.name}</div>
-                      <div className='text-base-content/50 text-xs'>
-                        {PROVIDER_TYPE_LABELS[p.providerType] ?? p.providerType} &middot;{' '}
-                        {resolveChatModelId(p) || _('No model')}
-                      </div>
-                    </div>
-                  </div>
-                  <div className='flex items-center gap-1'>
-                    <button
-                      className='btn btn-ghost btn-xs'
-                      onClick={() => {
-                        setEditingId(p.id);
-                        setEditingConfig({ ...p });
-                      }}
-                      title={_('Edit')}
-                    >
-                      <PiPencilSimple className='size-4' />
-                    </button>
-                    <button
-                      className='btn btn-ghost btn-xs text-error'
-                      onClick={() => handleDeleteProvider(p.id)}
-                      title={_('Delete')}
-                    >
-                      <PiTrash className='size-4' />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {providers.length === 0 && !addingNew && (
-            <div className='text-base-content/50 py-4 text-center text-sm'>
-              {_('No providers configured. Click Add to get started.')}
+                <PiArrowsClockwise className='size-4' />
+              </button>
             </div>
-          )}
-        </div>
-
-        {/* Add new form */}
-        {addingNew && (
-          <div className='mt-2'>
-            <ProviderForm
-              config={newConfig}
-              onChange={setNewConfig}
-              onSave={handleAddProvider}
-              onCancel={() => {
-                setAddingNew(false);
-                setNewConfig(emptyConfig('ollama'));
-              }}
-              isNew={true}
-              _={_}
+            <input
+              type='text'
+              className='input input-bordered input-sm w-full'
+              value={ollamaUrl}
+              onChange={(e) => setOllamaUrl(e.target.value)}
+              placeholder='http://127.0.0.1:11434'
+              disabled={!enabled}
             />
           </div>
-        )}
-      </div>
-
-      {/* Connection Test */}
-      <div className={clsx('w-full', disabledSection)}>
-        <h2 className='mb-2 font-medium'>{_('Connection')}</h2>
-        <div className='card border-base-200 bg-base-100 border shadow'>
-          <div className='divide-base-200 divide-y'>
-            <div className='config-item'>
-              <div className='flex flex-col'>
-                <span className='text-sm'>
-                  {activeConfig
-                    ? `${activeConfig.name} — ${resolveChatModelId(activeConfig) || _('No model')}`
-                    : _('No active provider')}
-                </span>
+          {ollamaModels.length > 0 ? (
+            <>
+              <div className='flex flex-col gap-2 py-3 pe-4'>
+                <SettingLabel>{_('AI Model')}</SettingLabel>
+                <select
+                  className='select select-bordered select-sm bg-base-100 text-base-content w-full'
+                  value={ollamaModel}
+                  onChange={(e) => setOllamaModel(e.target.value)}
+                  disabled={!enabled}
+                >
+                  {ollamaModels.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className='flex items-center gap-2'>
+              <div className='flex flex-col gap-2 py-3 pe-4'>
+                <SettingLabel>{_('Embedding Model')}</SettingLabel>
+                <select
+                  className='select select-bordered select-sm bg-base-100 text-base-content w-full'
+                  value={ollamaEmbeddingModel}
+                  onChange={(e) => setOllamaEmbeddingModel(e.target.value)}
+                  disabled={!enabled}
+                >
+                  {ollamaModels.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : !fetchingModels ? (
+            <SettingsRow
+              label={<span className='text-warning text-sm'>{_('No models detected')}</span>}
+            />
+          ) : null}
+        </BoxedList>
+      )}
+
+      {provider === 'ai-gateway' && (
+        <BoxedList
+          title={_('AI Gateway Configuration')}
+          description={_(
+            'Choose from a selection of high-quality, economical AI models. You can also bring your own model by selecting "Custom Model" below.',
+          )}
+          className={disabledSection}
+        >
+          <div className='flex flex-col gap-2 px-4 py-3'>
+            <div className='flex w-full items-center justify-between'>
+              <SettingLabel>{_('API Key')}</SettingLabel>
+              <a
+                href='https://vercel.com/docs/ai/ai-gateway'
+                target='_blank'
+                rel='noopener noreferrer'
+                className={clsx('link text-xs', !enabled && 'pointer-events-none')}
+              >
+                {_('Get Key')}
+              </a>
+            </div>
+            <input
+              type='password'
+              className='input input-bordered input-sm w-full'
+              value={gatewayKey}
+              onChange={(e) => setGatewayKey(e.target.value)}
+              placeholder='vck_...'
+              disabled={!enabled}
+            />
+          </div>
+          <div className='flex flex-col gap-2 px-4 py-3'>
+            <SettingLabel>{_('Model')}</SettingLabel>
+            <select
+              className='select select-bordered select-sm bg-base-100 text-base-content w-full'
+              value={selectedModel}
+              onChange={(e) => handleModelChange(e.target.value)}
+              disabled={!enabled}
+            >
+              {modelOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label} — ${opt.inputCost}/M in, ${opt.outputCost}/M out
+                </option>
+              ))}
+              <option value={CUSTOM_MODEL_VALUE}>{_('Custom Model...')}</option>
+            </select>
+          </div>
+
+          {selectedModel === CUSTOM_MODEL_VALUE && (
+            <div className='flex flex-col gap-2 px-4 py-3'>
+              <SettingLabel>{_('Custom Model ID')}</SettingLabel>
+              <div className='flex w-full gap-2'>
+                <input
+                  type='text'
+                  className='input input-bordered input-sm flex-1'
+                  value={customModelInput}
+                  onChange={(e) => {
+                    setCustomModelInput(e.target.value);
+                    setCustomModelStatus('idle');
+                    setCustomModelError('');
+                  }}
+                  placeholder='provider/model-name'
+                  disabled={!enabled}
+                />
                 <button
                   className='btn btn-outline btn-sm'
-                  onClick={handleTestConnection}
-                  disabled={!enabled || !activeConfig || connectionStatus === 'testing'}
+                  onClick={validateCustomModel}
+                  disabled={!enabled || customModelStatus === 'validating'}
                 >
-                  {connectionStatus === 'testing' ? (
+                  {customModelStatus === 'validating' ? (
                     <PiSpinner className='size-4 animate-spin' />
                   ) : (
-                    _('Test Connection')
+                    _('Validate')
                   )}
                 </button>
-                {connectionStatus === 'success' && (
-                  <span className='text-success flex items-center gap-1 text-sm'>
-                    <PiCheckCircle className='size-4 shrink-0' />
-                    {_('Connected')}
-                  </span>
-                )}
-                {connectionStatus === 'error' && (
-                  <span className='text-error flex items-center gap-1 text-sm'>
-                    <PiWarningCircle className='size-4 shrink-0' />
-                    {errorMessage || _('Failed')}
-                  </span>
-                )}
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Profiles */}
-      {providers.length > 0 && (
-        <div className={clsx('w-full', disabledSection)}>
-          <button
-            className='mb-2 flex items-center gap-1 font-medium'
-            onClick={() => setShowAdvanced(!showAdvanced)}
-          >
-            <span className={clsx('transition-transform', showAdvanced && 'rotate-90')}>
-              &#9654;
-            </span>
-            {_('AI Profiles')}
-          </button>
-          {showAdvanced && (
-            <div className='card border-base-200 bg-base-100 border shadow'>
-              <div className='divide-base-200 divide-y'>
-                <div className='flex flex-wrap items-center gap-2 px-4 py-3'>
-                  {profilesState.map((profile) => (
-                    <button
-                      key={profile.id}
-                      className={clsx(
-                        'btn btn-xs',
-                        profile.id === activeProfileId ? 'btn-primary' : 'btn-ghost',
-                      )}
-                      onClick={() => setActiveProfileId(profile.id)}
-                    >
-                      {profile.name}
-                    </button>
-                  ))}
-                  <button className='btn btn-ghost btn-xs' onClick={handleBlankProfile}>
-                    <PiPlus className='size-4' />
-                    {_('New')}
-                  </button>
-                  <button className='btn btn-ghost btn-xs' onClick={handleAddProfile}>
-                    {_('Duplicate')}
-                  </button>
-                  <button
-                    className='btn btn-ghost btn-xs text-error'
-                    onClick={handleDeleteProfile}
-                    disabled={profilesState.length <= 1}
-                  >
-                    <PiTrash className='size-4' />
-                    {_('Delete')}
-                  </button>
-                </div>
-
-                <div className='config-item !h-auto flex-col !items-start gap-2 py-3'>
-                  <span>{_('Profile Name')}</span>
-                  <input
-                    type='text'
-                    className='input input-bordered input-sm w-full'
-                    value={selectedProfile.name}
-                    onChange={(e) =>
-                      updateActiveProfile((profile) => ({ ...profile, name: e.target.value }))
-                    }
-                  />
-                </div>
-
-                {(['translation', 'dictionary', 'chat', 'embedding'] as AITaskType[]).map(
-                  (task) => {
-                    const kind: ModelEntry['kind'] = task === 'embedding' ? 'embedding' : 'chat';
-                    const selectableProviders = providers.filter(
-                      (provider) => getModelsByKind(provider, kind).length > 0,
-                    );
-                    const selection = modelAssignments[task];
-                    const selectedProvider =
-                      selectableProviders.find(
-                        (provider) => provider.id === selection?.providerId,
-                      ) ??
-                      (task === 'chat'
-                        ? selectableProviders.find((provider) => provider.id === activeProviderId)
-                        : selectableProviders[0]);
-                    const modelOptions = selectedProvider
-                      ? getModelsByKind(selectedProvider, kind)
-                      : [];
-                    const selectedModelId =
-                      modelOptions.find((model) => model.id === selection?.modelId)?.id ||
-                      modelOptions[0]?.id ||
-                      '';
-                    const params = inferenceParamsByTask[task] ?? {};
-
-                    return (
-                      <div
-                        key={task}
-                        className='config-item !h-auto flex-col !items-start gap-3 py-3'
-                      >
-                        <span>{_(TASK_LABELS[task])}</span>
-                        <div className='grid w-full gap-2 sm:grid-cols-2'>
-                          <select
-                            className='select select-bordered select-sm bg-base-100 text-base-content w-full'
-                            value={selectedProvider?.id ?? ''}
-                            onChange={(e) => {
-                              const providerId = e.target.value;
-                              const provider = selectableProviders.find(
-                                (item) => item.id === providerId,
-                              );
-                              const firstModelId = provider
-                                ? getModelsByKind(provider, kind)[0]?.id
-                                : undefined;
-                              updateTaskAssignment(
-                                task,
-                                providerId ? { providerId, modelId: firstModelId } : undefined,
-                              );
-                            }}
-                          >
-                            {selectableProviders.map((provider) => (
-                              <option key={provider.id} value={provider.id}>
-                                {provider.name}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            className='select select-bordered select-sm bg-base-100 text-base-content w-full'
-                            value={selectedModelId}
-                            onChange={(e) => {
-                              if (!selectedProvider) return;
-                              updateTaskAssignment(task, {
-                                providerId: selectedProvider.id,
-                                modelId: e.target.value,
-                              });
-                            }}
-                            disabled={!selectedProvider}
-                          >
-                            {modelOptions.map((model) => (
-                              <option key={model.id} value={model.id}>
-                                {model.label || model.id}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className='grid w-full gap-2 sm:grid-cols-4'>
-                          <input
-                            type='number'
-                            className='input input-bordered input-sm w-full'
-                            placeholder={_('Temperature')}
-                            value={params.temperature ?? ''}
-                            onChange={(e) =>
-                              updateTaskInferenceParams(task, {
-                                temperature: e.target.value ? Number(e.target.value) : undefined,
-                              })
-                            }
-                          />
-                          <input
-                            type='number'
-                            className='input input-bordered input-sm w-full'
-                            placeholder={_('Top-p')}
-                            value={params.topP ?? ''}
-                            onChange={(e) =>
-                              updateTaskInferenceParams(task, {
-                                topP: e.target.value ? Number(e.target.value) : undefined,
-                              })
-                            }
-                          />
-                          <input
-                            type='number'
-                            className='input input-bordered input-sm w-full'
-                            placeholder={_('Max tokens')}
-                            value={params.maxTokens ?? ''}
-                            onChange={(e) =>
-                              updateTaskInferenceParams(task, {
-                                maxTokens: e.target.value ? Number(e.target.value) : undefined,
-                              })
-                            }
-                          />
-                          <select
-                            data-testid={`task-reasoning-${task}`}
-                            className='select select-bordered select-sm bg-base-100 text-base-content w-full'
-                            value={params.reasoningEffort ?? ''}
-                            onChange={(e) =>
-                              updateTaskInferenceParams(task, {
-                                reasoningEffort: (e.target.value ||
-                                  undefined) as InferenceParams['reasoningEffort'],
-                              })
-                            }
-                          >
-                            <option value=''>{_('Reasoning')}</option>
-                            <option value='off'>{_('Off')}</option>
-                            <option value='low'>{_('Low')}</option>
-                            <option value='medium'>{_('Medium')}</option>
-                            <option value='high'>{_('High')}</option>
-                          </select>
-                        </div>
-                      </div>
-                    );
-                  },
-                )}
-              </div>
+              {customModelStatus === 'valid' && customModelPricing && (
+                <span className='text-success flex items-center gap-1 text-sm'>
+                  <PiCheckCircle />
+                  {_('Model available')} · ${customModelPricing.input}/M in, $
+                  {customModelPricing.output}/M out
+                </span>
+              )}
+              {customModelStatus === 'invalid' && (
+                <span className='text-error text-sm'>{customModelError}</span>
+              )}
             </div>
           )}
-        </div>
+        </BoxedList>
       )}
+
+      <BoxedList title={_('Connection')} className={disabledSection}>
+        <div className='flex min-h-14 items-center justify-between gap-3 pe-4'>
+          <button
+            className='btn btn-outline btn-sm'
+            onClick={handleTestConnection}
+            disabled={!enabled || connectionStatus === 'testing'}
+          >
+            {_('Test Connection')}
+          </button>
+          <div>
+            {connectionStatus === 'success' && (
+              <span className='text-success flex items-center gap-1 text-sm'>
+                <PiCheckCircle className='size-4 shrink-0' />
+                {_('Connected')}
+              </span>
+            )}
+            {connectionStatus === 'error' && (
+              <span className='text-error flex items-center gap-1 text-sm'>
+                <PiWarningCircle className='size-4 shrink-0' />
+                {errorMessage || _('Failed')}
+              </span>
+            )}
+          </div>
+        </div>
+      </BoxedList>
     </div>
   );
 };

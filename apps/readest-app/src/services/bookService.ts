@@ -296,6 +296,7 @@ export async function importBook(
       if (series) {
         book.metadata.series = formatTitle(series.name);
         book.metadata.seriesIndex = parseFloat(series.position || '0');
+        if (series.total) book.metadata.seriesTotal = parseInt(series.total, 10);
       }
     }
     // update book metadata when reimporting the same book
@@ -570,6 +571,7 @@ export async function refreshBookMetadata(fs: FileSystem, book: Book): Promise<b
     if (series) {
       book.metadata.series = formatTitle(series.name);
       book.metadata.seriesIndex = parseFloat(series.position || '0');
+      if (series.total) book.metadata.seriesTotal = parseInt(series.total, 10);
     }
   }
 

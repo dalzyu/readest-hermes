@@ -1,17 +1,15 @@
 import clsx from 'clsx';
 import React, { useCallback, useEffect, useRef } from 'react';
-import { FaCirclePause, FaCirclePlay, FaHeadphones } from 'react-icons/fa6';
+import { FaHeadphones } from 'react-icons/fa6';
 import { RiArrowLeftSLine, RiArrowRightSLine } from 'react-icons/ri';
 import { RiArrowGoBackLine, RiArrowGoForwardLine } from 'react-icons/ri';
 import { RiArrowLeftDoubleLine, RiArrowRightDoubleLine } from 'react-icons/ri';
-import { getNavigationIcon, getNavigationLabel, getNavigationHandler } from './utils';
 import { useReaderStore } from '@/store/readerStore';
-import { useAudioSyncStore } from '@/store/audioSyncStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useBookDataStore } from '@/store/bookDataStore';
-import { useAudioSync } from '@/hooks/useAudioSync';
-import { FooterBarChildProps } from './types';
 import { formatProgress } from '@/utils/progress';
+import type { FooterBarChildProps } from './types';
+import { getNavigationIcon } from './utils';
 import Button from '@/components/Button';
 
 const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
@@ -25,15 +23,12 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
 }) => {
   const _ = useTranslation();
   const { hoveredBookKey, getView, getViewState, getProgress, getViewSettings } = useReaderStore();
-  const { sessionStates } = useAudioSyncStore();
   const { getBookData } = useBookDataStore();
-  const { controller: audioSyncController, status: audioSyncStatus } = useAudioSync(bookKey);
   const view = getView(bookKey);
   const bookData = getBookData(bookKey);
   const progress = getProgress(bookKey);
   const viewState = getViewState(bookKey);
   const viewSettings = getViewSettings(bookKey);
-  const audioSession = sessionStates[bookKey.split('-')[0]!];
   const progressStyle = viewSettings?.progressStyle || 'percentage';
 
   const [progressValue, setProgressValue] = React.useState(
@@ -70,15 +65,6 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
     [navigationHandlers],
   );
 
-  const handleToggleAudiobook = useCallback(async () => {
-    if (!audioSyncController) return;
-    if (audioSession?.mode === 'playing') {
-      audioSyncController.pause();
-      return;
-    }
-    await audioSyncController.play();
-  }, [audioSession?.mode, audioSyncController]);
-
   const isMobile = window.innerWidth < 640 || window.innerHeight < 640;
 
   return (
@@ -100,23 +86,15 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
             <RiArrowLeftDoubleLine />,
             <RiArrowRightDoubleLine />,
           )}
-          onClick={getNavigationHandler(
-            viewSettings?.rtl,
-            navigationHandlers.onPrevSection,
-            navigationHandlers.onNextSection,
-          )}
-          label={getNavigationLabel(viewSettings?.rtl, _('Previous Section'), _('Next Section'))}
+          onClick={navigationHandlers.onPrevSection}
+          label={_('Previous Section')}
         />
       )}
       {!viewSettings?.showPaginationButtons && (
         <Button
           icon={getNavigationIcon(viewSettings?.rtl, <RiArrowLeftSLine />, <RiArrowRightSLine />)}
-          onClick={getNavigationHandler(
-            viewSettings?.rtl,
-            navigationHandlers.onPrevPage,
-            navigationHandlers.onNextPage,
-          )}
-          label={getNavigationLabel(viewSettings?.rtl, _('Previous Page'), _('Next Page'))}
+          onClick={navigationHandlers.onPrevPage}
+          label={_('Previous Page')}
         />
       )}
       <Button
@@ -150,20 +128,6 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
         value={progressValue}
         onChange={(e) => handleProgressChange(parseInt(e.target.value, 10))}
       />
-      {audioSyncStatus?.playable && (
-        <Button
-          icon={
-            audioSession?.mode === 'playing' ? (
-              <FaCirclePause className='text-blue-500' />
-            ) : (
-              <FaCirclePlay className='text-blue-500' />
-            )
-          }
-          onClick={() => void handleToggleAudiobook()}
-          label={audioSession?.mode === 'playing' ? _('Pause Audiobook') : _('Play Audiobook')}
-          disabled={!audioSyncController}
-        />
-      )}
       <Button
         icon={<FaHeadphones className={viewState?.ttsEnabled ? 'text-blue-500' : ''} />}
         onClick={onSpeakText!}
@@ -172,12 +136,8 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
       {!viewSettings?.showPaginationButtons && (
         <Button
           icon={getNavigationIcon(viewSettings?.rtl, <RiArrowRightSLine />, <RiArrowLeftSLine />)}
-          onClick={getNavigationHandler(
-            viewSettings?.rtl,
-            navigationHandlers.onNextPage,
-            navigationHandlers.onPrevPage,
-          )}
-          label={getNavigationLabel(viewSettings?.rtl, _('Next Page'), _('Previous Page'))}
+          onClick={navigationHandlers.onNextPage}
+          label={_('Next Page')}
         />
       )}
       {!viewSettings?.showPaginationButtons && (
@@ -187,12 +147,8 @@ const DesktopFooterBar: React.FC<FooterBarChildProps> = ({
             <RiArrowRightDoubleLine />,
             <RiArrowLeftDoubleLine />,
           )}
-          onClick={getNavigationHandler(
-            viewSettings?.rtl,
-            navigationHandlers.onNextSection,
-            navigationHandlers.onPrevSection,
-          )}
-          label={getNavigationLabel(viewSettings?.rtl, _('Next Section'), _('Previous Section'))}
+          onClick={navigationHandlers.onNextSection}
+          label={_('Next Section')}
         />
       )}
     </div>
