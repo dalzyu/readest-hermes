@@ -221,9 +221,6 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
   hyphenation: true,
   invertImgColorInDark: false,
   theme: 'light',
-  overrideFont: false,
-  overrideLayout: false,
-  overrideColor: false,
   backgroundTextureId: 'none',
   backgroundOpacity: 0.6,
   backgroundSize: 'cover',
@@ -232,6 +229,11 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
   codeLanguage: 'auto-detect',
   userStylesheet: '',
   userUIStylesheet: '',
+
+  overrideFont: false,
+  overrideLayout: false,
+  overrideColor: false,
+  useBookLayout: false,
 
   zoomMode: 'fit-page',
   spreadMode: 'auto',
