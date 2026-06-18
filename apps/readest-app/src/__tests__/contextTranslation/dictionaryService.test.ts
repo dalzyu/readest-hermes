@@ -160,8 +160,9 @@ describe('importUserDictionary', () => {
       parseIfo: vi.fn(() => ({ name: 'Empty', wordcount: 0 })),
     }));
     vi.resetModules();
-    const { importUserDictionary: reimport } =
-      await import('@/services/learning/dictionaryService');
+    const { importUserDictionary: reimport } = await import(
+      '@/services/learning/dictionaryService'
+    );
 
     await expect(
       reimport(fakeZipBuffer(), {

@@ -57,10 +57,10 @@ function buildPackageFailureStatus(
 function shouldGeneratePackage(status: AudioSyncStatus): boolean {
   return Boolean(
     status.asset &&
-    status.map &&
-    !status.package &&
-    (!status.job || status.job.phase === 'ready') &&
-    !status.job?.error,
+      status.map &&
+      !status.package &&
+      (!status.job || status.job.phase === 'ready') &&
+      !status.job?.error,
   );
 }
 

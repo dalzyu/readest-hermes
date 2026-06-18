@@ -30,19 +30,18 @@ describe('/api/ai/embed', () => {
     expect(json.error).toMatch(/not allowed/i);
   });
 
-  test.each(AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST)(
-    'accepts whitelisted embedding model %s',
-    async (model) => {
-      const req = new NextRequest('http://localhost/api/ai/embed', {
-        method: 'POST',
-        body: JSON.stringify({
-          texts: ['hello'],
-          model,
-          apiKey: 'test-key',
-        }),
-      });
-      const res = await POST(req);
-      expect(res.status).not.toBe(400);
-    },
-  );
+  test.each(
+    AI_GATEWAY_EMBEDDING_MODEL_ALLOWLIST,
+  )('accepts whitelisted embedding model %s', async (model) => {
+    const req = new NextRequest('http://localhost/api/ai/embed', {
+      method: 'POST',
+      body: JSON.stringify({
+        texts: ['hello'],
+        model,
+        apiKey: 'test-key',
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).not.toBe(400);
+  });
 });

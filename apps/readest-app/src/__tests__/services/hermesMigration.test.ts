@@ -56,7 +56,9 @@ function cloneRecord(record: SeedRecord): SeedRecord {
 
 function createIndexedDbMock({
   includeDatabases = true,
-}: { includeDatabases?: boolean } = {}): IndexedDbMock {
+}: {
+  includeDatabases?: boolean;
+} = {}): IndexedDbMock {
   const states = new Map<string, DbState>();
 
   const getStoreState = (dbName: string, storeName: string): StoreState => {

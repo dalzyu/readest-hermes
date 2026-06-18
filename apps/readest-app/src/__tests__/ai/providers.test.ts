@@ -386,50 +386,50 @@ describe('OpenAIProvider', () => {
   });
 });
 
-describe.each(GENERIC_SDK_PROVIDER_CASES)(
-  'GenericSdkProvider $providerType',
-  ({ providerType, expectedBaseURL }) => {
-    beforeEach(() => {
-      vi.clearAllMocks();
+describe.each(GENERIC_SDK_PROVIDER_CASES)('GenericSdkProvider $providerType', ({
+  providerType,
+  expectedBaseURL,
+}) => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('supports the runtime provider and resolves the expected base URL', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [{ id: 'chat-model' }] }),
     });
 
-    test('supports the runtime provider and resolves the expected base URL', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: [{ id: 'chat-model' }] }),
-      });
+    const provider = createProviderFromConfig({
+      id: `${providerType}-test`,
+      name: `${providerType} provider`,
+      providerType,
+      baseUrl: '',
+      models: [{ id: 'chat-model', kind: 'chat' }],
+      apiKey: 'test-key',
+    });
 
-      const provider = createProviderFromConfig({
-        id: `${providerType}-test`,
-        name: `${providerType} provider`,
-        providerType,
-        baseUrl: '',
-        models: [{ id: 'chat-model', kind: 'chat' }],
+    expect(GenericSdkProvider.supports(providerType)).toBe(true);
+    expect(provider.providerType).toBe(providerType);
+    expect(provider.getModel('chat-model')).toBe('chat:chat-model');
+
+    await provider.healthCheck({ modelId: 'chat-model' });
+
+    expect(mockCreateOpenAICompatible).toHaveBeenCalledWith(
+      expect.objectContaining({
         apiKey: 'test-key',
-      });
-
-      expect(GenericSdkProvider.supports(providerType)).toBe(true);
-      expect(provider.providerType).toBe(providerType);
-      expect(provider.getModel('chat-model')).toBe('chat:chat-model');
-
-      await provider.healthCheck({ modelId: 'chat-model' });
-
-      expect(mockCreateOpenAICompatible).toHaveBeenCalledWith(
-        expect.objectContaining({
-          apiKey: 'test-key',
-          baseURL: expectedBaseURL,
-        }),
-      );
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(
-        `${expectedBaseURL}/models`,
-        expect.objectContaining({
-          headers: { Authorization: 'Bearer test-key' },
-        }),
-      );
-    });
-  },
-);
+        baseURL: expectedBaseURL,
+      }),
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${expectedBaseURL}/models`,
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer test-key' },
+      }),
+    );
+  });
+});
 
 describe('GenericSdkProvider health check normalization', () => {
   beforeEach(() => {
@@ -463,20 +463,19 @@ describe('GenericSdkProvider health check normalization', () => {
   });
 });
 
-describe.each(SUPPORTED_PROVIDER_TYPES)(
-  'createProviderFromConfig supports $providerType',
-  (providerType) => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
+describe.each(
+  SUPPORTED_PROVIDER_TYPES,
+)('createProviderFromConfig supports $providerType', (providerType) => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-    test('instantiates the runtime provider without throwing', () => {
-      const provider = createProviderFromConfig(buildProviderConfig(providerType));
+  test('instantiates the runtime provider without throwing', () => {
+    const provider = createProviderFromConfig(buildProviderConfig(providerType));
 
-      expect(provider.providerType).toBe(providerType);
-    });
-  },
-);
+    expect(provider.providerType).toBe(providerType);
+  });
+});
 
 describe('getAIProvider', () => {
   test('should return OllamaProvider for ollama settings', () => {

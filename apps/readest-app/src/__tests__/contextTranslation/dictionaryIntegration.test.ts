@@ -96,8 +96,9 @@ function readDictZip(): Uint8Array {
 // ---------------------------------------------------------------------------
 // Import the subject under test *after* mocks are registered
 // ---------------------------------------------------------------------------
-const { importUserDictionary, deleteUserDictionary, lookupDefinitions, findMatches } =
-  await import('@/services/learning/dictionaryService');
+const { importUserDictionary, deleteUserDictionary, lookupDefinitions, findMatches } = await import(
+  '@/services/learning/dictionaryService'
+);
 
 // ---------------------------------------------------------------------------
 // Tests

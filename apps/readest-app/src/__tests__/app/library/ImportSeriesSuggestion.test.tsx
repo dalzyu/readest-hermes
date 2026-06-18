@@ -267,17 +267,19 @@ describe('buildImportSeriesSuggestions — multilingual normalization', () => {
       seriesName: 'ثلاثية غرناطة',
       existingTitle: 'ثلاثية غرناطة 1',
     },
-  ] as const)(
-    '$label titles and authors produce a suggestion',
-    ({ title, author, seriesName, existingTitle }) => {
-      const importedBook = makeBook({ title, author });
-      const series: BookSeries[] = [makeSeries(seriesName, ['existing-1'])];
-      const library: Book[] = [makeBook({ hash: 'existing-1', title: existingTitle, author })];
+  ] as const)('$label titles and authors produce a suggestion', ({
+    title,
+    author,
+    seriesName,
+    existingTitle,
+  }) => {
+    const importedBook = makeBook({ title, author });
+    const series: BookSeries[] = [makeSeries(seriesName, ['existing-1'])];
+    const library: Book[] = [makeBook({ hash: 'existing-1', title: existingTitle, author })];
 
-      const suggestions = buildImportSeriesSuggestions([importedBook], series, library);
-      expect(suggestions).toHaveLength(1);
-      expect(suggestions[0]?.series.name).toBe(seriesName);
-      expect(suggestions[0]?.suggestedVolumeIndex).toBe(2);
-    },
-  );
+    const suggestions = buildImportSeriesSuggestions([importedBook], series, library);
+    expect(suggestions).toHaveLength(1);
+    expect(suggestions[0]?.series.name).toBe(seriesName);
+    expect(suggestions[0]?.suggestedVolumeIndex).toBe(2);
+  });
 });
