@@ -20,6 +20,7 @@ import { useTransferQueue } from '@/hooks/useTransferQueue';
 import { useTheme } from '@/hooks/useTheme';
 import { useLibrary } from '@/hooks/useLibrary';
 import { eventDispatcher } from '@/utils/event';
+import { navigateToReader } from '@/utils/nav';
 import { getFileExtFromMimeType } from '@/libs/document';
 import { OPDSFeed, OPDSPublication, OPDSSearch } from '@/types/opds';
 import {
@@ -37,7 +38,8 @@ import {
   probeFilename,
 } from './utils/opdsReq';
 import { ImportError } from '@/services/errors';
-import { HERMES_OPDS_USER_AGENT } from '@/services/constants';
+import { READEST_OPDS_USER_AGENT } from '@/services/constants';
+import { buildPseStreamFileName } from '@/services/opds/pseStream';
 import { FeedView } from './components/FeedView';
 import { PublicationView } from './components/PublicationView';
 import { SearchView } from './components/SearchView';
@@ -140,11 +142,11 @@ export default function BrowserPage() {
           formData[param.name] = param.value || '';
         }
       });
-      const map = new Map<string | null, Map<string | null, string>>();
+      const map = new Map<string | undefined, Map<string, string>>();
 
       for (const param of search.params || []) {
         const value = formData[param.name] || '';
-        const ns = param.ns ?? null;
+        const ns = param.ns ?? undefined;
 
         if (map.has(ns)) {
           map.get(ns)!.set(param.name, value);
@@ -229,7 +231,7 @@ export default function BrowserPage() {
               addToHistory(url, newState, 'feed', null);
             }
           } else if (localName === 'entry') {
-            const publication = getPublication(doc.documentElement);
+            const publication = getPublication(doc.documentElement) as OPDSPublication;
             const newState = {
               publication,
               baseURL: responseURL,
@@ -244,7 +246,7 @@ export default function BrowserPage() {
               addToHistory(url, newState, 'publication', null);
             }
           } else if (localName === 'OpenSearchDescription') {
-            const search = getOpenSearch(doc);
+            const search = getOpenSearch(doc) as OPDSSearch;
             const newState = {
               search,
               baseURL: responseURL,
@@ -383,8 +385,8 @@ export default function BrowserPage() {
                 required: true,
               },
             ],
-            search: (map: Map<string | null, Map<string | null, string>>) => {
-              const defaultParams = map.get(null);
+            search: (map: Map<string | undefined, Map<string, string>>) => {
+              const defaultParams = map.get(undefined);
               const searchTerms = defaultParams?.get('searchTerms') || '';
               const decodedURL = decodeURIComponent(searchURL);
               return decodedURL.replace('{searchTerms}', encodeURIComponent(searchTerms));
@@ -431,7 +433,7 @@ export default function BrowserPage() {
           const useProxy = needsProxy(url);
           let downloadUrl = useProxy ? getProxiedURL(url, '', true, customHeaders) : url;
           const headers: Record<string, string> = {
-            'User-Agent': HERMES_OPDS_USER_AGENT,
+            'User-Agent': READEST_OPDS_USER_AGENT,
             Accept: '*/*',
             ...(!useProxy ? customHeaders : {}),
           };
@@ -494,6 +496,29 @@ export default function BrowserPage() {
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, state.baseURL, appService, libraryLoaded],
+  );
+
+  const handleStream = useCallback(
+    async (href: string, count: number, title: string, author: string) => {
+      if (!appService || !libraryLoaded) return;
+      try {
+        const url = resolveURL(href, state.baseURL);
+        const psePath = buildPseStreamFileName({ url, catalogId, count, title, author });
+        const { library, setLibrary } = useLibraryStore.getState();
+        const book = await appService.importBook(psePath, library, { transient: true });
+        if (book) {
+          setLibrary(library);
+          navigateToReader(router, [book.hash]);
+        }
+      } catch (e) {
+        console.error('Stream error:', e);
+        eventDispatcher.dispatch('toast', {
+          type: 'error',
+          message: _('Failed to start stream') + `:\n${e instanceof Error ? e.message : e}`,
+        });
+      }
+    },
+    [state.baseURL, catalogId, appService, libraryLoaded, router, _],
   );
 
   const handleGenerateCachedImageUrl = useCallback(
@@ -673,6 +698,7 @@ export default function BrowserPage() {
             publication={publication}
             baseURL={state.baseURL}
             onDownload={handleDownload}
+            onStream={handleStream}
             resolveURL={resolveURL}
             onGenerateCachedImageUrl={handleGenerateCachedImageUrl}
           />

@@ -27,6 +27,7 @@ import type { BookNav } from '@/services/nav';
 import { partialMD5, md5 } from '@/utils/md5';
 import { getBaseFilename, getFilename } from '@/utils/path';
 import { BookDoc, DocumentLoader, EXTS } from '@/libs/document';
+import { isPseStreamFileName, openPseStreamBook, parsePseStreamFileName } from './opds/pseStream';
 import { DEFAULT_BOOK_SEARCH_CONFIG, DEFAULT_FIXED_LAYOUT_VIEW_SETTINGS } from './constants';
 import { isContentURI, isValidURL, makeSafeFilename } from '@/utils/misc';
 import { deserializeConfig, serializeConfig } from '@/utils/serializer';
@@ -240,32 +241,39 @@ export async function importBook(
     transient = false,
     lookupIndex,
   } = options;
+  const isPseStream = typeof file === 'string' && isPseStreamFileName(file);
   try {
     let loadedBook: BookDoc;
     let format: BookFormat;
     let filename: string;
-    let fileobj: File;
+    let fileobj: File | undefined;
 
     if (transient && typeof file !== 'string') {
       throw new Error('Transient import is only supported for file paths');
     }
 
     try {
-      if (typeof file === 'string') {
-        fileobj = await fs.openFile(file, 'None');
-        filename = fileobj.name || getFilename(file);
+      if (isPseStream) {
+        const data = parsePseStreamFileName(file as string);
+        ({ book: loadedBook, format } = await openPseStreamBook(data));
+        filename = file as string;
       } else {
-        fileobj = file;
-        filename = file.name;
+        if (typeof file === 'string') {
+          fileobj = await fs.openFile(file, 'None');
+          filename = fileobj.name || getFilename(file);
+        } else {
+          fileobj = file;
+          filename = file.name;
+        }
+        if (/\.txt$/i.test(filename)) {
+          const txt2epub = new TxtToEpubConverter();
+          ({ file: fileobj } = await txt2epub.convert({ file: fileobj }));
+        }
+        if (!fileobj || fileobj.size === 0) {
+          throw new Error('Invalid or empty book file');
+        }
+        ({ book: loadedBook, format } = await new DocumentLoader(fileobj).open());
       }
-      if (/\.txt$/i.test(filename)) {
-        const txt2epub = new TxtToEpubConverter();
-        ({ file: fileobj } = await txt2epub.convert({ file: fileobj }));
-      }
-      if (!fileobj || fileobj.size === 0) {
-        throw new Error('Invalid or empty book file');
-      }
-      ({ book: loadedBook, format } = await new DocumentLoader(fileobj).open());
       if (!loadedBook) {
         throw new Error('Unsupported or corrupted book file');
       }
@@ -278,7 +286,8 @@ export async function importBook(
       throw new Error(`Failed to open the book file: ${(error as Error).message || error}`);
     }
 
-    const hash = await partialMD5(fileobj);
+    const hash = isPseStream ? md5(file as string) : await partialMD5(fileobj!);
+
     const metaHash = getMetadataHash(loadedBook.metadata);
     let existingBook = lookupIndex
       ? lookupIndex.byHash.get(hash)
@@ -368,7 +377,12 @@ export async function importBook(
       await fs.createDir(getDir(book), 'Books');
     }
     const bookFilename = getLocalBookFilename(book);
-    if (saveBook && !transient && (!(await fs.exists(bookFilename, 'Books')) || overwrite)) {
+    if (
+      saveBook &&
+      !transient &&
+      fileobj &&
+      (!(await fs.exists(bookFilename, 'Books')) || overwrite)
+    ) {
       if (/\.txt$/i.test(filename)) {
         await fs.writeFile(bookFilename, 'Books', fileobj);
       } else if (typeof file === 'string' && isContentURI(file)) {
@@ -444,7 +458,10 @@ export async function importBook(
     }
 
     // update file links with url or path or content uri
-    if (typeof file === 'string') {
+    if (isPseStream) {
+      book.url = file as string;
+      if (existingBook) existingBook.url = file as string;
+    } else if (typeof file === 'string') {
       if (isValidURL(file)) {
         book.url = file;
         if (existingBook) existingBook.url = file;
@@ -514,6 +531,7 @@ export async function loadBookContent(
     }
   }
   const fp = getLocalBookFilename(book);
+
   if (await fs.exists(fp, 'Books')) {
     file = await fs.openFile(fp, 'Books');
   } else if (book.filePath) {
