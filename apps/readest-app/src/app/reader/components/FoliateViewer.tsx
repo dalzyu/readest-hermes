@@ -23,6 +23,7 @@ import { useAutoFocus } from '@/hooks/useAutoFocus';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useEinkMode } from '@/hooks/useEinkMode';
 import { useKOSync } from '../hooks/useKOSync';
+import { useWebDAVSync } from '../hooks/useWebDAVSync';
 import {
   applyFixedlayoutStyles,
   applyImageStyle,
@@ -146,6 +147,7 @@ const FoliateViewer: React.FC<{
   useProgressAutoSave(bookKey);
   useBookCoverAutoSave(bookKey);
   const { syncState, conflictDetails, resolveWithLocal, resolveWithRemote } = useKOSync(bookKey);
+  useWebDAVSync(bookKey);
   useTextTranslation(bookKey, viewRef.current);
 
   const resolveAudioSyncWordCfi = useCallback((word: AudioSyncWord): string | null => {
