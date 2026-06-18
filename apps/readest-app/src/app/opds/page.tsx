@@ -26,6 +26,7 @@ import { OPDSFeed, OPDSPublication, OPDSSearch } from '@/types/opds';
 import {
   getFileExtFromPath,
   isSearchLink,
+  looksLikeXMLContent,
   MIME,
   parseMediaType,
   resolveURL,
@@ -45,6 +46,7 @@ import { PublicationView } from './components/PublicationView';
 import { SearchView } from './components/SearchView';
 import { Navigation } from './components/Navigation';
 import { normalizeOPDSCustomHeaders } from './utils/customHeaders';
+import { stashOPDSReturnTarget } from './utils/opdsClose';
 
 type ViewMode = 'feed' | 'publication' | 'search' | 'loading' | 'error';
 
@@ -200,6 +202,11 @@ export default function BrowserPage() {
               type: 'error',
             });
             setTimeout(() => {
+              // router.back() (not closeOPDSBrowser) so the user can
+              // resume their browser history if the catalog was just
+              // temporarily down. stashOPDSReturnTarget ensures the
+              // deep-link still applies when back lands on /library.
+              stashOPDSReturnTarget(searchParams);
               router.back();
             }, 5000);
             throw new Error(errorMessage);
@@ -210,7 +217,7 @@ export default function BrowserPage() {
         const responseURL = res.url;
         const text = await res.text();
 
-        if (text.startsWith('<')) {
+        if (looksLikeXMLContent(text)) {
           const doc = new DOMParser().parseFromString(text, MIME.XML as DOMParserSupportedType);
           const {
             documentElement: { localName },
@@ -269,6 +276,7 @@ export default function BrowserPage() {
             const htmlDoc = new DOMParser().parseFromString(text, type as DOMParserSupportedType);
 
             if (!htmlDoc.head) {
+              stashOPDSReturnTarget(searchParams);
               router.back();
               throw new Error(`Failed to load OPDS feed: ${res.status} ${res.statusText}`);
             }
@@ -278,6 +286,7 @@ export default function BrowserPage() {
             );
 
             if (!link) {
+              stashOPDSReturnTarget(searchParams);
               router.back();
               throw new Error('Document has no link to OPDS feeds');
             }
@@ -467,7 +476,7 @@ export default function BrowserPage() {
           const probedFilename = await probeFilename(responseHeaders);
           if (probedFilename) {
             const newFilePath = await appService?.resolveFilePath(probedFilename, 'Cache');
-            await appService?.copyFile(dstFilePath, newFilePath, 'None');
+            await appService?.copyFile(dstFilePath, 'None', newFilePath, 'None');
             await appService?.deleteFile(dstFilePath, 'None');
             console.log('Renamed downloaded file to:', newFilePath);
             dstFilePath = newFilePath;

@@ -40,6 +40,10 @@
   "Failed to sync {{count}} OPDS catalog(s)_other": "Failed to sync {{count}} OPDS catalogs",
   "Imported {{count}} dictionary_one": "Imported {{count}} dictionary",
   "Imported {{count}} dictionary_other": "Imported {{count}} dictionaries",
+  "{{count}} catalog_one": "{{count}} catalog",
+  "{{count}} catalog_other": "{{count}} catalogs",
+  "Replaced {{count}} existing dictionary_one": "Replaced {{count}} existing dictionary",
+  "Replaced {{count}} existing dictionary_other": "Replaced {{count}} existing dictionaries",
   "{{count}} books refreshed_one": "{{count}} book refreshed",
   "{{count}} books refreshed_other": "{{count}} books refreshed",
   "{{count}} failed_one": "{{count}} failed",
@@ -49,5 +53,11 @@
   "{{count}} new item(s) downloaded from OPDS_one": "{{count}} new item downloaded from OPDS",
   "{{count}} new item(s) downloaded from OPDS_other": "{{count}} new items downloaded from OPDS",
   "{{engine}}: {{count}} voices_one": "{{engine}}: {{count}} voice",
-  "{{engine}}: {{count}} voices_other": "{{engine}}: {{count}} voices"
+  "{{engine}}: {{count}} voices_other": "{{engine}}: {{count}} voices",
+  "Cleared {{count}} highlights and notes._one": "Cleared {{count}} highlight and note.",
+  "Cleared {{count}} highlights and notes._other": "Cleared {{count}} highlights and notes.",
+  "Are you sure to clear all {{count}} highlights and notes?_one": "Are you sure to clear all {{count}} highlight and note?",
+  "Are you sure to clear all {{count}} highlights and notes?_other": "Are you sure to clear all {{count}} highlights and notes?",
+  "Imported {{count}} annotations_one": "Imported {{count}} annotation",
+  "Imported {{count}} annotations_other": "Imported {{count}} annotations"
 }

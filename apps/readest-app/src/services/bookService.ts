@@ -30,7 +30,7 @@ import { BookDoc, DocumentLoader, EXTS } from '@/libs/document';
 import { isPseStreamFileName, openPseStreamBook, parsePseStreamFileName } from './opds/pseStream';
 import { DEFAULT_BOOK_SEARCH_CONFIG, DEFAULT_FIXED_LAYOUT_VIEW_SETTINGS } from './constants';
 import { isContentURI, isValidURL, makeSafeFilename } from '@/utils/misc';
-import { deserializeConfig, serializeConfig } from '@/utils/serializer';
+import { deserializeConfig, serializeConfig, serializeRawConfig } from '@/utils/serializer';
 import { ClosableFile } from '@/utils/file';
 import { TxtToEpubConverter } from '@/utils/txt';
 import { svg2png } from '@/utils/svg';
@@ -194,7 +194,7 @@ export async function mergeBooks(
     }
     base.booknotes = [...noteMap.values()];
 
-    mergedConfigData = JSON.stringify(base);
+    mergedConfigData = serializeRawConfig(base);
   }
 
   for (const dup of duplicates) {
@@ -386,13 +386,13 @@ export async function importBook(
       if (/\.txt$/i.test(filename)) {
         await fs.writeFile(bookFilename, 'Books', fileobj);
       } else if (typeof file === 'string' && isContentURI(file)) {
-        await fs.copyFile(file, bookFilename, 'Books');
+        await fs.copyFile(file, 'None', bookFilename, 'Books');
       } else if (typeof file === 'string' && !isValidURL(file)) {
         try {
           // try to copy the file directly first in case of large files to avoid memory issues
           // on desktop when reading recursively from selected directory the direct copy will fail
           // due to permission issues, then fallback to read and write files
-          await fs.copyFile(file, bookFilename, 'Books');
+          await fs.copyFile(file, 'None', bookFilename, 'Books');
         } catch {
           await fs.writeFile(bookFilename, 'Books', await fileobj.arrayBuffer());
         }
@@ -432,7 +432,7 @@ export async function importBook(
         const config: Partial<BookConfig> = JSON.parse(bestConfigData);
         config.bookHash = hash;
         config.metaHash = metaHash;
-        await fs.writeFile(getConfigFilename(book), 'Books', JSON.stringify(config));
+        await fs.writeFile(getConfigFilename(book), 'Books', serializeRawConfig(config));
       } else {
         const oldConfigPath = `${oldBookDir}/config.json`;
         if (await fs.exists(oldConfigPath, 'Books')) {
@@ -440,7 +440,7 @@ export async function importBook(
           const config: Partial<BookConfig> = JSON.parse(configData);
           config.bookHash = hash;
           config.metaHash = metaHash;
-          await fs.writeFile(getConfigFilename(book), 'Books', JSON.stringify(config));
+          await fs.writeFile(getConfigFilename(book), 'Books', serializeRawConfig(config));
         } else {
           await saveBookConfigFn(book, INIT_BOOK_CONFIG);
         }
@@ -454,7 +454,7 @@ export async function importBook(
       const config: Partial<BookConfig> = JSON.parse(bestConfigData);
       config.bookHash = hash;
       config.metaHash = metaHash;
-      await fs.writeFile(getConfigFilename(book), 'Books', JSON.stringify(config));
+      await fs.writeFile(getConfigFilename(book), 'Books', serializeRawConfig(config));
     }
 
     // update file links with url or path or content uri
@@ -590,7 +590,7 @@ export async function saveBookConfig(
     };
     serializedConfig = serializeConfig(config, globalViewSettings, DEFAULT_BOOK_SEARCH_CONFIG);
   } else {
-    serializedConfig = JSON.stringify(config);
+    serializedConfig = serializeRawConfig(config);
   }
   await fs.writeFile(getConfigFilename(book), 'Books', serializedConfig);
 }
@@ -665,7 +665,7 @@ export async function exportBook(
   fs: FileSystem,
   book: Book,
   resolveFilePath: (path: string, base: BaseDir) => Promise<string>,
-  copyFile: (srcPath: string, dstPath: string, base: BaseDir) => Promise<void>,
+  copyFile: (srcPath: string, srcBase: BaseDir, dstPath: string, dstBase: BaseDir) => Promise<void>,
   saveFile: (
     filename: string,
     content: ArrayBuffer,
@@ -678,7 +678,7 @@ export async function exportBook(
   let filePath = await resolveFilePath(getLocalBookFilename(book), 'Books');
   const mimeType = file.type || 'application/octet-stream';
   if (getFilename(filePath) !== filename) {
-    await copyFile(filePath, filename, 'Temp');
+    await copyFile(filePath, 'None', filename, 'Temp');
     filePath = await resolveFilePath(filename, 'Temp');
   }
   return await saveFile(filename, content, { filePath, mimeType });

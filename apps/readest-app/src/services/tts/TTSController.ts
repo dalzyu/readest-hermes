@@ -195,7 +195,23 @@ export class TTSController extends EventTarget {
       textWalker,
       createRejectFilter({
         tags: ['rt', 'canvas', 'br'],
-        classes: ['annotationLayer'],
+        // Footnotes/endnotes are hidden in the rendered page (see the
+        // `.epubtype-footnote`/`aside[epub|type]` rules in getPageLayoutStyles);
+        // skip them in TTS too, including for background sections whose
+        // documents are loaded without those styles.
+        classes: [
+          'annotationLayer',
+          'epubtype-footnote',
+          'duokan-footnote-content',
+          'duokan-footnote-item',
+        ],
+        attributeTokens: [
+          {
+            tag: 'aside',
+            attribute: 'epub:type',
+            tokens: ['footnote', 'endnote', 'note', 'rearnote'],
+          },
+        ],
         contents: [{ tag: 'a', content: /^[\[\(]?[\*\d]+[\)\]]?$/ }],
       }),
       this.#getHighlighter(),
@@ -325,12 +341,10 @@ export class TTSController extends EventTarget {
         ssml = await this.#preprocessSSML(await ssml);
         if (!ssml) {
           this.#nossmlCnt++;
-          // Detect end-of-book: if there is no next section, stop cleanly rather
-          // than burning through ten empty cycles.
-          if (this.state === 'playing' && !oneTime) {
+          // FIXME: in case we are at the end of the book, need a better way to handle this
+          if (this.#nossmlCnt < 10 && this.state === 'playing' && !oneTime) {
             resolve();
-            const hasNext = await this.#initTTSForNextSection();
-            if (hasNext) {
+            if (await this.#initTTSForNextSection()) {
               await this.forward();
             } else {
               await this.stop();

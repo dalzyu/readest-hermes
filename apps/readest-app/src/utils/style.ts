@@ -182,6 +182,9 @@ const getColorStyles = (
     hr.background-img {
       mix-blend-mode: multiply;
     }
+    p[width][height] > img:only-child {
+      mix-blend-mode: multiply;
+    }
     /* inline images */
     *:has(> img.has-text-siblings):not(body) {
       ${overrideColor ? `background-color: ${bg};` : ''}
@@ -349,6 +352,11 @@ const getPageLayoutStyles = (
     width: auto;
     height: auto;
   }
+  /* some mobi */
+  p[width][height] > img:only-child { 
+    width: unset !important;
+    height: unset !important;
+  }
 
   /* page break */
   body.paginated-mode div[style*="page-break-after: always"],
@@ -460,6 +468,9 @@ const getParagraphLayoutStyles = (
     ${!vertical && overrideLayout ? `margin-top: ${paragraphMargin}em !important;` : ''}
     ${!vertical && overrideLayout ? `margin-bottom: ${paragraphMargin}em !important;` : ''}
   }
+  p > font:only-child { 
+    display: flow-root; 
+  }
 
   :lang(zh), :lang(ja), :lang(ko) {
     widows: 1;
@@ -531,6 +542,35 @@ export const getFootnoteStyles = () => `
   }
 `;
 
+/**
+ * Baseline stylesheet injected into every dictionary card's shadow root
+ * (alongside any loose `.css` files imported with the bundle and any
+ * `<link rel="stylesheet">` references resolved from the MDD).
+ *
+ * The seam exists so app-wide rules can be added in one place without
+ * touching the provider code. Currently it ships:
+ */
+export const getDictStyles = (bg: string, fg: string, isDarkMode: boolean) => {
+  void fg;
+  return `
+    a:empty {
+      background-color: transparent;
+      mix-blend-mode: multiply;
+    }
+    a img {
+      mix-blend-mode: multiply;
+    }
+    div[data-dict-kind="mdict"] .entry_name {
+      font-size: 1.2em;
+      margin-block-start: 0.5em;
+      margin-block-end: 0.5em;
+    }
+    div[data-dict-kind="mdict"] .juan_drop {
+      ${isDarkMode ? `background-color: color-mix(in srgb, ${bg} 80%, #000);` : ''}
+    }
+  `;
+};
+
 const getTranslationStyles = (showSource: boolean) => `
   .translation-source {
   }
@@ -575,6 +615,16 @@ const getWarichuStyles = () => `
     font-size: 0.5em;
     vertical-align: middle;
     line-height: 1.1;
+  }
+`;
+
+const getRubyStyles = () => `
+  rt {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  rp {
+    display: none !important;
   }
 `;
 
@@ -674,8 +724,9 @@ export const getStyles = (viewSettings: ViewSettings, themeCode?: ThemeCode) => 
   );
   const translationStyles = getTranslationStyles(viewSettings.showTranslateSource!);
   const warichuStyles = getWarichuStyles();
+  const rubyStyles = getRubyStyles();
   const userStylesheet = viewSettings.userStylesheet!;
-  return `${pageLayoutStyles}\n${paragraphLayoutStyles}\n${fontStyles}\n${colorStyles}\n${translationStyles}\n${warichuStyles}\n${userStylesheet}`;
+  return `${pageLayoutStyles}\n${paragraphLayoutStyles}\n${fontStyles}\n${colorStyles}\n${translationStyles}\n${warichuStyles}\n${rubyStyles}\n${userStylesheet}`;
 };
 
 export const applyTranslationStyle = (viewSettings: ViewSettings) => {

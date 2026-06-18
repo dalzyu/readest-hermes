@@ -253,9 +253,6 @@ export interface ViewConfig {
   showCurrentBatteryStatus: boolean;
   showBatteryPercentage: boolean;
   tapToToggleFooter: boolean;
-  focusMode: boolean;
-  showBarsOnScroll: boolean;
-  showMarginsOnScroll: boolean;
   showPaginationButtons: boolean;
   progressStyle: 'percentage' | 'fraction';
   progressInfoMode: ProgressBarMode;
@@ -343,8 +340,7 @@ export interface ViewSettingsConfig {
 }
 
 export interface ViewSettings
-  extends
-    BookLayout,
+  extends BookLayout,
     BookStyle,
     BookFont,
     BookLanguage,
@@ -399,7 +395,10 @@ export interface BookSearchResult {
   progress?: number;
 }
 
+export const BOOK_CONFIG_SCHEMA_VERSION = 1;
+
 export interface BookConfig {
+  schemaVersion?: number;
   bookHash?: string;
   metaHash?: string;
   progress?: [number, number]; // [current pagenum, total pagenum], 1-based page number
@@ -409,7 +408,6 @@ export interface BookConfig {
   rsvpPosition?: { cfi: string; wordText: string };
   searchConfig?: Partial<BookSearchConfig>;
   viewSettings?: Partial<ViewSettings>;
-  notebookActiveTab?: 'notes' | 'ai' | 'vocabulary';
 
   lastSyncedAtConfig?: number;
   lastSyncedAtNotes?: number;
@@ -440,8 +438,4 @@ export interface BooksGroup {
 export interface BookContent {
   book: Book;
   file: File;
-}
-
-export interface LoadBookContentOptions {
-  preferGeneratedPackage?: boolean;
 }

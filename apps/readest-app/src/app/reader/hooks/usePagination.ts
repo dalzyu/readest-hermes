@@ -1,15 +1,17 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { FoliateView } from '@/types/view';
 import { ViewSettings } from '@/types/book';
 import { useReaderStore } from '@/store/readerStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useDeviceControlStore } from '@/store/deviceStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { useSidebarStore } from '@/store/sidebarStore';
 import { eventDispatcher } from '@/utils/event';
+import { resolvePageTurn, normalizeDomKeyEvent, KeyCandidate } from '@/utils/keybinding';
 import { isTauriAppPlatform } from '@/services/environment';
 import { tauriGetWindowLogicalPosition } from '@/utils/window';
 import { getReadingRulerMoveDirection } from '../utils/readingRuler';
-import { SmoothScroller, type SmoothScrollTarget } from '../utils/smoothWheelScroll';
 import { useTouchInterceptor } from './useTouchInterceptor';
 
 export type ScrollSource = 'touch' | 'mouse';
@@ -56,13 +58,13 @@ export const viewPagination = (
 ) => {
   if (!view || !viewSettings) return;
   const renderer = view.renderer;
-  if (viewSettings.rtl) {
+  if (view.book.dir === 'rtl') {
     side = swapLeftRight(side);
   }
   if (renderer.scrolled) {
     const { size } = renderer;
-    const showHeader = viewSettings.showHeader && viewSettings.showBarsOnScroll;
-    const showFooter = viewSettings.showFooter && viewSettings.showBarsOnScroll;
+    const showHeader = viewSettings.showHeader;
+    const showFooter = viewSettings.showFooter;
     const scrollingOverlap = viewSettings.scrollingOverlap;
     const distance = size - scrollingOverlap - (showHeader ? 44 : 0) - (showFooter ? 44 : 0);
     switch (mode) {
@@ -110,17 +112,15 @@ export const usePagination = (
   const { getBookData } = useBookDataStore();
   const { getViewSettings, getViewState } = useReaderStore();
   const { hoveredBookKey, setHoveredBookKey } = useReaderStore();
-  const { acquireVolumeKeyInterception, releaseVolumeKeyInterception } = useDeviceControlStore();
-  const smoothScrollerRef = useRef<SmoothScroller | null>(null);
-  const smoothScrollTargetRef = useRef<SmoothScrollTarget>({
-    get position() {
-      return viewRef.current?.renderer.containerPosition ?? 0;
-    },
-    set position(value: number) {
-      const renderer = viewRef.current?.renderer;
-      if (renderer) renderer.containerPosition = value;
-    },
-  });
+  const {
+    acquireVolumeKeyInterception,
+    releaseVolumeKeyInterception,
+    acquirePageTurnerKeyInterception,
+    releasePageTurnerKeyInterception,
+  } = useDeviceControlStore();
+  // Reactive subscription: drives the effect dependency array below. The
+  // handlers themselves re-read via getState() to avoid stale closures.
+  const hardwarePageTurner = useSettingsStore((s) => s.settings.hardwarePageTurner);
 
   const handlePageFlip = async (
     msg: MessageEvent | CustomEvent | React.MouseEvent<HTMLDivElement, MouseEvent>,
@@ -199,37 +199,22 @@ export const usePagination = (
               viewPagination(viewRef.current, viewSettings, side);
             }
           }
-        } else if (msg.data.type === 'iframe-wheel') {
-          const { deltaY, deltaX, isMouseWheel } = msg.data;
-          if (
-            viewSettings.scrolled &&
-            isMouseWheel &&
-            !isPanningView(viewRef.current, viewSettings)
-          ) {
-            // Mouse wheels deliver one large quantised delta per notch which
-            // Chromium would scroll without interpolation, producing the
-            // jerky one-step-per-frame motion reported on Windows. The
-            // iframe handler already preventDefault'd the native scroll —
-            // here we replay the delta as a smooth animation instead.
-            if (!smoothScrollerRef.current) {
-              smoothScrollerRef.current = new SmoothScroller();
-            }
-            smoothScrollerRef.current.scrollBy(smoothScrollTargetRef.current, deltaY);
-          } else if (!viewSettings.scrolled && !isPanningView(viewRef.current, viewSettings)) {
-            // Paginated mode: wheel always flips a page (the iframe doesn't
-            // scroll because the container has overflow:hidden).
-            if (deltaY > 0) {
-              viewPagination(viewRef.current, viewSettings, 'down');
-            } else if (deltaY < 0) {
-              viewPagination(viewRef.current, viewSettings, 'up');
-            } else if (deltaX < 0) {
-              viewPagination(viewRef.current, viewSettings, 'left');
-            } else if (deltaX > 0) {
-              viewPagination(viewRef.current, viewSettings, 'right');
-            }
+        } else if (
+          msg.data.type === 'iframe-wheel' &&
+          !viewSettings.scrolled &&
+          !isPanningView(viewRef.current, viewSettings)
+        ) {
+          // The wheel event is handled by the iframe itself in scrolled mode.
+          const { deltaY, deltaX } = msg.data;
+          if (deltaY > 0) {
+            viewPagination(viewRef.current, viewSettings, 'down');
+          } else if (deltaY < 0) {
+            viewPagination(viewRef.current, viewSettings, 'up');
+          } else if (deltaX < 0) {
+            viewPagination(viewRef.current, viewSettings, 'left');
+          } else if (deltaX > 0) {
+            viewPagination(viewRef.current, viewSettings, 'right');
           }
-          // Otherwise (scrolled mode + trackpad/high-resolution input) the
-          // browser's native scroll already runs and is pixel-precise.
         } else if (msg.data.type === 'iframe-mouseup') {
           if (msg.data.button === 3) {
             viewRef.current?.history.back();
@@ -273,11 +258,75 @@ export const usePagination = (
     }
   };
 
-  useEffect(() => {
-    return () => {
-      smoothScrollerRef.current?.cancel();
-    };
-  }, []);
+  // Hardware page turner: media keys arrive via the `native-key-down`
+  // event; D-pad / keyboard keys arrive either as a top-window `keydown`
+  // or — when focus is inside a book iframe — as an `iframe-keydown`
+  // postMessage (mirroring useShortcuts' unified window + iframe handling).
+  // All resolve through the shared binding registry. Suppressed while the
+  // toolbar is visible so D-pad keys keep driving toolbar spatial navigation.
+  const handleHardwarePageTurn = (candidate: KeyCandidate): boolean => {
+    const settings = useSettingsStore.getState().settings.hardwarePageTurner;
+    if (!settings?.enabled) return false;
+    if (useReaderStore.getState().hoveredBookKey) return false;
+
+    // Only the active book (the one driving the sidebar) responds, so a
+    // single key press doesn't flip every book open in a parallel view.
+    if (useSidebarStore.getState().sideBarBookKey !== bookKey) return false;
+
+    const viewState = getViewState(bookKey);
+    if (!viewState?.inited) return false;
+
+    const action = resolvePageTurn(settings, candidate);
+    if (!action) return false;
+
+    const viewSettings = getViewSettings(bookKey);
+    const side = action === 'pagePrev' || action === 'sectionPrev' ? 'up' : 'down';
+    const mode = action === 'sectionPrev' || action === 'sectionNext' ? 'section' : 'page';
+    setHoveredBookKey('');
+    if (
+      mode === 'page' &&
+      viewSettings?.readingRulerEnabled &&
+      eventDispatcher.dispatchSync('reading-ruler-move', {
+        bookKey,
+        direction: getReadingRulerMoveDirection(side, viewRef.current?.book.dir),
+      })
+    ) {
+      return true;
+    }
+    viewPagination(viewRef.current, viewSettings, side, mode);
+    return true;
+  };
+
+  const handleHardwareNativeKey = (msg: CustomEvent) => {
+    const keyName = msg.detail?.keyName;
+    if (typeof keyName !== 'string') return;
+    handleHardwarePageTurn({ source: 'native', id: keyName });
+  };
+
+  const handleHardwareDomKey = (event: KeyboardEvent | MessageEvent) => {
+    let candidate: KeyCandidate;
+    if (event instanceof KeyboardEvent) {
+      if (event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? '')) {
+        return;
+      }
+      candidate = normalizeDomKeyEvent(event);
+    } else if (event.data?.type === 'iframe-keydown' && event.data.bookKey === bookKey) {
+      const id = event.data.code || event.data.key;
+      if (typeof id !== 'string' || !id) return;
+      candidate = { source: 'dom', id };
+    } else {
+      return;
+    }
+
+    if (handleHardwarePageTurn(candidate)) {
+      // Stop `useShortcuts` from also paging on this key — capture-phase
+      // for the window keydown, registration order for the iframe message.
+      if (event instanceof KeyboardEvent) event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  };
 
   useEffect(() => {
     if (!appService?.isMobileApp) return;
@@ -296,6 +345,45 @@ export const usePagination = (
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Hardware page turner: native-key + DOM-key listeners and native
+  // media-key interception, re-evaluated whenever the setting changes.
+  useEffect(() => {
+    const hasNativeBinding =
+      hardwarePageTurner?.bindings.pagePrev?.source === 'native' ||
+      hardwarePageTurner?.bindings.pageNext?.source === 'native' ||
+      hardwarePageTurner?.bindings.sectionPrev?.source === 'native' ||
+      hardwarePageTurner?.bindings.sectionNext?.source === 'native';
+    const needsNativeInterception =
+      !!appService?.isMobileApp && !!hardwarePageTurner?.enabled && hasNativeBinding;
+
+    if (needsNativeInterception) {
+      acquirePageTurnerKeyInterception();
+    }
+    if (hasNativeBinding) {
+      eventDispatcher.on('native-key-down', handleHardwareNativeKey);
+    }
+    window.addEventListener('keydown', handleHardwareDomKey, true);
+    window.addEventListener('message', handleHardwareDomKey);
+
+    return () => {
+      if (needsNativeInterception) {
+        releasePageTurnerKeyInterception();
+      }
+      if (hasNativeBinding) {
+        eventDispatcher.off('native-key-down', handleHardwareNativeKey);
+      }
+      window.removeEventListener('keydown', handleHardwareDomKey, true);
+      window.removeEventListener('message', handleHardwareDomKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    hardwarePageTurner?.enabled,
+    hardwarePageTurner?.bindings.pagePrev?.source,
+    hardwarePageTurner?.bindings.pageNext?.source,
+    hardwarePageTurner?.bindings.sectionPrev?.source,
+    hardwarePageTurner?.bindings.sectionNext?.source,
+  ]);
 
   // Touch swipe page flip for fixed-layout books — registered as a touch interceptor
   // so it participates in the priority-based consumption chain.

@@ -33,6 +33,7 @@ import { DEFAULT_AI_SETTINGS } from './ai/constants';
 export const DATA_SUBDIR = 'Readest';
 export const LOCAL_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
 export const CLOUD_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
+export const CLOUD_REPLICAS_SUBDIR = `${DATA_SUBDIR}/Replicas`;
 export const LOCAL_FONTS_SUBDIR = `${DATA_SUBDIR}/Fonts`;
 export const LOCAL_IMAGES_SUBDIR = `${DATA_SUBDIR}/Images`;
 export const LOCAL_DICTIONARIES_SUBDIR = `${DATA_SUBDIR}/Dictionaries`;
@@ -93,6 +94,10 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   screenWakeLock: false,
   screenBrightness: -1, // -1~100, -1 for system default
   autoScreenBrightness: true,
+  hardwarePageTurner: {
+    enabled: false,
+    bindings: { pagePrev: null, pageNext: null, sectionPrev: null, sectionNext: null },
+  },
   openLastBooks: false,
   lastOpenBooks: [],
   autoImportBooksOnOpen: false,
@@ -109,6 +114,8 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   metadataSeriesCollapsed: false,
   metadataOthersCollapsed: false,
   metadataDescriptionCollapsed: false,
+
+  pinCodeEnabled: false,
 
   customDictionaries: [],
   dictionarySettings: {
@@ -127,6 +134,17 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   lastSyncedAtBooks: 0,
   lastSyncedAtConfigs: 0,
   lastSyncedAtNotes: 0,
+  lastSyncedAtReplicas: {},
+  syncCategories: {
+    book: true,
+    progress: true,
+    note: true,
+    dictionary: true,
+    font: true,
+    texture: true,
+    opds_catalog: true,
+    settings: true,
+  },
 };
 
 export const DEFAULT_MOBILE_SYSTEM_SETTINGS: Partial<SystemSettings> = {
@@ -292,7 +310,6 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
 
   showHeader: true,
   showFooter: true,
-  showBarsOnScroll: false,
   showRemainingTime: false,
   showRemainingPages: false,
   showProgressInfo: true,
@@ -301,7 +318,6 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   showBatteryPercentage: true,
   use24HourClock: false,
   tapToToggleFooter: false,
-  showMarginsOnScroll: false,
   showPaginationButtons: false,
   progressStyle: 'fraction',
   progressInfoMode: 'all',
@@ -730,6 +746,13 @@ export const READEST_NODE_BASE_URL = 'https://node.readest.com';
 
 export const SHARE_BASE_URL = `${READEST_WEB_BASE_URL}/s`;
 export const SHARE_EXPIRATION_DAYS = [1, 3, 7] as const;
+
+// Send to Readest — the domain inbound capture emails are addressed to, the
+// R2 bucket holding raw inbound payloads, and the per-user cap on undrained
+// inbox items (defense against a leaked address).
+export const SEND_EMAIL_DOMAIN = 'readest.com';
+export const SEND_INBOX_BUCKET = 'readest-send-inbox';
+export const SEND_INBOX_PENDING_LIMIT = 50;
 export const SHARE_DEFAULT_EXPIRATION_DAYS = 3;
 export const SHARE_MAX_PER_USER = 50;
 export const SHARE_TOKEN_LENGTH = 22;
@@ -842,6 +865,7 @@ export const TRANSLATED_LANGS = {
   ko: '한국어',
   es: 'Español',
   pt: 'Português',
+  'pt-BR': 'Português (Brasil)',
   ru: 'Русский',
   he: 'עברית',
   ar: 'العربية',
@@ -864,6 +888,7 @@ export const TRANSLATED_LANGS = {
   'zh-TW': '正體中文',
   ro: 'Română',
   hu: 'Magyar',
+  uz: 'Oʻzbek',
 };
 
 export const TRANSLATOR_LANGS: Record<string, string> = {

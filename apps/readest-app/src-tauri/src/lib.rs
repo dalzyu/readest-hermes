@@ -22,6 +22,8 @@ use tauri_plugin_fs::FsExt;
 
 #[cfg(desktop)]
 use tauri::{Listener, Url};
+#[cfg(desktop)]
+mod clip_url;
 mod dir_scanner;
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 mod discord_rpc;
@@ -70,6 +72,57 @@ fn allow_dir_in_scopes(app: &AppHandle, dir: &PathBuf) {
         log::error!("Failed to allow directory in asset_protocol_scope: {e}");
     } else {
         log::info!("Allowed directory in asset_protocol_scope: {dir:?}");
+    }
+}
+
+/// Frontend-callable shim around [`allow_file_in_scopes`] /
+/// [`allow_dir_in_scopes`]. Used after dialog-based file/folder pickers
+/// because the Tauri `dialog` plugin only auto-grants `fs_scope`, not
+/// `asset_protocol_scope` — and our importer relies on the asset
+/// protocol (`RemoteFile`) to read user-selected files. Without this,
+/// importing a book from e.g. `~/Downloads/...` fails with
+/// "asset protocol not configured to allow the path".
+///
+/// Granted scopes are persisted across app restarts thanks to
+/// `tauri_plugin_persisted_scope`, so re-picking the same file isn't
+/// required after the first allow call.
+///
+/// Security: this command refuses to extend `asset_protocol_scope` for
+/// any path that is not already allowed in `fs_scope`. The `fs_scope`
+/// is populated only by the Tauri `dialog` plugin (when the user picks
+/// through the OS picker) or by `tauri_plugin_persisted_scope` (which
+/// restores prior dialog grants on startup). That gate constrains the
+/// command to user-selected paths only — otherwise any frontend code
+/// (including a future XSS via book content, OPDS HTML, dictionary
+/// lookups, or a compromised dependency) could invoke it with an
+/// arbitrary path like `/` or `~/.ssh` and gain persistent read access
+/// to the entire user home directory via the asset protocol.
+#[command]
+fn allow_paths_in_scopes(_app: AppHandle, _paths: Vec<String>, _is_directory: bool) {
+    #[cfg(desktop)]
+    {
+        let fs_scope = _app.fs_scope();
+        for raw in _paths {
+            if raw.is_empty() {
+                continue;
+            }
+            let path = PathBuf::from(&raw);
+            if !fs_scope.is_allowed(&path) {
+                log::warn!("allow_paths_in_scopes refused (path not in fs_scope): {path:?}");
+                continue;
+            }
+            if _is_directory {
+                allow_dir_in_scopes(&_app, &path);
+            } else {
+                allow_file_in_scopes(&_app, vec![path]);
+            }
+        }
+    }
+    #[cfg(target_os = "android")]
+    {
+        // Android picker already routes through register_select_directory_callback
+        // for directories; files go through SAF / content-URIs and don't use
+        // asset_protocol_scope. Nothing to do here.
     }
 }
 
@@ -168,6 +221,7 @@ pub fn run() {
             upload_file,
             get_environment_variable,
             get_executable_dir,
+            allow_paths_in_scopes,
             dir_scanner::read_dir,
             #[cfg(target_os = "macos")]
             macos::safari_auth::auth_with_safari,
@@ -175,10 +229,14 @@ pub fn run() {
             macos::apple_auth::start_apple_sign_in,
             #[cfg(target_os = "macos")]
             macos::traffic_light::set_traffic_lights,
+            #[cfg(target_os = "macos")]
+            macos::system_dictionary::show_lookup_popover,
             #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
             discord_rpc::update_book_presence,
             #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
             discord_rpc::clear_book_presence,
+            #[cfg(desktop)]
+            clip_url::clip_url,
         ])
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
@@ -191,7 +249,8 @@ pub fn run() {
         .plugin(tauri_plugin_device_info::init())
         .plugin(tauri_plugin_turso::init())
         .plugin(tauri_plugin_native_bridge::init())
-        .plugin(tauri_plugin_native_tts::init());
+        .plugin(tauri_plugin_native_tts::init())
+        .plugin(tauri_plugin_webview_upgrade::init());
 
     #[cfg(desktop)]
     let builder = builder.plugin(

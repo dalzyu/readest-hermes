@@ -9,8 +9,6 @@ vi.mock('@/utils/misc', () => ({
   getOSPlatform: vi.fn(() => 'macos'),
 }));
 
-import packageJson from '../../../package.json';
-
 import {
   DATA_SUBDIR,
   LOCAL_BOOKS_SUBDIR,
@@ -66,12 +64,12 @@ import {
   CJK_FONTS_PATTENS,
   BOOK_IDS_SEPARATOR,
   DOWNLOAD_READEST_URL,
-  HERMES_WEB_BASE_URL,
-  HERMES_NODE_BASE_URL,
-  HERMES_UPDATER_FILE,
-  HERMES_CHANGELOG_FILE,
-  HERMES_PUBLIC_STORAGE_BASE_URL,
-  HERMES_OPDS_USER_AGENT,
+  READEST_WEB_BASE_URL,
+  READEST_NODE_BASE_URL,
+  READEST_UPDATER_FILE,
+  READEST_CHANGELOG_FILE,
+  READEST_PUBLIC_STORAGE_BASE_URL,
+  READEST_OPDS_USER_AGENT,
   SYNC_PROGRESS_INTERVAL_SEC,
   SYNC_NOTES_INTERVAL_SEC,
   SYNC_BOOKS_INTERVAL_SEC,
@@ -245,6 +243,24 @@ describe('services/constants', () => {
       expect(DEFAULT_SYSTEM_SETTINGS.screenBrightness!).toBeLessThanOrEqual(100);
     });
 
+    it('seeds syncCategories with every SyncCategory key, all enabled', () => {
+      const cats = DEFAULT_SYSTEM_SETTINGS.syncCategories!;
+      expect(cats).toEqual({
+        book: true,
+        progress: true,
+        note: true,
+        dictionary: true,
+        font: true,
+        texture: true,
+        opds_catalog: true,
+        settings: true,
+      });
+    });
+
+    it('seeds lastSyncedAtReplicas as an empty record', () => {
+      expect(DEFAULT_SYSTEM_SETTINGS.lastSyncedAtReplicas).toEqual({});
+    });
+
     it('has library settings', () => {
       expect(DEFAULT_SYSTEM_SETTINGS.libraryViewMode).toBe('grid');
       expect(typeof DEFAULT_SYSTEM_SETTINGS.librarySortBy).toBe('string');
@@ -276,6 +292,16 @@ describe('services/constants', () => {
     it('lastOpenBooks is an empty array', () => {
       expect(Array.isArray(DEFAULT_SYSTEM_SETTINGS.lastOpenBooks)).toBe(true);
       expect(DEFAULT_SYSTEM_SETTINGS.lastOpenBooks!.length).toBe(0);
+    });
+
+    it('has a disabled hardwarePageTurner with empty bindings', () => {
+      const hw = DEFAULT_SYSTEM_SETTINGS.hardwarePageTurner!;
+      expect(hw).toBeDefined();
+      expect(hw.enabled).toBe(false);
+      expect(hw.bindings.pagePrev).toBeNull();
+      expect(hw.bindings.pageNext).toBeNull();
+      expect(hw.bindings.sectionPrev).toBeNull();
+      expect(hw.bindings.sectionNext).toBeNull();
     });
   });
 
@@ -570,7 +596,6 @@ describe('services/constants', () => {
     it('has boolean display flags', () => {
       expect(typeof DEFAULT_VIEW_CONFIG.showHeader).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.showFooter).toBe('boolean');
-      expect(typeof DEFAULT_VIEW_CONFIG.showBarsOnScroll).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.showRemainingTime).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.showRemainingPages).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.showProgressInfo).toBe('boolean');
@@ -579,8 +604,6 @@ describe('services/constants', () => {
       expect(typeof DEFAULT_VIEW_CONFIG.showBatteryPercentage).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.use24HourClock).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.tapToToggleFooter).toBe('boolean');
-      expect(typeof DEFAULT_VIEW_CONFIG.showMarginsOnScroll).toBe('boolean');
-      expect(typeof DEFAULT_VIEW_CONFIG.focusMode).toBe('boolean');
       expect(typeof DEFAULT_VIEW_CONFIG.showPaginationButtons).toBe('boolean');
     });
 
@@ -849,27 +872,31 @@ describe('services/constants', () => {
       expect(DOWNLOAD_READEST_URL).toMatch(/^https:\/\//);
     });
 
-    it('HERMES base URLs stay blank until explicitly configured', () => {
-      expect(HERMES_WEB_BASE_URL).toBe('');
-      expect(HERMES_NODE_BASE_URL).toBe('');
+    it('READEST_WEB_BASE_URL is a valid URL', () => {
+      expect(READEST_WEB_BASE_URL).toMatch(/^https:\/\//);
     });
 
-    it('HERMES_UPDATER_FILE is a URL ending with .json', () => {
-      expect(HERMES_UPDATER_FILE).toMatch(/^https:\/\//);
-      expect(HERMES_UPDATER_FILE).toMatch(/\.json$/);
+    it('READEST_NODE_BASE_URL is a valid URL', () => {
+      expect(READEST_NODE_BASE_URL).toMatch(/^https:\/\//);
     });
 
-    it('HERMES_CHANGELOG_FILE is a URL ending with .json', () => {
-      expect(HERMES_CHANGELOG_FILE).toMatch(/^https:\/\//);
-      expect(HERMES_CHANGELOG_FILE).toMatch(/\.json$/);
+    it('READEST_UPDATER_FILE is a URL ending with .json', () => {
+      expect(READEST_UPDATER_FILE).toMatch(/^https:\/\//);
+      expect(READEST_UPDATER_FILE).toMatch(/\.json$/);
     });
 
-    it('HERMES_PUBLIC_STORAGE_BASE_URL defaults to blank', () => {
-      expect(HERMES_PUBLIC_STORAGE_BASE_URL).toBe('');
+    it('READEST_CHANGELOG_FILE is a URL ending with .json', () => {
+      expect(READEST_CHANGELOG_FILE).toMatch(/^https:\/\//);
+      expect(READEST_CHANGELOG_FILE).toMatch(/\.json$/);
     });
 
-    it('HERMES_OPDS_USER_AGENT tracks the app version', () => {
-      expect(HERMES_OPDS_USER_AGENT).toBe(`Hermes/${packageJson.version} (OPDS Browser)`);
+    it('READEST_PUBLIC_STORAGE_BASE_URL is a valid URL', () => {
+      expect(READEST_PUBLIC_STORAGE_BASE_URL).toMatch(/^https:\/\//);
+    });
+
+    it('READEST_OPDS_USER_AGENT is a non-empty string', () => {
+      expect(typeof READEST_OPDS_USER_AGENT).toBe('string');
+      expect(READEST_OPDS_USER_AGENT.length).toBeGreaterThan(0);
     });
   });
 

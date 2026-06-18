@@ -2,12 +2,7 @@ import { AppService } from '@/types/system';
 import { isTauriAppPlatform } from '@/services/environment';
 import { basename } from '@tauri-apps/api/path';
 import { stubTranslation as _ } from '@/utils/misc';
-import {
-  AUDIO_ACCEPT_FORMATS,
-  BOOK_ACCEPT_FORMATS,
-  SUPPORTED_AUDIO_EXTS,
-  SUPPORTED_BOOK_EXTS,
-} from '@/services/constants';
+import { BOOK_ACCEPT_FORMATS, SUPPORTED_BOOK_EXTS } from '@/services/constants';
 
 export interface FileSelectorOptions {
   type: SelectionType;
@@ -50,7 +45,9 @@ const selectFileTauri = async (
   appService: AppService,
   _: (key: string) => string,
 ): Promise<string[]> => {
-  const noFilter = appService?.isIOSApp || (appService?.isAndroidApp && options.type === 'books');
+  const noFilter =
+    appService?.isIOSApp ||
+    (appService?.isAndroidApp && (options.type === 'books' || options.type === 'dictionaries'));
   const exts = noFilter ? [] : options.extensions || [];
   const title = options.dialogTitle || _('Select Files');
   let files = (await appService?.selectFiles(_(title), exts)) || [];
@@ -130,8 +127,8 @@ export const FILE_SELECTION_PRESETS = {
     dialogTitle: _('Select Video'),
   },
   audio: {
-    accept: AUDIO_ACCEPT_FORMATS,
-    extensions: SUPPORTED_AUDIO_EXTS,
+    accept: 'audio/*',
+    extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a'],
     dialogTitle: _('Select Audio'),
   },
   books: {
@@ -145,8 +142,8 @@ export const FILE_SELECTION_PRESETS = {
     dialogTitle: _('Select Fonts'),
   },
   dictionaries: {
-    accept: '.mdx, .mdd, .ifo, .idx, .dict, .dz, .syn, .index, .slob',
-    extensions: ['mdx', 'mdd', 'ifo', 'idx', 'dict', 'dz', 'syn', 'index', 'slob'],
+    accept: '.mdx, .mdd, .ifo, .idx, .dict, .dz, .syn, .index, .slob, .css',
+    extensions: ['mdx', 'mdd', 'ifo', 'idx', 'dict', 'dz', 'syn', 'index', 'slob', 'css'],
     dialogTitle: _('Select Dictionary Files'),
   },
   covers: {

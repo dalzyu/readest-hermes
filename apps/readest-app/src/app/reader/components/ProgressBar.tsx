@@ -37,7 +37,6 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   const { section, pageinfo } = progress || {};
 
   const showDoubleBorder = viewSettings.vertical && viewSettings.doubleBorder;
-  const isScrolled = viewSettings.scrolled;
   const isVertical = viewSettings.vertical;
   const isEink = viewSettings.isEink;
   const { progressStyle: readingProgressStyle } = viewSettings;
@@ -146,6 +145,18 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progressBarMode]);
 
+  // Self-heal a stuck "none" (or partial) mode left over from a prior
+  // tap-to-toggle session. Without this, dismissing the footer via tap
+  // and then disabling the toggle in settings would leave the footer
+  // permanently hidden — the user's only way back to a visible footer
+  // would be to re-enable the toggle and tap through the cycle.
+  useEffect(() => {
+    if (!viewSettings.tapToToggleFooter && progressBarMode !== 'all') {
+      setProgressBarMode('all');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewSettings.tapToToggleFooter]);
+
   const isMobile = appService?.isMobile || window.innerWidth < 640;
   const showStatusInfo =
     (progressBarMode === 'all' ||
@@ -161,7 +172,6 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
         'progressinfo absolute bottom-0 flex items-center justify-between font-sans',
         isEink ? 'text-sm font-normal' : 'text-neutral-content text-xs font-extralight',
         isVertical ? 'writing-vertical-rl' : 'w-full',
-        isScrolled && !isVertical && 'bg-base-100',
         isMobile ? 'pointer-events-auto' : 'pointer-events-none',
       )}
       onClick={() => {
@@ -199,10 +209,8 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
     >
       <div
         aria-hidden='true'
-        className={clsx(
-          'flex items-center justify-between',
-          isVertical ? 'h-full' : 'h-[52px] w-full',
-        )}
+        className={clsx('flex items-center justify-between', isVertical ? 'h-full' : 'w-full')}
+        style={isVertical ? {} : { height: `${viewSettings.marginBottomPx}px` }}
       >
         {(progressBarMode === 'all' || progressBarMode.includes('remaining')) &&
           hasRemainingInfo && (

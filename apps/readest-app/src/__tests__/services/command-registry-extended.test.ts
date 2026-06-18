@@ -5,7 +5,8 @@ vi.mock('react-icons/ri', () => ({
   RiFontSize: () => null,
   RiDashboardLine: () => null,
   RiTranslate: () => null,
-  RiChatAiLine: () => null,
+  RiPlugLine: () => null,
+  RiShareLine: () => null,
 }));
 vi.mock('react-icons/vsc', () => ({
   VscSymbolColor: () => null,
