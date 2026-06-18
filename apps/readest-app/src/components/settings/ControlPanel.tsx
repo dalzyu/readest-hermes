@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useReaderStore } from '@/store/readerStore';
-import { useDeviceControlStore } from '@/store/deviceStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -14,6 +13,7 @@ import { SettingsPanelPanelProp } from './SettingsDialog';
 import { annotationToolQuickActions } from '@/app/reader/components/annotator/AnnotationTools';
 import { BoxedList, SettingsRow, SettingsSelect, SettingsSwitchRow } from './primitives';
 import NumberInput from './NumberInput';
+import PageTurnerSettings from './PageTurnerSettings';
 
 const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }) => {
   const _ = useTranslation();
@@ -22,7 +22,6 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   const { getBookData } = useBookDataStore();
   const { settings } = useSettingsStore();
   const { applyEinkMode } = useEinkMode();
-  const { acquireVolumeKeyInterception, releaseVolumeKeyInterception } = useDeviceControlStore();
   const bookData = getBookData(bookKey);
   const viewSettings = getViewSettings(bookKey) || settings.globalViewSettings;
 
@@ -30,7 +29,6 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   const [noContinuousScroll, setNoContinuousScroll] = useState(viewSettings.noContinuousScroll);
   const [scrollingOverlap, setScrollingOverlap] = useState(viewSettings.scrollingOverlap);
   const [hideScrollbar, setHideScrollbar] = useState(viewSettings.hideScrollbar || false);
-  const [volumeKeysToFlip, setVolumeKeysToFlip] = useState(viewSettings.volumeKeysToFlip);
   const [showPaginationButtons, setShowPaginationButtons] = useState(
     viewSettings.showPaginationButtons,
   );
@@ -53,6 +51,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   const [allowScript, setAllowScript] = useState(viewSettings.allowScript);
 
   const resetToDefaults = useResetViewSettings();
+  const pageTurnerResetRef = useRef<() => void>(() => {});
 
   const handleReset = () => {
     resetToDefaults({
@@ -60,7 +59,6 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
       noContinuousScroll: setNoContinuousScroll,
       scrollingOverlap: setScrollingOverlap,
       hideScrollbar: setHideScrollbar,
-      volumeKeysToFlip: setVolumeKeysToFlip,
       showPaginationButtons: setShowPaginationButtons,
       disableClick: setIsDisableClick,
       swapClickArea: setSwapClickArea,
@@ -72,6 +70,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
       enableAnnotationQuickActions: setEnableAnnotationQuickActions,
       copyToNotebook: setCopyToNotebook,
     });
+    pageTurnerResetRef.current();
   };
 
   useEffect(() => {
@@ -112,18 +111,6 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
     saveViewSettings(envConfig, bookKey, 'scrollingOverlap', scrollingOverlap, false, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollingOverlap]);
-
-  useEffect(() => {
-    saveViewSettings(envConfig, bookKey, 'volumeKeysToFlip', volumeKeysToFlip, false, false);
-    if (appService?.isMobileApp) {
-      if (volumeKeysToFlip) {
-        acquireVolumeKeyInterception();
-      } else {
-        releaseVolumeKeyInterception();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [volumeKeysToFlip]);
 
   useEffect(() => {
     saveViewSettings(
@@ -300,13 +287,6 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
           onChange={() => setIsDisableDoubleClick(!isDisableDoubleClick)}
           data-setting-id='settings.control.disableDoubleClick'
         />
-        {appService?.isMobileApp && (
-          <SettingsSwitchRow
-            label={_('Volume Keys for Page Flip')}
-            checked={volumeKeysToFlip}
-            onChange={() => setVolumeKeysToFlip(!volumeKeysToFlip)}
-          />
-        )}
         <SettingsSwitchRow
           label={_('Show Page Navigation Buttons')}
           checked={showPaginationButtons}
@@ -314,6 +294,13 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
           data-setting-id='settings.control.showPaginationButtons'
         />
       </BoxedList>
+
+      <PageTurnerSettings
+        bookKey={bookKey}
+        onRegisterReset={(fn) => {
+          pageTurnerResetRef.current = fn;
+        }}
+      />
 
       <BoxedList
         title={_('Annotation Tools')}
