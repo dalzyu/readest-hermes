@@ -14,8 +14,10 @@ import {
   TTSConfig,
   ViewConfig,
   ViewSettings,
+  ViewSettingsConfig,
 } from '@/types/book';
 import {
+  HardcoverSettings,
   KOSyncSettings,
   LibraryGroupByType,
   LibrarySortByType,
@@ -26,15 +28,15 @@ import {
 import { UserStorageQuota, UserDailyTranslationQuota } from '@/types/quota';
 import { getDefaultMaxBlockSize, getDefaultMaxInlineSize } from '@/utils/config';
 import { stubTranslation as _ } from '@/utils/misc';
-import { getAppVersion } from '@/utils/version';
 import { DEFAULT_AI_SETTINGS } from './ai/constants';
-import { DEFAULT_DICTIONARY_SETTINGS, DEFAULT_LOOKUP_SETTINGS } from './learning/settings';
 
-export const DATA_SUBDIR = 'Hermes';
+export const DATA_SUBDIR = 'Readest';
 export const LOCAL_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
 export const CLOUD_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
+export const CLOUD_REPLICAS_SUBDIR = `${DATA_SUBDIR}/Replicas`;
 export const LOCAL_FONTS_SUBDIR = `${DATA_SUBDIR}/Fonts`;
 export const LOCAL_IMAGES_SUBDIR = `${DATA_SUBDIR}/Images`;
+export const LOCAL_DICTIONARIES_SUBDIR = `${DATA_SUBDIR}/Dictionaries`;
 
 export const SETTINGS_FILENAME = 'settings.json';
 
@@ -55,8 +57,6 @@ export const BOOK_UNGROUPED_ID = '';
 
 export const SUPPORTED_IMAGE_EXTS = ['png', 'jpg', 'jpeg'];
 export const IMAGE_ACCEPT_FORMATS = SUPPORTED_IMAGE_EXTS.map((ext) => `.${ext}`).join(', ');
-export const SUPPORTED_AUDIO_EXTS = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'm4b'];
-export const AUDIO_ACCEPT_FORMATS = SUPPORTED_AUDIO_EXTS.map((ext) => `.${ext}`).join(', ');
 
 export const DEFAULT_KOSYNC_SETTINGS = {
   serverUrl: 'https://sync.koreader.rocks/', // https://kosync.ak-team.com:3042/
@@ -77,6 +77,12 @@ export const DEFAULT_READWISE_SETTINGS = {
   lastSyncedAt: 0,
 } as ReadwiseSettings;
 
+export const DEFAULT_HARDCOVER_SETTINGS = {
+  enabled: false,
+  accessToken: '',
+  lastSyncedAt: 0,
+} as HardcoverSettings;
+
 export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   keepLogin: false,
   autoUpload: true,
@@ -88,6 +94,10 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   screenWakeLock: false,
   screenBrightness: -1, // -1~100, -1 for system default
   autoScreenBrightness: true,
+  hardwarePageTurner: {
+    enabled: false,
+    bindings: { pagePrev: null, pageNext: null, sectionPrev: null, sectionNext: null },
+  },
   openLastBooks: false,
   lastOpenBooks: [],
   autoImportBooksOnOpen: false,
@@ -105,13 +115,36 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   metadataOthersCollapsed: false,
   metadataDescriptionCollapsed: false,
 
+  pinCodeEnabled: false,
+
+  customDictionaries: [],
+  dictionarySettings: {
+    providerOrder: ['builtin:wiktionary', 'builtin:wikipedia'],
+    providerEnabled: {
+      'builtin:wiktionary': true,
+      'builtin:wikipedia': true,
+    },
+  },
+
   kosync: DEFAULT_KOSYNC_SETTINGS,
   readwise: DEFAULT_READWISE_SETTINGS,
+  hardcover: DEFAULT_HARDCOVER_SETTINGS,
   aiSettings: DEFAULT_AI_SETTINGS,
 
   lastSyncedAtBooks: 0,
   lastSyncedAtConfigs: 0,
   lastSyncedAtNotes: 0,
+  lastSyncedAtReplicas: {},
+  syncCategories: {
+    book: true,
+    progress: true,
+    note: true,
+    dictionary: true,
+    font: true,
+    texture: true,
+    opds_catalog: true,
+    settings: true,
+  },
 };
 
 export const DEFAULT_MOBILE_SYSTEM_SETTINGS: Partial<SystemSettings> = {
@@ -155,9 +188,6 @@ export const DEFAULT_READSETTINGS: ReadSettings = {
   userHighlightColors: [],
   defaultHighlightLabels: {},
   customTtsHighlightColors: [],
-  lookup: DEFAULT_LOOKUP_SETTINGS,
-  dictionary: DEFAULT_DICTIONARY_SETTINGS,
-  autoIndexOnOpen: false,
 };
 
 export const DEFAULT_MOBILE_READSETTINGS: Partial<ReadSettings> = {
@@ -187,12 +217,12 @@ export const DEFAULT_BOOK_LAYOUT: BookLayout = {
   compactMarginRightPx: 16,
   gapPercent: 5,
   scrolled: false,
+  noContinuousScroll: false,
   disableClick: false,
   fullscreenClickArea: false,
   swapClickArea: false,
   disableDoubleClick: false,
   volumeKeysToFlip: false,
-  noContinuousScroll: false,
   maxColumnCount: 2,
   maxInlineSize: getDefaultMaxInlineSize(),
   maxBlockSize: getDefaultMaxBlockSize(),
@@ -218,11 +248,7 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
   textIndent: 0,
   fullJustification: true,
   hyphenation: true,
-  invertImgColorInDark: false,
   theme: 'light',
-  overrideFont: false,
-  overrideLayout: false,
-  overrideColor: false,
   backgroundTextureId: 'none',
   backgroundOpacity: 0.6,
   backgroundSize: 'cover',
@@ -232,9 +258,15 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
   userStylesheet: '',
   userUIStylesheet: '',
 
+  overrideFont: false,
+  overrideLayout: false,
+  overrideColor: false,
+  useBookLayout: false,
+
   zoomMode: 'fit-page',
   spreadMode: 'auto',
   keepCoverSpread: true,
+  invertImgColorInDark: false,
   applyThemeToPDF: false,
 };
 
@@ -264,6 +296,10 @@ export const DEFAULT_EINK_VIEW_SETTINGS: Partial<ViewSettings> = {
   volumeKeysToFlip: true,
 };
 
+export const DEFAULT_PARAGRAPH_MODE_CONFIG: ParagraphModeConfig = {
+  enabled: false,
+};
+
 export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   sideBarTab: 'toc',
   uiLanguage: '',
@@ -274,7 +310,6 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
 
   showHeader: true,
   showFooter: true,
-  showBarsOnScroll: false,
   showRemainingTime: false,
   showRemainingPages: false,
   showProgressInfo: true,
@@ -283,8 +318,6 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   showBatteryPercentage: true,
   use24HourClock: false,
   tapToToggleFooter: false,
-  focusMode: false,
-  showMarginsOnScroll: false,
   showPaginationButtons: false,
   progressStyle: 'fraction',
   progressInfoMode: 'all',
@@ -292,6 +325,8 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   animated: false,
   isEink: false,
   isColorEink: false,
+
+  paragraphMode: DEFAULT_PARAGRAPH_MODE_CONFIG,
 
   readingRulerEnabled: false,
   readingRulerLines: 2,
@@ -344,15 +379,15 @@ export const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
   screenOrientation: 'auto',
 };
 
-export const DEFAULT_PARAGRAPH_MODE_CONFIG: ParagraphModeConfig = {
-  enabled: false,
-};
-
 export const DEFAULT_BOOK_SEARCH_CONFIG: BookSearchConfig = {
   scope: 'book',
   matchCase: false,
   matchWholeWords: false,
   matchDiacritics: false,
+};
+
+export const DEFAULT_VIEW_SETTINGS_CONFIG: ViewSettingsConfig = {
+  isGlobal: true,
 };
 
 export const SYSTEM_SETTINGS_VERSION = 1;
@@ -704,23 +739,41 @@ export const CJK_FONTS_PATTENS = new RegExp(
 
 export const BOOK_IDS_SEPARATOR = '+';
 
-export const CLOUD_ENABLED = false;
+export const DOWNLOAD_READEST_URL = 'https://readest.com?utm_source=readest_web';
 
-export const DOWNLOAD_READEST_URL = 'https://github.com/dalzyu/readest-hermes/releases/latest';
+export const READEST_WEB_BASE_URL = 'https://web.readest.com';
+export const READEST_NODE_BASE_URL = 'https://node.readest.com';
 
-export const HERMES_WEB_BASE_URL = '';
-export const HERMES_NODE_BASE_URL = '';
+export const SHARE_BASE_URL = `${READEST_WEB_BASE_URL}/s`;
+export const SHARE_EXPIRATION_DAYS = [1, 3, 7] as const;
 
-const LATEST_DOWNLOAD_BASE_URL =
-  'https://github.com/dalzyu/readest-hermes/releases/latest/download';
+// Send to Readest — the domain inbound capture emails are addressed to, the
+// R2 bucket holding raw inbound payloads, and the per-user cap on undrained
+// inbox items (defense against a leaked address).
+export const SEND_EMAIL_DOMAIN = 'readest.com';
+export const SEND_INBOX_BUCKET = 'readest-send-inbox';
+export const SEND_INBOX_PENDING_LIMIT = 50;
+// Hard cap on the size of a single uploaded EPUB the browser extension can
+// drop into the inbox. 30 MB is the same total-asset cap the client-side
+// bundler enforces — plus a bit of head-room for chapter HTML / structural
+// overhead. Beyond this size a clipped article is almost certainly an
+// over-illustrated page that would never read well in the EPUB anyway.
+export const SEND_INBOX_FILE_MAX_BYTES = 40 * 1024 * 1024;
+export const SHARE_DEFAULT_EXPIRATION_DAYS = 3;
+export const SHARE_MAX_PER_USER = 50;
+export const SHARE_TOKEN_LENGTH = 22;
+export const SHARE_PRESIGN_TTL_SECONDS = 300;
+export const SHARE_CFI_MAX_LENGTH = 512;
 
-export const HERMES_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
+const LATEST_DOWNLOAD_BASE_URL = 'https://download.readest.com/releases';
 
-export const HERMES_CHANGELOG_FILE = `${LATEST_DOWNLOAD_BASE_URL}/release-notes.json`;
+export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 
-export const HERMES_PUBLIC_STORAGE_BASE_URL = '';
+export const READEST_CHANGELOG_FILE = `${LATEST_DOWNLOAD_BASE_URL}/release-notes.json`;
 
-export const HERMES_OPDS_USER_AGENT = 'Hermes/' + getAppVersion() + ' (OPDS Browser)';
+export const READEST_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';
+
+export const READEST_OPDS_USER_AGENT = 'Readest/1.0 (OPDS Browser)';
 
 export const SYNC_PROGRESS_INTERVAL_SEC = 3;
 export const SYNC_NOTES_INTERVAL_SEC = 5;
@@ -818,6 +871,7 @@ export const TRANSLATED_LANGS = {
   ko: '한국어',
   es: 'Español',
   pt: 'Português',
+  'pt-BR': 'Português (Brasil)',
   ru: 'Русский',
   he: 'עברית',
   ar: 'العربية',
@@ -838,6 +892,9 @@ export const TRANSLATED_LANGS = {
   si: 'සිංහල',
   'zh-CN': '简体中文',
   'zh-TW': '正體中文',
+  ro: 'Română',
+  hu: 'Magyar',
+  uz: 'Oʻzbek',
 };
 
 export const TRANSLATOR_LANGS: Record<string, string> = {
@@ -847,7 +904,6 @@ export const TRANSLATOR_LANGS: Record<string, string> = {
   fi: 'Suomi',
   da: 'Dansk',
   cs: 'Čeština',
-  hu: 'Magyar',
   km: 'ខ្មែរ',
   ro: 'Română',
   bg: 'Български',
