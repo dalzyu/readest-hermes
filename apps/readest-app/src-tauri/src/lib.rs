@@ -22,7 +22,6 @@ use tauri_plugin_fs::FsExt;
 
 #[cfg(desktop)]
 use tauri::{Listener, Url};
-mod audio_sync;
 mod dir_scanner;
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 mod discord_rpc;
@@ -112,10 +111,7 @@ fn set_window_open_with_files(app: &AppHandle, files: Vec<PathBuf>) {
         })
         .collect::<Vec<_>>()
         .join(",");
-    let Some(window) = app.get_webview_window("main") else {
-        log::warn!("Main window not ready when attempting to pass open-with files");
-        return;
-    };
+    let window = app.get_webview_window("main").unwrap();
     let script = format!("window.OPEN_WITH_FILES = [{files}];");
     if let Err(e) = window.eval(&script) {
         eprintln!("Failed to set open files variable: {e}");
@@ -173,14 +169,6 @@ pub fn run() {
             get_environment_variable,
             get_executable_dir,
             dir_scanner::read_dir,
-            audio_sync::commands::inspect_audio_metadata,
-            audio_sync::commands::import_audio_metadata,
-            audio_sync::commands::start_alignment_job,
-            audio_sync::commands::read_alignment_job_status,
-            audio_sync::commands::cancel_alignment_job,
-            audio_sync::runtime_manager::get_audio_sync_helper_status,
-            audio_sync::runtime_manager::install_audio_sync_helper,
-            audio_sync::runtime_manager::remove_audio_sync_helper,
             #[cfg(target_os = "macos")]
             macos::safari_auth::auth_with_safari,
             #[cfg(target_os = "macos")]
@@ -200,53 +188,24 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_sharekit::init())
+        .plugin(tauri_plugin_device_info::init())
+        .plugin(tauri_plugin_turso::init())
         .plugin(tauri_plugin_native_bridge::init())
         .plugin(tauri_plugin_native_tts::init());
-
-    #[cfg(not(all(target_os = "windows", target_arch = "x86")))]
-    let builder = builder.plugin(tauri_plugin_device_info::init());
-
-    #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_turso::init());
 
     #[cfg(desktop)]
     let builder = builder.plugin(
         tauri_plugin_single_instance::Builder::new()
             .callback(move |app, argv, cwd| {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_focus();
+                }
                 let files = get_files_from_argv(argv.clone());
                 if !files.is_empty() {
                     allow_file_in_scopes(app, files.clone());
                 }
-
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.set_focus();
-                    if let Err(error) =
-                        app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
-                    {
-                        log::warn!("Failed to emit single-instance payload: {error}");
-                    }
-                } else {
-                    log::warn!("Single-instance callback fired before main window was ready");
-                    let app_handle = app.clone();
-                    let deferred_files = if !files.is_empty() {
-                        Some(files.clone())
-                    } else {
-                        None
-                    };
-                    app.once("window-ready", move |_| {
-                        if let Some(files) = deferred_files {
-                            set_window_open_with_files(&app_handle, files);
-                        }
-                        if let Some(window) = app_handle.get_webview_window("main") {
-                            let _ = window.set_focus();
-                        }
-                        if let Err(error) = app_handle
-                            .emit("single-instance", SingleInstancePayload { args: argv, cwd })
-                        {
-                            log::warn!("Failed to emit deferred single-instance payload: {error}");
-                        }
-                    });
-                }
+                app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
+                    .unwrap();
             })
             .dbus_id("com.bilingify.readest".to_owned())
             .build(),
@@ -346,16 +305,16 @@ pub fn run() {
             let is_appimage = false;
 
             #[cfg(desktop)]
-            let updater_disabled = std::env::var("HERMES_DISABLE_UPDATER").is_ok();
+            let updater_disabled = std::env::var("READEST_DISABLE_UPDATER").is_ok();
             #[cfg(not(desktop))]
             let updater_disabled = false;
 
             let init_script = format!(
                 r#"
-                    if ({is_eink}) window.__HERMES_IS_EINK = true;
-                    if ({cli_access}) window.__HERMES_CLI_ACCESS = true;
-                    if ({is_appimage}) window.__HERMES_IS_APPIMAGE = true;
-                    if ({updater_disabled}) window.__HERMES_UPDATER_DISABLED = true;
+                    if ({is_eink}) window.__READEST_IS_EINK = true;
+                    if ({cli_access}) window.__READEST_CLI_ACCESS = true;
+                    if ({is_appimage}) window.__READEST_IS_APPIMAGE = true;
+                    if ({updater_disabled}) window.__READEST_UPDATER_DISABLED = true;
                     window.addEventListener('DOMContentLoaded', function() {{
                         document.documentElement.classList.add('edge-to-edge');
                         const isTauriLocal = window.location.protocol === 'tauri:' ||
@@ -417,7 +376,9 @@ pub fn run() {
                     true
                 });
 
-            #[cfg(desktop)]
+            #[cfg(target_os = "macos")]
+            let win_builder = win_builder.inner_size(1280.0, 800.0).resizable(true);
+            #[cfg(all(not(target_os = "macos"), desktop))]
             let win_builder = win_builder.inner_size(800.0, 600.0).resizable(true);
 
             #[cfg(target_os = "macos")]
@@ -432,7 +393,7 @@ pub fn run() {
                     .decorations(false)
                     .visible(false)
                     .shadow(true)
-                    .title("Hermes");
+                    .title("Readest");
 
                 #[cfg(target_os = "windows")]
                 {
