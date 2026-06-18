@@ -10,7 +10,7 @@ import { useDeviceControlStore } from '@/store/deviceStore';
 import { eventDispatcher } from '@/utils/event';
 import { FooterBarProps, NavigationHandlers, FooterBarChildProps } from './types';
 import { debounce } from '@/utils/debounce';
-import { viewPagination } from '../../hooks/usePagination';
+import { RSVPControl } from '../rsvp';
 import MobileFooterBar from './MobileFooterBar';
 import DesktopFooterBar from './DesktopFooterBar';
 import TTSControl from '../tts/TTSControl';
@@ -67,12 +67,12 @@ const FooterBar: React.FC<FooterBarProps> = ({
   );
 
   const handleGoPrevPage = useCallback(() => {
-    viewPagination(view, viewSettings, 'left', 'page');
-  }, [view, viewSettings]);
+    view?.renderer.prev();
+  }, [view]);
 
   const handleGoNextPage = useCallback(() => {
-    viewPagination(view, viewSettings, 'right', 'page');
-  }, [view, viewSettings]);
+    view?.renderer.next();
+  }, [view]);
 
   const handleGoPrevSection = useCallback(() => {
     view?.renderer.prevSection?.();
@@ -269,6 +269,7 @@ const FooterBar: React.FC<FooterBarProps> = ({
       )}
 
       <TTSControl bookKey={bookKey} gridInsets={gridInsets} />
+      <RSVPControl bookKey={bookKey} gridInsets={gridInsets} />
     </>
   );
 };
