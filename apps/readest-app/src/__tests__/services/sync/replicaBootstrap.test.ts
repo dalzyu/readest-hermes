@@ -1,4 +1,13 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+
+vi.mock('@/store/customDictionaryStore', () => ({
+  useCustomDictionaryStore: { getState: () => ({ markAvailableByContentId: vi.fn() }) },
+}));
+
+vi.mock('@/store/customFontStore', () => ({
+  useCustomFontStore: { getState: () => ({ markAvailableByContentId: vi.fn() }) },
+}));
+
 import {
   __resetBootstrapForTests,
   bootstrapReplicaAdapters,
@@ -8,11 +17,13 @@ import {
   getReplicaAdapter,
   listReplicaAdapters,
 } from '@/services/sync/replicaRegistry';
+import { __resetReplicaTransferIntegrationForTests } from '@/services/sync/replicaTransferIntegration';
 import { dictionaryAdapter } from '@/services/sync/adapters/dictionary';
 
 afterEach(() => {
   clearReplicaAdapters();
   __resetBootstrapForTests();
+  __resetReplicaTransferIntegrationForTests();
 });
 
 describe('bootstrapReplicaAdapters', () => {
@@ -24,12 +35,12 @@ describe('bootstrapReplicaAdapters', () => {
   test('is idempotent: calling twice is a no-op (does not throw)', () => {
     bootstrapReplicaAdapters();
     bootstrapReplicaAdapters();
-    expect(listReplicaAdapters()).toHaveLength(1);
+    expect(listReplicaAdapters()).toHaveLength(2);
   });
 
-  test('only registers the kinds in the PR-1 allowlist', () => {
+  test('registers the current allowlist (dictionary, font)', () => {
     bootstrapReplicaAdapters();
     const kinds = listReplicaAdapters().map((a) => a.kind);
-    expect(kinds).toEqual(['dictionary']);
+    expect(kinds).toEqual(['dictionary', 'font']);
   });
 });
