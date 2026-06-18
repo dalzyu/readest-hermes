@@ -530,6 +530,13 @@ input[type='range'].slider-input {
   background-color: theme('colors.base-content') !important;
 }
 
+/* Inverted chip for e-ink: base-content fill, base-100 content. Declared after
+   the substring matchers above so the content color wins the cascade. */
+[data-eink='true'] .eink-inverted {
+  background-color: theme('colors.base-content') !important;
+  color: theme('colors.base-100') !important;
+}
+
 [data-eink='true'] [class*='font-light'] {
   font-weight: normal !important;
 }
@@ -616,6 +623,11 @@ input[type='range'].slider-input {
 
 [data-eink='true'] .dropdown-toggle {
   background-color: theme('colors.transparent') !important;
+  /* A toggle that also carries a fill class (e.g. btn-outline) gets its label
+     inverted to base-100 by the rule above; with the background neutralized to
+     transparent that leaves white-on-white. Keep the text base-content so the
+     label stays legible (issue #4435). */
+  color: theme('colors.base-content') !important;
 }
 
 [data-eink='true'] .opds-navigation .card {

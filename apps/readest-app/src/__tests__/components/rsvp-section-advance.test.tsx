@@ -44,6 +44,7 @@ vi.mock('@/store/readerStore', () => ({
       location: 'epubcfi(/6/8!/4/1:0)',
       sectionHref: `ch${primaryIndex}.xhtml`,
     }),
+    getViewSettings: () => null,
   }),
 }));
 
@@ -84,6 +85,11 @@ vi.mock('@/services/rsvp', () => ({
       loadNextPageContent: vi.fn(() => {
         loadedSections.push(primaryIndex);
       }),
+      // Slice 5 (#3235) TTS-sync surface used by RSVPControl's subscription.
+      setExternallyDriven: vi.fn(),
+      stopEstimator: vi.fn(),
+      syncToCfi: vi.fn(() => false),
+      driveEstimatedFromCfi: vi.fn(() => false),
       getStoredPosition: vi.fn(() => null),
       get currentState() {
         return { active: true };

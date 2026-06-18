@@ -26,11 +26,13 @@ import { navigateToReader } from '@/utils/nav';
 import { getFileExtFromMimeType } from '@/libs/document';
 import { OPDSFeed, OPDSPublication, OPDSSearch, REL } from '@/types/opds';
 import {
+  expandOPDSSearchTemplate,
   getFileExtFromPath,
   isSearchLink,
   looksLikeXMLContent,
   MIME,
   parseMediaType,
+  parseOPDSXML,
   resolveURL,
 } from './utils/opdsUtils';
 import {
@@ -247,7 +249,7 @@ export default function BrowserPage() {
         const text = await res.text();
 
         if (looksLikeXMLContent(text)) {
-          const doc = new DOMParser().parseFromString(text, MIME.XML as DOMParserSupportedType);
+          const doc = parseOPDSXML(text);
           const {
             documentElement: { localName },
           } = doc;
@@ -327,7 +329,16 @@ export default function BrowserPage() {
             }
           }
         } else {
-          const feed = JSON.parse(text);
+          // Defense-in-depth: a non-feed response (e.g. an image returned for a
+          // link that isn't actually a feed) is neither XML nor JSON. Surface a
+          // clear message instead of letting a raw JSON.parse SyntaxError leak
+          // into the error view (readest issue #4599).
+          let feed;
+          try {
+            feed = JSON.parse(text);
+          } catch {
+            throw new Error(_('Content is neither valid XML nor JSON'));
+          }
           const newState = {
             feed,
             baseURL: responseURL,
@@ -418,6 +429,13 @@ export default function BrowserPage() {
         const searchURL = resolveURL(searchLink.href, state.baseURL);
         if (searchLink.type === MIME.OPENSEARCH) {
           handleNavigate(searchURL, true);
+        } else if (searchLink.type === MIME.OPDS2) {
+          // OPDS 2.0 JSON: href is an RFC 6570 URI template (e.g.
+          // `/search{?query}`). Expand it with the typed term BEFORE resolving
+          // against the base URL — resolveURL would otherwise mangle the
+          // `{?query}` template braces and drop the query.
+          const expandedHref = expandOPDSSearchTemplate(searchLink.href, queryTerm);
+          handleNavigate(resolveURL(expandedHref, state.baseURL), true);
         } else if (searchLink.type === MIME.ATOM) {
           const search: OPDSSearch = {
             metadata: {
@@ -948,6 +966,7 @@ export default function BrowserPage() {
             onDownload={handleDownload}
             onStream={handleStream}
             resolveURL={resolveURL}
+            onNavigate={handleNavigate}
             onGenerateCachedImageUrl={handleGenerateCachedImageUrl}
           />
         )}

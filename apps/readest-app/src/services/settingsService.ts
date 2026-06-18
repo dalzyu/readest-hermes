@@ -20,15 +20,14 @@ import {
   SETTINGS_FILENAME,
   DEFAULT_MOBILE_SYSTEM_SETTINGS,
   DEFAULT_ANNOTATOR_CONFIG,
+  DEFAULT_WORD_LENS_CONFIG,
   DEFAULT_EINK_VIEW_SETTINGS,
   DEFAULT_VIEW_SETTINGS_CONFIG,
 } from './constants';
-import { DEFAULT_AI_SETTINGS, DEFAULT_AI_PROFILE } from './ai/constants';
-import type { AISettings, AITaskType, ModelEntry, ProviderConfig } from './ai/types';
+import { DEFAULT_AI_SETTINGS } from './ai/constants';
 import { getTargetLang, isCJKEnv } from '@/utils/misc';
 import { safeLoadJSON, safeSaveJSON } from './persistence';
 
-import { resolveContextTranslationFieldSources } from '@/services/learning/defaults';
 export interface Context {
   fs: FileSystem;
   isMobile: boolean;
@@ -46,6 +45,7 @@ export function getDefaultViewSettings(ctx: Context): ViewSettings {
     ...DEFAULT_TTS_CONFIG,
     ...DEFAULT_SCREEN_CONFIG,
     ...DEFAULT_ANNOTATOR_CONFIG,
+    ...DEFAULT_WORD_LENS_CONFIG,
     ...DEFAULT_VIEW_SETTINGS_CONFIG,
     ...(ctx.isMobile ? DEFAULT_MOBILE_VIEW_SETTINGS : {}),
     ...(ctx.isEink ? DEFAULT_EINK_VIEW_SETTINGS : {}),
@@ -103,111 +103,6 @@ export function migrateHighlightColorPrefs(read: ReadSettings): void {
   read.userHighlightColors = userColors;
 }
 
-function getLegacyModelSelection(
-  provider: ProviderConfig,
-  task: AITaskType,
-): { providerId: string; modelId: string } | undefined {
-  const kind: ModelEntry['kind'] = task === 'embedding' ? 'embedding' : 'chat';
-  const modelId = provider.models.find((model) => model.kind === kind)?.id;
-  if (!modelId) return undefined;
-  return { providerId: provider.id, modelId };
-}
-
-function migrateProviderConfigShape(provider: unknown): ProviderConfig | null {
-  if (!provider || typeof provider !== 'object') return null;
-  const legacy = provider as ProviderConfig & {
-    model?: string;
-    embeddingModel?: string;
-    apiStyle?: 'chat-completions' | 'responses';
-    providerType?: string;
-  };
-  const legacyProviderType = (provider as { providerType?: string }).providerType;
-  if (!legacy.id || !legacyProviderType) return null;
-
-  const providerType =
-    legacyProviderType === 'openai-compatible'
-      ? 'openai'
-      : (legacyProviderType as ProviderConfig['providerType']);
-  const existingModels = Array.isArray((legacy as ProviderConfig).models)
-    ? (legacy as ProviderConfig).models.filter((model) => model?.id && model?.kind)
-    : [];
-  const migratedModels: ModelEntry[] = [...existingModels];
-  if (migratedModels.length === 0 && typeof legacy.model === 'string' && legacy.model.trim()) {
-    migratedModels.push({ id: legacy.model.trim(), kind: 'chat' });
-  }
-  if (
-    typeof legacy.embeddingModel === 'string' &&
-    legacy.embeddingModel.trim() &&
-    !migratedModels.some((model) => model.kind === 'embedding')
-  ) {
-    migratedModels.push({ id: legacy.embeddingModel.trim(), kind: 'embedding' });
-  }
-
-  return {
-    id: legacy.id,
-    name: legacy.name ?? '',
-    providerType,
-    baseUrl: legacy.baseUrl ?? '',
-    apiKey: legacy.apiKey,
-    models: migratedModels,
-    apiStandard:
-      (legacy as { apiStandard?: 'chat-completions' | 'responses' }).apiStandard ?? legacy.apiStyle,
-  };
-}
-
-function migrateAISettingsShape(aiSettings: AISettings): AISettings {
-  const providers = aiSettings.providers
-    .map((provider) => migrateProviderConfigShape(provider))
-    .filter((provider): provider is ProviderConfig => provider !== null);
-
-  const legacyModelAssignments = (
-    aiSettings as AISettings & {
-      modelAssignments?: Partial<Record<AITaskType, string>>;
-    }
-  ).modelAssignments;
-  const existingProfiles = Array.isArray(aiSettings.profiles) ? aiSettings.profiles : [];
-  const profiles =
-    existingProfiles.length > 0
-      ? existingProfiles
-      : [
-          {
-            ...DEFAULT_AI_PROFILE,
-            modelAssignments: Object.fromEntries(
-              (Object.entries(legacyModelAssignments ?? {}) as Array<[AITaskType, string]>).flatMap(
-                ([task, providerId]) => {
-                  const provider = providers.find((entry) => entry.id === providerId);
-                  const selection = provider ? getLegacyModelSelection(provider, task) : undefined;
-                  return selection ? [[task, selection]] : [];
-                },
-              ),
-            ),
-          },
-        ];
-
-  const activeProfileId =
-    aiSettings.activeProfileId &&
-    profiles.some((profile) => profile.id === aiSettings.activeProfileId)
-      ? aiSettings.activeProfileId
-      : profiles[0]?.id || DEFAULT_AI_PROFILE.id;
-
-  return {
-    ...DEFAULT_AI_SETTINGS,
-    ...aiSettings,
-    providers,
-    profiles,
-    activeProfileId,
-    developerMode: aiSettings.developerMode ?? false,
-  };
-}
-
-export function migrateContextTranslationSource(settings: SystemSettings): void {
-  const current = settings.globalReadSettings.contextTranslation;
-  if (!current) return;
-
-  current.fieldSources = resolveContextTranslationFieldSources(current);
-  delete (current as { source?: unknown }).source;
-}
-
 export async function loadSettings(ctx: Context): Promise<SystemSettings> {
   const defaultSettings: SystemSettings = {
     ...DEFAULT_SYSTEM_SETTINGS,
@@ -244,15 +139,14 @@ export async function loadSettings(ctx: Context): Promise<SystemSettings> {
     ...settings.globalReadSettings,
   };
   migrateHighlightColorPrefs(settings.globalReadSettings);
-  migrateContextTranslationSource(settings);
   settings.globalViewSettings = {
     ...getDefaultViewSettings(ctx),
     ...settings.globalViewSettings,
   };
-  settings.aiSettings = migrateAISettingsShape({
+  settings.aiSettings = {
     ...DEFAULT_AI_SETTINGS,
     ...settings.aiSettings,
-  });
+  };
 
   settings.localBooksDir = await ctx.fs.getPrefix('Books');
 

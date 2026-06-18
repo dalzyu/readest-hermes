@@ -2,6 +2,9 @@ package com.readest.native_bridge
 
 import android.Manifest
 import android.app.Activity
+import android.app.PendingIntent
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -39,6 +42,7 @@ import app.tauri.plugin.Plugin
 import app.tauri.plugin.Invoke
 import org.json.JSONArray
 import java.io.*
+import kotlinx.coroutines.*
 
 @InvokeArg
 class AuthRequestArgs {
@@ -138,6 +142,16 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
     private val billingManager by lazy {
         BillingManager(activity)
     }
+    // Scope for offloading blocking @Command I/O (file copy, package
+    // install, font scan, dictionary lookup) off the plugin command thread.
+    // Cancelled in onDestroy so in-flight work can't resolve into — or leak —
+    // a dead Activity.
+    private val pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    override fun onDestroy() {
+        pluginScope.cancel()
+        instance = null
+    }
 
     companion object {
         private const val REQUEST_MANAGE_STORAGE = 1001
@@ -159,27 +173,153 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
     }
 
     private fun handleIntent(intent: Intent?) {
-        val uri = intent?.data ?: return
-        Log.e("NativeBridgePlugin", "Received intent: $uri")
-        when {
-          uri.scheme == "readest" && uri.host == "auth-callback" -> {
-              val result = JSObject().apply {
-                  put("redirectUrl", uri.toString())
-              }
-              pendingInvoke?.resolve(result)
-              pendingInvoke = null
-          }
+        if (intent == null) return
+        Log.d("NativeBridgePlugin", "Received intent: action=${intent.action} data=${intent.data}")
 
-          intent.action == Intent.ACTION_VIEW -> {
-              try {
-                activity.contentResolver.takePersistableUriPermission(
-                      uri,
-                      Intent.FLAG_GRANT_READ_URI_PERMISSION
-                  )
-              } catch (e: SecurityException) {
-                Log.e("NativeBridgePlugin", "Failed to take persistable URI permission: ${e.message}")
-              }
-          }
+        // OAuth callback uses a custom scheme on intent.data and is handled
+        // separately from any user-shared content.
+        intent.data?.let { uri ->
+            if (uri.scheme == "readest" && uri.host == "auth-callback") {
+                val result = JSObject().apply {
+                    put("redirectUrl", uri.toString())
+                }
+                pendingInvoke?.resolve(result)
+                pendingInvoke = null
+                return
+            }
+        }
+
+        when (intent.action) {
+            Intent.ACTION_VIEW -> {
+                // "Open with Readest": the OS hands us a single content://
+                // (or file://) URI on `intent.data`. Take the persistable
+                // permission so we can read it through any subsequent app
+                // launch, then forward it to the JS side via the existing
+                // shared-intent channel — without this trigger, the URI
+                // silently dies in Kotlin and the user just sees the
+                // library splash with nothing happening.
+                val uri = intent.data ?: return
+                tryTakePersistableReadPermission(uri)
+                emitSharedIntent("VIEW", listOf(uri))
+            }
+
+            Intent.ACTION_SEND -> {
+                // System share-sheet → "Send to Readest" (single file).
+                // The URI lives on EXTRA_STREAM, not on intent.data, which
+                // is why the previous data-only handler never saw share
+                // captures at all.
+                val uri = getExtraStream(intent) ?: return
+                tryTakePersistableReadPermission(uri)
+                emitSharedIntent("SEND", listOf(uri))
+            }
+
+            Intent.ACTION_SEND_MULTIPLE -> {
+                val uris = getExtraStreamList(intent)
+                if (uris.isEmpty()) return
+                uris.forEach { tryTakePersistableReadPermission(it) }
+                emitSharedIntent("SEND", uris)
+            }
+        }
+    }
+
+    private fun tryTakePersistableReadPermission(uri: Uri) {
+        // Only content:// URIs support persistable permissions; file://
+        // URIs are accessible directly and would throw SecurityException
+        // here. Skip the call rather than swallow noisy logs.
+        if (uri.scheme != "content") return
+        try {
+            activity.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (e: SecurityException) {
+            Log.w("NativeBridgePlugin", "takePersistableUriPermission failed for $uri: ${e.message}")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getExtraStream(intent: Intent): Uri? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getExtraStreamList(intent: Intent): List<Uri> {
+        val list: ArrayList<Uri>? =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+            }
+        return list ?: emptyList()
+    }
+
+    // shared-intent events emitted before the JS side has registered its
+    // listener via addPluginListener("native-bridge", "shared-intent", ...)
+    // would otherwise vanish — the upstream Plugin.trigger() drops events
+    // when the per-event listener list is empty. This is exactly what
+    // happens on cold launch via "Open with Readest": Android delivers the
+    // ACTION_VIEW intent to onCreate / onNewIntent (the WebView is already
+    // up but the JS app is mid-hydration), we emit it through triggerEvent
+    // immediately, and useAppUrlIngress's addPluginListener call lands a
+    // few hundred ms later — too late to receive the now-discarded event.
+    //
+    // To fix this we queue events whenever no listener is registered, then
+    // replay the queue when a registerListener call lands for this event
+    // (see overridden registerListener below).
+    private val pendingEvents: MutableMap<String, MutableList<JSObject>> = mutableMapOf()
+    private val pendingEventsLock = Any()
+
+    private fun emitSharedIntent(action: String, uris: List<Uri>) {
+        val payload = JSObject().apply {
+            put("action", action)
+            val arr = JSArray()
+            uris.forEach { arr.put(it.toString()) }
+            put("urls", arr)
+        }
+        emitOrQueue("shared-intent", payload)
+    }
+
+    private fun emitOrQueue(eventName: String, payload: JSObject) {
+        if (hasListener(eventName)) {
+            triggerEvent(eventName, payload)
+        } else {
+            synchronized(pendingEventsLock) {
+                val list = pendingEvents.getOrPut(eventName) { mutableListOf() }
+                list.add(payload)
+            }
+            Log.d("NativeBridgePlugin", "Queued $eventName payload (no listener yet); pending size=${pendingEvents[eventName]?.size}")
+        }
+    }
+
+    override fun registerListener(invoke: Invoke) {
+        super.registerListener(invoke)
+        // After super.registerListener, the listener is now wired up.
+        // Drain any queued events for the same name so the JS side gets
+        // events that were emitted between native start and listener
+        // registration.
+        // The event name lives on the invoke args, not directly accessible
+        // post-resolve; instead, drain every queued bucket whose key has a
+        // listener now. Cheap because there's at most one or two events.
+        val toReplay = mutableListOf<Pair<String, JSObject>>()
+        synchronized(pendingEventsLock) {
+            val toRemove = mutableListOf<String>()
+            for ((event, list) in pendingEvents) {
+                if (hasListener(event)) {
+                    list.forEach { toReplay.add(event to it) }
+                    toRemove.add(event)
+                }
+            }
+            toRemove.forEach { pendingEvents.remove(it) }
+        }
+        if (toReplay.isNotEmpty()) {
+            Log.d("NativeBridgePlugin", "Replaying ${toReplay.size} queued event(s) after registerListener")
+            for ((event, payload) in toReplay) {
+                triggerEvent(event, payload)
+            }
         }
     }
 
@@ -200,58 +340,68 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
     @Command
     fun copy_uri_to_path(invoke: Invoke) {
         val args = invoke.parseArgs(CopyURIRequestArgs::class.java)
-        val ret = JSObject()
-        try {
-            val uri = Uri.parse(args.uri ?: "")
-            val dst = File(args.dst ?: "")
-            val inputStream = activity.contentResolver.openInputStream(uri)
+        pluginScope.launch {
+            val ret = withContext(Dispatchers.IO) {
+                val r = JSObject()
+                try {
+                    val uri = Uri.parse(args.uri ?: "")
+                    val dst = File(args.dst ?: "")
+                    val inputStream = activity.contentResolver.openInputStream(uri)
 
-            if (inputStream != null) {
-                dst.outputStream().use { output ->
-                    inputStream.use { input ->
-                        input.copyTo(output)
+                    if (inputStream != null) {
+                        dst.outputStream().use { output ->
+                            inputStream.use { input ->
+                                input.copyTo(output)
+                            }
+                        }
+                        r.put("success", true)
+                    } else {
+                        r.put("success", false)
+                        r.put("error", "Failed to open input stream from URI")
                     }
+                } catch (e: Exception) {
+                    r.put("success", false)
+                    r.put("error", e.message)
                 }
-                ret.put("success", true)
-            } else {
-                ret.put("success", false)
-                ret.put("error", "Failed to open input stream from URI")
+                r
             }
-        } catch (e: Exception) {
-            ret.put("success", false)
-            ret.put("error", e.message)
+            if (isActive) invoke.resolve(ret)
         }
-        invoke.resolve(ret)
     }
 
     @Command
     fun install_package(invoke: Invoke) {
         val args = invoke.parseArgs(InstallPackageRequestArgs::class.java)
-        val ret = JSObject()
-        try {
-            val file = File(args.path ?: "")
-            if (file.exists()) {
-                val intent = Intent(Intent.ACTION_VIEW)
-                val apkUri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
-                intent.setDataAndType(apkUri, "application/vnd.android.package-archive")
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                val packageManager = activity.packageManager
-                val resolveInfos = packageManager.queryIntentActivities(intent, 0)
-                for (resolveInfo in resolveInfos) {
-                    val packageName = resolveInfo.activityInfo.packageName
-                    activity.grantUriPermission(packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        pluginScope.launch {
+            val ret = withContext(Dispatchers.IO) {
+                val r = JSObject()
+                try {
+                    val file = File(args.path ?: "")
+                    if (file.exists()) {
+                        val intent = Intent(Intent.ACTION_VIEW)
+                        val apkUri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
+                        intent.setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                        val packageManager = activity.packageManager
+                        val resolveInfos = packageManager.queryIntentActivities(intent, 0)
+                        for (resolveInfo in resolveInfos) {
+                            val packageName = resolveInfo.activityInfo.packageName
+                            activity.grantUriPermission(packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        withContext(Dispatchers.Main) { activity.startActivity(intent) }
+                        r.put("success", true)
+                    } else {
+                        r.put("success", false)
+                        r.put("error", "File does not exist")
+                    }
+                } catch (e: Exception) {
+                    r.put("success", false)
+                    r.put("error", e.message)
                 }
-                activity.startActivity(intent)
-                ret.put("success", true)
-            } else {
-                ret.put("success", false)
-                ret.put("error", "File does not exist")
+                r
             }
-        } catch (e: Exception) {
-            ret.put("success", false)
-            ret.put("error", e.message)
+            if (isActive) invoke.resolve(ret)
         }
-        invoke.resolve(ret)
     }
 
     @Command
@@ -364,46 +514,66 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
 
     @Command
     fun get_sys_fonts_list(invoke: Invoke) {
-        val ret = JSObject()
-        try {
-            val fontList = mutableListOf<String>()
-            val fontFileList = mutableListOf<String>()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val systemFonts = SystemFonts.getAvailableFonts()
-                for (font in systemFonts) {
-                    val file = font.getFile()?: continue
-                    if (file.isFile && (file.name.endsWith(".ttf", true) || file.name.endsWith(".otf", true))) {
-                        fontFileList.add(file.name)
+        pluginScope.launch {
+            val ret = withContext(Dispatchers.IO) {
+                val r = JSObject()
+                try {
+                    val fontList = cachedFontList ?: run {
+                        val fonts = scanFonts()
+                        cachedFontList = fonts
+                        fonts
+                    }
+                    val fontDict = JSObject()
+                    for (fontName in fontList) {
+                        fontDict.put(fontName, fontName)
+                    }
+                    r.put("fonts", fontDict)
+                } catch (e: Exception) {
+                    r.put("error", e.message)
+                }
+                r
+            }
+            if (isActive) invoke.resolve(ret)
+        }
+    }
+
+    // Scanning system fonts walks the font directory and is stable for the
+    // process lifetime, so cache it. @Volatile for safe publication across
+    // the IO dispatcher threads.
+    @Volatile
+    private var cachedFontList: List<String>? = null
+
+    private fun scanFonts(): List<String> {
+        val fontList = mutableListOf<String>()
+        val fontFileList = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val systemFonts = SystemFonts.getAvailableFonts()
+            for (font in systemFonts) {
+                val file = font.getFile() ?: continue
+                if (file.isFile && (file.name.endsWith(".ttf", true) || file.name.endsWith(".otf", true))) {
+                    fontFileList.add(file.name)
+                }
+            }
+        } else {
+            val fontDirs = listOf("/system/fonts", "/system/font", "/data/fonts")
+            for (dirPath in fontDirs) {
+                val dir = File(dirPath)
+                if (dir.exists() && dir.isDirectory) {
+                    dir.listFiles()?.forEach { file ->
+                        if (file.isFile && (file.name.endsWith(".ttf", true) || file.name.endsWith(".otf", true))) {
+                            fontFileList.add(file.name)
+                        }
                     }
                 }
-            } else {
-                val fontDirs = listOf("/system/fonts", "/system/font", "/data/fonts")
-                for (dirPath in fontDirs) {
-                  val dir = File(dirPath)
-                  if (dir.exists() && dir.isDirectory) {
-                      dir.listFiles()?.forEach { file ->
-                          if (file.isFile && (file.name.endsWith(".ttf", true) || file.name.endsWith(".otf", true))) {
-                              fontFileList.add(file.name)
-                          }
-                      }
-                  }
-                }
             }
-            for (fileFileName in fontFileList) {
-                var fontName = fileFileName
-                    .replace(Regex("\\.(ttf|otf)$", RegexOption.IGNORE_CASE), "")
-                    .trim()
-                fontList.add(fontName)
-            }
-            var fontDict = JSObject()
-            for (fontName in fontList) {
-                fontDict.put(fontName, fontName)
-            }
-            ret.put("fonts", fontDict)
-        } catch (e: Exception) {
-            ret.put("error", e.message)
         }
-        invoke.resolve(ret)
+        for (fileFileName in fontFileList) {
+            val fontName = fileFileName
+                .replace(Regex("\\.(ttf|otf)$", RegexOption.IGNORE_CASE), "")
+                .trim()
+            fontList.add(fontName)
+        }
+        return fontList
     }
 
     @Command
@@ -888,22 +1058,26 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
      * intent (Android 6.0+). This is the same dispatch the system
      * "selection toolbar" uses for "Translate" / "Define" actions, so
      * any third-party dictionary that registers the intent (ColorDict,
-     * GoldenDict, 欧路, Pleco, etc.) shows up without extra work on
+     * GoldenDict, 欧路词典, Pleco, etc.) shows up without extra work on
      * our side.
      *
-     * Important: we deliberately do NOT wrap the intent with
-     * `Intent.createChooser`. Chooser-style dialogs always re-prompt
-     * (no "Always use this app" affordance), which the user found
-     * annoying when they have a single preferred dictionary. Plain
-     * `startActivity(intent)` instead surfaces the standard system
-     * disambiguation dialog with the "Just once / Always" buttons —
-     * picking "Always" makes subsequent lookups go straight to that
-     * app. When only one app handles the intent, Android skips the
-     * picker entirely and launches it directly.
+     * Routing is decided by [decideLookupDispatch], which filters out
+     * web browsers so an OEM browser that registers `ACTION_PROCESS_TEXT`
+     * (VIVO / iQOO OriginOS — issue #4559) can't swallow the lookup:
      *
-     * If no app is installed that responds to the intent, returns
-     * `unavailable: true` instead of throwing — the TS layer surfaces
-     * a hint rather than a generic error in that case.
+     * - **No browser among the handlers** → dispatch implicitly, exactly
+     *   as before. A single handler goes straight through; multiple
+     *   handlers raise the system disambiguation dialog with its native
+     *   "Just once / Always" buttons.
+     * - **Browser + a single dictionary** → launch the dictionary
+     *   directly (explicit component), bypassing the browser default.
+     * - **Browser + several dictionaries** → show a chooser that excludes
+     *   the browser(s) and remember whichever dictionary the user taps
+     *   (see [startBrowserExcludingChooser] / [LookupChoiceReceiver]) so
+     *   later lookups launch it directly.
+     * - **Only a browser (no dictionary installed)** → returns
+     *   `unavailable: true` so the TS layer hints to install a dictionary
+     *   instead of dumping the user into the browser.
      */
     @Command
     fun show_lookup_popover(invoke: Invoke) {
@@ -913,44 +1087,162 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
             return invoke.reject("empty word")
         }
 
-        try {
-            val intent = Intent(Intent.ACTION_PROCESS_TEXT).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_PROCESS_TEXT, word)
-                // Read-only — we don't want third-party apps writing
-                // back into a clipboard or selection slot we don't own.
-                putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
-            }
-
-            // Probe for handlers before dispatching. An ActivityNotFound
-            // crash is a worse UX than a quiet "no dictionary app"
-            // result; surface the empty case explicitly.
-            val pm = activity.packageManager
-            val handlers = pm.queryIntentActivities(intent, 0)
-            if (handlers.isEmpty()) {
-                val ret = JSObject()
-                ret.put("success", false)
-                ret.put("unavailable", true)
-                return invoke.resolve(ret)
-            }
-
-            // FLAG_ACTIVITY_NEW_TASK is required because `activity`
-            // here is the plugin's host activity context — without it,
-            // some OEM ROMs reject the dispatch with "Calling
-            // startActivity() from outside of an Activity context".
-            // The system disambiguation dialog still appears (with the
-            // Always/Just once buttons) for multi-handler cases; for
-            // single-handler cases it goes straight through.
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            activity.startActivity(intent)
-
-            val ret = JSObject()
-            ret.put("success", true)
-            invoke.resolve(ret)
-        } catch (e: Exception) {
-            Log.e("NativeBridgePlugin", "show_lookup_popover failed", e)
-            invoke.reject("Failed to look up word: ${e.message}")
+        val intent = Intent(Intent.ACTION_PROCESS_TEXT).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_PROCESS_TEXT, word)
+            // Read-only — we don't want third-party apps writing
+            // back into a clipboard or selection slot we don't own.
+            putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
         }
+
+        pluginScope.launch {
+            try {
+                // queryIntentActivities/queryBrowserPackages scan installed-app
+                // manifests (50–200ms) and readRememberedDictionary touches
+                // disk; keep them off the plugin command thread so other plugin
+                // IPC isn't queued behind a dictionary lookup. The dispatch
+                // itself (startActivity) hops back to Main below.
+                val (dispatch, remembered) = withContext(Dispatchers.IO) {
+                    val pm = activity.packageManager
+                    val handlers = pm.queryIntentActivities(intent, 0).map {
+                        LookupHandler(it.activityInfo.packageName, it.activityInfo.name)
+                    }
+                    val browserPackages = queryBrowserPackages(pm)
+                    val remembered = readRememberedDictionary()
+                    decideLookupDispatch(handlers, browserPackages, remembered) to remembered
+                }
+                if (!isActive) return@launch
+
+                when (dispatch) {
+                    is LookupDispatch.Unavailable -> {
+                        val ret = JSObject()
+                        ret.put("success", false)
+                        ret.put("unavailable", true)
+                        invoke.resolve(ret)
+                        return@launch
+                    }
+                    // FLAG_ACTIVITY_NEW_TASK is required because `activity`
+                    // here is the plugin's host activity context — without it
+                    // some OEM ROMs reject the dispatch with "Calling
+                    // startActivity() from outside of an Activity context".
+                    is LookupDispatch.DispatchImplicit -> {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        activity.startActivity(intent)
+                    }
+                    is LookupDispatch.DispatchExplicit -> {
+                        intent.setClassName(dispatch.handler.packageName, dispatch.handler.className)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        activity.startActivity(intent)
+                    }
+                    is LookupDispatch.DispatchChooser -> {
+                        // We only reach here when the remembered app (if any)
+                        // was stale — otherwise it would have been launched
+                        // directly. Drop it so a fresh pick replaces it.
+                        if (remembered != null) clearRememberedDictionary()
+                        startBrowserExcludingChooser(intent, dispatch.exclude)
+                    }
+                }
+
+                val ret = JSObject()
+                ret.put("success", true)
+                invoke.resolve(ret)
+            } catch (e: Exception) {
+                Log.e("NativeBridgePlugin", "show_lookup_popover failed", e)
+                if (isActive) invoke.reject("Failed to look up word: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Package names of installed web browsers — apps with an activity
+     * that handles a web `ACTION_VIEW` + `CATEGORY_BROWSABLE` intent.
+     * Such apps are always visible under Android 11+ package-visibility
+     * rules, so no extra `<queries>` entry is needed here.
+     */
+    private fun queryBrowserPackages(pm: PackageManager): Set<String> {
+        val probe = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.example.com"))
+            .addCategory(Intent.CATEGORY_BROWSABLE)
+        return pm.queryIntentActivities(probe, 0)
+            .map { it.activityInfo.packageName }
+            .toSet()
+    }
+
+    private fun lookupPrefs() =
+        activity.getSharedPreferences(LOOKUP_PREFS_NAME, Context.MODE_PRIVATE)
+
+    private fun readRememberedDictionary(): LookupHandler? {
+        val prefs = lookupPrefs()
+        val pkg = prefs.getString(LOOKUP_PREF_PACKAGE, null) ?: return null
+        val cls = prefs.getString(LOOKUP_PREF_CLASS, null) ?: return null
+        return LookupHandler(pkg, cls)
+    }
+
+    private fun clearRememberedDictionary() {
+        lookupPrefs().edit().remove(LOOKUP_PREF_PACKAGE).remove(LOOKUP_PREF_CLASS).apply()
+    }
+
+    /**
+     * Show the system chooser for [target] with the browser [exclude]
+     * components filtered out (`EXTRA_EXCLUDE_COMPONENTS`, API 24+), and
+     * register an `IntentSender` so the user's pick comes back via
+     * [LookupChoiceReceiver] and is remembered. `ACTION_CHOOSER` has no
+     * native "Always" button, so this re-implements that affordance.
+     */
+    private fun startBrowserExcludingChooser(target: Intent, exclude: List<LookupHandler>) {
+        val callback = Intent(activity, LookupChoiceReceiver::class.java)
+        // FLAG_MUTABLE so the system can fill in EXTRA_CHOSEN_COMPONENT on Android 12+.
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+        val pending = PendingIntent.getBroadcast(activity, 0, callback, flags)
+
+        val chooser = Intent.createChooser(target, null, pending.intentSender).apply {
+            putExtra(
+                Intent.EXTRA_EXCLUDE_COMPONENTS,
+                exclude.map { ComponentName(it.packageName, it.className) }.toTypedArray(),
+            )
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        activity.startActivity(chooser)
+    }
+
+    /**
+     * Report the dictionary app currently remembered for the
+     * browser-excluding chooser (see [show_lookup_popover]), so the
+     * settings UI can offer a "reset" affordance. Resolves with
+     * `{ packageName, label }` when one is remembered and still
+     * installed, or `{}` otherwise (clearing a stale entry on the way).
+     */
+    @Command
+    fun get_lookup_dictionary(invoke: Invoke) {
+        val ret = JSObject()
+        val remembered = readRememberedDictionary() ?: return invoke.resolve(ret)
+        try {
+            val pm = activity.packageManager
+            val appInfo = pm.getApplicationInfo(remembered.packageName, 0)
+            ret.put("packageName", remembered.packageName)
+            ret.put("label", pm.getApplicationLabel(appInfo).toString())
+        } catch (e: PackageManager.NameNotFoundException) {
+            // App was uninstalled — drop the stale memory and report none.
+            clearRememberedDictionary()
+        } catch (e: Exception) {
+            Log.e("NativeBridgePlugin", "get_lookup_dictionary failed", e)
+        }
+        invoke.resolve(ret)
+    }
+
+    /** Forget the remembered dictionary app so the next lookup re-prompts. */
+    @Command
+    fun clear_lookup_dictionary(invoke: Invoke) {
+        val ret = JSObject()
+        try {
+            clearRememberedDictionary()
+            ret.put("success", true)
+        } catch (e: Exception) {
+            Log.e("NativeBridgePlugin", "clear_lookup_dictionary failed", e)
+            ret.put("success", false)
+            ret.put("error", e.message ?: "unknown")
+        }
+        invoke.resolve(ret)
     }
 
     /**

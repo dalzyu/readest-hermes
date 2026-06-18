@@ -3,7 +3,6 @@ import { useAuth } from '@/context/AuthContext';
 import { useSync } from '@/hooks/useSync';
 import { BookConfig, FIXED_LAYOUT_FORMATS } from '@/types/book';
 import { useBookDataStore } from '@/store/bookDataStore';
-import { useLibraryStore } from '@/store/libraryStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -26,7 +25,7 @@ export const useProgressSync = (bookKey: string) => {
   const { getConfig, setConfig, getBookData } = useBookDataStore();
   const { getView, getProgress, setHoveredBookKey } = useReaderStore();
   const { settings } = useSettingsStore();
-  const { syncedConfigs, syncConfigs, syncBooks } = useSync(bookKey);
+  const { syncedConfigs, syncConfigs } = useSync(bookKey);
   const { user } = useAuth();
   const progress = getProgress(bookKey);
 
@@ -59,18 +58,6 @@ export const useProgressSync = (bookKey: string) => {
     // see issue #4198). useBooksSync still seeds new books rows when the
     // user is on the library page.
     await syncConfigs([compressedConfig], bookHash, metaHash, 'push');
-
-    // Also push the corresponding `books` row. The library sync lane
-    // (useBooksSync) only runs while the library page is mounted, so while a
-    // reader stays open the server's `books` record is never re-pushed and
-    // other devices' library pull-to-refresh keeps showing stale progress
-    // (issue #4198). useProgressAutoSave has already merged config.progress
-    // into the in-memory library Book via saveConfig, so we just forward
-    // that book through the books lane.
-    const libraryBook = useLibraryStore.getState().library.find((b) => b.hash === bookHash);
-    if (libraryBook && !libraryBook.deletedAt) {
-      await syncBooks([libraryBook], 'push');
-    }
   };
 
   const pullConfig = async (bookKey: string) => {
@@ -143,9 +130,24 @@ export const useProgressSync = (bookKey: string) => {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleAutoSync = useCallback(
+    debounce(() => {
+      syncConfig();
+    }, SYNC_PROGRESS_INTERVAL_SEC * 1000),
+    [],
+  );
+
   const handleSyncBookProgress = async (event: CustomEvent) => {
     const { bookKey: syncBookKey } = event.detail;
     if (syncBookKey === bookKey) {
+      // Flush any pending debounced push first so the latest local progress
+      // reaches the cloud before we (re)pull. This covers the book-close case
+      // (issue #4532): the reader can tear down inside the SYNC_PROGRESS_INTERVAL_SEC
+      // auto-sync window, which would otherwise drop the pending push and leave
+      // other devices on the previous cloud-synced position. Must run while the
+      // gate below is still open so syncConfig takes the push branch.
+      handleAutoSync.flush();
       // Manual pull-to-refresh: tear down any prior retry chain so the new
       // attempt starts fresh, rather than being short-circuited by the
       // "retry already pending" guard in pullWithRetry.
@@ -156,7 +158,8 @@ export const useProgressSync = (bookKey: string) => {
     }
   };
 
-  // Push: ad-hoc push when the book is closed
+  // Push: flush the pending push + pull when the book is closed or the user
+  // taps the manual Sync button.
   useEffect(() => {
     eventDispatcher.on('sync-book-progress', handleSyncBookProgress);
     return () => {
@@ -164,14 +167,6 @@ export const useProgressSync = (bookKey: string) => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookKey]);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleAutoSync = useCallback(
-    debounce(() => {
-      syncConfig();
-    }, SYNC_PROGRESS_INTERVAL_SEC * 1000),
-    [],
-  );
 
   // Push: auto-push progress when progress changes with a debounce
   useEffect(() => {

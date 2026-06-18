@@ -45,6 +45,13 @@ export const FIXED_LAYOUT_FORMATS: Set<BookFormat> = new Set(['PDF', 'CBZ']);
 export interface BookLookupIndex {
   byHash: Map<string, Book>;
   byMetaKey: Map<string, Book[]>; // key = `${metaHash}:${format}`
+  // Maps normalized absolute source path -> Book for in-place imports.
+  // Lets the importer recognize "I already have this exact file" without
+  // having to open, parse, and hash it again. Only books with a non-empty
+  // `filePath` and `!deletedAt` are indexed. The key is produced by
+  // `normalizeFilePathForIndex` so callers must use the same helper to
+  // probe; importBook handles that internally.
+  byFilePath: Map<string, Book>;
 }
 
 /**
@@ -273,7 +280,8 @@ export interface ViewConfig {
   showBatteryPercentage: boolean;
   tapToToggleFooter: boolean;
   showPaginationButtons: boolean;
-  progressStyle: 'percentage' | 'fraction';
+  progressStyle: 'percentage' | 'fraction' | 'reference';
+  referencePageCount: number;
   progressInfoMode: ProgressBarMode;
 
   animated: boolean;
@@ -326,8 +334,17 @@ export interface NoteExportConfig {
 export interface AnnotatorConfig {
   enableAnnotationQuickActions: boolean;
   annotationQuickAction: AnnotationToolType | null;
+  annotationToolbarItems: AnnotationToolType[];
   copyToNotebook: boolean;
   noteExportConfig: NoteExportConfig;
+}
+
+export interface WordLensConfig {
+  wordLensEnabled: boolean;
+  /** Difficulty slider, 1 (fewest hints) .. 5 (most hints). */
+  wordLensLevel: number;
+  /** Hint (target) language; '' = auto (app UI language). */
+  wordLensHintLang: string;
 }
 
 export interface ScreenConfig {
@@ -370,6 +387,7 @@ export interface ViewSettings
     ScreenConfig,
     ProofreadRulesConfig,
     AnnotatorConfig,
+    WordLensConfig,
     ViewSettingsConfig {}
 
 export interface BookProgress {
@@ -378,6 +396,7 @@ export interface BookProgress {
   sectionLabel: string;
   section: PageInfo;
   pageinfo: PageInfo;
+  pageItem?: { label?: string; href?: string } | null;
   timeinfo: TimeInfo;
   index: number;
   range: Range;

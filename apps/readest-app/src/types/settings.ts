@@ -54,6 +54,12 @@ export interface ReadSettings {
   autohideCursor: boolean;
   translationProvider: string;
   translateTargetLang: string;
+  /**
+   * Global Word Lens toggle: auto-download a gloss pack on demand when the
+   * pair isn't cached locally. When off, the reader never fetches packs
+   * silently; users download them explicitly from the Word Lens sub-page.
+   */
+  wordLensAutoDownload: boolean;
   highlightStyle: HighlightStyle;
   highlightStyles: Record<HighlightStyle, HighlightColor>;
 
@@ -92,6 +98,10 @@ export interface HardcoverSettings {
   enabled: boolean;
   accessToken: string;
   lastSyncedAt: number;
+  // When true, progress + notes are pushed to Hardcover automatically as the
+  // user reads (debounced) instead of only via the reader menu. Default OFF;
+  // existing connected users (undefined) stay manual until they opt in.
+  autoSync?: boolean;
 }
 
 export interface WebDAVSettings {
@@ -227,7 +237,8 @@ export type SyncCategory =
   | 'texture'
   | 'opds_catalog'
   | 'settings'
-  | 'credentials';
+  | 'credentials'
+  | 'stats';
 
 export const SYNC_CATEGORIES: readonly SyncCategory[] = [
   'book',
@@ -238,6 +249,7 @@ export const SYNC_CATEGORIES: readonly SyncCategory[] = [
   'texture',
   'opds_catalog',
   'settings',
+  'stats',
   'credentials',
 ] as const;
 
@@ -281,6 +293,7 @@ export interface SystemSettings {
   alwaysOnTop: boolean;
   openBookInNewWindow: boolean;
   autoCheckUpdates: boolean;
+  updateChannel: 'stable' | 'nightly';
   screenWakeLock: boolean;
   screenBrightness: number;
   autoScreenBrightness: boolean;

@@ -7,5 +7,4 @@ export type AnnotationToolType =
   | 'translate'
   | 'tts'
   | 'proofread'
-  | 'ctx-translate'
-  | 'ctx-dictionary';
+  | 'share';

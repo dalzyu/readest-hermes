@@ -10,7 +10,7 @@ import { Book } from '@/types/book';
 import { AppService, DeleteAction } from '@/types/system';
 import { buildBookLookupIndex } from '@/services/bookService';
 import { navigateToLibrary, navigateToLogin, navigateToReader } from '@/utils/nav';
-import { formatAuthors, formatTitle, getPrimaryLanguage, listFormater } from '@/utils/book';
+import { getBookWithUpdatedMetadata, listFormater } from '@/utils/book';
 import { getImportErrorMessage } from '@/services/errors';
 import { ingestFile } from '@/services/ingestService';
 import { eventDispatcher } from '@/utils/event';
@@ -143,6 +143,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const { token, user } = useAuth();
   const {
     library: libraryBooks,
+    libraryLoaded: libraryLoadedFromDisk,
     isSyncing,
     syncProgress,
     updateBook,
@@ -372,7 +373,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   useEffect(() => {
     const doCheckAppUpdates = async () => {
       if (appService?.hasUpdater && settings.autoCheckUpdates) {
-        await checkForAppUpdates(_);
+        await checkForAppUpdates(_, true, settings.updateChannel);
       } else if (appService?.hasUpdater === false) {
         checkAppReleaseNotes();
       }
@@ -545,7 +546,11 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       }
     };
 
-    const hasCachedLibrary = libraryBooks.length > 0;
+    // Reuse the in-store library only when it was actually loaded from disk.
+    // Gating on `length > 0` was unsafe: a transient "Open with" entry made the
+    // store non-empty before any disk load, so this skipped loadLibraryBooks and
+    // a later save persisted the partial library (wiping library.json).
+    const hasCachedLibrary = libraryLoadedFromDisk;
     const loadingTimeout = hasCachedLibrary ? null : setTimeout(() => setLoading(true), 500);
     const initLibrary = async () => {
       const appService = await envConfig.getAppService();
@@ -678,7 +683,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     // O(1) instead of O(n) over the existing library. importBook also keeps
     // the index updated as new books are appended, so subsequent files in
     // the same batch see the additions.
-    const lookupIndex = buildBookLookupIndex(library);
+    //
+    // `osPlatform` is required for the `byFilePath` arm: on case-insensitive
+    // filesystems (macOS / iOS / Windows) two paths that differ only in
+    // casing must hash to the same key, so the in-place fast path in
+    // importBook can recognize a re-import of the same file.
+    const lookupIndex = buildBookLookupIndex(library, appService?.osPlatform);
     const failedImports: Array<{ filename: string; errorMessage: string }> = [];
     const successfulImports: string[] = [];
 
@@ -872,18 +882,22 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         both: _('Book deleted: {{title}}', { title: book.title }),
         cloud: _('Deleted cloud backup of the book: {{title}}', { title: book.title }),
         local: _('Deleted local copy of the book: {{title}}', { title: book.title }),
+        purge: _('Purged book data: {{title}}', { title: book.title }),
       };
       const deletionFailMessages = {
         both: _('Failed to delete book: {{title}}', { title: book.title }),
         cloud: _('Failed to delete cloud backup of the book: {{title}}', { title: book.title }),
         local: _('Failed to delete local copy of the book: {{title}}', { title: book.title }),
+        purge: _('Failed to purge book data: {{title}}', { title: book.title }),
       };
 
       try {
-        // Handle local deletion immediately
-        if (deleteAction === 'local' || deleteAction === 'both') {
-          await appService?.deleteBook(book, 'local');
-          if (deleteAction === 'both') {
+        // Handle local deletion immediately. Purge mirrors 'both' (tombstone +
+        // queued cloud delete) but hands 'purge' to deleteBook, which also wipes
+        // the entire Books/<hash>/ folder (config/nav/cover) — issue #4615.
+        if (deleteAction === 'local' || deleteAction === 'both' || deleteAction === 'purge') {
+          await appService?.deleteBook(book, deleteAction === 'purge' ? 'purge' : 'local');
+          if (deleteAction === 'both' || deleteAction === 'purge') {
             book.deletedAt = Date.now();
             book.downloadedAt = null;
             book.coverDownloadedAt = null;
@@ -894,7 +908,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         }
 
         // Queue cloud deletion
-        if (deleteAction === 'cloud' || deleteAction === 'both') {
+        if (deleteAction === 'cloud' || deleteAction === 'both' || deleteAction === 'purge') {
           const transferId = transferManager.queueDelete(book, 1, true);
           if (!transferId) {
             throw new Error('Failed to queue cloud deletion');
@@ -918,16 +932,15 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   };
 
   const handleUpdateMetadata = async (book: Book, metadata: BookMetadata) => {
-    book.metadata = metadata;
-    book.title = formatTitle(metadata.title);
-    book.author = formatAuthors(metadata.author);
-    book.primaryLanguage = getPrimaryLanguage(metadata.language);
-    book.updatedAt = Date.now();
+    // Build a NEW book object instead of mutating `book` in place. <BookCover>
+    // is memoized and compares fields off the book, so mutating the existing
+    // object (which React holds as the previous snapshot) makes the comparator
+    // see no change and the library cover only refreshes after a full reload.
+    const updatedBook = getBookWithUpdatedMetadata(book, metadata);
     if (metadata.coverImageBlobUrl || metadata.coverImageUrl || metadata.coverImageFile) {
-      book.coverImageUrl = metadata.coverImageBlobUrl || metadata.coverImageUrl;
       try {
         await appService?.updateCoverImage(
-          book,
+          updatedBook,
           metadata.coverImageBlobUrl || metadata.coverImageUrl,
           metadata.coverImageFile,
         );
@@ -945,7 +958,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     }
     metadata.coverImageBlobUrl = undefined;
     metadata.coverImageFile = undefined;
-    await updateBook(envConfig, book);
+    await updateBook(envConfig, updatedBook);
   };
 
   const handleImportBooksFromFiles = async () => {
@@ -1464,6 +1477,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           handleBookDelete={handleBookDelete('both')}
           handleBookDeleteCloudBackup={handleBookDelete('cloud')}
           handleBookDeleteLocalCopy={handleBookDelete('local')}
+          handleBookPurge={handleBookDelete('purge')}
           handleBookMetadataUpdate={handleUpdateMetadata}
         />
       )}

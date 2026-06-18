@@ -33,17 +33,14 @@ const currentViewSettings = {
   vertical: false,
   rtl: false,
   paragraphMode: { enabled: false },
-  focusMode: false,
 };
-
-const setViewSettingsMock = vi.fn();
 
 vi.mock('@/store/readerStore', () => ({
   useReaderStore: () => ({
     getView: () => mockView,
     getViewState: () => ({ ttsEnabled: false }),
     getViewSettings: () => currentViewSettings,
-    setViewSettings: setViewSettingsMock,
+    setViewSettings: vi.fn(),
   }),
 }));
 
@@ -130,8 +127,6 @@ describe('useBookShortcuts', () => {
     currentViewSettings.vertical = false;
     currentViewSettings.rtl = false;
     currentViewSettings.paragraphMode.enabled = false;
-    currentViewSettings.focusMode = false;
-    setViewSettingsMock.mockReset();
     mockView.book.dir = 'ltr';
   });
 
@@ -183,13 +178,12 @@ describe('useBookShortcuts', () => {
     expect(mockView.next).toHaveBeenCalledWith(72);
   });
 
-  it('toggles focus mode on the active book', () => {
-    render(<Harness />);
-    shortcutState.actions?.['onToggleFocusMode']?.();
+  it('dispatches rsvp-start for the current book when the RSVP shortcut fires', () => {
+    const dispatchSpy = vi.spyOn(eventDispatcher, 'dispatch');
 
-    expect(setViewSettingsMock).toHaveBeenCalledWith(
-      'book-1',
-      expect.objectContaining({ focusMode: true }),
-    );
+    render(<Harness />);
+    shortcutState.actions?.['onStartRSVP']?.();
+
+    expect(dispatchSpy).toHaveBeenCalledWith('rsvp-start', { bookKey: 'book-1' });
   });
 });

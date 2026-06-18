@@ -13,7 +13,7 @@ import { useBookDataStore } from '@/store/bookDataStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useCustomFontStore } from '@/store/customFontStore';
 import { useParallelViewStore } from '@/store/parallelViewStore';
-import { useMouseEvent, useTouchEvent, useLongPressEvent } from '../hooks/useIframeEvents';
+import { useMouseEvent, useTouchEvent, useOpenMediaEvent } from '../hooks/useIframeEvents';
 import { useBrightnessGesture } from '../hooks/useBrightnessGesture';
 import BrightnessOverlay from './BrightnessOverlay';
 import { usePagination, viewPagination } from '../hooks/usePagination';
@@ -41,6 +41,7 @@ import {
 import { applyScrollableStyle, applyTableTouchScroll } from '@/utils/scrollable';
 import { mountAdditionalFonts, mountCustomFont } from '@/styles/fonts';
 import { layoutWarichu, relayoutWarichu } from '@/utils/warichu';
+import { refreshSectionGlosses } from '@/app/reader/utils/wordlensSection';
 import { getBookDirFromLanguage, getBookDirFromWritingMode } from '@/utils/book';
 import { getIndexFromCfi } from '@/utils/cfi';
 import { useUICSS } from '@/hooks/useUICSS';
@@ -70,6 +71,8 @@ import { getViewInsets } from '@/utils/insets';
 import { handleA11yNavigation } from '@/utils/a11y';
 import { isCJKLang } from '@/utils/lang';
 import { getLocale } from '@/utils/misc';
+import { isMetered } from '@/utils/network';
+import { eventDispatcher } from '@/utils/event';
 import { isFontType } from '@/utils/font';
 import { ParagraphControl } from './paragraph';
 import Spinner from '@/components/Spinner';
@@ -96,11 +99,19 @@ const FoliateViewer: React.FC<{
   const { themeCode, isDarkMode } = useThemeStore();
   const { settings } = useSettingsStore();
   const { loadFont, loadCustomFonts, getLoadedFonts, getAvailableFonts } = useCustomFontStore();
-  const { getView, setView: setFoliateView, setViewInited, setProgress } = useReaderStore();
+  // Per-field selectors — see store/readerProgressStore.ts header for the
+  // "destructure-subscribes-the-whole-store" rationale.
+  const getView = useReaderStore((s) => s.getView);
+  const setFoliateView = useReaderStore((s) => s.setView);
+  const setViewInited = useReaderStore((s) => s.setViewInited);
+  const setProgress = useReaderStore((s) => s.setProgress);
   const setPreviewMode = useReaderStore((s) => s.setPreviewMode);
-  const { getViewState, getProgress, getViewSettings, setViewSettings } = useReaderStore();
-  const { getParallels } = useParallelViewStore();
-  const { getBookData } = useBookDataStore();
+  const getViewState = useReaderStore((s) => s.getViewState);
+  const getProgress = useReaderStore((s) => s.getProgress);
+  const getViewSettings = useReaderStore((s) => s.getViewSettings);
+  const setViewSettings = useReaderStore((s) => s.setViewSettings);
+  const getParallels = useParallelViewStore((s) => s.getParallels);
+  const getBookData = useBookDataStore((s) => s.getBookData);
   const { applyBackgroundTexture } = useBackgroundTexture();
   const { applyEinkMode } = useEinkMode();
   const { registerBrightnessListeners, overlayVisible, overlayLevel } =
@@ -139,8 +150,37 @@ const FoliateViewer: React.FC<{
   useWebDAVSync(bookKey);
   useTextTranslation(bookKey, viewRef.current);
 
-  const progressRelocateHandler = (event: Event) => {
-    const detail = (event as CustomEvent).detail;
+  // Coalesce setProgress writes within a single animation frame.
+  //
+  // Why: foliate fires `relocate` multiple times during a swipe burst
+  // (one per snap step / intermediate stabilize). Each call ends up in
+  // `setProgress`, which writes to readerProgressStore + bookDataStore.
+  // Even after we split progress into its own store, running the writes
+  // back-to-back on the same frame is still wasted work — only the
+  // last detail in the burst is what the user sees on screen.
+  //
+  // Earlier this used requestIdleCallback to defer the commit further,
+  // but profiling on Android showed Fire Idle Callback ballooning to
+  // 2.0+ seconds of total time per ~28 s session: rIC backed up under
+  // sustained pressure and dumped the whole queue into the post-swipe
+  // pause, producing exactly the "feels sluggish right after I let go"
+  // jank we were trying to fix. rAF runs once per frame, gets scheduled
+  // by the browser's normal vsync loop, and doesn't accumulate when
+  // the page is busy — which is the behaviour we want here.
+  const pendingRelocateRef = useRef<CustomEvent | null>(null);
+  const relocateRafRef = useRef<number | null>(null);
+  const cancelRelocateScheduled = useCallback(() => {
+    const id = relocateRafRef.current;
+    if (id == null) return;
+    relocateRafRef.current = null;
+    cancelAnimationFrame(id);
+  }, []);
+  const commitRelocate = useCallback(() => {
+    relocateRafRef.current = null;
+    const event = pendingRelocateRef.current;
+    pendingRelocateRef.current = null;
+    if (!event) return;
+    const detail = event.detail;
     const atEnd = viewRef.current?.renderer.atEnd || false;
     const { current, next, total } = detail.location as PageInfo;
     const currentPage = atEnd && total > 0 ? total - 1 : current;
@@ -149,12 +189,39 @@ const FoliateViewer: React.FC<{
       bookKey,
       detail.cfi,
       detail.tocItem,
+      detail.pageItem,
       detail.section,
       pageInfo,
       detail.time,
       detail.range,
     );
+  }, [bookKey, setProgress]);
+
+  const progressRelocateHandler = (event: Event) => {
+    // Always stash the latest detail; if another rAF is already pending
+    // it'll pick this up and the intermediate states are skipped.
+    pendingRelocateRef.current = event as CustomEvent;
+    if (relocateRafRef.current != null) return;
+    relocateRafRef.current = requestAnimationFrame(commitRelocate);
   };
+
+  useEffect(() => {
+    // On unmount: flush any pending commit synchronously before tearing
+    // down — otherwise the last page-turn before the user closes the
+    // book could be lost. Then cancel the scheduled handle to be safe
+    // against double-fire.
+    return () => {
+      if (pendingRelocateRef.current) {
+        try {
+          commitRelocate();
+        } catch {
+          // Tearing down — last-effort save shouldn't crash the unmount
+        }
+      }
+      cancelRelocateScheduled();
+      pendingRelocateRef.current = null;
+    };
+  }, [cancelRelocateScheduled, commitRelocate]);
 
   const getDocTransformHandler = ({ width, height }: { width: number; height: number }) => {
     return (event: Event) => {
@@ -314,7 +381,10 @@ const FoliateViewer: React.FC<{
         detail.doc.addEventListener('keyup', handleKeyup.bind(null, bookKey));
         detail.doc.addEventListener('mousedown', handleMousedown.bind(null, bookKey));
         detail.doc.addEventListener('mouseup', handleMouseup.bind(null, bookKey));
-        detail.doc.addEventListener('click', handleClick.bind(null, bookKey, doubleClickDisabled));
+        detail.doc.addEventListener(
+          'click',
+          handleClick.bind(null, bookKey, doubleClickDisabled, !!bookData?.isFixedLayout),
+        );
         detail.doc.addEventListener('wheel', handleWheel.bind(null, bookKey));
         detail.doc.addEventListener('touchstart', handleTouchStart.bind(null, bookKey));
         detail.doc.addEventListener('touchmove', handleTouchMove.bind(null, bookKey));
@@ -341,10 +411,44 @@ const FoliateViewer: React.FC<{
     }
   };
 
+  // Build the Word Lens refresh context: gate silent auto-download on the global
+  // toggle AND a best-effort metered-connection check, and show a single
+  // "Downloading…" toast on the first progress tick (the per-percent progress
+  // lives in the Word Lens settings panel). `wordLensToastShownRef` de-dupes the
+  // toast across the multiple section docs a refresh pass touches.
+  const wordLensToastShownRef = useRef(false);
+  const buildWordLensCtx = (bookLang?: string | null) => {
+    // Read the live setting (not the first-render `settings` snapshot closed over
+    // by the empty-deps `stabilizedHandler`) so toggling Auto-download mid-session
+    // takes effect on the next section refresh.
+    const liveSettings = useSettingsStore.getState().settings;
+    const allowDownload =
+      (liveSettings.globalReadSettings.wordLensAutoDownload ?? true) && !isMetered();
+    return {
+      appService: appService!,
+      bookLang,
+      appLang: getLocale().split('-')[0] || 'en',
+      allowDownload,
+      onProgress: () => {
+        if (wordLensToastShownRef.current) return;
+        wordLensToastShownRef.current = true;
+        eventDispatcher.dispatch('toast', {
+          type: 'info',
+          message: _('Downloading Word Lens data…'),
+        });
+      },
+    };
+  };
+
   const stabilizedHandler = useCallback(() => {
     setLoading(false);
     // Layout/relayout warichu after paginator has set column-width via columnize()
     const contents = viewRef.current?.renderer?.getContents?.() || [];
+    const vs = getViewSettings(bookKey);
+    const bookLang = getBookData(bookKey)?.book?.primaryLanguage;
+    // Fixed-layout (pre-paginated) books have no reflow room; injecting ruby
+    // would overflow their fixed boxes, so skip Word Lens glosses there.
+    const isFixedLayout = bookDoc.rendition?.layout === 'pre-paginated';
     for (const { doc } of contents) {
       if (doc) {
         const hasPending = doc.querySelectorAll('.warichu-pending').length > 0;
@@ -354,8 +458,12 @@ const FoliateViewer: React.FC<{
         } else if (hasExisting) {
           relayoutWarichu(doc);
         }
+        if (vs && appService && !isFixedLayout) {
+          void refreshSectionGlosses(doc, vs, buildWordLensCtx(bookLang));
+        }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const docRelocateHandler = (event: Event) => {
@@ -480,7 +588,7 @@ const FoliateViewer: React.FC<{
     setCurrentImageIndex(0);
   }, []);
 
-  useLongPressEvent(bookKey, handleImagePress, handleTablePress);
+  useOpenMediaEvent(bookKey, handleImagePress, handleTablePress);
 
   useFoliateEvents(viewRef.current, {
     onLoad: docLoadHandler,
@@ -716,6 +824,22 @@ const FoliateViewer: React.FC<{
     viewSettings?.applyThemeToPDF,
     viewSettings?.hideScrollbar,
   ]);
+
+  useEffect(() => {
+    const contents = viewRef.current?.renderer?.getContents?.() || [];
+    const vs = getViewSettings(bookKey);
+    if (!vs || !appService) return;
+    const bookLang = getBookData(bookKey)?.book?.primaryLanguage;
+    const isFixedLayout = bookDoc.rendition?.layout === 'pre-paginated';
+    if (isFixedLayout) return;
+    // A settings change is the moment a fresh download may start; let the
+    // one-time "Downloading…" toast fire again for it.
+    wordLensToastShownRef.current = false;
+    for (const { doc } of contents) {
+      if (doc) void refreshSectionGlosses(doc, vs, buildWordLensCtx(bookLang));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewSettings?.wordLensEnabled, viewSettings?.wordLensLevel, viewSettings?.wordLensHintLang]);
 
   useEffect(() => {
     const mountCustomFonts = async () => {

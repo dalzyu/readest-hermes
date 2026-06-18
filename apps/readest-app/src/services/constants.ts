@@ -15,6 +15,7 @@ import {
   ViewConfig,
   ViewSettings,
   ViewSettingsConfig,
+  WordLensConfig,
 } from '@/types/book';
 import {
   HardcoverSettings,
@@ -30,6 +31,7 @@ import { UserStorageQuota, UserDailyTranslationQuota } from '@/types/quota';
 import { getDefaultMaxBlockSize, getDefaultMaxInlineSize } from '@/utils/config';
 import { stubTranslation as _ } from '@/utils/misc';
 import { DEFAULT_AI_SETTINGS } from './ai/constants';
+import { DEFAULT_ANNOTATION_TOOLBAR_ITEMS } from '@/utils/annotationToolbar';
 
 export const DATA_SUBDIR = 'Readest';
 export const LOCAL_BOOKS_SUBDIR = `${DATA_SUBDIR}/Books`;
@@ -82,6 +84,7 @@ export const DEFAULT_HARDCOVER_SETTINGS = {
   enabled: false,
   accessToken: '',
   lastSyncedAt: 0,
+  autoSync: false,
 } as HardcoverSettings;
 
 export const DEFAULT_WEBDAV_SETTINGS = {
@@ -106,6 +109,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   alwaysShowStatusBar: false,
   alwaysInForeground: false,
   autoCheckUpdates: true,
+  updateChannel: 'stable',
   screenWakeLock: false,
   screenBrightness: -1, // -1~100, -1 for system default
   autoScreenBrightness: true,
@@ -195,6 +199,7 @@ export const DEFAULT_READSETTINGS: ReadSettings = {
   autohideCursor: true,
   translationProvider: 'deepl',
   translateTargetLang: 'EN',
+  wordLensAutoDownload: true,
 
   customThemes: [],
   highlightStyle: 'highlight',
@@ -339,6 +344,7 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   tapToToggleFooter: false,
   showPaginationButtons: false,
   progressStyle: 'fraction',
+  referencePageCount: 0,
   progressInfoMode: 'all',
 
   animated: false,
@@ -394,8 +400,15 @@ export const DEFAULT_NOTE_EXPORT_CONFIG: NoteExportConfig = {
 export const DEFAULT_ANNOTATOR_CONFIG: AnnotatorConfig = {
   enableAnnotationQuickActions: true,
   annotationQuickAction: null,
+  annotationToolbarItems: DEFAULT_ANNOTATION_TOOLBAR_ITEMS,
   copyToNotebook: false,
   noteExportConfig: DEFAULT_NOTE_EXPORT_CONFIG,
+};
+
+export const DEFAULT_WORD_LENS_CONFIG: WordLensConfig = {
+  wordLensEnabled: false,
+  wordLensLevel: 3,
+  wordLensHintLang: '',
 };
 
 export const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
@@ -793,6 +806,14 @@ const LATEST_DOWNLOAD_BASE_URL = 'https://download.readest.com/releases';
 export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 
 export const READEST_CHANGELOG_FILE = `${LATEST_DOWNLOAD_BASE_URL}/release-notes.json`;
+
+export const READEST_NIGHTLY_UPDATER_FILE = 'https://download.readest.com/nightly/latest.json';
+
+// Public (verification) key, identical to src-tauri/tauri.conf.json `updater.pubkey`.
+// Used to verify nightly artifacts in the custom install flows (portable /
+// AppImage / Android). Safe to embed — it is a public key.
+export const READEST_UPDATER_PUBKEY =
+  'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJFMEQ1QjE2OEU1NEIzNTEKUldSUnMxU09GbHNOdmpEaWFMT1crRFpEV2VORzQ2MklxaFc0M1R0ci9xY2c1bENXS0xhM1R1L2sK';
 
 export const READEST_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';
 

@@ -26,12 +26,10 @@ import { useSettingsStore } from './settingsStore';
 import { BookData, useBookDataStore } from './bookDataStore';
 import { useLibraryStore } from './libraryStore';
 import { uniqueId } from '@/utils/misc';
-import { readingStatsService } from '@/services/readingStats/readingStatsService';
 
 interface ViewState {
   /* Unique key for each book view */
   key: string;
-  bookHash: string;
   view: FoliateView | null;
   viewerKey: string;
   isPrimary: boolean;
@@ -54,18 +52,6 @@ interface ViewState {
     view settings for primary view are saved to book config which is persisted to config file
     omitting settings that are not changed from global settings */
   viewSettings: ViewSettings | null;
-  /* Session tracking for reading stats */
-  sessionStartedAt: number | null;
-  sessionStartPage: number | null;
-}
-
-export type ReaderIndexPhase = 'pending' | 'chunking' | 'embedding' | 'finalizing' | 'complete';
-
-export interface ReaderIndexProgress {
-  runId: string;
-  current: number;
-  total: number;
-  phase: ReaderIndexPhase;
 }
 
 interface ReaderStore {
@@ -82,6 +68,7 @@ interface ReaderStore {
     key: string,
     location: string,
     tocItem: TOCItem,
+    pageItem: BookProgress['pageItem'],
     section: PageInfo,
     pageinfo: PageInfo,
     timeinfo: TimeInfo,
@@ -109,26 +96,6 @@ interface ReaderStore {
   setViewInited: (key: string, inited: boolean) => void;
   setPreviewMode: (key: string, previewMode: boolean) => void;
   recreateViewer: (envConfig: EnvConfigType, key: string) => void;
-  recordSession: (key: string) => boolean;
-  indexingProgress: Record<string, ReaderIndexProgress>;
-  startIndexing: (key: string, runId: string) => void;
-  updateIndexingProgress: (
-    key: string,
-    runId: string,
-    progress: Omit<ReaderIndexProgress, 'runId'>,
-  ) => void;
-  finishIndexing: (key: string, runId: string) => void;
-  cancelIndexing: (key: string, runId?: string) => void;
-}
-
-const INDEXING_COMPLETE_HOLD_MS = 1200;
-const indexingClearTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-function clearIndexingTimer(key: string): void {
-  const timer = indexingClearTimers.get(key);
-  if (!timer) return;
-  clearTimeout(timer);
-  indexingClearTimers.delete(key);
 }
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
@@ -136,85 +103,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   bookKeys: [],
   hoveredBookKey: null,
   setBookKeys: (keys: string[]) => set({ bookKeys: keys }),
-  indexingProgress: {},
-  startIndexing: (key: string, runId: string) => {
-    clearIndexingTimer(key);
-    set((state) => ({
-      indexingProgress: {
-        ...state.indexingProgress,
-        [key]: { runId, current: 0, total: 1, phase: 'pending' },
-      },
-    }));
-  },
-  updateIndexingProgress: (
-    key: string,
-    runId: string,
-    progress: Omit<ReaderIndexProgress, 'runId'>,
-  ) =>
-    set((state) => {
-      const currentProgress = state.indexingProgress[key];
-      if (!currentProgress || currentProgress.runId !== runId) {
-        return state;
-      }
-      return {
-        indexingProgress: {
-          ...state.indexingProgress,
-          [key]: { runId, current: progress.current, total: progress.total, phase: progress.phase },
-        },
-      };
-    }),
-  finishIndexing: (key: string, runId: string) => {
-    clearIndexingTimer(key);
-    set((state) => {
-      const currentProgress = state.indexingProgress[key];
-      if (!currentProgress || currentProgress.runId !== runId) {
-        return state;
-      }
-      return {
-        indexingProgress: {
-          ...state.indexingProgress,
-          [key]: {
-            ...currentProgress,
-            current: currentProgress.total,
-            phase: 'complete',
-          },
-        },
-      };
-    });
-
-    const timer = setTimeout(() => {
-      set((state) => {
-        const currentProgress = state.indexingProgress[key];
-        if (
-          !currentProgress ||
-          currentProgress.runId !== runId ||
-          currentProgress.phase !== 'complete'
-        ) {
-          return state;
-        }
-        const indexingProgress = { ...state.indexingProgress };
-        delete indexingProgress[key];
-        return { indexingProgress };
-      });
-      indexingClearTimers.delete(key);
-    }, INDEXING_COMPLETE_HOLD_MS);
-    indexingClearTimers.set(key, timer);
-  },
-  cancelIndexing: (key: string, runId?: string) => {
-    clearIndexingTimer(key);
-    set((state) => {
-      const currentProgress = state.indexingProgress[key];
-      if (!currentProgress) {
-        return state;
-      }
-      if (runId && currentProgress.runId !== runId) {
-        return state;
-      }
-      const indexingProgress = { ...state.indexingProgress };
-      delete indexingProgress[key];
-      return { indexingProgress };
-    });
-  },
   setHoveredBookKey: (key: string | null) => set({ hoveredBookKey: key }),
   getView: (key: string | null) => (key && get().viewStates[key]?.view) || null,
   setView: (key: string, view) =>
@@ -254,7 +142,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         ...state.viewStates,
         [key]: {
           key: '',
-          bookHash: id,
           view: null,
           viewerKey: '',
           isPrimary: false,
@@ -268,8 +155,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           gridInsets: null,
           previewMode: false,
           viewSettings: null,
-          sessionStartedAt: null,
-          sessionStartPage: null,
         },
       },
     }));
@@ -297,7 +182,15 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         } else {
           const content = (await appService.loadBookContent(book)) as BookContent;
           file = content.file;
-          const doc = await new DocumentLoader(file).open();
+          let nativeFilePath: string | null = null;
+          try {
+            nativeFilePath = await appService.resolveNativeBookFilePath(book);
+          } catch (err) {
+            console.warn('resolveNativeBookFilePath failed', err);
+          }
+          const doc = await new DocumentLoader(file, {
+            nativeFilePath: nativeFilePath ?? undefined,
+          }).open();
           bookDoc = doc.book;
         }
       }
@@ -368,6 +261,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             book.metadata.seriesTotal ?? (series.total ? parseInt(series.total, 10) : undefined);
         }
       }
+      // TODO: uncomment this when we can ensure metaHash is correctly generated for all books
+      // book.metaHash = book.metaHash ?? getMetadataHash(bookDoc.metadata);
       book.metaHash = getMetadataHash(bookDoc.metadata);
 
       const isFixedLayout =
@@ -387,7 +282,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           [key]: {
             ...state.viewStates[key],
             key,
-            bookHash: id,
             view: null,
             viewerKey: `${key}-${uniqueId()}`,
             isPrimary,
@@ -401,8 +295,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             gridInsets: null,
             previewMode: false,
             viewSettings: { ...globalViewSettings, ...configViewSettings },
-            sessionStartedAt: null,
-            sessionStartPage: null,
           },
         },
       }));
@@ -414,7 +306,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           [key]: {
             ...state.viewStates[key],
             key: '',
-            bookHash: id,
             view: null,
             viewerKey: '',
             isPrimary: false,
@@ -428,8 +319,6 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             gridInsets: null,
             previewMode: false,
             viewSettings: null,
-            sessionStartedAt: null,
-            sessionStartPage: null,
           },
         },
       }));
@@ -473,6 +362,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     key: string,
     location: string,
     tocItem: TOCItem,
+    pageItem: BookProgress['pageItem'],
     section: PageInfo,
     pageinfo: PageInfo,
     timeinfo: TimeInfo,
@@ -529,6 +419,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
               location,
               sectionHref: tocItem?.href,
               sectionLabel: tocItem?.label,
+              pageItem,
               section,
               pageinfo,
               timeinfo,
@@ -598,25 +489,15 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     })),
 
   setViewInited: (key: string, inited: boolean) =>
-    set((state) => {
-      const viewState = state.viewStates[key];
-      if (!viewState) return state;
-
-      const nextSessionStartedAt = inited ? Date.now() : null;
-      const nextSessionStartPage = inited ? (viewState.progress?.pageinfo?.current ?? 0) : null;
-
-      return {
-        viewStates: {
-          ...state.viewStates,
-          [key]: {
-            ...viewState,
-            inited,
-            sessionStartedAt: nextSessionStartedAt,
-            sessionStartPage: nextSessionStartPage,
-          },
+    set((state) => ({
+      viewStates: {
+        ...state.viewStates,
+        [key]: {
+          ...state.viewStates[key]!,
+          inited,
         },
-      };
-    }),
+      },
+    })),
 
   setPreviewMode: (key: string, previewMode: boolean) =>
     set((state) => ({
@@ -645,86 +526,4 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         }));
       });
   },
-
-  recordSession: (key: string) => {
-    const viewState = get().viewStates[key];
-    if (!viewState?.inited || !viewState.sessionStartedAt) return false;
-
-    const progress = viewState.progress?.pageinfo;
-    const currentPage = progress?.current ?? viewState.sessionStartPage ?? 0;
-    const sessionStartPage = viewState.sessionStartPage ?? currentPage;
-    const endedAt = Date.now();
-    const startedAt = viewState.sessionStartedAt;
-    const secondsRead = Math.floor((endedAt - startedAt) / 1000);
-    const pageDelta = Math.max(0, currentPage - sessionStartPage);
-    const bookHash = viewState.bookHash;
-
-    const recorded = readingStatsService.recordSession({
-      bookHash,
-      startedAt,
-      endedAt,
-      secondsRead,
-      pageDelta,
-    });
-
-    if (recorded) {
-      set((state) => ({
-        viewStates: {
-          ...state.viewStates,
-          [key]: {
-            ...state.viewStates[key]!,
-            sessionStartedAt: null,
-            sessionStartPage: null,
-          },
-        },
-      }));
-    }
-
-    return recorded;
-  },
 }));
-
-function flushActiveReadingSessions(): void {
-  const { viewStates, recordSession } = useReaderStore.getState();
-  Object.entries(viewStates).forEach(([key, viewState]) => {
-    const recorded = recordSession(key);
-    if (recorded || !viewState.sessionStartedAt) return;
-
-    useReaderStore.setState((state) => ({
-      viewStates: {
-        ...state.viewStates,
-        [key]: {
-          ...state.viewStates[key]!,
-          sessionStartedAt: null,
-          sessionStartPage: null,
-        },
-      },
-    }));
-  });
-}
-
-function resumeActiveReadingSessions(): void {
-  const { viewStates, setViewInited } = useReaderStore.getState();
-  Object.entries(viewStates).forEach(([key, viewState]) => {
-    if (viewState.view && viewState.inited && !viewState.sessionStartedAt) {
-      setViewInited(key, true);
-    }
-  });
-}
-
-if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-  const handleVisibilityChange = () => {
-    if (document.visibilityState === 'hidden') {
-      flushActiveReadingSessions();
-      return;
-    }
-
-    if (document.visibilityState === 'visible') {
-      resumeActiveReadingSessions();
-    }
-  };
-
-  window.addEventListener('beforeunload', flushActiveReadingSessions);
-  window.addEventListener('pagehide', flushActiveReadingSessions);
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-}
