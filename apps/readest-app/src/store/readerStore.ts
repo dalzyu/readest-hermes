@@ -52,6 +52,9 @@ interface ViewState {
     view settings for primary view are saved to book config which is persisted to config file
     omitting settings that are not changed from global settings */
   viewSettings: ViewSettings | null;
+
+  sessionStartedAt?: number;
+  sessionStartPage?: number;
 }
 
 interface ReaderStore {
@@ -96,7 +99,16 @@ interface ReaderStore {
   setViewInited: (key: string, inited: boolean) => void;
   setPreviewMode: (key: string, previewMode: boolean) => void;
   recreateViewer: (envConfig: EnvConfigType, key: string) => void;
+
+  indexingProgress?: number;
+  startIndexing?: (envConfig: EnvConfigType) => Promise<void>;
+  updateIndexingProgress?: (progress: number) => void;
+  finishIndexing?: () => void;
+  cancelIndexing?: () => void;
+  recordSession?: (key: string) => void;
 }
+
+export type ReaderIndexPhase = 'idle' | 'indexing' | 'done' | 'error';
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
   viewStates: {},

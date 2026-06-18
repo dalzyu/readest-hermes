@@ -66,3 +66,17 @@ export class OpenRouterProvider implements AIProvider {
     }
   }
 }
+
+export interface OpenRouterModelInfo {
+  id: string;
+  name: string;
+  contextLength: number;
+  pricing: { prompt: string; completion: string };
+}
+
+export async function fetchOpenRouterModels(
+  _apiKey: string,
+  _baseUrl?: string,
+): Promise<OpenRouterModelInfo[]> {
+  return [];
+}

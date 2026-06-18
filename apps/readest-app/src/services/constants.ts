@@ -963,3 +963,7 @@ export const SUPPORTED_LANGS: Record<string, string> = { ...TRANSLATED_LANGS, zh
 export const SUPPORTED_LANGNAMES: Record<string, string> = Object.fromEntries(
   Object.entries(SUPPORTED_LANGS).map(([code, name]) => [name, code]),
 );
+
+export const CLOUD_ENABLED = true;
+export const HERMES_OPDS_USER_AGENT = 'Readest/1.0 (OPDS Browser)';
+export const HERMES_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';

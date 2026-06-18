@@ -295,6 +295,8 @@ export interface ViewConfig {
   readingRulerPosition: number;
   readingRulerOpacity: number;
   readingRulerColor: ReadingRulerColor;
+
+  focusMode?: boolean;
 }
 
 export interface TTSConfig {

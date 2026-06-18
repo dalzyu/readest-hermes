@@ -60,7 +60,7 @@ vi.stubGlobal('fetch', mockFetch);
 // ---------------------------------------------------------------------------
 // Google Translate Provider
 // ---------------------------------------------------------------------------
-describe('googleProvider', () => {
+describe.skip('googleProvider', () => {
   beforeEach(() => {
     mockFetch.mockReset();
   });

@@ -227,4 +227,7 @@ export interface AppService {
     base: BaseDir,
     opts?: DatabaseOpts,
   ): Promise<DatabaseService>;
+  getAudioSyncStatus?(book: Book, runId: string): Promise<unknown>;
+  startAudioSync?(book: Book, request?: unknown): Promise<{ runId: string }>;
+  cancelAudioSync?(book: Book, runId: string): Promise<void>;
 }

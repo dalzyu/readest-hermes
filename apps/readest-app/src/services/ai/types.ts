@@ -126,6 +126,20 @@ export interface AISettings {
   spoilerProtection: boolean;
   maxContextChunks: number;
   indexingMode: 'on-demand' | 'background';
+
+  provider?: string;
+  reedy?: boolean;
+  ollamaBaseUrl?: string;
+  ollamaModel?: string;
+  ollamaEmbeddingModel?: string;
+  aiGatewayApiKey?: string;
+  aiGatewayModel?: string;
+  aiGatewayCustomModel?: string;
+  aiGatewayEmbeddingModel?: string;
+  openrouterApiKey?: string;
+  openrouterBaseUrl?: string;
+  openrouterModel?: string;
+  openrouterEmbeddingModel?: string;
 }
 
 export interface TextChunk {

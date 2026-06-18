@@ -370,3 +370,18 @@ export const getMetadataHashInfo = (metadata: BookMetadata): MetadataHashInfo | 
 export const getMetadataHash = (metadata: BookMetadata) => {
   return getMetadataHashInfo(metadata)?.metaHash;
 };
+
+export const getAudioAlignmentInputFilename = (book: Book) => `audio-alignment-${book.hash}.json`;
+export const getAudioAlignmentReportFilename = (book: Book) =>
+  `audio-alignment-report-${book.hash}.json`;
+export const getAudioAssetFilename = (book: Book) => `audio-asset-${book.hash}`;
+export const getAudioSyncCorrectionFilename = (book: Book) =>
+  `audio-sync-correction-${book.hash}.json`;
+export const getAudioSyncMapFilename = (book: Book) => `audio-sync-map-${book.hash}.json`;
+export const getAudioSyncPackageFilename = (book: Book) => `audio-sync-package-${book.hash}.zip`;
+export const getAudioSyncPackageProvenanceFilename = (book: Book) =>
+  `audio-sync-provenance-${book.hash}.json`;
+export const getAudioSyncPackageVersionDir = (book: Book) => `audio-sync-versions-${book.hash}`;
+export const getBookAudioDir = (book: Book) => `audio-${book.hash}`;
+export const getLegacyAudioSyncMapFilename = (book: Book) =>
+  `legacy-audio-sync-map-${book.hash}.json`;

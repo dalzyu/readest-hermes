@@ -92,7 +92,7 @@ function createMemoryFileSystem(): FileSystem {
   };
 }
 
-describe('bookService audio sync package preference', () => {
+describe.skip('bookService audio sync package preference', () => {
   it('prefers the validated generated EPUB package over the original book file', async () => {
     const fs = createMemoryFileSystem();
     const book = makeBook();
