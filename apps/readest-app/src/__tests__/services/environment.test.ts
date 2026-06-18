@@ -2,7 +2,8 @@ import { describe, test, expect, beforeEach, vi } from 'vitest';
 
 // ── Mocks for constants ──────────────────────────────────────────
 vi.mock('@/services/constants', () => ({
-  CLOUD_ENABLED: false,
+  READEST_WEB_BASE_URL: 'https://web.readest.com',
+  READEST_NODE_BASE_URL: 'https://node.readest.com',
 }));
 
 // We need to reset modules between tests to pick up env var changes,
@@ -17,7 +18,8 @@ beforeEach(() => {
   Object.keys(env).forEach((key) => delete env[key]);
   Object.assign(env, originalEnv);
   // Clean up any window globals we set
-  delete (window as unknown as Record<string, unknown>)['__HERMES_CLI_ACCESS'];
+  delete (window as unknown as Record<string, unknown>)['__READEST_CLI_ACCESS'];
+  delete (window as unknown as Record<string, unknown>)['__READEST_RUNTIME_CONFIG'];
 });
 
 describe('environment', () => {
@@ -65,19 +67,19 @@ describe('environment', () => {
 
   // ── hasCli ─────────────────────────────────────────────────────
   describe('hasCli', () => {
-    test('returns true when __HERMES_CLI_ACCESS is true', async () => {
-      window.__HERMES_CLI_ACCESS = true;
+    test('returns true when __READEST_CLI_ACCESS is true', async () => {
+      window.__READEST_CLI_ACCESS = true;
       const { hasCli } = await import('@/services/environment');
       expect(hasCli()).toBe(true);
     });
 
-    test('returns false when __HERMES_CLI_ACCESS is not set', async () => {
+    test('returns false when __READEST_CLI_ACCESS is not set', async () => {
       const { hasCli } = await import('@/services/environment');
       expect(hasCli()).toBe(false);
     });
 
-    test('returns false when __HERMES_CLI_ACCESS is explicitly false', async () => {
-      window.__HERMES_CLI_ACCESS = false;
+    test('returns false when __READEST_CLI_ACCESS is explicitly false', async () => {
+      window.__READEST_CLI_ACCESS = false;
       const { hasCli } = await import('@/services/environment');
       expect(hasCli()).toBe(false);
     });
@@ -105,16 +107,32 @@ describe('environment', () => {
 
   // ── getBaseUrl ─────────────────────────────────────────────────
   describe('getBaseUrl', () => {
+    test('returns runtime-configured apiBaseUrl when set', async () => {
+      window.__READEST_RUNTIME_CONFIG = {
+        apiBaseUrl: 'https://runtime-api.example.com',
+      };
+      env['NEXT_PUBLIC_API_BASE_URL'] = 'https://custom-api.example.com';
+      const { getBaseUrl } = await import('@/services/environment');
+      expect(getBaseUrl()).toBe('https://runtime-api.example.com');
+    });
+
+    test('returns API_BASE_URL when set', async () => {
+      env['API_BASE_URL'] = 'https://runtime-api.example.com';
+      delete env['NEXT_PUBLIC_API_BASE_URL'];
+      const { getBaseUrl } = await import('@/services/environment');
+      expect(getBaseUrl()).toBe('https://runtime-api.example.com');
+    });
+
     test('returns NEXT_PUBLIC_API_BASE_URL when set', async () => {
       env['NEXT_PUBLIC_API_BASE_URL'] = 'https://custom-api.example.com';
       const { getBaseUrl } = await import('@/services/environment');
       expect(getBaseUrl()).toBe('https://custom-api.example.com');
     });
 
-    test('returns empty string when NEXT_PUBLIC_API_BASE_URL is not set in offline mode', async () => {
+    test('falls back to READEST_WEB_BASE_URL when env var not set', async () => {
       delete env['NEXT_PUBLIC_API_BASE_URL'];
       const { getBaseUrl } = await import('@/services/environment');
-      expect(getBaseUrl()).toBe('');
+      expect(getBaseUrl()).toBe('https://web.readest.com');
     });
   });
 
@@ -126,10 +144,10 @@ describe('environment', () => {
       expect(getNodeBaseUrl()).toBe('https://custom-node.example.com');
     });
 
-    test('returns empty string when NEXT_PUBLIC_NODE_BASE_URL is not set in offline mode', async () => {
+    test('falls back to READEST_NODE_BASE_URL when env var not set', async () => {
       delete env['NEXT_PUBLIC_NODE_BASE_URL'];
       const { getNodeBaseUrl } = await import('@/services/environment');
-      expect(getNodeBaseUrl()).toBe('');
+      expect(getNodeBaseUrl()).toBe('https://node.readest.com');
     });
   });
 
@@ -196,28 +214,20 @@ describe('environment', () => {
       expect(getAPIBaseUrl()).toBe('/api');
     });
 
-    test('returns configured API URL in web development mode when set', async () => {
-      env['NODE_ENV'] = 'development';
-      env['NEXT_PUBLIC_APP_PLATFORM'] = 'web';
-      env['NEXT_PUBLIC_API_BASE_URL'] = 'https://custom-api.example.com';
-      const { getAPIBaseUrl } = await import('@/services/environment');
-      expect(getAPIBaseUrl()).toBe('https://custom-api.example.com/api');
-    });
-
-    test('returns relative path in production when base URL is unset', async () => {
+    test('returns full URL in production', async () => {
       env['NODE_ENV'] = 'production';
       env['NEXT_PUBLIC_APP_PLATFORM'] = 'web';
       delete env['NEXT_PUBLIC_API_BASE_URL'];
       const { getAPIBaseUrl } = await import('@/services/environment');
-      expect(getAPIBaseUrl()).toBe('/api');
+      expect(getAPIBaseUrl()).toBe('https://web.readest.com/api');
     });
 
-    test('returns relative path for tauri platform even in development when base URL is unset', async () => {
+    test('returns full URL for tauri platform even in development', async () => {
       env['NODE_ENV'] = 'development';
       env['NEXT_PUBLIC_APP_PLATFORM'] = 'tauri';
       delete env['NEXT_PUBLIC_API_BASE_URL'];
       const { getAPIBaseUrl } = await import('@/services/environment');
-      expect(getAPIBaseUrl()).toBe('/api');
+      expect(getAPIBaseUrl()).toBe('https://web.readest.com/api');
     });
   });
 
@@ -230,28 +240,20 @@ describe('environment', () => {
       expect(getNodeAPIBaseUrl()).toBe('/api');
     });
 
-    test('returns configured node URL in web development mode when set', async () => {
-      env['NODE_ENV'] = 'development';
-      env['NEXT_PUBLIC_APP_PLATFORM'] = 'web';
-      env['NEXT_PUBLIC_NODE_BASE_URL'] = 'https://custom-node.example.com';
-      const { getNodeAPIBaseUrl } = await import('@/services/environment');
-      expect(getNodeAPIBaseUrl()).toBe('https://custom-node.example.com/api');
-    });
-
-    test('returns relative node path in production when base URL is unset', async () => {
+    test('returns full node URL in production', async () => {
       env['NODE_ENV'] = 'production';
       env['NEXT_PUBLIC_APP_PLATFORM'] = 'web';
       delete env['NEXT_PUBLIC_NODE_BASE_URL'];
       const { getNodeAPIBaseUrl } = await import('@/services/environment');
-      expect(getNodeAPIBaseUrl()).toBe('/api');
+      expect(getNodeAPIBaseUrl()).toBe('https://node.readest.com/api');
     });
 
-    test('returns relative node path for tauri platform even in development when base URL is unset', async () => {
+    test('returns full node URL for tauri platform even in development', async () => {
       env['NODE_ENV'] = 'development';
       env['NEXT_PUBLIC_APP_PLATFORM'] = 'tauri';
       delete env['NEXT_PUBLIC_NODE_BASE_URL'];
       const { getNodeAPIBaseUrl } = await import('@/services/environment');
-      expect(getNodeAPIBaseUrl()).toBe('/api');
+      expect(getNodeAPIBaseUrl()).toBe('https://node.readest.com/api');
     });
   });
 
