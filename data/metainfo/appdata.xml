@@ -2,13 +2,13 @@
 <component type="desktop-application">
   <id>com.bilingify.readest</id>
 
-  <name>Hermes</name>
+  <name>Readest</name>
   <summary>Modern, feature-rich ebook reader</summary>
 
   <description>
-    <p>Hermes is a modern, feature-rich ebook reader designed for avid readers offering seamless cross-platform access, powerful tools, and an intuitive interface to elevate your reading experience.</p>
-    <p>Built on the original Readest project and its modern Foliate rewrite, Hermes leverages Next.js 15 and Tauri v2 to deliver a smooth, cross-platform experience across macOS, Windows, Linux, Android, iOS, and the Web.</p>
-    <p>Whether you're analyzing complex texts, immersing yourself in stories, or exploring new ideas, Hermes adapts to your needs with powerful features for deep, thoughtful reading.</p>
+    <p>Readest is a modern, feature-rich ebook reader designed for avid readers offering seamless cross-platform access, powerful tools, and an intuitive interface to elevate your reading experience.</p>
+    <p>Built as a modern rewrite of Foliate, Readest leverages Next.js 15 and Tauri v2 to deliver a smooth, cross-platform experience across macOS, Windows, Linux, Android, iOS, and the Web.</p>
+    <p>Whether you're analyzing complex texts, immersing yourself in stories, or exploring new ideas, Readest adapts to your needs with powerful features for deep, thoughtful reading.</p>
     <p>Key features include:</p>
     <ul>
       <li>Multi-format support for EPUB, MOBI, KF8 (AZW3), FB2, CBZ, TXT, and PDF (experimental).</li>
@@ -23,9 +23,9 @@
       <li>Cross-platform synchronization of book files, reading progress, notes, and bookmarks across all supported platforms.</li>
       <li>Text-to-Speech functionality for a more accessible reading experience.</li>
       <li>Organize, sort, and manage your entire ebook library with advanced library management tools.</li>
-      <li>One-click file association to quickly open files in Hermes from your file browser.</li>
+      <li>One-click file association to quickly open files in Readest from your file browser.</li>
     </ul>
-    <p>Hermes also includes custom CSS support for personalized styling, and code syntax highlighting for technical books. The application is designed to honor the legacy of deep reading while embracing modern technology for an enhanced experience.</p>
+    <p>Readest also includes custom CSS support for personalized styling, and code syntax highlighting for technical books. The application is designed to honor the legacy of deep reading while embracing modern technology for an enhanced experience.</p>
   </description>
 
   <categories>
@@ -51,38 +51,27 @@
     <keyword>sync</keyword>
   </keywords>
 
-  <url type="homepage">https://github.com/dalzyu/readest-hermes</url>
-  <url type="bugtracker">https://github.com/dalzyu/readest-hermes/issues</url>
-  <url type="help">https://github.com/dalzyu/readest-hermes/wiki</url>
-  <url type="donation">https://github.com/sponsors/dalzyu</url>
+  <url type="homepage">https://github.com/readest/readest</url>
+  <url type="bugtracker">https://github.com/readest/readest/issues</url>
+  <url type="help">https://github.com/readest/readest/wiki</url>
+  <url type="donation">https://github.com/sponsors/readest</url>
 
   <launchable type="desktop-id">com.bilingify.readest.desktop</launchable>
 
   <releases>
-    <release version="0.2.2" date="2026-04-14">
+    <release version="0.10.6" date="2026-04-13">
       <description>
         <ul>
-          <li>Context translation now ships with the hardened production repair, rescue, and sanitization flow enabled in the live app</li>
-          <li>Advanced translation settings now let users customize the full harness behavior, including repair and sanitization controls</li>
-          <li>Release and test tooling were hardened for Hermes CI, Windows worktrees, and multi-model regression coverage</li>
-        </ul>
-      </description>
-    </release>
-    <release version="0.1.0" date="2026-04-11">
-      <description>
-        <ul>
-          <li>Hermes 0.1.0 marks the first offline-only release line for the Readest fork</li>
-          <li>Version metadata now aligns across the web app, Rust backend, and release notes</li>
-          <li>Release packaging and branding cleanup continue in the remaining 0.1.0 slices</li>
-        </ul>
-      </description>
-    </release>
-    <release version="0.0.1" date="2026-04-10">
-      <description>
-        <ul>
-          <li>Initial Hermes release line based on the original Readest project</li>
-          <li>Release naming and user-facing app branding now identify the app as Hermes</li>
-          <li>Hermes now tracks its own independent version number starting at 0.0.1</li>
+          <li>Library: Much faster browsing for large collections</li>
+          <li>Reading: Added an option to keep the book's original paragraph layout</li>
+          <li>Reading: Fixed page navigation for Arabic books</li>
+          <li>PDF: Fixed TTS reading interruptions at line breaks in PDFs</li>
+          <li>PDF: You can now apply your chosen theme colors to PDFs</li>
+          <li>Sync: Added HTTP Basic auth support for CWA</li>
+          <li>Sync: Improved progress sync with Hardcover.app</li>
+          <li>OPDS: You can now edit your registered catalogs, with better handling of download filenames</li>
+          <li>Speed Reading: Your reading position now syncs across devices</li>
+          <li>Platform: Fixed window buttons on macOS, reduced crashes on iOS</li>
         </ul>
       </description>
     </release>
@@ -232,7 +221,7 @@
           <li>OPDS: Improved compatibility with older versions of Calibre Web</li>
           <li>OPDS: Added an instant search bar for faster browsing in OPDS catalogs</li>
           <li>OPDS: Added a curated book catalog from Standard Ebooks</li>
-          <li>Bookshelf: Added a 鈥淕roup Books鈥?action to the context menu</li>
+          <li>Bookshelf: Added a “Group Books” action to the context menu</li>
           <li>Comics: Fixed layout issues to improve comic book reading</li>
           <li>Layout: Footnote popups now adapt correctly to different screen sizes</li>
           <li>Layout: Fixed an issue where the maximum inline width was not applied to EPUBs</li>
@@ -244,35 +233,33 @@
         </ul>
       </description>
     </release>
-    <release version="0.9.95" date="2025-12-08">
-      <description>
-        <ul>
-          <li>OPDS: You can now search, browse, and download ebooks directly from OPDS catalogs</li>
-          <li>OPDS: Improved compatibility with Calibre Web for reliable downloads</li>
-          <li>OPDS: Fixed an issue where book covers from self-hosted Calibre OPDS servers did not display correctly</li>
-          <li>Cloud Storage: You can view and delete files stored in your cloud storage directly from the app</li>
-          <li>Bookshelf: Added support for importing books from a folder recursively</li>
-          <li>Bookshelf: You can now rename your bookshelf groups</li>
-          <li>EPUB: Added support for SVG covers from Standard Ebooks</li>
-          <li>Annotations: Keyboard shortcuts no longer copy selected text into the notebook</li>
-          <li>Footnotes: Footnote popups now scale properly on small screens</li>
-          <li>Touch/Styli: Removed the context menu for smoother interaction on touch and stylus devices</li>
-          <li>Layout: Devices with unfoldable screens now automatically switch to a two-column layout</li>
-          <li>PDF: Improved zoomed-in navigation and hand-tool behavior for smoother page navigation</li>
-          <li>Android: Fixed highlighting of the current sentence when using native Android text-to-speech</li>
-          <li>Android: Back button handling now works correctly on Android 15 and above</li>
-          <li>Android: You can now open files shared from other apps</li>
-        </ul>
-      </description>
-    </release>
   </releases>
 
   <metadata_license>FSFAP</metadata_license>
   <project_license>AGPL-3.0-or-later</project_license>
 
   <developer id="com.readest">
-    <name>Hermes Team</name>
+    <name>Readest Team</name>
   </developer>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Readest main interface with annotation</caption>
+      <image type="source">https://raw.githubusercontent.com/readest/readest/refs/heads/main/data/screenshots/annotations.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Reading interface with dark mode</caption>
+      <image type="source">https://raw.githubusercontent.com/readest/readest/refs/heads/main/data/screenshots/dark_mode.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Reading with TTS speak out</caption>
+      <image type="source">https://raw.githubusercontent.com/readest/readest/refs/heads/main/data/screenshots/tts_speak_aloud.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Reading tools with Wikipedia integration</caption>
+      <image type="source">https://raw.githubusercontent.com/readest/readest/refs/heads/main/data/screenshots/wikipedia_vertical.png</image>
+    </screenshot>
+  </screenshots>
 
   <content_rating type="oars-1.1">
     <content_attribute id="social-info">moderate</content_attribute>
