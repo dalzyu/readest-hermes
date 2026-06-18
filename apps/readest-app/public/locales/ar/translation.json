@@ -1314,5 +1314,18 @@
   "Select all the bundle files together when importing.": "حدد جميع ملفات الحزمة معًا عند الاستيراد.",
   "Manage Dictionaries": "إدارة القواميس",
   "Select Dictionary Files": "اختر ملفات القاموس",
-  "Read on Wikipedia →": "اقرأ على ويكيبيديا ←"
+  "Read on Wikipedia →": "اقرأ على ويكيبيديا ←",
+  "This link can't be opened": "تعذر فتح هذا الرابط",
+  "The annotation link is missing required information. The original link may have been truncated.": "تفتقد إلى معلومات مطلوبة في رابط التعليق. ربما تم اقتطاع الرابط الأصلي.",
+  "Go to Readest": "الانتقال إلى Readest",
+  "Open-source ebook reader for everyone, on every device.": "قارئ كتب إلكتروني مفتوح المصدر للجميع وعلى كل جهاز.",
+  "Open in Readest": "فتح في Readest",
+  "If Readest didn't open automatically, choose an option below:": "إذا لم يفتح Readest تلقائيًا، فاختر أحد الخيارات أدناه:",
+  "Continue reading where you left off.": "تابع القراءة من حيث توقفت.",
+  "Readest logo": "شعار Readest",
+  "Opening Readest...": "جارٍ فتح Readest…",
+  "Open in Readest app": "فتح في تطبيق Readest",
+  "Continue in browser": "متابعة في المتصفح",
+  "Don't have Readest?": "ليس لديك Readest؟",
+  "Book not in your library": "الكتاب غير موجود في مكتبتك"
 }

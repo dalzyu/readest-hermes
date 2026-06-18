@@ -1224,5 +1224,18 @@
   "Select all the bundle files together when importing.": "가져올 때 번들의 모든 파일을 함께 선택하세요.",
   "Manage Dictionaries": "사전 관리",
   "Select Dictionary Files": "사전 파일 선택",
-  "Read on Wikipedia →": "위키백과에서 읽기 →"
+  "Read on Wikipedia →": "위키백과에서 읽기 →",
+  "This link can't be opened": "이 링크를 열 수 없습니다",
+  "The annotation link is missing required information. The original link may have been truncated.": "주석 링크에 필요한 정보가 누락되었습니다. 원본 링크가 잘렸을 수 있습니다.",
+  "Go to Readest": "Readest로 이동",
+  "Open-source ebook reader for everyone, on every device.": "누구나, 어떤 기기에서나 사용할 수 있는 오픈소스 전자책 리더.",
+  "Open in Readest": "Readest에서 열기",
+  "If Readest didn't open automatically, choose an option below:": "Readest가 자동으로 열리지 않았다면 아래에서 선택하세요:",
+  "Continue reading where you left off.": "마지막으로 읽던 곳부터 이어서 읽으세요.",
+  "Readest logo": "Readest 로고",
+  "Opening Readest...": "Readest를 여는 중…",
+  "Open in Readest app": "Readest 앱에서 열기",
+  "Continue in browser": "브라우저에서 계속",
+  "Don't have Readest?": "Readest가 없으신가요?",
+  "Book not in your library": "책이 라이브러리에 없습니다"
 }

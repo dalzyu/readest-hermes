@@ -1260,5 +1260,18 @@
   "Select all the bundle files together when importing.": "Seleziona tutti i file del pacchetto insieme durante l’importazione.",
   "Manage Dictionaries": "Gestisci dizionari",
   "Select Dictionary Files": "Seleziona file del dizionario",
-  "Read on Wikipedia →": "Leggi su Wikipedia →"
+  "Read on Wikipedia →": "Leggi su Wikipedia →",
+  "This link can't be opened": "Impossibile aprire questo collegamento",
+  "The annotation link is missing required information. The original link may have been truncated.": "Al collegamento di annotazione mancano informazioni necessarie. Il collegamento originale potrebbe essere stato troncato.",
+  "Go to Readest": "Vai a Readest",
+  "Open-source ebook reader for everyone, on every device.": "Lettore di e-book open source per tutti, su qualsiasi dispositivo.",
+  "Open in Readest": "Apri in Readest",
+  "If Readest didn't open automatically, choose an option below:": "Se Readest non si è aperto automaticamente, scegli un'opzione qui sotto:",
+  "Continue reading where you left off.": "Riprendi da dove avevi interrotto.",
+  "Readest logo": "Logo Readest",
+  "Opening Readest...": "Apertura di Readest…",
+  "Open in Readest app": "Apri nell'app Readest",
+  "Continue in browser": "Continua nel browser",
+  "Don't have Readest?": "Non hai Readest?",
+  "Book not in your library": "Libro non presente nella tua libreria"
 }

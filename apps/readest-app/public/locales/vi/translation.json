@@ -1224,5 +1224,18 @@
   "Select all the bundle files together when importing.": "Chọn tất cả các tệp của gói cùng lúc khi nhập.",
   "Manage Dictionaries": "Quản lý từ điển",
   "Select Dictionary Files": "Chọn tệp từ điển",
-  "Read on Wikipedia →": "Đọc trên Wikipedia →"
+  "Read on Wikipedia →": "Đọc trên Wikipedia →",
+  "This link can't be opened": "Không thể mở liên kết này",
+  "The annotation link is missing required information. The original link may have been truncated.": "Liên kết chú thích thiếu thông tin cần thiết. Liên kết gốc có thể đã bị cắt ngắn.",
+  "Go to Readest": "Đến Readest",
+  "Open-source ebook reader for everyone, on every device.": "Trình đọc ebook mã nguồn mở cho mọi người, trên mọi thiết bị.",
+  "Open in Readest": "Mở trong Readest",
+  "If Readest didn't open automatically, choose an option below:": "Nếu Readest không tự mở, hãy chọn một tuỳ chọn bên dưới:",
+  "Continue reading where you left off.": "Đọc tiếp từ nơi bạn đã dừng lại.",
+  "Readest logo": "Biểu trưng Readest",
+  "Opening Readest...": "Đang mở Readest…",
+  "Open in Readest app": "Mở trong ứng dụng Readest",
+  "Continue in browser": "Tiếp tục trong trình duyệt",
+  "Don't have Readest?": "Bạn chưa có Readest?",
+  "Book not in your library": "Sách không có trong thư viện của bạn"
 }

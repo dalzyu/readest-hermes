@@ -1224,5 +1224,18 @@
   "Select all the bundle files together when importing.": "Pilih semua file paket sekaligus saat mengimpor.",
   "Manage Dictionaries": "Kelola Kamus",
   "Select Dictionary Files": "Pilih File Kamus",
-  "Read on Wikipedia →": "Baca di Wikipedia →"
+  "Read on Wikipedia →": "Baca di Wikipedia →",
+  "This link can't be opened": "Tautan ini tidak dapat dibuka",
+  "The annotation link is missing required information. The original link may have been truncated.": "Tautan anotasi tidak memiliki informasi yang diperlukan. Tautan asli mungkin telah terpotong.",
+  "Go to Readest": "Buka Readest",
+  "Open-source ebook reader for everyone, on every device.": "Pembaca ebook sumber terbuka untuk semua orang, di setiap perangkat.",
+  "Open in Readest": "Buka di Readest",
+  "If Readest didn't open automatically, choose an option below:": "Jika Readest tidak terbuka otomatis, pilih salah satu opsi di bawah:",
+  "Continue reading where you left off.": "Lanjutkan membaca dari tempat terakhir.",
+  "Readest logo": "Logo Readest",
+  "Opening Readest...": "Membuka Readest…",
+  "Open in Readest app": "Buka di aplikasi Readest",
+  "Continue in browser": "Lanjutkan di peramban",
+  "Don't have Readest?": "Belum punya Readest?",
+  "Book not in your library": "Buku tidak ada di pustaka Anda"
 }

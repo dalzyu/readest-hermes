@@ -1242,5 +1242,18 @@
   "Select all the bundle files together when importing.": "Markera alla paketfiler tillsammans när du importerar.",
   "Manage Dictionaries": "Hantera ordböcker",
   "Select Dictionary Files": "Välj ordboksfiler",
-  "Read on Wikipedia →": "Läs på Wikipedia →"
+  "Read on Wikipedia →": "Läs på Wikipedia →",
+  "This link can't be opened": "Det går inte att öppna länken",
+  "The annotation link is missing required information. The original link may have been truncated.": "Anteckningslänken saknar nödvändig information. Den ursprungliga länken kan ha kapats.",
+  "Go to Readest": "Gå till Readest",
+  "Open-source ebook reader for everyone, on every device.": "Öppen källkods e-bokläsare för alla, på alla enheter.",
+  "Open in Readest": "Öppna i Readest",
+  "If Readest didn't open automatically, choose an option below:": "Om Readest inte öppnades automatiskt, välj ett alternativ nedan:",
+  "Continue reading where you left off.": "Fortsätt läsa där du slutade.",
+  "Readest logo": "Readest-logotyp",
+  "Opening Readest...": "Öppnar Readest…",
+  "Open in Readest app": "Öppna i Readest-appen",
+  "Continue in browser": "Fortsätt i webbläsaren",
+  "Don't have Readest?": "Saknar du Readest?",
+  "Book not in your library": "Boken finns inte i ditt bibliotek"
 }

@@ -1242,5 +1242,18 @@
   "Select all the bundle files together when importing.": "İçe aktarırken paketin tüm dosyalarını birlikte seçin.",
   "Manage Dictionaries": "Sözlükleri yönet",
   "Select Dictionary Files": "Sözlük dosyalarını seç",
-  "Read on Wikipedia →": "Wikipedia'da oku →"
+  "Read on Wikipedia →": "Wikipedia'da oku →",
+  "This link can't be opened": "Bu bağlantı açılamıyor",
+  "The annotation link is missing required information. The original link may have been truncated.": "Açıklama bağlantısında gerekli bilgiler eksik. Orijinal bağlantı kesilmiş olabilir.",
+  "Go to Readest": "Readest'e git",
+  "Open-source ebook reader for everyone, on every device.": "Herkes için, her cihazda; açık kaynak e-kitap okuyucusu.",
+  "Open in Readest": "Readest'te aç",
+  "If Readest didn't open automatically, choose an option below:": "Readest otomatik olarak açılmadıysa aşağıdan bir seçenek belirle:",
+  "Continue reading where you left off.": "Kaldığın yerden okumaya devam et.",
+  "Readest logo": "Readest logosu",
+  "Opening Readest...": "Readest açılıyor…",
+  "Open in Readest app": "Readest uygulamasında aç",
+  "Continue in browser": "Tarayıcıda devam et",
+  "Don't have Readest?": "Readest'iniz yok mu?",
+  "Book not in your library": "Kitap, kitaplığınızda yok"
 }

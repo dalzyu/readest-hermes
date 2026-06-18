@@ -1278,5 +1278,18 @@
   "Select all the bundle files together when importing.": "Під час імпорту вибирайте всі файли пакета разом.",
   "Manage Dictionaries": "Керування словниками",
   "Select Dictionary Files": "Виберіть файли словника",
-  "Read on Wikipedia →": "Читати у Вікіпедії →"
+  "Read on Wikipedia →": "Читати у Вікіпедії →",
+  "This link can't be opened": "Не вдалося відкрити посилання",
+  "The annotation link is missing required information. The original link may have been truncated.": "У посиланні на анотацію бракує потрібної інформації. Можливо, початкове посилання було обрізане.",
+  "Go to Readest": "Перейти до Readest",
+  "Open-source ebook reader for everyone, on every device.": "Електронна читалка з відкритим кодом — для всіх і на будь-якому пристрої.",
+  "Open in Readest": "Відкрити в Readest",
+  "If Readest didn't open automatically, choose an option below:": "Якщо Readest не відкрився автоматично, оберіть варіант нижче:",
+  "Continue reading where you left off.": "Продовжуйте читати з місця, де ви зупинилися.",
+  "Readest logo": "Логотип Readest",
+  "Opening Readest...": "Відкриваємо Readest…",
+  "Open in Readest app": "Відкрити в застосунку Readest",
+  "Continue in browser": "Продовжити у браузері",
+  "Don't have Readest?": "Не маєте Readest?",
+  "Book not in your library": "Книги немає у вашій бібліотеці"
 }

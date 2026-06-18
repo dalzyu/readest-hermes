@@ -1260,5 +1260,18 @@
   "Select all the bundle files together when importing.": "בחרו את כל קבצי החבילה יחד בעת הייבוא.",
   "Manage Dictionaries": "ניהול מילונים",
   "Select Dictionary Files": "בחירת קבצי מילון",
-  "Read on Wikipedia →": "קראו בוויקיפדיה →"
+  "Read on Wikipedia →": "קראו בוויקיפדיה →",
+  "This link can't be opened": "לא ניתן לפתוח את הקישור",
+  "The annotation link is missing required information. The original link may have been truncated.": "בקישור ההערה חסר מידע נדרש. ייתכן שהקישור המקורי נקטע.",
+  "Go to Readest": "מעבר אל Readest",
+  "Open-source ebook reader for everyone, on every device.": "קורא ספרים אלקטרוניים בקוד פתוח לכולם, בכל מכשיר.",
+  "Open in Readest": "פתיחה ב-Readest",
+  "If Readest didn't open automatically, choose an option below:": "אם Readest לא נפתח אוטומטית, בחרו אפשרות מהאפשרויות שלמטה:",
+  "Continue reading where you left off.": "המשיכו לקרוא מהמקום שעצרתם.",
+  "Readest logo": "הסמל של Readest",
+  "Opening Readest...": "פותח את Readest…",
+  "Open in Readest app": "פתיחה באפליקציית Readest",
+  "Continue in browser": "המשך בדפדפן",
+  "Don't have Readest?": "אין לך את Readest?",
+  "Book not in your library": "הספר אינו בספרייה שלך"
 }

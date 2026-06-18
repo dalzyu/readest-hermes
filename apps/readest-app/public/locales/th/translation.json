@@ -1224,5 +1224,18 @@
   "Select all the bundle files together when importing.": "เลือกไฟล์ทั้งหมดของบันเดิลพร้อมกันเมื่อทำการนำเข้า",
   "Manage Dictionaries": "จัดการพจนานุกรม",
   "Select Dictionary Files": "เลือกไฟล์พจนานุกรม",
-  "Read on Wikipedia →": "อ่านบนวิกิพีเดีย →"
+  "Read on Wikipedia →": "อ่านบนวิกิพีเดีย →",
+  "This link can't be opened": "ไม่สามารถเปิดลิงก์นี้ได้",
+  "The annotation link is missing required information. The original link may have been truncated.": "ลิงก์คำอธิบายประกอบไม่มีข้อมูลที่จำเป็น ลิงก์เดิมอาจถูกตัดทอน",
+  "Go to Readest": "ไปที่ Readest",
+  "Open-source ebook reader for everyone, on every device.": "โปรแกรมอ่านอีบุ๊กโอเพนซอร์สสำหรับทุกคน บนทุกอุปกรณ์",
+  "Open in Readest": "เปิดใน Readest",
+  "If Readest didn't open automatically, choose an option below:": "หาก Readest ไม่เปิดโดยอัตโนมัติ ให้เลือกตัวเลือกด้านล่าง:",
+  "Continue reading where you left off.": "อ่านต่อจากจุดที่ค้างไว้",
+  "Readest logo": "โลโก้ Readest",
+  "Opening Readest...": "กำลังเปิด Readest…",
+  "Open in Readest app": "เปิดในแอป Readest",
+  "Continue in browser": "ทำต่อในเบราว์เซอร์",
+  "Don't have Readest?": "ยังไม่มี Readest?",
+  "Book not in your library": "ไม่พบหนังสือนี้ในคลังของคุณ"
 }
