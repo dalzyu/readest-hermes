@@ -110,7 +110,10 @@ const PageNavigationButtons: React.FC<PageNavigationButtonsProps> = ({
         </button>
         <button
           onClick={handleGoLeftPage}
-          className='flex h-20 w-20 items-center justify-center focus:outline-none'
+          className={clsx(
+            'flex h-20 w-20 items-center justify-center focus:outline-none',
+            !isPageNavigationButtonsVisible && appService?.isAndroidApp && 'h-4 w-4',
+          )}
           aria-hidden={false}
           aria-label={getLeftPageLabel()}
           tabIndex={0}
@@ -140,7 +143,10 @@ const PageNavigationButtons: React.FC<PageNavigationButtonsProps> = ({
       >
         <button
           onClick={handleGoRightPage}
-          className='flex h-20 w-20 items-center justify-center focus:outline-none'
+          className={clsx(
+            'flex h-20 w-20 items-center justify-center focus:outline-none',
+            !isPageNavigationButtonsVisible && appService?.isAndroidApp && 'h-4 w-4',
+          )}
           aria-hidden={false}
           aria-label={getRightPageLabel()}
           tabIndex={0}
