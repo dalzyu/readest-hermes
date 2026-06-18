@@ -5,7 +5,7 @@ import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { CLOUD_ENABLED, SYNC_BOOKS_INTERVAL_SEC } from '@/services/constants';
+import { SYNC_BOOKS_INTERVAL_SEC } from '@/services/constants';
 import { throttle } from '@/utils/throttle';
 import { debounce } from '@/utils/debounce';
 import { eventDispatcher } from '@/utils/event';
@@ -20,7 +20,7 @@ export const useBooksSync = () => {
   const isPullingRef = useRef(false);
 
   const getNewBooks = useCallback(() => {
-    if (!CLOUD_ENABLED || !user) return {};
+    if (!user) return {};
     const library = useLibraryStore.getState().library;
     const newBooks = library.filter(
       (book) =>
@@ -36,7 +36,7 @@ export const useBooksSync = () => {
 
   const pullLibrary = useCallback(
     async (fullRefresh = false, verbose = false) => {
-      if (!CLOUD_ENABLED || !user) return;
+      if (!user) return;
       if (isPullingRef.current) {
         console.log('Pull already in progress, skipping...');
         return;
@@ -66,7 +66,6 @@ export const useBooksSync = () => {
   const handleAutoSync = useCallback(
     throttle(
       () => {
-        if (!CLOUD_ENABLED) return;
         const newBooks = getNewBooks();
         if (newBooks.lastSyncedAt) {
           syncBooks(newBooks.books, 'both');
@@ -79,7 +78,7 @@ export const useBooksSync = () => {
   );
 
   useEffect(() => {
-    if (!CLOUD_ENABLED || !user) return;
+    if (!user) return;
     if (isPullingRef.current) {
       return;
     }
@@ -87,7 +86,7 @@ export const useBooksSync = () => {
   }, [user, library, handleAutoSync]);
 
   const pushLibrary = useCallback(async () => {
-    if (!CLOUD_ENABLED || !user) return;
+    if (!user) return;
     const newBooks = getNewBooks();
     if (newBooks.lastSyncedAt) {
       await syncBooks(newBooks?.books, 'push');
@@ -95,17 +94,18 @@ export const useBooksSync = () => {
   }, [user, syncBooks, getNewBooks]);
 
   useEffect(() => {
-    if (!CLOUD_ENABLED || !user || !useSyncInited || !libraryLoaded) return;
+    if (!user || !useSyncInited || !libraryLoaded) return;
     pullLibrary();
   }, [user, useSyncInited, libraryLoaded, pullLibrary]);
 
   const updateLibrary = useCallback(async () => {
-    if (!CLOUD_ENABLED || !syncedBooks?.length) return;
+    if (!syncedBooks?.length) return;
 
     // Process old books first so that when we update the library the order is preserved
     syncedBooks.sort((a, b) => a.updatedAt - b.updatedAt);
     const bookHashesInSynced = new Set(syncedBooks.map((book) => book.hash));
-    const oldBooks = library.filter((book) => bookHashesInSynced.has(book.hash));
+    const liveLibrary = useLibraryStore.getState().library;
+    const oldBooks = liveLibrary.filter((book) => bookHashesInSynced.has(book.hash));
     const oldBooksNeedsDownload = oldBooks.filter((book) => {
       return !book.deletedAt && book.uploadedAt && !book.coverDownloadedAt;
     });
@@ -131,7 +131,7 @@ export const useBooksSync = () => {
       await appService?.downloadBookCovers(batch);
     }
 
-    const updatedLibrary = await Promise.all(library.map(processOldBook));
+    const updatedLibrary = await Promise.all(liveLibrary.map(processOldBook));
     setLibrary(updatedLibrary);
     appService?.saveLibraryBooks(updatedLibrary);
 
@@ -178,14 +178,22 @@ export const useBooksSync = () => {
   );
 
   useEffect(() => {
-    if (!CLOUD_ENABLED) return;
+    // Defer processing synced books until the library has been loaded from
+    // disk. Otherwise updateLibrary runs against an empty `library`
+    // closure, treats every synced book as new, and the resulting
+    // `setLibrary([only sync books])` can race with initLibrary's
+    // `setLibrary([disk books])` — the empty-merged save can land on disk
+    // afterwards and overwrite the loaded snapshot. The synced books stay
+    // queued in `syncedBooks` state; this effect re-fires when
+    // libraryLoaded flips to true and processes them then.
+    if (!libraryLoaded) return;
     if (isSyncing) {
       debouncedUpdateLibrary();
     } else {
       updateLibrary();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncedBooks, updateLibrary, debouncedUpdateLibrary]);
+  }, [syncedBooks, updateLibrary, debouncedUpdateLibrary, libraryLoaded]);
 
   return { pullLibrary, pushLibrary };
 };
