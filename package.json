@@ -1,19 +1,21 @@
 {
-  "name": "@hermes/monorepo",
+  "name": "@readest/monorepo",
   "private": true,
   "repository": "readest/readest",
   "scripts": {
-    "test": "pnpm --filter @hermes/app test",
-    "lint": "pnpm --filter @hermes/app lint",
-    "tauri": "pnpm --filter @hermes/app tauri",
-    "dev-web": "pnpm --filter @hermes/app dev-web",
+    "test": "pnpm --filter @readest/readest-app test",
+    "test:lua": "pnpm --filter @readest/readest-app test:lua",
+    "lint": "pnpm --filter @readest/readest-app lint",
+    "lint:lua": "pnpm --filter @readest/readest-app lint:lua",
+    "tauri": "pnpm --filter @readest/readest-app tauri",
+    "dev-web": "pnpm --filter @readest/readest-app dev-web",
     "prepare": "husky",
-    "fmt:check": "pnpm --filter @hermes/app fmt:check",
-    "clippy:check": "pnpm --filter @hermes/app clippy:check",
+    "fmt:check": "pnpm --filter @readest/readest-app fmt:check",
+    "clippy:check": "pnpm --filter @readest/readest-app clippy:check",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,css,json,md,html,yml}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,css,json,md,html,yml}\""
   },
-  "packageManager": "pnpm@10.30.3",
+  "packageManager": "pnpm@11.1.1",
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
     "@sindresorhus/tsconfig": "^6.0.0",
@@ -27,31 +29,5 @@
     "**/*.{js,jsx,ts,tsx,css,json,md,html,yml}": [
       "prettier --write"
     ]
-  },
-  "pnpm": {
-    "overrides": {
-      "glob": ">=11.1.0",
-      "jws": ">=4.0.1",
-      "vite": ">=7.3.1",
-      "srvx": ">=0.11.13",
-      "rollup": ">=4.59.0",
-      "undici": ">=7.24.0",
-      "flatted": ">=3.4.2",
-      "body-parser": ">=2.2.1",
-      "dompurify": ">=3.3.2",
-      "picomatch": ">=4.0.4",
-      "path-to-regexp": ">=8.4.0",
-      "serialize-javascript": ">=7.0.5",
-      "fast-xml-parser": ">=5.5.7",
-      "lodash-es": ">=4.17.23",
-      "@babel/runtime": ">=7.26.10",
-      "@babel/helpers": ">=7.26.10",
-      "mdast-util-gfm-autolink-literal": "2.0.1",
-      "@ai-sdk/provider-utils": "4.0.8"
-    },
-    "patchedDependencies": {
-      "mdast-util-gfm-autolink-literal@2.0.1": "patches/mdast-util-gfm-autolink-literal@2.0.1.patch",
-      "@ai-sdk/provider-utils@4.0.8": "patches/@ai-sdk__provider-utils@4.0.8.patch"
-    }
   }
 }
