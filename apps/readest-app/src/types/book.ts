@@ -34,6 +34,45 @@ export interface ParagraphModeConfig {
 
 export const FIXED_LAYOUT_FORMATS: Set<BookFormat> = new Set(['PDF', 'CBZ']);
 
+/**
+ * Lookup tables built from a Book[] for O(1) hash and metaHash queries during
+ * batch import. Mutated in place by importBook so subsequent files in the
+ * same batch see books added by earlier files. Defined here (rather than in
+ * services/bookService) so the AppService interface in types/system can
+ * reference it without an inline `import(...)` type.
+ */
+export interface BookLookupIndex {
+  byHash: Map<string, Book>;
+  byMetaKey: Map<string, Book[]>; // key = `${metaHash}:${format}`
+}
+
+/**
+ * User-facing options for AppService.importBook. The bookService implementation
+ * extends this with required callbacks (saveBookConfig / generateCoverImageUrl)
+ * that are bound by the AppService instance.
+ */
+export interface ImportBookOptions {
+  /** Whether to copy the file into the Books directory. Defaults to true. */
+  saveBook?: boolean;
+  /** Whether to extract and save a cover image. Defaults to true. */
+  saveCover?: boolean;
+  /** Whether to overwrite an existing file at the same path. Defaults to false. */
+  overwrite?: boolean;
+  /** Whether the import is transient (not stored long-term). Defaults to false. */
+  transient?: boolean;
+  /**
+   * If true, do NOT copy the source file into Books/<hash>/. Instead, persist
+   * an absolute filePath on the Book and let isBookAvailable / loadBookContent
+   * fall back to it. The caller is responsible for verifying the source is
+   * already inside the user's chosen library root (customRootDir) so that the
+   * file remains stable across launches. Sidecar files (cover.png, config.json,
+   * nav.json) are still written to Books/<hash>/ as usual. Defaults to false.
+   */
+  inPlace?: boolean;
+  /** Pre-built lookup index for O(1) dedup during batch imports. */
+  lookupIndex?: BookLookupIndex;
+}
+
 export interface Book {
   // if Book is a remote book we just lazy load the book content via url
   url?: string;
@@ -163,9 +202,6 @@ export interface BookStyle {
   fullJustification: boolean;
   hyphenation: boolean;
   theme: string;
-  overrideFont: boolean;
-  overrideLayout: boolean;
-  overrideColor: boolean;
   backgroundTextureId: string;
   backgroundOpacity: number;
   backgroundSize: string;
@@ -174,6 +210,11 @@ export interface BookStyle {
   codeLanguage: string;
   userStylesheet: string;
   userUIStylesheet: string;
+
+  overrideFont: boolean;
+  overrideLayout: boolean;
+  overrideColor: boolean;
+  useBookLayout: boolean;
 
   // fixed-layout specific
   zoomMode: 'fit-page' | 'fit-width' | 'original-size' | 'custom';
@@ -229,9 +270,6 @@ export interface ViewConfig {
   showCurrentBatteryStatus: boolean;
   showBatteryPercentage: boolean;
   tapToToggleFooter: boolean;
-  focusMode: boolean;
-  showBarsOnScroll: boolean;
-  showMarginsOnScroll: boolean;
   showPaginationButtons: boolean;
   progressStyle: 'percentage' | 'fraction';
   progressInfoMode: ProgressBarMode;
@@ -239,6 +277,8 @@ export interface ViewConfig {
   animated: boolean;
   isEink: boolean;
   isColorEink: boolean;
+
+  paragraphMode: ParagraphModeConfig;
 
   readingRulerEnabled: boolean;
   readingRulerLines: number;
@@ -312,9 +352,12 @@ export interface ProofreadRulesConfig {
   proofreadRules?: ProofreadRule[];
 }
 
+export interface ViewSettingsConfig {
+  isGlobal: boolean;
+}
+
 export interface ViewSettings
-  extends
-    BookLayout,
+  extends BookLayout,
     BookStyle,
     BookFont,
     BookLanguage,
@@ -323,9 +366,8 @@ export interface ViewSettings
     TranslatorConfig,
     ScreenConfig,
     ProofreadRulesConfig,
-    AnnotatorConfig {
-  paragraphMode?: ParagraphModeConfig;
-}
+    AnnotatorConfig,
+    ViewSettingsConfig {}
 
 export interface BookProgress {
   location: string;
@@ -370,16 +412,19 @@ export interface BookSearchResult {
   progress?: number;
 }
 
+export const BOOK_CONFIG_SCHEMA_VERSION = 1;
+
 export interface BookConfig {
+  schemaVersion?: number;
   bookHash?: string;
   metaHash?: string;
   progress?: [number, number]; // [current pagenum, total pagenum], 1-based page number
   location?: string; // CFI of the current location
   xpointer?: string; // XPointer of the current location (for Koreader interoperability)
   booknotes?: BookNote[];
+  rsvpPosition?: { cfi: string; wordText: string };
   searchConfig?: Partial<BookSearchConfig>;
   viewSettings?: Partial<ViewSettings>;
-  notebookActiveTab?: 'notes' | 'ai' | 'vocabulary';
 
   lastSyncedAtConfig?: number;
   lastSyncedAtNotes?: number;
@@ -410,8 +455,4 @@ export interface BooksGroup {
 export interface BookContent {
   book: Book;
   file: File;
-}
-
-export interface LoadBookContentOptions {
-  preferGeneratedPackage?: boolean;
 }
