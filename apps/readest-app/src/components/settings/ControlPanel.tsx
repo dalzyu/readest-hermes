@@ -33,6 +33,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
     viewSettings.showPaginationButtons,
   );
   const [isDisableClick, setIsDisableClick] = useState(viewSettings.disableClick);
+  const [isDisableSwipe, setIsDisableSwipe] = useState(viewSettings.disableSwipe);
   const [fullscreenClickArea, setFullscreenClickArea] = useState(viewSettings.fullscreenClickArea);
   const [swapClickArea, setSwapClickArea] = useState(viewSettings.swapClickArea);
   const [isDisableDoubleClick, setIsDisableDoubleClick] = useState(viewSettings.disableDoubleClick);
@@ -47,6 +48,9 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   const [isEink, setIsEink] = useState(viewSettings.isEink);
   const [isColorEink, setIsColorEink] = useState(viewSettings.isColorEink);
   const [autoScreenBrightness, setAutoScreenBrightness] = useState(settings.autoScreenBrightness);
+  const [swipeBrightnessGesture, setSwipeBrightnessGesture] = useState(
+    settings.swipeBrightnessGesture,
+  );
   const [screenWakeLock, setScreenWakeLock] = useState(settings.screenWakeLock);
   const [allowScript, setAllowScript] = useState(viewSettings.allowScript);
 
@@ -61,6 +65,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
       hideScrollbar: setHideScrollbar,
       showPaginationButtons: setShowPaginationButtons,
       disableClick: setIsDisableClick,
+      disableSwipe: setIsDisableSwipe,
       swapClickArea: setSwapClickArea,
       animated: setAnimated,
       isEink: setIsEink,
@@ -130,6 +135,19 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   }, [isDisableClick]);
 
   useEffect(() => {
+    saveViewSettings(envConfig, bookKey, 'disableSwipe', isDisableSwipe, false, false);
+    // The renderer reads `no-swipe` at touchmove/touchend time, so we have to
+    // push the attribute through immediately rather than waiting for the next
+    // recreateViewer pass.
+    if (isDisableSwipe) {
+      getView(bookKey)?.renderer.setAttribute('no-swipe', '');
+    } else {
+      getView(bookKey)?.renderer.removeAttribute('no-swipe');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDisableSwipe]);
+
+  useEffect(() => {
     saveViewSettings(envConfig, bookKey, 'disableDoubleClick', isDisableDoubleClick, false, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDisableDoubleClick]);
@@ -175,6 +193,12 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
     saveSysSettings(envConfig, 'autoScreenBrightness', autoScreenBrightness);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoScreenBrightness]);
+
+  useEffect(() => {
+    if (swipeBrightnessGesture === settings.swipeBrightnessGesture) return;
+    saveSysSettings(envConfig, 'swipeBrightnessGesture', swipeBrightnessGesture);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swipeBrightnessGesture]);
 
   useEffect(() => {
     if (screenWakeLock === settings.screenWakeLock) return;
@@ -268,6 +292,12 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
           onChange={() => setIsDisableClick(!isDisableClick)}
         />
         <SettingsSwitchRow
+          label={_('Swipe to Paginate')}
+          checked={!isDisableSwipe}
+          onChange={() => setIsDisableSwipe(!isDisableSwipe)}
+          data-setting-id='settings.control.swipeToPaginate'
+        />
+        <SettingsSwitchRow
           label={appService?.isMobileApp ? _('Tap Both Sides') : _('Click Both Sides')}
           checked={fullscreenClickArea}
           disabled={isDisableClick}
@@ -359,6 +389,15 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
             label={_('System Screen Brightness')}
             checked={autoScreenBrightness}
             onChange={() => setAutoScreenBrightness(!autoScreenBrightness)}
+          />
+        )}
+        {appService?.hasScreenBrightness && (
+          <SettingsSwitchRow
+            label={_('Swipe for Brightness')}
+            description={_('Slide along the left edge')}
+            checked={swipeBrightnessGesture}
+            onChange={() => setSwipeBrightnessGesture(!swipeBrightnessGesture)}
+            data-setting-id='settings.control.swipeBrightnessGesture'
           />
         )}
         <SettingsSwitchRow

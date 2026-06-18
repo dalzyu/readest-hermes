@@ -14,7 +14,7 @@ import { getParagraphActionForKey } from '@/utils/paragraphPresentation';
 import { viewPagination } from './usePagination';
 import useShortcuts from '@/hooks/useShortcuts';
 import useBooksManager from './useBooksManager';
-import { getReadingRulerMoveDirection } from '../utils/readingRuler';
+import { getReadingRulerMoveDirection, isReadingRulerMoveKey } from '../utils/readingRuler';
 
 interface UseBookShortcutsProps {
   sideBarBookKey: string | null;
@@ -40,6 +40,8 @@ const useBookShortcuts = ({ sideBarBookKey, bookKeys }: UseBookShortcutsProps) =
 
     const viewSettings = getViewSettings(sideBarBookKey);
     if (!viewSettings?.readingRulerEnabled) return false;
+    // In vertical layout, only Up/Down move the ruler; Left/Right turn pages.
+    if (!isReadingRulerMoveKey(side, !!viewSettings.vertical)) return false;
 
     return eventDispatcher.dispatchSync('reading-ruler-move', {
       bookKey: sideBarBookKey,
@@ -314,6 +316,11 @@ const useBookShortcuts = ({ sideBarBookKey, bookKeys }: UseBookShortcutsProps) =
     eventDispatcher.dispatch('tts-backward', { bookKey: sideBarBookKey, byMark: false });
   };
 
+  const ttsHighlightSentence = () => {
+    if (!sideBarBookKey) return;
+    eventDispatcher.dispatch('tts-highlight-sentence', { bookKey: sideBarBookKey });
+  };
+
   const toggleBookmark = () => {
     if (!sideBarBookKey) return;
     eventDispatcher.dispatch('toggle-bookmark', { bookKey: sideBarBookKey });
@@ -371,6 +378,7 @@ const useBookShortcuts = ({ sideBarBookKey, bookKeys }: UseBookShortcutsProps) =
       onTTSGoPreviousSentence: ttsGoPreviousSentence,
       onTTSGoNextParagraph: ttsGoNextParagraph,
       onTTSGoPreviousParagraph: ttsGoPreviousParagraph,
+      onTTSHighlightSentence: ttsHighlightSentence,
       onReloadPage: reloadPage,
       onCloseWindow: closeWindow,
       onQuitApp: quitApp,

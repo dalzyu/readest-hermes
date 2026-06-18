@@ -95,7 +95,10 @@
       "identifier": "http:default",
       "allow": [
         {
-          "url": "https://github.com/dalzyu/readest-hermes/*"
+          "url": "https://*.readest.com"
+        },
+        {
+          "url": "https://github.com/readest/*"
         },
         {
           "url": "https://*.deepl.com"
@@ -171,19 +174,19 @@
       "identifier": "shell:allow-spawn",
       "allow": [
         {
-          "name": "start-hermes",
+          "name": "start-readest",
           "cmd": "cmd",
-          "args": ["/C", "start", "", { "validator": "^.*Hermes(.*)\\.exe$" }]
+          "args": ["/C", "start", "", { "validator": "^.*Readest(.*)\\.exe$" }]
         },
         {
           "name": "chmod-appimage",
           "cmd": "chmod",
-          "args": ["+x", { "validator": "^.*Hermes(.*)\\.AppImage$" }]
+          "args": ["+x", { "validator": "^.*Readest(.*)\\.AppImage$" }]
         },
         {
           "name": "launch-appimage",
           "cmd": "setsid",
-          "args": [{ "validator": "^.*Hermes(.*)\\.AppImage$" }]
+          "args": [{ "validator": "^.*Readest(.*)\\.AppImage$" }]
         }
       ]
     },
@@ -193,6 +196,10 @@
     "haptics:allow-selection-feedback",
     "deep-link:default",
     "sharekit:default",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-text",
+    "device-info:default",
+    "turso:default",
     "native-tts:default",
     "native-bridge:default"
   ]

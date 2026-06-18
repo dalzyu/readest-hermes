@@ -45,9 +45,21 @@ import {
 import { runSimpleCC } from '@/utils/simplecc';
 import { getWordCount } from '@/utils/word';
 import { getIndexFromCfi, isCfiInLocation } from '@/utils/cfi';
+import { writeTextToClipboard } from '@/utils/clipboard';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
-import { getHighlightColorHex, removeBookNoteOverlays } from '../../utils/annotatorUtil';
+import {
+  buildTTSSentenceHighlight,
+  getHighlightColorHex,
+  removeBookNoteOverlays,
+} from '../../utils/annotatorUtil';
+import {
+  expandAllRenderedSections,
+  expandGlobalAnnotation,
+  isSyntheticGlobalValue,
+  removeGlobalAnnotationOverlays,
+  sourceCfiFromSyntheticValue,
+} from '../../utils/globalAnnotations';
 import { annotationToolButtons } from './AnnotationTools';
 import AnnotationRangeEditor from './AnnotationRangeEditor';
 import AnnotationPopup from './AnnotationPopup';
@@ -58,6 +70,7 @@ import useShortcuts from '@/hooks/useShortcuts';
 import ProofreadPopup from './ProofreadPopup';
 import { setProofreadRulesVisibility } from '@/app/reader/components/ProofreadRules';
 import ExportMarkdownDialog from './ExportMarkdownDialog';
+import ImportAnnotationsDialog from './ImportAnnotationsDialog';
 import Alert from '@/components/Alert';
 import ModalPortal from '@/components/ModalPortal';
 import { useFileSelector } from '@/hooks/useFileSelector';
@@ -118,6 +131,8 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const [editingAnnotation, setEditingAnnotation] = useState<BookNote | null>(null);
   const [externalDragPoint, setExternalDragPoint] = useState<Point | null>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importingMrexpt, setImportingMrexpt] = useState(false);
   // "Clear Annotations" confirm dialog. Hosted here (and not in BookMenu)
   // because the menu unmounts the moment the user picks the entry, which
   // would otherwise tear down the dialog state immediately.
@@ -369,13 +384,19 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const onCreateOverlay = (event: Event) => {
     const detail = (event as CustomEvent).detail;
     const { booknotes = [] } = getConfig(bookKey)!;
-    booknotes
-      .filter(
-        (booknote) =>
-          booknote.type === 'annotation' &&
-          !booknote.deletedAt &&
-          getIndexFromCfi(booknote.cfi) === detail.index,
-      )
+    // Resolve the live (doc, overlayer) pair for this section so we can
+    // fan out global annotations across every text-occurrence in it.
+    const sectionContent = view?.renderer?.getContents().find((c) => c.index === detail.index) as
+      | { doc?: Document; index?: number }
+      | undefined;
+    const sectionDoc = sectionContent?.doc;
+
+    const activeAnnotations = booknotes.filter((b) => b.type === 'annotation' && !b.deletedAt);
+
+    // 1. Draw native overlays only for notes whose anchor (cfi) lives
+    //    inside this section — same as before.
+    activeAnnotations
+      .filter((booknote) => getIndexFromCfi(booknote.cfi) === detail.index)
       .map((annotation) => {
         try {
           view?.addAnnotation(annotation);
@@ -383,6 +404,21 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           console.warn('Failed to add annotation', { annotation, error: err });
         }
       });
+
+    // 2. Fan out every `global` annotation in this newly-rendered
+    //    section, regardless of which section originally anchored it.
+    //    `expandGlobalAnnotation` already skips the home anchor when the
+    //    synthetic CFI collides with `note.cfi`.
+    if (sectionDoc) {
+      for (const annotation of activeAnnotations) {
+        if (!annotation.global) continue;
+        try {
+          expandGlobalAnnotation(view ?? null, annotation, sectionDoc, detail.index);
+        } catch (err) {
+          console.warn('Failed to expand global annotation', { annotation, error: err });
+        }
+      }
+    }
   };
 
   const onDrawAnnotation = (event: Event) => {
@@ -431,7 +467,12 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     const { value, index, range } = detail;
     const { booknotes = [] } = getConfig(bookKey)!;
     const isNote = value.startsWith(NOTE_PREFIX);
-    const cfi = isNote ? value.replace(NOTE_PREFIX, '') : value;
+    const rawValue = isNote ? value.replace(NOTE_PREFIX, '') : value;
+    // A click on a fan-out copy of a global annotation reports a
+    // synthetic value (`${cfi}#g${i}`); map it back to the source
+    // booknote so the popup behaves identically to clicking the
+    // original anchor.
+    const cfi = isSyntheticGlobalValue(rawValue) ? sourceCfiFromSyntheticValue(rawValue) : rawValue;
     const annotations = booknotes.filter(
       (booknote) => booknote.type === 'annotation' && !booknote.deletedAt && booknote.cfi === cfi,
     );
@@ -499,11 +540,13 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   useEffect(() => {
     eventDispatcher.on('export-annotations', handleExportMarkdown);
     eventDispatcher.on('clear-annotations', handleClearAnnotations);
-    eventDispatcher.on('import-mrexpt', handleImportMrexpt);
+    eventDispatcher.on('import-annotations', handleImportAnnotations);
+    eventDispatcher.on('create-tts-highlight', handleCreateTTSHighlight);
     return () => {
       eventDispatcher.off('export-annotations', handleExportMarkdown);
       eventDispatcher.off('clear-annotations', handleClearAnnotations);
-      eventDispatcher.off('import-mrexpt', handleImportMrexpt);
+      eventDispatcher.off('import-annotations', handleImportAnnotations);
+      eventDispatcher.off('create-tts-highlight', handleCreateTTSHighlight);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -649,6 +692,17 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       Promise.all(
         notes.map((note) => view?.addAnnotation({ ...note, value: `${NOTE_PREFIX}${note.cfi}` })),
       );
+      // Fan-out for any annotation flagged `global`. Semantics is
+      // book-wide, so we don't filter by `location` here: every note
+      // with `global=true` gets expanded across every section that
+      // happens to be rendered right now. Sections rendered later are
+      // covered by `onCreateOverlay`.
+      const globalAnnotations = booknotes.filter(
+        (item) => !item.deletedAt && item.type === 'annotation' && item.style && item.global,
+      );
+      for (const annotation of globalAnnotations) {
+        if (view) expandAllRenderedSections(view, annotation);
+      }
     } catch (e) {
       console.warn(e);
     }
@@ -676,9 +730,10 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
   const handleCopy = (dismissPopup = true) => {
     if (!selection || !selection.text) return;
+    const textToCopy = selection.text;
     setTimeout(() => {
       // Delay to ensure it won't be overridden by system clipboard actions
-      navigator.clipboard?.writeText(selection.text);
+      void writeTextToClipboard(textToCopy);
     }, 100);
     if (dismissPopup) {
       handleDismissPopupAndSelection();
@@ -756,13 +811,28 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     );
     const views = getViewsById(bookKey.split('-')[0]!);
     if (existingIndex !== -1) {
-      views.forEach((view) => view?.addAnnotation(annotation, true));
+      const existing = annotations[existingIndex]!;
+      // Tear down both the original anchor and any global fan-outs that
+      // were drawn for the previous style/color, so the redraw below
+      // doesn't end up overlaying two highlights at the same position.
+      views.forEach((view) => view?.addAnnotation(existing, true));
+      if (existing.global) {
+        views.forEach((view) => removeGlobalAnnotationOverlays(view, existing));
+      }
       if (update) {
-        annotation.id = annotations[existingIndex]!.id;
+        annotation.id = existing.id;
+        // Carry the existing `global` flag forward — toggling color/style
+        // shouldn't silently demote a global highlight back to single-range.
+        if (existing.global) annotation.global = true;
         annotations[existingIndex] = annotation;
         views.forEach((view) => view?.addAnnotation(annotation));
+        if (annotation.global) {
+          views.forEach((view) => {
+            if (view) expandAllRenderedSections(view, annotation);
+          });
+        }
       } else {
-        annotations[existingIndex]!.deletedAt = Date.now();
+        existing.deletedAt = Date.now();
         handleDismissPopup();
       }
     } else {
@@ -774,6 +844,66 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     const updatedConfig = updateBooknotes(bookKey, annotations);
     if (updatedConfig) {
       saveConfig(envConfig, bookKey, updatedConfig, settings);
+    }
+  };
+
+  const handleCreateTTSHighlight = (event: CustomEvent) => {
+    const detail = event.detail as { bookKey: string; cfi: string; text: string } | undefined;
+    if (!detail || detail.bookKey !== bookKey) return;
+    const { settings } = useSettingsStore.getState();
+    const style = settings.globalReadSettings.highlightStyle;
+    const color = settings.globalReadSettings.highlightStyles[style];
+    const { booknotes: annotations = [] } = getConfig(bookKey)!;
+    const page = getProgress(bookKey)?.page;
+    const annotation = buildTTSSentenceHighlight(
+      annotations,
+      { cfi: detail.cfi, text: detail.text, style, color, page },
+      Date.now(),
+    );
+    if (!annotation) return;
+    annotations.push(annotation);
+    const updatedConfig = updateBooknotes(bookKey, annotations);
+    if (updatedConfig) {
+      saveConfig(envConfig, bookKey, updatedConfig, settings);
+    }
+    const views = getViewsById(bookKey.split('-')[0]!);
+    views.forEach((view) => view?.addAnnotation(annotation));
+  };
+
+  /**
+   * Toggle the `global` flag on the annotation currently anchored at
+   * `selection.cfi`. When enabling, fan out overlays for every other
+   * occurrence of `selection.text` in the same section; when disabling,
+   * tear them down. The original anchor highlight at `cfi` is left
+   * untouched in either direction.
+   *
+   * Hidden for fixed-layout formats (PDF/CBZ) because they don't expose
+   * a per-section text DOM we can scan.
+   */
+  const handleToggleGlobal = () => {
+    if (!selection || !selection.cfi || !selection.text) return;
+    if (bookData.isFixedLayout) return;
+    const { booknotes: annotations = [] } = config;
+    const idx = annotations.findIndex(
+      (a) => a.type === 'annotation' && a.style && !a.deletedAt && a.cfi === selection.cfi,
+    );
+    if (idx === -1) return;
+    const existing = annotations[idx]!;
+    const nextGlobal = !existing.global;
+    annotations[idx] = { ...existing, global: nextGlobal, updatedAt: Date.now() };
+    const updatedConfig = updateBooknotes(bookKey, annotations);
+    if (updatedConfig) {
+      saveConfig(envConfig, bookKey, updatedConfig, settings);
+    }
+
+    const views = getViewsById(bookKey.split('-')[0]!);
+    if (nextGlobal) {
+      const updated = annotations[idx]!;
+      views.forEach((v) => {
+        if (v) expandAllRenderedSections(v, updated);
+      });
+    } else {
+      views.forEach((v) => removeGlobalAnnotationOverlays(v, existing));
     }
   };
 
@@ -897,9 +1027,14 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     [selection?.text],
   );
 
-  const handleImportMrexpt = async (event: CustomEvent) => {
+  const handleImportAnnotations = (event: CustomEvent) => {
     const { bookKey: importBookKey } = event.detail;
     if (bookKey !== importBookKey) return;
+    setShowImportDialog(true);
+  };
+
+  const importFromMoonReader = async () => {
+    setShowImportDialog(false);
 
     const { bookDoc } = bookData;
     if (!bookDoc) {
@@ -953,68 +1088,73 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       return;
     }
 
-    let conversion;
+    setImportingMrexpt(true);
     try {
-      conversion = await convertMrexptEntriesToBookNotes(entries, bookDoc, {
-        highlightStyle: settings.globalReadSettings.highlightStyle,
-        highlightColor:
-          settings.globalReadSettings.highlightStyles[settings.globalReadSettings.highlightStyle],
-      });
-    } catch (e) {
-      console.warn('Failed to convert mrexpt entries:', e);
-      eventDispatcher.dispatch('toast', {
-        type: 'warning',
-        message: _('Failed to import annotations.'),
-        timeout: 3000,
-      });
-      return;
-    }
+      let conversion;
+      try {
+        conversion = await convertMrexptEntriesToBookNotes(entries, bookDoc, {
+          highlightStyle: settings.globalReadSettings.highlightStyle,
+          highlightColor:
+            settings.globalReadSettings.highlightStyles[settings.globalReadSettings.highlightStyle],
+        });
+      } catch (e) {
+        console.warn('Failed to convert mrexpt entries:', e);
+        eventDispatcher.dispatch('toast', {
+          type: 'warning',
+          message: _('Failed to import annotations.'),
+          timeout: 3000,
+        });
+        return;
+      }
 
-    if (conversion.notes.length === 0) {
+      if (conversion.notes.length === 0) {
+        eventDispatcher.dispatch('toast', {
+          type: 'info',
+          message: _('No annotations could be located in this book.'),
+          timeout: 2500,
+        });
+        return;
+      }
+
+      // Merge into the current book config, deduplicating by note id and
+      // preferring the latest updatedAt for any conflicting entries.
+      const config = getConfig(bookKey)!;
+      const { merged, applied, added, updated } = mergeImportedBookNotes(
+        config.booknotes ?? [],
+        conversion.notes,
+      );
+      const updatedConfig = updateBooknotes(bookKey, merged);
+      if (updatedConfig) {
+        saveConfig(envConfig, bookKey, updatedConfig, settings);
+      }
+
+      // Apply imported (or resurrected) annotations to all live views so
+      // they appear immediately. We only re-draw the notes that actually
+      // changed in this round, otherwise duplicate addAnnotation calls
+      // can confuse the overlay layer.
+      const views = getViewsById(bookKey.split('-')[0]!);
+      for (const note of applied) {
+        try {
+          views.forEach((v) => v?.addAnnotation(note));
+        } catch (err) {
+          console.warn('Failed to add imported annotation', { note, err });
+        }
+      }
+
+      // A single result toast: the count if anything changed, otherwise a
+      // plain "nothing new" hint for a repeated import of the same file.
+      const imported = added + updated;
       eventDispatcher.dispatch('toast', {
         type: 'info',
-        message: _('No annotations could be located in this book.'),
+        message:
+          imported > 0
+            ? _('Imported {{count}} annotations', { count: imported })
+            : _('No new annotations to import'),
         timeout: 2500,
       });
-      return;
+    } finally {
+      setImportingMrexpt(false);
     }
-
-    // Merge into the current book config, deduplicating by note id and
-    // preferring the latest updatedAt for any conflicting entries.
-    const config = getConfig(bookKey)!;
-    const { merged, applied, added, updated } = mergeImportedBookNotes(
-      config.booknotes ?? [],
-      conversion.notes,
-    );
-    const updatedConfig = updateBooknotes(bookKey, merged);
-    if (updatedConfig) {
-      saveConfig(envConfig, bookKey, updatedConfig, settings);
-    }
-
-    // Apply imported (or resurrected) annotations to all live views so
-    // they appear immediately. We only re-draw the notes that actually
-    // changed in this round, otherwise duplicate addAnnotation calls
-    // can confuse the overlay layer.
-    const views = getViewsById(bookKey.split('-')[0]!);
-    for (const note of applied) {
-      try {
-        views.forEach((v) => v?.addAnnotation(note));
-      } catch (err) {
-        console.warn('Failed to add imported annotation', { note, err });
-      }
-    }
-
-    // A single result toast: the count if anything changed, otherwise a
-    // plain "nothing new" hint for a repeated import of the same file.
-    const imported = added + updated;
-    eventDispatcher.dispatch('toast', {
-      type: 'info',
-      message:
-        imported > 0
-          ? _('Imported {{count}} annotations', { count: imported })
-          : _('No new annotations to import'),
-      timeout: 2500,
-    });
   };
 
   const handleExportMarkdown = async (event: CustomEvent) => {
@@ -1070,7 +1210,7 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
     setTimeout(() => {
       // Delay to ensure it won't be overridden by system clipboard actions
-      navigator.clipboard?.writeText(content);
+      void writeTextToClipboard(content);
     }, 100);
 
     const ext = isPlainText ? 'txt' : 'md';
@@ -1146,6 +1286,22 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   };
 
   const selectionAnnotated = selection?.annotated;
+  // For the ✓ (global) toggle in HighlightOptions: figure out whether
+  // the booknote anchored at the current selection is currently global,
+  // and whether the toggle should be shown at all (only meaningful for
+  // re-flowable formats with a non-empty selection text).
+  const currentAnnotation = selection?.cfi
+    ? config.booknotes?.find(
+        (a) => a.type === 'annotation' && a.style && !a.deletedAt && a.cfi === selection.cfi,
+      )
+    : undefined;
+  const globalToggleAvailable =
+    !bookData.isFixedLayout &&
+    !!selection?.annotated &&
+    !!currentAnnotation &&
+    !!selection?.text &&
+    selection.text.trim().length > 0;
+  const globalToggleActive = !!currentAnnotation?.global;
   const toolButtons = annotationToolButtons.map(({ type, label, Icon }) => {
     switch (type) {
       case 'copy':
@@ -1255,6 +1411,9 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           selectedColor={selectedColor}
           popupWidth={annotPopupWidth}
           popupHeight={annotPopupHeight}
+          globalToggleAvailable={globalToggleAvailable}
+          globalToggleActive={globalToggleActive}
+          onToggleGlobal={handleToggleGlobal}
           onHighlight={handleHighlight}
           onDismiss={handleDismissPopupAndSelection}
         />
@@ -1300,6 +1459,13 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           onExport={handleConfirmExport}
         />
       )}
+      {showImportDialog && (
+        <ImportAnnotationsDialog
+          isOpen={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+          onImportMoonReader={importFromMoonReader}
+        />
+      )}
       {clearAnnotationsCount > 0 && (
         <ModalPortal>
           <Alert
@@ -1314,6 +1480,28 @@ const Annotator: React.FC<{ bookKey: string }> = ({ bookKey }) => {
             }}
           />
         </ModalPortal>
+      )}
+      {importingMrexpt && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/30'>
+          <div className='modal-box bg-base-100 flex flex-col items-center gap-3 px-8 py-6 shadow-2xl'>
+            <svg className='text-primary h-8 w-8 animate-spin' viewBox='0 0 24 24' fill='none'>
+              <circle
+                className='opacity-25'
+                cx='12'
+                cy='12'
+                r='10'
+                stroke='currentColor'
+                strokeWidth='4'
+              />
+              <path
+                className='opacity-75'
+                fill='currentColor'
+                d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z'
+              />
+            </svg>
+            <p className='font-size-sm text-base-content'>{_('Importing annotations...')}</p>
+          </div>
+        </div>
       )}
     </div>
   );

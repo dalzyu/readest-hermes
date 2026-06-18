@@ -14,6 +14,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useCustomFontStore } from '@/store/customFontStore';
 import { useParallelViewStore } from '@/store/parallelViewStore';
 import { useMouseEvent, useTouchEvent, useLongPressEvent } from '../hooks/useIframeEvents';
+import { useBrightnessGesture } from '../hooks/useBrightnessGesture';
+import BrightnessOverlay from './BrightnessOverlay';
 import { usePagination, viewPagination } from '../hooks/usePagination';
 import { useFoliateEvents } from '../hooks/useFoliateEvents';
 import { useProgressSync } from '../hooks/useProgressSync';
@@ -23,12 +25,12 @@ import { useAutoFocus } from '@/hooks/useAutoFocus';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useEinkMode } from '@/hooks/useEinkMode';
 import { useKOSync } from '../hooks/useKOSync';
+import { useWebDAVSync } from '../hooks/useWebDAVSync';
 import {
   applyFixedlayoutStyles,
   applyImageStyle,
   applyScrollbarStyle,
   applyScrollModeClass,
-  applyTableStyle,
   applyThemeModeClass,
   applyTranslationStyle,
   getStyles,
@@ -36,6 +38,7 @@ import {
   keepTextAlignment,
   transformStylesheet,
 } from '@/utils/style';
+import { applyScrollableStyle, applyTableTouchScroll } from '@/utils/scrollable';
 import { mountAdditionalFonts, mountCustomFont } from '@/styles/fonts';
 import { layoutWarichu, relayoutWarichu } from '@/utils/warichu';
 import { getBookDirFromLanguage, getBookDirFromWritingMode } from '@/utils/book';
@@ -100,6 +103,8 @@ const FoliateViewer: React.FC<{
   const { getBookData } = useBookDataStore();
   const { applyBackgroundTexture } = useBackgroundTexture();
   const { applyEinkMode } = useEinkMode();
+  const { registerBrightnessListeners, overlayVisible, overlayLevel } =
+    useBrightnessGesture(bookKey);
   const bookData = getBookData(bookKey);
   const viewState = getViewState(bookKey);
   const viewSettings = getViewSettings(bookKey);
@@ -131,6 +136,7 @@ const FoliateViewer: React.FC<{
   useProgressAutoSave(bookKey);
   useBookCoverAutoSave(bookKey);
   const { syncState, conflictDetails, resolveWithLocal, resolveWithRemote } = useKOSync(bookKey);
+  useWebDAVSync(bookKey);
   useTextTranslation(bookKey, viewRef.current);
 
   const progressRelocateHandler = (event: Event) => {
@@ -256,7 +262,8 @@ const FoliateViewer: React.FC<{
       }
 
       applyImageStyle(detail.doc);
-      applyTableStyle(detail.doc);
+      applyScrollableStyle(detail.doc);
+      applyTableTouchScroll(detail.doc);
       applyThemeModeClass(detail.doc, isDarkMode);
       applyScrollModeClass(detail.doc, viewSettings.scrolled || false);
       applyScrollbarStyle(document, viewSettings.hideScrollbar || false);
@@ -308,13 +315,12 @@ const FoliateViewer: React.FC<{
         detail.doc.addEventListener('mousedown', handleMousedown.bind(null, bookKey));
         detail.doc.addEventListener('mouseup', handleMouseup.bind(null, bookKey));
         detail.doc.addEventListener('click', handleClick.bind(null, bookKey, doubleClickDisabled));
-        // passive: false so handleWheel can preventDefault for mouse-wheel
-        // events and replace the native jerky scroll with a smooth animation.
-        detail.doc.addEventListener('wheel', handleWheel.bind(null, bookKey), { passive: false });
+        detail.doc.addEventListener('wheel', handleWheel.bind(null, bookKey));
         detail.doc.addEventListener('touchstart', handleTouchStart.bind(null, bookKey));
         detail.doc.addEventListener('touchmove', handleTouchMove.bind(null, bookKey));
         detail.doc.addEventListener('touchend', handleTouchEnd.bind(null, bookKey));
         addLongPressListeners(bookKey, detail.doc);
+        registerBrightnessListeners(detail.doc);
       }
     }
   };
@@ -553,7 +559,7 @@ const FoliateViewer: React.FC<{
       const width = viewWidth - insets.left - insets.right;
       const height = viewHeight - insets.top - insets.bottom;
       book.transformTarget?.addEventListener('data', getDocTransformHandler({ width, height }));
-      view.renderer.setStyles?.(getStyles(viewSettings));
+      view.renderer.setStyles?.(getStyles(viewSettings, undefined, getLoadedFonts()));
       applyTranslationStyle(viewSettings);
 
       doubleClickDisabled.current = viewSettings.disableDoubleClick!;
@@ -570,6 +576,11 @@ const FoliateViewer: React.FC<{
         view.renderer.setAttribute('animated', '');
       } else {
         view.renderer.removeAttribute('animated');
+      }
+      if (viewSettings.disableSwipe) {
+        view.renderer.setAttribute('no-swipe', '');
+      } else {
+        view.renderer.removeAttribute('no-swipe');
       }
       if (appService?.isAndroidApp) {
         if (eink) {
@@ -675,7 +686,7 @@ const FoliateViewer: React.FC<{
     if (viewRef.current && viewRef.current.renderer) {
       const renderer = viewRef.current.renderer;
       const viewSettings = getViewSettings(bookKey)!;
-      viewRef.current.renderer.setStyles?.(getStyles(viewSettings));
+      viewRef.current.renderer.setStyles?.(getStyles(viewSettings, undefined, getLoadedFonts()));
       const docs = viewRef.current.renderer.getContents();
       docs.forEach(({ doc }) => {
         if (bookDoc.rendition?.layout === 'pre-paginated') {
@@ -791,6 +802,7 @@ const FoliateViewer: React.FC<{
         {...mouseHandlers}
         {...touchHandlers}
       />
+      <BrightnessOverlay visible={overlayVisible} level={overlayLevel} />
       <ParagraphControl bookKey={bookKey} viewRef={viewRef} gridInsets={gridInsets} />
       {((!docLoaded.current && loading) || viewState?.loading) && (
         <div className='absolute left-0 top-0 z-10 flex h-full w-full items-center justify-center'>

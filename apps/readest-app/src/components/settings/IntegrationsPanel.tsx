@@ -9,12 +9,15 @@ import {
   RiBook3Line,
   RiDiscordLine,
   RiSendPlaneLine,
+  RiCloudLine,
 } from 'react-icons/ri';
 import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useCustomOPDSStore } from '@/store/customOPDSStore';
+import { useWebDAVSyncStore } from '@/store/webdavSyncStore';
 import { CatalogManager } from '@/app/opds/components/CatalogManager';
 import { saveSysSettings } from '@/helpers/settings';
 import { navigateToLogin } from '@/utils/nav';
@@ -22,10 +25,11 @@ import KOSyncForm from './integrations/KOSyncForm';
 import ReadwiseForm from './integrations/ReadwiseForm';
 import HardcoverForm from './integrations/HardcoverForm';
 import SendToReadestForm from './integrations/SendToReadestForm';
+import WebDAVForm from './integrations/WebDAVForm';
 import SubPageHeader from './SubPageHeader';
 import { SectionTitle, SettingLabel } from './primitives';
 
-type SubPage = 'kosync' | 'readwise' | 'hardcover' | 'opds' | 'send' | null;
+type SubPage = 'kosync' | 'webdav' | 'readwise' | 'hardcover' | 'opds' | 'send' | null;
 
 /**
  * Integrations panel — single point of discovery for external service config:
@@ -47,8 +51,26 @@ const IntegrationsPanel: React.FC = () => {
   const { settings, requestedSubPage, setRequestedSubPage } = useSettingsStore();
   const opdsCatalogs = useCustomOPDSStore((s) => s.catalogs);
   const opdsCount = opdsCatalogs.filter((c) => !c.deletedAt).length;
+  // Surface a library-wide WebDAV sync that's mid-flight in the row's
+  // status line. Keeps the user from feeling like the run was lost
+  // when they back out of the WebDAV sub-page or close the dialog.
+  const isWebDAVSyncing = useWebDAVSyncStore((s) => s.isSyncing);
 
   const [subPage, setSubPage] = useState<SubPage>(null);
+
+  // Android Back / Esc: when any integrations sub-page (KOSync, WebDAV,
+  // Readwise, Hardcover, OPDS, Send-to-Readest) is open, intercept and
+  // step back to the integrations list instead of letting <Dialog>'s
+  // listener close the whole Settings dialog. The hook registers its
+  // sync `native-key-down` listener *after* <Dialog>'s, and
+  // `dispatchSync` walks listeners LIFO — so this one claims Back first
+  // when enabled and `return true` consumes the event. When subPage is
+  // null the hook is disabled and Back falls through to close the dialog
+  // as before.
+  useKeyDownActions({
+    enabled: subPage !== null,
+    onCancel: () => setSubPage(null),
+  });
 
   const toggleDiscordPresence = () => {
     const discordRichPresenceEnabled = !settings.discordRichPresenceEnabled;
@@ -66,6 +88,7 @@ const IntegrationsPanel: React.FC = () => {
     if (!requestedSubPage) return;
     if (
       requestedSubPage === 'kosync' ||
+      requestedSubPage === 'webdav' ||
       requestedSubPage === 'readwise' ||
       requestedSubPage === 'hardcover' ||
       requestedSubPage === 'opds' ||
@@ -84,6 +107,12 @@ const IntegrationsPanel: React.FC = () => {
     return (
       <div className='my-4 w-full'>
         <KOSyncForm onBack={() => setSubPage(null)} />
+      </div>
+    );
+  if (subPage === 'webdav')
+    return (
+      <div className='my-4 w-full'>
+        <WebDAVForm onBack={() => setSubPage(null)} />
       </div>
     );
   if (subPage === 'readwise')
@@ -125,6 +154,13 @@ const IntegrationsPanel: React.FC = () => {
 
   const readwiseStatus = settings.readwise?.enabled ? _('Connected') : _('Not connected');
   const hardcoverStatus = settings.hardcover?.enabled ? _('Connected') : _('Not connected');
+  const webdavStatus = isWebDAVSyncing
+    ? _('Syncing…')
+    : settings.webdav?.enabled
+      ? settings.webdav.username
+        ? _('Connected as {{user}}', { user: settings.webdav.username })
+        : _('Connected')
+      : _('Not connected');
   const opdsStatus =
     opdsCount > 0 ? _('{{count}} catalog', { count: opdsCount }) : _('No catalogs');
 
@@ -146,6 +182,12 @@ const IntegrationsPanel: React.FC = () => {
               title={_('KOReader Sync')}
               status={koSyncStatus}
               onClick={() => setSubPage('kosync')}
+            />
+            <IntegrationRow
+              icon={RiCloudLine}
+              title={_('WebDAV')}
+              status={webdavStatus}
+              onClick={() => setSubPage('webdav')}
             />
             <IntegrationRow
               icon={RiBookReadLine}

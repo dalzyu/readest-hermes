@@ -17,6 +17,7 @@ import {
 import { ClosableFile } from '@/utils/file';
 import { ProgressHandler } from '@/utils/transfer';
 import { CLOUD_BOOKS_SUBDIR, CLOUD_REPLICAS_SUBDIR } from './constants';
+import { isBookFileContentSource, resolveBookContentSource } from './bookContent';
 
 export async function deleteBook(
   fs: FileSystem,
@@ -24,14 +25,25 @@ export async function deleteBook(
   deleteAction: DeleteAction,
 ): Promise<void> {
   if (deleteAction === 'local' || deleteAction === 'both') {
-    const localDeleteFps =
-      deleteAction === 'local'
-        ? [getLocalBookFilename(book)]
-        : [getLocalBookFilename(book), getCoverFilename(book)];
-    for (const fp of localDeleteFps) {
-      if (await fs.exists(fp, 'Books')) {
-        await fs.removeFile(fp, 'Books');
+    const source = await resolveBookContentSource(fs, book);
+    if (source.kind === 'external') {
+      try {
+        if (await fs.exists(source.path, source.base)) {
+          await fs.removeFile(source.path, source.base);
+        }
+      } catch (error) {
+        // Best effort: a missing/permission-denied source shouldn't block
+        // the metadata-side bookkeeping that follows.
+        console.log('Failed to remove in-place source file:', error);
       }
+    } else if (source.kind === 'managed') {
+      if (await fs.exists(source.path, source.base)) {
+        await fs.removeFile(source.path, source.base);
+      }
+    }
+
+    if (deleteAction === 'both' && (await fs.exists(getCoverFilename(book), 'Books'))) {
+      await fs.removeFile(getCoverFilename(book), 'Books');
     }
     if (deleteAction === 'local') {
       book.downloadedAt = null;
@@ -147,50 +159,51 @@ export async function uploadBook(
   book: Book,
   onProgress?: ProgressHandler,
 ): Promise<void> {
-  let uploaded = false;
   const completedFiles = { count: 0 };
-  let toUploadFpCount = 0;
   const coverExist = await fs.exists(getCoverFilename(book), 'Books');
-  let bookFileExist = await fs.exists(getLocalBookFilename(book), 'Books');
-  if (coverExist) {
-    toUploadFpCount++;
-  }
-  if (bookFileExist) {
-    toUploadFpCount++;
-  }
-  if (!bookFileExist && book.url) {
-    const fileobj = await fs.openFile(book.url, 'None');
+
+  let bookSource = await resolveBookContentSource(fs, book);
+  if (bookSource.kind === 'url') {
+    const fileobj = await fs.openFile(bookSource.path, bookSource.base);
     await fs.writeFile(getLocalBookFilename(book), 'Books', await fileobj.arrayBuffer());
-    bookFileExist = true;
+    const f = fileobj as ClosableFile;
+    if (f && f.close) {
+      await f.close();
+    }
+    bookSource = { kind: 'managed', path: getLocalBookFilename(book), base: 'Books' };
   }
 
+  if (!isBookFileContentSource(bookSource)) {
+    throw new Error('Book file not uploaded');
+  }
+
+  const toUploadFpCount = coverExist ? 2 : 1;
   const handleProgress = createProgressHandler(toUploadFpCount, completedFiles, onProgress);
 
   if (coverExist) {
     const lfp = getCoverFilename(book);
     const cfp = `${CLOUD_BOOKS_SUBDIR}/${getCoverFilename(book)}`;
     await uploadFileToCloud(fs, resolveFilePath, lfp, cfp, 'Books', handleProgress, book.hash);
-    uploaded = true;
     completedFiles.count++;
   }
 
-  if (bookFileExist) {
-    const lfp = getLocalBookFilename(book);
-    const cfp = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
-    await uploadFileToCloud(fs, resolveFilePath, lfp, cfp, 'Books', handleProgress, book.hash);
-    uploaded = true;
-    completedFiles.count++;
-  }
+  const cfp = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
+  await uploadFileToCloud(
+    fs,
+    resolveFilePath,
+    bookSource.path,
+    cfp,
+    bookSource.base,
+    handleProgress,
+    book.hash,
+  );
+  completedFiles.count++;
 
-  if (uploaded) {
-    book.deletedAt = null;
-    book.updatedAt = Date.now();
-    book.uploadedAt = Date.now();
-    book.downloadedAt = Date.now();
-    book.coverDownloadedAt = Date.now();
-  } else {
-    throw new Error('Book file not uploaded');
-  }
+  book.deletedAt = null;
+  book.updatedAt = Date.now();
+  book.uploadedAt = Date.now();
+  book.downloadedAt = Date.now();
+  book.coverDownloadedAt = Date.now();
 }
 
 export async function downloadCloudFile(

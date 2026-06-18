@@ -1,6 +1,7 @@
 import { BookMetadata } from '@/libs/document';
 import { TTSHighlightOptions } from '@/services/tts/types';
 import { TTSMediaMetadataMode } from '@/services/tts/types';
+import type { AnnotationLinkType } from '@/utils/deeplink';
 import { AnnotationToolType } from './annotator';
 
 export type BookFormat =
@@ -60,6 +61,15 @@ export interface ImportBookOptions {
   overwrite?: boolean;
   /** Whether the import is transient (not stored long-term). Defaults to false. */
   transient?: boolean;
+  /**
+   * If true, do NOT copy the source file into Books/<hash>/. Instead, persist
+   * an absolute filePath on the Book and let isBookAvailable / loadBookContent
+   * fall back to it. The caller is responsible for verifying the source is
+   * already inside the user's chosen library root (customRootDir) so that the
+   * file remains stable across launches. Sidecar files (cover.png, config.json,
+   * nav.json) are still written to Books/<hash>/ as usual. Defaults to false.
+   */
+  inPlace?: boolean;
   /** Pre-built lookup index for O(1) dedup during batch imports. */
   lookupIndex?: BookLookupIndex;
 }
@@ -130,6 +140,14 @@ export interface BookNote {
   style?: HighlightStyle;
   color?: HighlightColor;
   note: string;
+  /**
+   * If true, this annotation should be applied to every occurrence of `text`
+   * within the same section (chapter/spine item), in addition to the original
+   * range identified by `cfi`. Defaults to false / undefined (single-range).
+   * Only meaningful for annotations that have a `text` value; ignored for
+   * bookmarks and excerpts, and for fixed-layout formats (e.g. PDF).
+   */
+  global?: boolean;
 
   createdAt: number;
   updatedAt: number;
@@ -160,6 +178,7 @@ export interface BookLayout {
   scrolled: boolean;
   noContinuousScroll: boolean;
   disableClick: boolean;
+  disableSwipe: boolean;
   fullscreenClickArea: boolean;
   swapClickArea: boolean;
   disableDoubleClick: boolean;
@@ -297,6 +316,7 @@ export interface NoteExportConfig {
   includePageNumber: boolean;
   includeTimestamp: boolean;
   includeChapterSeparator: boolean;
+  linkType: AnnotationLinkType;
   noteSeparator: string;
   useCustomTemplate: boolean;
   customTemplate: string;

@@ -4,7 +4,6 @@ import {
   Book,
   BookConfig,
   BookContent,
-  LoadBookContentOptions,
   BookFormat,
   BookLookupIndex,
   BookNote,
@@ -26,7 +25,7 @@ import {
 import type { BookNav } from '@/services/nav';
 import { partialMD5, md5 } from '@/utils/md5';
 import { getBaseFilename, getFilename } from '@/utils/path';
-import { BookDoc, DocumentLoader, EXTS } from '@/libs/document';
+import { BookDoc, DocumentLoader } from '@/libs/document';
 import { isPseStreamFileName, openPseStreamBook, parsePseStreamFileName } from './opds/pseStream';
 import { DEFAULT_BOOK_SEARCH_CONFIG, DEFAULT_FIXED_LAYOUT_VIEW_SETTINGS } from './constants';
 import { isContentURI, isValidURL, makeSafeFilename } from '@/utils/misc';
@@ -35,9 +34,13 @@ import { ClosableFile } from '@/utils/file';
 import { TxtToEpubConverter } from '@/utils/txt';
 import { svg2png } from '@/utils/svg';
 import { normalizeMetadataIsbn } from '@/utils/isbn';
-import { loadAudioSyncGeneratedPackage } from '@/services/audioSync/storage';
 import { BookFileNotFoundError } from './errors';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import {
+  isBookFileContentSource,
+  resolveBookContentSource,
+  type BookFileContentSource,
+} from './bookContent';
 
 export function buildBookLookupIndex(books: Book[]): BookLookupIndex {
   const byHash = new Map<string, Book>();
@@ -239,6 +242,7 @@ export async function importBook(
     saveCover = true,
     overwrite = false,
     transient = false,
+    inPlace = false,
     lookupIndex,
   } = options;
   const isPseStream = typeof file === 'string' && isPseStreamFileName(file);
@@ -346,6 +350,7 @@ export async function importBook(
       if (series) {
         book.metadata.series = formatTitle(series.name);
         book.metadata.seriesIndex = parseFloat(series.position || '0');
+        if (series.total) book.metadata.seriesTotal = parseInt(series.total, 10);
       }
     }
     // update book metadata when reimporting the same book
@@ -377,12 +382,13 @@ export async function importBook(
       await fs.createDir(getDir(book), 'Books');
     }
     const bookFilename = getLocalBookFilename(book);
-    if (
+    const willWriteBookFile =
       saveBook &&
       !transient &&
-      fileobj &&
-      (!(await fs.exists(bookFilename, 'Books')) || overwrite)
-    ) {
+      !inPlace &&
+      !!fileobj &&
+      (!(await fs.exists(bookFilename, 'Books')) || overwrite);
+    if (willWriteBookFile && fileobj) {
       if (/\.txt$/i.test(filename)) {
         await fs.writeFile(bookFilename, 'Books', fileobj);
       } else if (typeof file === 'string' && isContentURI(file)) {
@@ -465,8 +471,10 @@ export async function importBook(
       if (isValidURL(file)) {
         book.url = file;
         if (existingBook) existingBook.url = file;
-      }
-      if (transient) {
+      } else if (transient || inPlace) {
+        // transient: source file is loaded directly, never persisted in Books/.
+        // inPlace: source file is inside the user's library root and we read it
+        // there directly instead of duplicating it under Books/<hash>/.
         book.filePath = file;
         if (existingBook) existingBook.filePath = file;
       }
@@ -487,72 +495,39 @@ export async function importBook(
 // --- Book Content & Config ---
 
 export async function isBookAvailable(fs: FileSystem, book: Book): Promise<boolean> {
-  const fp = getLocalBookFilename(book);
-  if (await fs.exists(fp, 'Books')) {
-    return true;
-  }
-  if (book.filePath) {
-    return await fs.exists(book.filePath, 'None');
-  }
-  if (book.url) {
-    return isValidURL(book.url);
-  }
-  return false;
+  return (await resolveBookContentSource(fs, book)).kind !== 'missing';
 }
 
 export async function getBookFileSize(fs: FileSystem, book: Book): Promise<number | null> {
-  const fp = getLocalBookFilename(book);
-  if (await fs.exists(fp, 'Books')) {
-    const file = await fs.openFile(fp, 'Books');
-    const size = file.size;
-    const f = file as ClosableFile;
-    if (f && f.close) {
-      await f.close();
-    }
-    return size;
+  const source = await resolveBookContentSource(fs, book);
+  if (source.kind !== 'managed' && source.kind !== 'external') {
+    return null;
   }
-  return null;
+  const file = await fs.openFile(source.path, source.base);
+  const size = file.size;
+  const f = file as ClosableFile;
+  if (f && f.close) {
+    await f.close();
+  }
+  return size;
 }
 
-export async function loadBookContent(
+async function openBookFileContent(
   fs: FileSystem,
   book: Book,
-  options: LoadBookContentOptions = {},
-): Promise<BookContent> {
-  let file: File;
-  if (options.preferGeneratedPackage !== false && book.format === 'EPUB') {
-    const generatedPackage = await loadAudioSyncGeneratedPackage(fs, book);
-    if (
-      generatedPackage?.validation.valid &&
-      (await fs.exists(generatedPackage.packagePath, 'Books'))
-    ) {
-      file = await fs.openFile(generatedPackage.packagePath, 'Books');
-      return { book, file };
-    }
+): Promise<{
+  source: BookFileContentSource;
+  file: File;
+}> {
+  const source = await resolveBookContentSource(fs, book);
+  if (!isBookFileContentSource(source)) {
+    throw new BookFileNotFoundError();
   }
-  const fp = getLocalBookFilename(book);
+  return { source, file: await fs.openFile(source.path, source.base) };
+}
 
-  if (await fs.exists(fp, 'Books')) {
-    file = await fs.openFile(fp, 'Books');
-  } else if (book.filePath) {
-    file = await fs.openFile(book.filePath, 'None');
-  } else if (book.url) {
-    file = await fs.openFile(book.url, 'None');
-  } else {
-    // 0.9.64 has a bug that book.title might be modified but the filename is not updated
-    const bookDir = getDir(book);
-    const files = await fs.readDir(getDir(book), 'Books');
-    if (files.length > 0) {
-      const bookFile = files.find((f) => f.path.endsWith(`.${EXTS[book.format]}`));
-      if (bookFile) {
-        file = await fs.openFile(`${bookDir}/${bookFile.path}`, 'Books');
-      } else {
-        throw new BookFileNotFoundError();
-      }
-    } else {
-      throw new BookFileNotFoundError();
-    }
-  }
+export async function loadBookContent(fs: FileSystem, book: Book): Promise<BookContent> {
+  const { file } = await openBookFileContent(fs, book);
   return { book, file };
 }
 
@@ -655,6 +630,7 @@ export async function refreshBookMetadata(fs: FileSystem, book: Book): Promise<b
     if (series) {
       book.metadata.series = formatTitle(series.name);
       book.metadata.seriesIndex = parseFloat(series.position || '0');
+      if (series.total) book.metadata.seriesTotal = parseInt(series.total, 10);
     }
   }
 
@@ -672,13 +648,16 @@ export async function exportBook(
     options?: { filePath?: string; mimeType?: string },
   ) => Promise<boolean>,
 ): Promise<boolean> {
-  const { file } = await loadBookContent(fs, book);
+  const { source, file } = await openBookFileContent(fs, book);
   const content = await file.arrayBuffer();
   const filename = `${makeSafeFilename(book.title)}.${book.format.toLowerCase()}`;
-  let filePath = await resolveFilePath(getLocalBookFilename(book), 'Books');
   const mimeType = file.type || 'application/octet-stream';
+  if (source.kind === 'url') {
+    return await saveFile(filename, content, { mimeType });
+  }
+  let filePath = await resolveFilePath(source.path, source.base);
   if (getFilename(filePath) !== filename) {
-    await copyFile(filePath, 'None', filename, 'Temp');
+    await copyFile(source.path, source.base, filename, 'Temp');
     filePath = await resolveFilePath(filename, 'Temp');
   }
   return await saveFile(filename, content, { filePath, mimeType });

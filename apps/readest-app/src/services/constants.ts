@@ -24,6 +24,7 @@ import {
   ReadSettings,
   ReadwiseSettings,
   SystemSettings,
+  WebDAVSettings,
 } from '@/types/settings';
 import { UserStorageQuota, UserDailyTranslationQuota } from '@/types/quota';
 import { getDefaultMaxBlockSize, getDefaultMaxInlineSize } from '@/utils/config';
@@ -83,6 +84,20 @@ export const DEFAULT_HARDCOVER_SETTINGS = {
   lastSyncedAt: 0,
 } as HardcoverSettings;
 
+export const DEFAULT_WEBDAV_SETTINGS = {
+  enabled: false,
+  serverUrl: '',
+  username: '',
+  password: '',
+  rootPath: '/',
+  syncProgress: true,
+  syncNotes: true,
+  syncBooks: false,
+  strategy: 'silent',
+  deviceId: '',
+  lastSyncedAt: 0,
+} as WebDAVSettings;
+
 export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   keepLogin: false,
   autoUpload: true,
@@ -94,6 +109,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   screenWakeLock: false,
   screenBrightness: -1, // -1~100, -1 for system default
   autoScreenBrightness: true,
+  swipeBrightnessGesture: true,
   hardwarePageTurner: {
     enabled: false,
     bindings: { pagePrev: null, pageNext: null, sectionPrev: null, sectionNext: null },
@@ -106,6 +122,8 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   libraryViewMode: 'grid',
   librarySortBy: LibrarySortByType.Updated,
   librarySortAscending: false,
+  librarySortByAuto: true,
+  librarySortBy2: 'none',
   libraryGroupBy: LibraryGroupByType.Group,
   libraryCoverFit: 'crop',
   libraryAutoColumns: true,
@@ -129,6 +147,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   kosync: DEFAULT_KOSYNC_SETTINGS,
   readwise: DEFAULT_READWISE_SETTINGS,
   hardcover: DEFAULT_HARDCOVER_SETTINGS,
+  webdav: DEFAULT_WEBDAV_SETTINGS,
   aiSettings: DEFAULT_AI_SETTINGS,
 
   lastSyncedAtBooks: 0,
@@ -219,6 +238,7 @@ export const DEFAULT_BOOK_LAYOUT: BookLayout = {
   scrolled: false,
   noContinuousScroll: false,
   disableClick: false,
+  disableSwipe: false,
   fullscreenClickArea: false,
   swapClickArea: false,
   disableDoubleClick: false,
@@ -274,7 +294,6 @@ export const DEFAULT_MOBILE_VIEW_SETTINGS: Partial<ViewSettings> = {
   fullJustification: false,
   animated: true,
   defaultFont: 'Sans-serif',
-  marginBottomPx: 16,
   disableDoubleClick: true,
   spreadMode: 'none',
 };
@@ -362,6 +381,10 @@ export const DEFAULT_NOTE_EXPORT_CONFIG: NoteExportConfig = {
   includePageNumber: true,
   includeTimestamp: false,
   includeChapterSeparator: false,
+  // Default to the app deeplink in the native app and the universal web link on
+  // the web. Inlined platform check avoids a circular import with
+  // environment.ts, which imports from this module.
+  linkType: process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'tauri' ? 'app' : 'web',
   noteSeparator: '\n\n',
   useCustomTemplate: false,
   customTemplate: '',
@@ -753,6 +776,12 @@ export const SHARE_EXPIRATION_DAYS = [1, 3, 7] as const;
 export const SEND_EMAIL_DOMAIN = 'readest.com';
 export const SEND_INBOX_BUCKET = 'readest-send-inbox';
 export const SEND_INBOX_PENDING_LIMIT = 50;
+// Hard cap on the size of a single uploaded EPUB the browser extension can
+// drop into the inbox. 30 MB is the same total-asset cap the client-side
+// bundler enforces — plus a bit of head-room for chapter HTML / structural
+// overhead. Beyond this size a clipped article is almost certainly an
+// over-illustrated page that would never read well in the EPUB anyway.
+export const SEND_INBOX_FILE_MAX_BYTES = 40 * 1024 * 1024;
 export const SHARE_DEFAULT_EXPIRATION_DAYS = 3;
 export const SHARE_MAX_PER_USER = 50;
 export const SHARE_TOKEN_LENGTH = 22;
