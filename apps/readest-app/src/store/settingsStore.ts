@@ -3,8 +3,6 @@ import { create } from 'zustand';
 import { SystemSettings } from '@/types/settings';
 import { EnvConfigType } from '@/services/environment';
 import { initDayjs } from '@/utils/time';
-import { DEFAULT_AI_PROFILE } from '@/services/ai/constants';
-import { normalizeDictionarySettings, normalizeLookupSettings } from '@/services/learning/settings';
 
 export type FontPanelView = 'main-fonts' | 'custom-fonts';
 
@@ -12,74 +10,53 @@ interface SettingsState {
   settings: SystemSettings;
   settingsDialogBookKey: string;
   isSettingsDialogOpen: boolean;
-  isSettingsGlobal: boolean;
   fontPanelView: FontPanelView;
   activeSettingsItemId: string | null;
+  /**
+   * Deep-link target — when set before opening the Settings dialog, the dialog
+   * mounts with this panel pre-selected (instead of the lastConfigPanel from
+   * localStorage). Cleared by the dialog after consumption.
+   */
+  requestedPanel: string | null;
+  /**
+   * Optional sub-page hint paired with `requestedPanel`. When the requested
+   * panel renders nested sub-pages (e.g. Integrations → KOSync / Readwise /
+   * Hardcover / OPDS), this string tells the panel which one to drill into.
+   * Cleared by the panel after consumption. Format is panel-specific —
+   * Integrations recognises 'kosync' | 'readwise' | 'hardcover' | 'opds'.
+   */
+  requestedSubPage: string | null;
   setSettings: (settings: SystemSettings) => void;
   saveSettings: (envConfig: EnvConfigType, settings: SystemSettings) => Promise<void>;
   setSettingsDialogBookKey: (bookKey: string) => void;
   setSettingsDialogOpen: (open: boolean) => void;
-  setSettingsGlobal: (global: boolean) => void;
   setFontPanelView: (view: FontPanelView) => void;
   setActiveSettingsItemId: (id: string | null) => void;
+  setRequestedPanel: (panel: string | null) => void;
+  setRequestedSubPage: (subPage: string | null) => void;
 
   applyUILanguage: (uiLanguage?: string) => void;
-}
-
-function normalizeSettings(settings: SystemSettings): SystemSettings {
-  const migrated: SystemSettings = { ...settings };
-
-  migrated.globalReadSettings = {
-    ...migrated.globalReadSettings,
-    lookup: normalizeLookupSettings(migrated.globalReadSettings?.lookup),
-    dictionary: normalizeDictionarySettings(migrated.globalReadSettings?.dictionary),
-  };
-
-  const aiSettings = migrated.aiSettings;
-  if (!aiSettings) return migrated;
-  if ((aiSettings.profiles ?? []).length > 0) return migrated;
-
-  const legacyAssignments = (
-    aiSettings as typeof aiSettings & {
-      modelAssignments?: Record<string, string>;
-    }
-  ).modelAssignments;
-  const profileAssignments = Object.fromEntries(
-    Object.entries(legacyAssignments ?? {}).map(([task, providerId]) => [task, { providerId }]),
-  );
-
-  return {
-    ...migrated,
-    aiSettings: {
-      ...aiSettings,
-      profiles: [
-        {
-          ...DEFAULT_AI_PROFILE,
-          modelAssignments: profileAssignments,
-        },
-      ],
-      activeProfileId: DEFAULT_AI_PROFILE.id,
-    },
-  };
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   settings: {} as SystemSettings,
   settingsDialogBookKey: '',
   isSettingsDialogOpen: false,
-  isSettingsGlobal: true,
   fontPanelView: 'main-fonts',
   activeSettingsItemId: null,
-  setSettings: (settings) => set({ settings: normalizeSettings(settings) }),
+  requestedPanel: null,
+  requestedSubPage: null,
+  setSettings: (settings) => set({ settings }),
   saveSettings: async (envConfig: EnvConfigType, settings: SystemSettings) => {
     const appService = await envConfig.getAppService();
     await appService.saveSettings(settings);
   },
   setSettingsDialogBookKey: (bookKey) => set({ settingsDialogBookKey: bookKey }),
   setSettingsDialogOpen: (open) => set({ isSettingsDialogOpen: open }),
-  setSettingsGlobal: (global) => set({ isSettingsGlobal: global }),
   setFontPanelView: (view) => set({ fontPanelView: view }),
   setActiveSettingsItemId: (id) => set({ activeSettingsItemId: id }),
+  setRequestedPanel: (panel) => set({ requestedPanel: panel }),
+  setRequestedSubPage: (subPage) => set({ requestedSubPage: subPage }),
 
   applyUILanguage: (uiLanguage?: string) => {
     const locale = uiLanguage ? uiLanguage : navigator.language;

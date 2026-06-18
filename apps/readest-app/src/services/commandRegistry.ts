@@ -1,6 +1,6 @@
 import { Fzf, FzfResultItem, byLengthAsc } from 'fzf';
 import { SettingsPanelType } from '@/components/settings/SettingsDialog';
-import { RiFontSize, RiDashboardLine, RiTranslate, RiChatAiLine } from 'react-icons/ri';
+import { RiFontSize, RiDashboardLine, RiTranslate, RiShareLine } from 'react-icons/ri';
 import { VscSymbolColor } from 'react-icons/vsc';
 import { LiaHandPointerSolid } from 'react-icons/lia';
 import { IoAccessibilityOutline } from 'react-icons/io5';
@@ -154,7 +154,7 @@ const panelIcons: Record<SettingsPanelType, IconType> = {
   TTS: PiSpeakerHigh,
   Language: RiTranslate,
   AI: PiRobot,
-  AiTranslate: RiChatAiLine,
+  Integrations: RiShareLine,
   Custom: IoAccessibilityOutline,
 };
 
@@ -235,6 +235,12 @@ const layoutPanelItems = [
     labelKey: _('Border Frame'),
     keywords: ['border', 'frame', 'vertical', 'mode'],
     section: 'Layout',
+  },
+  {
+    id: 'settings.layout.useBookLayout',
+    labelKey: _('Use Book Layout'),
+    keywords: ['paragraph', 'book', 'layout', 'default', 'original', 'preserve'],
+    section: 'Paragraph',
   },
   {
     id: 'settings.layout.paragraphMargin',
@@ -479,6 +485,12 @@ const controlPanelItems = [
     section: 'Device',
   },
   {
+    id: 'settings.control.screenWakeLock',
+    labelKey: _('Keep Screen Awake'),
+    keywords: ['screen', 'wake', 'lock', 'awake', 'sleep', 'display'],
+    section: 'Device',
+  },
+  {
     id: 'settings.control.allowJavascript',
     labelKey: _('Allow JavaScript'),
     keywords: ['javascript', 'js', 'script', 'security', 'allow'],
@@ -626,13 +638,13 @@ const actionItems = [
   },
   {
     id: 'action.about',
-    labelKey: _('About Hermes'),
-    keywords: ['about', 'hermes', 'version', 'info'],
+    labelKey: _('About Readest'),
+    keywords: ['about', 'readest', 'version', 'info'],
   },
   {
     id: 'action.telemetry',
-    labelKey: _('Help improve Hermes'),
-    keywords: ['telemetry', 'analytics', 'improve', 'statistics', 'hermes'],
+    labelKey: _('Help improve Readest'),
+    keywords: ['telemetry', 'analytics', 'improve', 'statistics'],
   },
 ];
 

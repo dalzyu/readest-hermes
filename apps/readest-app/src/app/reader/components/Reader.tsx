@@ -25,8 +25,6 @@ import { getSysFontsList, setSystemUIVisibility } from '@/utils/bridge';
 import { AboutWindow } from '@/components/AboutWindow';
 import { KeyboardShortcutsHelp } from '@/components/KeyboardShortcutsHelp';
 import { UpdaterWindow } from '@/components/UpdaterWindow';
-import { KOSyncSettingsWindow } from './KOSyncSettings';
-import { ReadwiseSettingsWindow } from './ReadwiseSettings';
 import { ProofreadRulesManager } from './ProofreadRules';
 import { Toast } from '@/components/Toast';
 import { getLocale } from '@/utils/misc';
@@ -182,8 +180,6 @@ const Reader: React.FC<{ ids?: string }> = ({ ids }) => {
         <AboutWindow />
         <KeyboardShortcutsHelp />
         <UpdaterWindow />
-        <KOSyncSettingsWindow />
-        <ReadwiseSettingsWindow />
         <ProofreadRulesManager />
         <Toast />
       </Suspense>
