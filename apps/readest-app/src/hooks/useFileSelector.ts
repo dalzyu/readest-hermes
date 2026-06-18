@@ -2,12 +2,7 @@ import { AppService } from '@/types/system';
 import { isTauriAppPlatform } from '@/services/environment';
 import { basename } from '@tauri-apps/api/path';
 import { stubTranslation as _ } from '@/utils/misc';
-import {
-  AUDIO_ACCEPT_FORMATS,
-  BOOK_ACCEPT_FORMATS,
-  SUPPORTED_AUDIO_EXTS,
-  SUPPORTED_BOOK_EXTS,
-} from '@/services/constants';
+import { BOOK_ACCEPT_FORMATS, SUPPORTED_BOOK_EXTS } from '@/services/constants';
 
 export interface FileSelectorOptions {
   type: SelectionType;
@@ -50,7 +45,17 @@ const selectFileTauri = async (
   appService: AppService,
   _: (key: string) => string,
 ): Promise<string[]> => {
-  const noFilter = appService?.isIOSApp || (appService?.isAndroidApp && options.type === 'books');
+  // Android's SAF picker filters by MIME type. Niche/custom extensions
+  // (e.g. ".mrexpt" from Moon+ Reader) have no registered MIME and would
+  // appear greyed-out, so for those cases we ask the native side for an
+  // unfiltered picker and re-apply the extension whitelist on the
+  // resulting paths below. We extend the same treatment to 'generic'
+  // selections because callers there typically pass arbitrary extensions
+  // that SAF likewise cannot match (e.g. mrexpt, txt).
+  const noFilter =
+    appService?.isIOSApp ||
+    (appService?.isAndroidApp &&
+      (options.type === 'books' || options.type === 'dictionaries' || options.type === 'generic'));
   const exts = noFilter ? [] : options.extensions || [];
   const title = options.dialogTitle || _('Select Files');
   let files = (await appService?.selectFiles(_(title), exts)) || [];
@@ -130,8 +135,8 @@ export const FILE_SELECTION_PRESETS = {
     dialogTitle: _('Select Video'),
   },
   audio: {
-    accept: AUDIO_ACCEPT_FORMATS,
-    extensions: SUPPORTED_AUDIO_EXTS,
+    accept: 'audio/*',
+    extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a'],
     dialogTitle: _('Select Audio'),
   },
   books: {
@@ -143,6 +148,11 @@ export const FILE_SELECTION_PRESETS = {
     accept: '.ttf, .otf, .woff, .woff2',
     extensions: ['ttf', 'otf', 'woff', 'woff2'],
     dialogTitle: _('Select Fonts'),
+  },
+  dictionaries: {
+    accept: '.mdx, .mdd, .ifo, .idx, .dict, .dz, .syn, .index, .slob, .css',
+    extensions: ['mdx', 'mdd', 'ifo', 'idx', 'dict', 'dz', 'syn', 'index', 'slob', 'css'],
+    dialogTitle: _('Select Dictionary Files'),
   },
   covers: {
     accept: '.png, .jpg, .jpeg, .gif',
