@@ -72,7 +72,6 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   const iconSize16 = useResponsiveSize(16);
   const iconSize18 = useResponsiveSize(18);
   const headerRef = useRef<HTMLDivElement>(null);
-  const windowButtonVisible = appService?.hasWindowBar && !isTrafficLightVisible;
 
   const docs = view?.renderer.getContents() ?? [];
   const pointerInDoc = docs.some(({ doc }) => doc?.body?.style.cursor === 'pointer');
@@ -141,6 +140,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   useSpatialNavigation(headerRef, isHeaderVisible);
   const trafficLightInHeader =
     appService?.hasTrafficLight && !trafficLightInFullscreen && !isSideBarVisible && isTopLeft;
+  const windowButtonVisible =
+    appService?.hasWindowBar && !isTrafficLightVisible && !trafficLightInHeader;
 
   return (
     <div
